@@ -2,6 +2,9 @@ import DeviceActivity
 import _DeviceActivity_SwiftUI
 import Foundation
 import ManagedSettings
+import OSLog
+
+private let reportLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time-extension")
 
 struct LocktyTotalActivityReport: DeviceActivityReportScene {
     let context: DeviceActivityReport.Context = .locktyTotalActivity
@@ -10,10 +13,19 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
     func makeConfiguration(
         representing data: DeviceActivityResults<DeviceActivityData>
     ) async -> LocktyActivityReportConfiguration {
+        reportLogger.notice("makeConfiguration invoked")
         let snapshot = await buildSnapshot(from: data)
 
         if let snapshot {
-            try? AppGroupStore().saveScreenTimeReportSnapshot(snapshot)
+            reportLogger.notice("Built snapshot day=\(snapshot.day.id, privacy: .public) totalActivityDuration=\(snapshot.totalActivityDuration, privacy: .public) apps=\(snapshot.applications.count, privacy: .public) segments=\(snapshot.activitySegments.count, privacy: .public)")
+            do {
+                try AppGroupStore().saveScreenTimeReportSnapshot(snapshot)
+                reportLogger.notice("Saved snapshot to App Group for day=\(snapshot.day.id, privacy: .public)")
+            } catch {
+                reportLogger.error("Failed to save snapshot: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            reportLogger.notice("buildSnapshot returned nil (no activity segments in the received data)")
         }
 
         return LocktyActivityReportConfiguration(totalActivityDuration: snapshot?.totalActivityDuration ?? 0)

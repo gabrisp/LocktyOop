@@ -166,13 +166,20 @@ struct AppPickerSheet: View {
             .onChange(of: viewModel.selection) { oldValue, newValue in
                 guard oldValue != newValue else { return }
                 viewModel.selectionDidChange(from: oldValue)
+
+                // Only auto-persist for single-application scopes (Pause), where a
+                // fresh one-app pick should save-and-dismiss immediately. For
+                // multi-select scopes (Routine/Library), FamilyActivityPicker can
+                // emit a transient/empty change event during its own open/close
+                // lifecycle; saving on every change risked persisting that empty
+                // state over a real selection. Those scopes save only on "Done".
+                guard viewModel.shouldAutoCommitSelection(after: oldValue) else { return }
                 do {
                     try viewModel.persistCurrentSelection()
                 } catch {
                     errorMessage = error.localizedDescription
                     return
                 }
-                guard viewModel.shouldAutoCommitSelection(after: oldValue) else { return }
                 dismiss()
             }
         }

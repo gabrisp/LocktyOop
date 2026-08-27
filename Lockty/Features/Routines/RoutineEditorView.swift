@@ -632,7 +632,7 @@ private struct SelectionPreviewCard: View {
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text("Selected apps")
+                Text("Selected apps (\(selection.applicationTokens.count))")
                     .font(LocktyTypography.headline)
                     .foregroundStyle(LocktyColors.primaryText)
 
@@ -640,8 +640,8 @@ private struct SelectionPreviewCard: View {
                     HStack(spacing: LocktySpacing.md) {
                         ForEach(Array(selection.applicationTokens), id: \.self) { token in
                             Label(token)
-                                .font(LocktyTypography.caption)
-                                .padding(.horizontal, LocktySpacing.sm)
+                                .labelStyle(.tokenTile)
+                                .frame(width: 64)
                                 .padding(.vertical, LocktySpacing.sm)
                                 .safeGlass(radius: 12)
                         }
@@ -651,6 +651,25 @@ private struct SelectionPreviewCard: View {
             }
         }
     }
+}
+
+private struct TokenTileLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: LocktySpacing.xs) {
+            configuration.icon
+                .font(.system(size: 22, weight: .semibold))
+                .frame(width: 34, height: 34)
+            configuration.title
+                .font(LocktyTypography.caption)
+                .foregroundStyle(LocktyColors.primaryText)
+                .lineLimit(1)
+                .multilineTextAlignment(.center)
+        }
+    }
+}
+
+private extension LabelStyle where Self == TokenTileLabelStyle {
+    static var tokenTile: TokenTileLabelStyle { TokenTileLabelStyle() }
 }
 
 struct EditorTopBar: View {

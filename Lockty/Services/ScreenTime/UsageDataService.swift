@@ -21,13 +21,3 @@ protocol UsageDataServicing {
     func usageSummary(for day: Date) async throws -> DayUsageSummary
     func mostUsedApplications(for day: Date) async throws -> [ApplicationUsage]
 }
-
-struct MockUsageDataService: UsageDataServicing {
-    func usageSummary(for day: Date) async throws -> DayUsageSummary {
-        throw UsageDataError.unavailable
-    }
-
-    func mostUsedApplications(for day: Date) async throws -> [ApplicationUsage] {
-        throw UsageDataError.unavailable
-    }
-}

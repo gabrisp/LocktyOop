@@ -25,37 +25,6 @@ protocol ShieldServicing {
     func restoreFromRuntimeState() async throws
 }
 
-final class MockShieldService: ShieldServicing {
-    private let appGroupStore: AppGroupStore
-    private(set) var appliedPolicy: ShieldPolicy = .empty
-
-    init(appGroupStore: AppGroupStore) {
-        self.appGroupStore = appGroupStore
-    }
-
-    func apply(_ policy: ShieldPolicy) async throws {
-        appliedPolicy = policy
-        try appGroupStore.updateRuntimeState { state in
-            state.shieldPolicy = policy
-        }
-    }
-
-    func remove(_ policy: ShieldPolicy) async throws {
-        if appliedPolicy == policy {
-            appliedPolicy = .empty
-        }
-        try appGroupStore.updateRuntimeState { state in
-            if state.shieldPolicy == policy {
-                state.shieldPolicy = .empty
-            }
-        }
-    }
-
-    func restoreFromRuntimeState() async throws {
-        appliedPolicy = try appGroupStore.loadRuntimeState().shieldPolicy
-    }
-}
-
 final class LiveShieldService: ShieldServicing {
     private let appGroupStore: AppGroupStore
     private let selectionStore: ScreenTimeSelectionStore

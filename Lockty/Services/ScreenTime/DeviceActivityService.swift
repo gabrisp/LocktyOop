@@ -6,11 +6,6 @@ protocol DeviceActivityServicing {
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws
 }
 
-struct MockDeviceActivityService: DeviceActivityServicing {
-    func schedulePauseRelock(_ allowance: ActivePauseAllowance) async throws {}
-    func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws {}
-}
-
 struct LiveDeviceActivityService: DeviceActivityServicing {
     private let center = DeviceActivityCenter()
 

@@ -19,12 +19,6 @@ enum NFCServiceError: LocalizedError {
     }
 }
 
-struct MockNFCService: NFCServicing {
-    func beginScan() async throws -> NFCAction {
-        throw NFCServiceError.unavailable
-    }
-}
-
 @MainActor
 final class LiveNFCService: NSObject, NFCNDEFReaderSessionDelegate, NFCServicing {
     private var session: NFCNDEFReaderSession?

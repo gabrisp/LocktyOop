@@ -14,15 +14,6 @@ enum AlarmAuthorizationState: String, Codable, Hashable {
     case notDetermined, authorized, denied, unsupported, unavailable
 }
 
-struct MockAlarmService: AlarmServicing {
-    func capabilities() -> SystemCapabilities {
-        .current
-    }
-
-    func authorizationState() async -> AlarmAuthorizationState { .unsupported }
-    func requestAuthorization() async -> AlarmAuthorizationState { .unsupported }
-}
-
 struct LiveAlarmService: AlarmServicing {
     func capabilities() -> SystemCapabilities { .current }
 

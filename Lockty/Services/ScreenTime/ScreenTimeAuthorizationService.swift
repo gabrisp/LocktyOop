@@ -34,20 +34,6 @@ protocol ScreenTimeAuthorizationServicing {
     func requestAuthorization() async -> ScreenTimeAuthorizationState
 }
 
-@Observable
-final class MockScreenTimeAuthorizationService: ScreenTimeAuthorizationServicing {
-    private(set) var currentState: ScreenTimeAuthorizationState = .unavailable
-
-    func refreshAuthorizationState() async -> ScreenTimeAuthorizationState {
-        currentState
-    }
-
-    func requestAuthorization() async -> ScreenTimeAuthorizationState {
-        currentState = .unavailable
-        return currentState
-    }
-}
-
 @MainActor
 @Observable
 final class LiveScreenTimeAuthorizationService: ScreenTimeAuthorizationServicing {

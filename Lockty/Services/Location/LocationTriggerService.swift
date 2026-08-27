@@ -13,14 +13,6 @@ protocol LocationTriggerServicing {
     func stopMonitoring(_ trigger: LocationTrigger) async throws
 }
 
-struct MockLocationTriggerService: LocationTriggerServicing {
-    var authorizationState: LocationAuthorizationState = .notDetermined
-    func refreshAuthorization() async -> LocationAuthorizationState { authorizationState }
-    func requestAuthorization() async -> LocationAuthorizationState { .whenInUse }
-    func startMonitoring(_ trigger: LocationTrigger) async throws {}
-    func stopMonitoring(_ trigger: LocationTrigger) async throws {}
-}
-
 @MainActor
 final class LiveLocationTriggerService: NSObject, CLLocationManagerDelegate, LocationTriggerServicing {
     private let manager = CLLocationManager()

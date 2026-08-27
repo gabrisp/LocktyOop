@@ -12,18 +12,6 @@ protocol NotificationServicing {
     func requestAuthorization() async -> NotificationAuthorizationState
 }
 
-struct MockNotificationService: NotificationServicing {
-    var authorizationState: NotificationAuthorizationState = .notDetermined
-    private let resolver = NotificationRouteResolver()
-
-    func route(_ payload: NotificationPayload) -> PendingSystemEvent? {
-        resolver.resolve(payload)
-    }
-
-    func refreshAuthorization() async -> NotificationAuthorizationState { authorizationState }
-    func requestAuthorization() async -> NotificationAuthorizationState { .authorized }
-}
-
 final class LiveNotificationService: NotificationServicing {
     private let center = UNUserNotificationCenter.current()
     private(set) var authorizationState: NotificationAuthorizationState = .notDetermined

@@ -178,14 +178,22 @@ final class PauseEditorViewModel {
 struct PauseEditorView: View {
     @State private var viewModel: PauseEditorViewModel
     let router: AppRouter
+    let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     init(
         viewModel: PauseEditorViewModel,
-        router: AppRouter
+        router: AppRouter,
+        onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
         self.router = router
+        self.onCloseEditor = onCloseEditor
+    }
+
+    private func close() {
+        onCloseEditor()
+        dismiss()
     }
 
     var body: some View {

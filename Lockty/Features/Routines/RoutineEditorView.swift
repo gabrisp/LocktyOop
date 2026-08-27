@@ -233,14 +233,22 @@ final class RoutineEditorViewModel {
 struct RoutineEditorView: View {
     @State private var viewModel: RoutineEditorViewModel
     let router: AppRouter
+    let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     init(
         viewModel: RoutineEditorViewModel,
-        router: AppRouter
+        router: AppRouter,
+        onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
         self.router = router
+        self.onCloseEditor = onCloseEditor
+    }
+
+    private func close() {
+        onCloseEditor()
+        dismiss()
     }
 
     var body: some View {
@@ -341,11 +349,11 @@ struct RoutineEditorView: View {
             EditorTopBar(
                 title: viewModel.title,
                 confirmTitle: "Save",
-                onClose: { dismiss() },
+                onClose: { close() },
                 onConfirm: {
                     Task {
                         if await viewModel.save() {
-                            dismiss()
+                            close()
                         }
                     }
                 }

@@ -9,7 +9,7 @@ struct PausesView: View {
             HStack {
                 SectionHeader(title: "Pauses")
                 IconButton(systemImage: "plus", accessibilityLabel: "Add Pause") {
-                    router.push(.pauseEditor(nil))
+                    router.push(.pauseEditor(PauseEditorRoute(pauseID: nil)))
                 }
             }
 
@@ -42,7 +42,7 @@ struct PausesView: View {
                         )
 
                         PrimaryButton("Create Pause", systemImage: "plus") {
-                            router.push(.pauseEditor(nil))
+                            router.push(.pauseEditor(PauseEditorRoute(pauseID: nil)))
                         }
                     }
                 }

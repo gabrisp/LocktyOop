@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23504" systemVersion="24A335" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="Routine" representedClassName="RoutineEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="allowsPauseDuringStrictMode" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="blockedApplicationIDsData" attributeType="Binary"/>
+        <attribute name="blockedDomainsData" attributeType="Binary"/>
+        <attribute name="breakPolicyData" attributeType="Binary"/>
+        <attribute name="colorHex" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="familyActivitySelectionData" optional="YES" attributeType="Binary"/>
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="modeRawValue" attributeType="String"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="executions" toMany="YES" deletionRule="Nullify" destinationEntity="RoutineExecution" inverseName="routine" inverseEntity="RoutineExecution"/>
+        <relationship name="tasks" toMany="YES" deletionRule="Cascade" destinationEntity="RoutineTask" inverseName="routine" inverseEntity="RoutineTask"/>
+        <relationship name="triggers" toMany="YES" deletionRule="Cascade" destinationEntity="RoutineTrigger" inverseName="routine" inverseEntity="RoutineTrigger"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="RoutineTask" representedClassName="RoutineTaskEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isOptional" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="order" attributeType="Integer 16" usesScalarValueType="YES"/>
+        <attribute name="title" attributeType="String"/>
+        <relationship name="routine" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Routine" inverseName="tasks" inverseEntity="Routine"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="RoutineTrigger" representedClassName="RoutineTriggerEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="configData" optional="YES" attributeType="Binary"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="kindRawValue" attributeType="String"/>
+        <relationship name="routine" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Routine" inverseName="triggers" inverseEntity="Routine"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="RoutineExecution" representedClassName="RoutineExecutionEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="completionReasonRawValue" optional="YES" attributeType="String"/>
+        <attribute name="endedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="routineID" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="routineName" attributeType="String"/>
+        <attribute name="startedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="breakEvents" toMany="YES" deletionRule="Cascade" destinationEntity="RoutineBreakEvent" inverseName="execution" inverseEntity="RoutineBreakEvent"/>
+        <relationship name="routine" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Routine" inverseName="executions" inverseEntity="Routine"/>
+        <relationship name="taskCompletions" toMany="YES" deletionRule="Cascade" destinationEntity="RoutineTaskCompletion" inverseName="execution" inverseEntity="RoutineTaskCompletion"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="RoutineTaskCompletion" representedClassName="RoutineTaskCompletionEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="orderSnapshot" attributeType="Integer 16" usesScalarValueType="YES"/>
+        <attribute name="taskID" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="titleSnapshot" attributeType="String"/>
+        <relationship name="execution" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoutineExecution" inverseName="taskCompletions" inverseEntity="RoutineExecution"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="RoutineBreakEvent" representedClassName="RoutineBreakEventEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="endedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="startedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="triggerRawValue" attributeType="String"/>
+        <relationship name="execution" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoutineExecution" inverseName="breakEvents" inverseEntity="RoutineExecution"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="PauseRule" representedClassName="PauseRuleEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="allowanceDuration" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="appBundleIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="appDisplayName" attributeType="String"/>
+        <attribute name="appIconArtworkURL" optional="YES" attributeType="String"/>
+        <attribute name="appIconSystemName" optional="YES" attributeType="String"/>
+        <attribute name="appID" attributeType="String"/>
+        <attribute name="appTokenData" optional="YES" attributeType="Binary"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isEnabled" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="relockAfterAllowance" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="events" toMany="YES" deletionRule="Nullify" destinationEntity="PauseEvent" inverseName="pauseRule" inverseEntity="PauseEvent"/>
+        <relationship name="steps" toMany="YES" deletionRule="Cascade" destinationEntity="PauseStep" inverseName="pauseRule" inverseEntity="PauseStep"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="PauseStep" representedClassName="PauseStepEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="configData" attributeType="Binary"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="kindRawValue" attributeType="String"/>
+        <attribute name="order" attributeType="Integer 16" usesScalarValueType="YES"/>
+        <relationship name="pauseRule" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PauseRule" inverseName="steps" inverseEntity="PauseRule"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="PauseEvent" representedClassName="PauseEventEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="actualUsageDuration" optional="YES" attributeType="Double" usesScalarValueType="NO"/>
+        <attribute name="allowanceDuration" optional="YES" attributeType="Double" usesScalarValueType="NO"/>
+        <attribute name="appDisplayName" attributeType="String"/>
+        <attribute name="appID" attributeType="String"/>
+        <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="decisionRawValue" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="intention" optional="YES" attributeType="String"/>
+        <attribute name="pauseRuleID" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="triggeredAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="pauseRule" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PauseRule" inverseName="events" inverseEntity="PauseRule"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <entity name="AppClassification" representedClassName="AppClassificationEntity" syncable="YES" codeGenerationType="none">
+        <attribute name="appID" attributeType="String"/>
+        <attribute name="classificationRawValue" attributeType="String"/>
+        <attribute name="displayName" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="appID"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+    <elements>
+        <element name="Routine" positionX="-63" positionY="-18" width="128" height="209"/>
+        <element name="RoutineTask" positionX="63" positionY="0" width="128" height="104"/>
+        <element name="RoutineTrigger" positionX="63" positionY="27" width="128" height="74"/>
+        <element name="RoutineExecution" positionX="63" positionY="54" width="128" height="149"/>
+        <element name="RoutineTaskCompletion" positionX="153" positionY="63" width="128" height="104"/>
+        <element name="RoutineBreakEvent" positionX="153" positionY="90" width="128" height="89"/>
+        <element name="PauseRule" positionX="-45" positionY="126" width="128" height="239"/>
+        <element name="PauseStep" positionX="99" positionY="135" width="128" height="89"/>
+        <element name="PauseEvent" positionX="99" positionY="153" width="128" height="194"/>
+        <element name="AppClassification" positionX="-63" positionY="180" width="128" height="89"/>
+    </elements>
+</model>

@@ -6,7 +6,7 @@ final class AppContainer {
     let theme: ThemeManager
 
     let appGroupStore: AppGroupStore
-    let persistenceStore: PersistenceStore
+    let persistenceController: PersistenceController
     let systemCapabilities: SystemCapabilities
     let haptics: HapticsFactory
 
@@ -41,7 +41,7 @@ final class AppContainer {
         router: AppRouter,
         theme: ThemeManager,
         appGroupStore: AppGroupStore,
-        persistenceStore: PersistenceStore,
+        persistenceController: PersistenceController,
         systemCapabilities: SystemCapabilities,
         haptics: HapticsFactory,
         screenTimeAuthorizationService: ScreenTimeAuthorizationServicing,
@@ -70,7 +70,7 @@ final class AppContainer {
         self.router = router
         self.theme = theme
         self.appGroupStore = appGroupStore
-        self.persistenceStore = persistenceStore
+        self.persistenceController = persistenceController
         self.systemCapabilities = systemCapabilities
         self.haptics = haptics
         self.screenTimeAuthorizationService = screenTimeAuthorizationService
@@ -101,12 +101,12 @@ final class AppContainer {
         let router = AppRouter()
         let theme = ThemeManager()
         let appGroupStore = AppGroupStore()
-        let persistenceStore = PersistenceStore()
+        let persistenceController = PersistenceController()
         let capabilities = SystemCapabilities.current
         let haptics = HapticsFactory()
 
         let authorizationService = LiveScreenTimeAuthorizationService()
-        let classificationRepository = SwiftDataAppClassificationRepository(store: persistenceStore)
+        let classificationRepository = CoreDataAppClassificationRepository(controller: persistenceController)
         let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
         let editorStore = EditorViewModelStore()
         let usageDataService = LiveUsageDataService(
@@ -115,15 +115,15 @@ final class AppContainer {
         )
         let shieldService = LiveShieldService(appGroupStore: appGroupStore, selectionStore: selectionStore)
         let deviceActivityService = LiveDeviceActivityService()
-        let pauseRuleRepository = SwiftDataPauseRuleRepository(
-            store: persistenceStore,
+        let pauseRuleRepository = CoreDataPauseRuleRepository(
+            controller: persistenceController,
             appGroupStore: appGroupStore,
             selectionStore: selectionStore
         )
-        let pauseEventRepository = SwiftDataPauseEventRepository(store: persistenceStore)
-        let routineExecutionRepository = SwiftDataRoutineExecutionRepository(store: persistenceStore)
-        let routineRepository = SwiftDataRoutineRepository(
-            store: persistenceStore,
+        let pauseEventRepository = CoreDataPauseEventRepository(controller: persistenceController)
+        let routineExecutionRepository = CoreDataRoutineExecutionRepository(controller: persistenceController)
+        let routineRepository = CoreDataRoutineRepository(
+            controller: persistenceController,
             selectionStore: selectionStore
         )
         let routineEngine = RoutineEngine(
@@ -207,7 +207,7 @@ final class AppContainer {
             router: router,
             theme: theme,
             appGroupStore: appGroupStore,
-            persistenceStore: persistenceStore,
+            persistenceController: persistenceController,
             systemCapabilities: capabilities,
             haptics: haptics,
             screenTimeAuthorizationService: authorizationService,

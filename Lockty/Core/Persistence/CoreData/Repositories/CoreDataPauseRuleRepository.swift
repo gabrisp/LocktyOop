@@ -1,0 +1,115 @@
+import CoreData
+import FamilyControls
+import Foundation
+import OSLog
+
+private let pauseRepositoryLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "pauses")
+
+@MainActor
+final class CoreDataPauseRuleRepository: PauseRuleRepository {
+    private let controller: PersistenceController
+    private let appGroupStore: AppGroupStore
+    private let selectionStore: ScreenTimeSelectionStore
+    private let mapper = PauseRuleMapper()
+
+    init(
+        controller: PersistenceController,
+        appGroupStore: AppGroupStore = AppGroupStore(),
+        selectionStore: ScreenTimeSelectionStore = ScreenTimeSelectionStore()
+    ) {
+        self.controller = controller
+        self.appGroupStore = appGroupStore
+        self.selectionStore = selectionStore
+    }
+
+    func rules() async -> [PauseRule] {
+        guard let context = controller.viewContext else { return [] }
+        guard let entities = try? context.fetch(PauseRuleEntity.fetchRequest()) else { return [] }
+        return entities.compactMap { entity in
+            guard let domain = try? mapper.makeDomain(from: entity) else { return nil }
+            syncSelectionStore(for: domain)
+            return domain
+        }.sorted { $0.application.displayName < $1.application.displayName }
+    }
+
+    func rule(id: UUID) async -> PauseRule? {
+        guard let context = controller.viewContext else { return nil }
+        let request = PauseRuleEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        guard let entity = try? context.fetch(request).first, let rule = try? mapper.makeDomain(from: entity) else {
+            return nil
+        }
+        syncSelectionStore(for: rule)
+        return rule
+    }
+
+    func rule(for appID: AppIdentity.ID) async -> PauseRule? {
+        guard let context = controller.viewContext else { return nil }
+        let request = PauseRuleEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "appID == %@", appID.rawValue)
+        request.fetchLimit = 1
+        guard let entity = try? context.fetch(request).first, let rule = try? mapper.makeDomain(from: entity) else {
+            return nil
+        }
+        syncSelectionStore(for: rule)
+        return rule
+    }
+
+    func save(_ rule: PauseRule) async {
+        guard let context = controller.viewContext else { return }
+        let request = PauseRuleEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", rule.id as CVarArg)
+        request.fetchLimit = 1
+        let entity = (try? context.fetch(request))?.first ?? PauseRuleEntity(context: context)
+
+        do {
+            try mapper.apply(rule, to: entity, context: context)
+            try context.save()
+        } catch {
+            return
+        }
+
+        pauseRepositoryLogger.notice("Saved pause rule id=\(rule.id.uuidString, privacy: .public) app=\(rule.application.displayName, privacy: .public) steps=\(rule.steps.count)")
+        syncSelectionStore(for: rule)
+        syncSharedSnapshots()
+    }
+
+    func delete(id: UUID) async {
+        guard let context = controller.viewContext else { return }
+        let request = PauseRuleEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        if let entity = try? context.fetch(request).first {
+            context.delete(entity)
+            try? context.save()
+            syncSharedSnapshots()
+        }
+    }
+
+    private func syncSharedSnapshots() {
+        let snapshots = appGroupStore.loadPauseRuleSnapshots()
+        let currentRules = snapshotsByReloading()
+        if snapshots != currentRules {
+            try? appGroupStore.savePauseRuleSnapshots(currentRules)
+        }
+    }
+
+    private func snapshotsByReloading() -> [PauseRuleSnapshot] {
+        guard let context = controller.viewContext, let entities = try? context.fetch(PauseRuleEntity.fetchRequest()) else {
+            return []
+        }
+        return entities.compactMap { entity in
+            guard let domain = try? mapper.makeDomain(from: entity) else { return nil }
+            return PauseRuleSnapshot(rule: domain)
+        }
+        .sorted { $0.application.displayName.localizedCaseInsensitiveCompare($1.application.displayName) == .orderedAscending }
+    }
+
+    private func syncSelectionStore(for rule: PauseRule) {
+        guard let token = rule.application.applicationToken else { return }
+        var selection = FamilyActivitySelection()
+        selection.applicationTokens = [token]
+        try? selectionStore.save(selection, scope: .pause(rule.id))
+    }
+}

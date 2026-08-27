@@ -20,6 +20,7 @@ struct EditableRoutineTask: Identifiable, Hashable {
 @Observable
 final class RoutineEditorViewModel {
     let editingID: UUID
+    let draftID: UUID
 
     var name = ""
     var icon = ""
@@ -52,6 +53,7 @@ final class RoutineEditorViewModel {
 
     init(
         routineID: UUID?,
+        draftID: UUID,
         repository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
@@ -59,6 +61,7 @@ final class RoutineEditorViewModel {
     ) {
         initialRoutineID = routineID
         editingID = routineID ?? UUID()
+        self.draftID = draftID
         self.repository = repository
         self.selectionStore = selectionStore
         self.routineEngine = routineEngine
@@ -353,7 +356,7 @@ struct RoutineEditorView: View {
 
                 editorSection(title: "Triggers") {
                     Button {
-                        router.presentSheet(.routineTriggers(viewModel.editingID))
+                        router.presentSheet(.routineTriggers(viewModel.draftID))
                     } label: {
                         EditorActionCard(
                             title: "Triggers",
@@ -529,7 +532,7 @@ private struct RoutineEditorHero: View {
                         .foregroundStyle(LocktyColors.primaryText)
 
                     Button {
-                        router.presentSheet(.routineIconPicker(viewModel.editingID))
+                        router.presentSheet(.routineIconPicker(viewModel.draftID))
                     } label: {
                         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.sm) {
                             Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
@@ -550,7 +553,7 @@ private struct RoutineEditorHero: View {
                         .foregroundStyle(LocktyColors.primaryText)
 
                     Button {
-                        router.presentSheet(.routineColorPicker(viewModel.editingID))
+                        router.presentSheet(.routineColorPicker(viewModel.draftID))
                     } label: {
                         Circle()
                             .fill(Color(hex: viewModel.colorHex))

@@ -18,6 +18,7 @@ final class EditorViewModelStore {
 
         let created = RoutineEditorViewModel(
             routineID: route.routineID,
+            draftID: route.draftID,
             repository: repository,
             selectionStore: selectionStore,
             routineEngine: routineEngine,

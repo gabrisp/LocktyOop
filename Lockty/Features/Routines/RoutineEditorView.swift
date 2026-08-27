@@ -23,9 +23,11 @@ final class RoutineEditorViewModel {
 
     var name = ""
     var icon = ""
+    var colorHex: String = RoutineIconColorCatalog.colors.first ?? "#0A84FF"
     var mode: RoutineMode = .normal
     var allowsPauseDuringStrictMode = true
     var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
+    var triggers: [RoutineTrigger] = [.manual]
     var maximumBreaks = 0
     var maximumBreakMinutes = 10
     var minimumBreakIntervalMinutes = 30
@@ -37,9 +39,13 @@ final class RoutineEditorViewModel {
     var errorMessage: String?
     private(set) var selectedApplicationCount = 0
     private(set) var selectionPreview = FamilyActivitySelection()
+    private(set) var mostUsedApplications: [ApplicationUsage] = []
 
     private let repository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
+    private let routineEngine: RoutineEngine
+    private let usageDataService: UsageDataServicing
+    private let strictModePolicy = StrictModePolicy()
     private let initialRoutineID: UUID?
     private var hasLoaded = false
     private var createdAt: Date
@@ -47,12 +53,16 @@ final class RoutineEditorViewModel {
     init(
         routineID: UUID?,
         repository: RoutineRepository,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        routineEngine: RoutineEngine,
+        usageDataService: UsageDataServicing
     ) {
         initialRoutineID = routineID
         editingID = routineID ?? UUID()
         self.repository = repository
         self.selectionStore = selectionStore
+        self.routineEngine = routineEngine
+        self.usageDataService = usageDataService
         createdAt = Date()
         refreshSelectionState()
     }
@@ -81,6 +91,77 @@ final class RoutineEditorViewModel {
         sanitizedTasks().count
     }
 
+    var editingBlockDecision: StrictModeDecision {
+        guard let initialRoutineID, routineEngine.activeRoutine()?.routineID == initialRoutineID else {
+            return .allowed
+        }
+        return strictModePolicy.decision(for: .editRoutine, activeRoutine: routineEngine.activeRoutine())
+    }
+
+    var isEditingBlocked: Bool {
+        !editingBlockDecision.isAllowed
+    }
+
+    var isScheduleEnabled: Bool {
+        scheduleTrigger != nil
+    }
+
+    var scheduleTrigger: RoutineSchedule? {
+        for trigger in triggers {
+            if case .schedule(let schedule) = trigger { return schedule }
+        }
+        return nil
+    }
+
+    var triggersSummary: String {
+        isScheduleEnabled ? "Manual + Schedule" : "Manual"
+    }
+
+    func setScheduleEnabled(_ enabled: Bool) {
+        if enabled {
+            guard scheduleTrigger == nil else { return }
+            triggers.append(.schedule(RoutineSchedule(
+                hour: 9,
+                minute: 0,
+                weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
+            )))
+        } else {
+            triggers.removeAll { if case .schedule = $0 { true } else { false } }
+        }
+        if triggers.isEmpty {
+            triggers = [.manual]
+        }
+    }
+
+    func updateSchedule(_ transform: (inout RoutineSchedule) -> Void) {
+        guard let index = triggers.firstIndex(where: { if case .schedule = $0 { true } else { false } }) else { return }
+        guard case .schedule(var schedule) = triggers[index] else { return }
+        transform(&schedule)
+        triggers[index] = .schedule(schedule)
+    }
+
+    func loadMostUsedApplications() async {
+        guard let usage = try? await usageDataService.mostUsedApplications(for: Date()) else { return }
+        mostUsedApplications = Array(usage.sorted { $0.duration > $1.duration }.prefix(6))
+    }
+
+    func isMostUsedApplicationSelected(_ usage: ApplicationUsage) -> Bool {
+        guard let token = usage.app.applicationToken else { return false }
+        return selectionPreview.applicationTokens.contains(token)
+    }
+
+    func toggleMostUsedApplication(_ usage: ApplicationUsage) async {
+        guard let token = usage.app.applicationToken else { return }
+        var selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
+        if selection.applicationTokens.contains(token) {
+            selection.applicationTokens.remove(token)
+        } else {
+            selection.applicationTokens.insert(token)
+        }
+        try? selectionStore.save(selection, scope: selectionScope)
+        refreshSelectionState()
+    }
+
     func load() async {
         guard !hasLoaded else { return }
         hasLoaded = true
@@ -92,7 +173,9 @@ final class RoutineEditorViewModel {
         createdAt = routine.createdAt
         name = routine.name
         icon = routine.icon ?? ""
+        colorHex = routine.colorHex ?? colorHex
         mode = routine.mode
+        triggers = routine.triggers.isEmpty ? [.manual] : routine.triggers
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         tasks = routine.tasks
             .sorted { $0.order < $1.order }
@@ -149,6 +232,11 @@ final class RoutineEditorViewModel {
     }
 
     func save() async -> Bool {
+        guard editingBlockDecision.isAllowed else {
+            errorMessage = editingBlockDecision.reason
+            return false
+        }
+
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             errorMessage = "Routine name is required."
@@ -162,8 +250,9 @@ final class RoutineEditorViewModel {
             id: editingID,
             name: trimmedName,
             icon: icon.isEmpty ? nil : icon,
+            colorHex: colorHex,
             mode: mode,
-            triggers: [.manual],
+            triggers: triggers,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             blockedDomains: Set(blockedDomains),
             tasks: tasks,
@@ -256,10 +345,30 @@ struct RoutineEditorView: View {
 
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                RoutineEditorHero(viewModel: viewModel)
+                if viewModel.isEditingBlocked {
+                    EditingDisabledBanner(message: viewModel.editingBlockDecision.reason ?? "This routine cannot be edited right now.")
+                }
+
+                RoutineEditorHero(viewModel: viewModel, router: router)
+
+                editorSection(title: "Triggers") {
+                    Button {
+                        router.presentSheet(.routineTriggers(viewModel.editingID))
+                    } label: {
+                        EditorActionCard(
+                            title: "Triggers",
+                            value: viewModel.triggersSummary,
+                            systemImage: "bolt.badge.clock"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .tappable()
+                }
 
                 editorSection(title: "Restrictions") {
                     VStack(spacing: LocktySpacing.md) {
+                        RoutineAppsMostUsedSection(viewModel: viewModel)
+
                         Button {
                             router.presentSheet(.appPicker(viewModel.selectionScope))
                         } label: {
@@ -359,8 +468,10 @@ struct RoutineEditorView: View {
                 }
             )
         }
+        .tint(Color(hex: viewModel.colorHex))
         .task {
             await viewModel.load()
+            await viewModel.loadMostUsedApplications()
         }
         .onChange(of: router.sheet) { _, newValue in
             if newValue == nil {
@@ -395,6 +506,7 @@ struct RoutineEditorView: View {
 
 private struct RoutineEditorHero: View {
     @Bindable var viewModel: RoutineEditorViewModel
+    let router: AppRouter
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
@@ -416,54 +528,44 @@ private struct RoutineEditorHero: View {
                         .font(LocktyTypography.headline)
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.sm) {
-                        Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .frame(width: 24, height: 24)
-                            .frame(width: 48, height: 48)
+                    Button {
+                        router.presentSheet(.routineIconPicker(viewModel.editingID))
+                    } label: {
+                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.sm) {
+                            Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .frame(width: 24, height: 24)
+                                .frame(width: 48, height: 48)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .tappable()
+                }
+                .frame(width: 72, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    Text("Color")
+                        .font(LocktyTypography.headline)
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Button {
+                        router.presentSheet(.routineColorPicker(viewModel.editingID))
+                    } label: {
+                        Circle()
+                            .fill(Color(hex: viewModel.colorHex))
+                            .frame(width: 48, height: 48)
+                            .overlay {
+                                Circle().stroke(LocktyColors.cardStroke, lineWidth: 0.5)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .tappable()
                 }
                 .frame(width: 72, alignment: .leading)
             }
 
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                Text("Choose icon")
-                    .font(LocktyTypography.headline)
-                    .foregroundStyle(LocktyColors.primaryText)
-
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Icon")
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.secondaryText)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: LocktySpacing.sm) {
-                            ForEach(Array(RoutineIconCatalog.icons.enumerated()), id: \.offset) { _, iconName in
-                                let isSelected = iconName == viewModel.icon
-                                Button {
-                                    viewModel.icon = iconName
-                                } label: {
-                                    Image(systemName: iconName)
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundStyle(LocktyColors.primaryText)
-                                        .frame(width: 48, height: 48)
-                                        .safeGlass(
-                                            radius: 14,
-                                            interactive: true,
-                                            tint: isSelected ? Color.accentColor.opacity(0.18) : nil
-                                        )
-                                        .overlay {
-                                            iconSelectionBorder(isSelected: isSelected)
-                                        }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.vertical, 1)
-                    }
-                }
-
                 Text("Apps and websites will be blocked while this routine runs.")
                     .font(LocktyTypography.callout)
                     .foregroundStyle(LocktyColors.secondaryText)
@@ -494,56 +596,6 @@ private struct RoutineEditorHero: View {
             }
         }
     }
-}
-
-@ViewBuilder
-private func iconSelectionBorder(isSelected: Bool) -> some View {
-    RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(
-            isSelected ? Color.accentColor : LocktyColors.cardStroke,
-            lineWidth: isSelected ? 1 : 0.5
-        )
-}
-
-private enum RoutineIconCatalog {
-    static let icons: [String] = [
-        "house.fill",
-        "bolt.fill",
-        "flame.fill",
-        "leaf.fill",
-        "heart.fill",
-        "star.fill",
-        "moon.fill",
-        "sun.max.fill",
-        "sparkles",
-        "timer",
-        "clock.fill",
-        "bell.fill",
-        "book.fill",
-        "pencil",
-        "graduationcap.fill",
-        "briefcase.fill",
-        "list.bullet",
-        "checklist",
-        "target",
-        "figure.walk",
-        "figure.run",
-        "dumbbell.fill",
-        "bed.double.fill",
-        "cup.and.saucer.fill",
-        "fork.knife",
-        "music.note",
-        "headphones",
-        "gamecontroller.fill",
-        "camera.fill",
-        "globe",
-        "location.fill",
-        "wifi",
-        "lock.fill",
-        "shield.fill",
-        "hand.raised.fill",
-        "message.fill"
-    ]
 }
 
 private struct RoutineTaskEditorCard: View {

@@ -32,6 +32,12 @@ final class RoutinesViewModel {
     }
 
     func delete(id: UUID) async {
+        let decision = StrictModePolicy().decision(for: .deleteRoutine, activeRoutine: routineEngine.activeRoutine())
+        guard routineEngine.activeRoutine()?.routineID != id || decision.isAllowed else {
+            errorMessage = decision.reason
+            return
+        }
+
         do {
             try await repository.delete(id: id)
             routines.removeAll { $0.id == id }

@@ -8,7 +8,9 @@ final class EditorViewModelStore {
     func routineEditor(
         route: RoutineEditorRoute,
         repository: RoutineRepository,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        routineEngine: RoutineEngine,
+        usageDataService: UsageDataServicing
     ) -> RoutineEditorViewModel {
         if let existing = routineEditors[route.draftID] {
             return existing
@@ -17,10 +19,16 @@ final class EditorViewModelStore {
         let created = RoutineEditorViewModel(
             routineID: route.routineID,
             repository: repository,
-            selectionStore: selectionStore
+            selectionStore: selectionStore,
+            routineEngine: routineEngine,
+            usageDataService: usageDataService
         )
         routineEditors[route.draftID] = created
         return created
+    }
+
+    func existingRoutineEditor(draftID: UUID) -> RoutineEditorViewModel? {
+        routineEditors[draftID]
     }
 
     func pauseEditor(

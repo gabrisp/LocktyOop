@@ -73,6 +73,15 @@ struct DestinationFactory {
 
         case .systemAccess:
             featureFactory.makeSystemAccessSheet()
+
+        case .routineIconPicker(let draftID):
+            featureFactory.makeRoutineIconPickerSheet(draftID: draftID)
+
+        case .routineColorPicker(let draftID):
+            featureFactory.makeRoutineColorPickerSheet(draftID: draftID)
+
+        case .routineTriggers(let draftID):
+            featureFactory.makeRoutineTriggersSheet(draftID: draftID)
         }
     }
 

@@ -20,6 +20,7 @@ struct FeatureFactory {
     let classificationRepository: AppClassificationRepository
     let haptics: HapticsProviding
     let editorStore: EditorViewModelStore
+    let usageDataService: UsageDataServicing
 
     func makeTodayView(day: Date) -> TodayView {
         TodayView(day: day, viewModel: todayViewModel, router: router)
@@ -65,11 +66,34 @@ struct FeatureFactory {
             viewModel: editorStore.routineEditor(
                 route: route,
                 repository: routineRepository,
-                selectionStore: selectionStore
+                selectionStore: selectionStore,
+                routineEngine: routineEngine,
+                usageDataService: usageDataService
             ),
             router: router,
             onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.draftID) }
         )
+    }
+
+    @ViewBuilder
+    func makeRoutineIconPickerSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
+            RoutineIconPickerSheet(selectedIcon: Bindable(viewModel).icon)
+        }
+    }
+
+    @ViewBuilder
+    func makeRoutineColorPickerSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
+            RoutineColorPickerSheet(selectedColorHex: Bindable(viewModel).colorHex)
+        }
+    }
+
+    @ViewBuilder
+    func makeRoutineTriggersSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
+            RoutineTriggersSheet(viewModel: viewModel)
+        }
     }
 
     func makeApplicationDetails(appID: AppIdentity.ID, day: Date?) -> ApplicationDetailView {

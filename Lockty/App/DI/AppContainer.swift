@@ -190,7 +190,8 @@ final class AppContainer {
             pauseEventRepository: pauseEventRepository,
             classificationRepository: classificationRepository,
             haptics: haptics,
-            editorStore: editorStore
+            editorStore: editorStore,
+            usageDataService: usageDataService
         )
         let destinationFactory = DestinationFactory(featureFactory: featureFactory)
         let startupCoordinator = StartupCoordinator(

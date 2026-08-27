@@ -1,5 +1,10 @@
 import Foundation
 
+protocol TodayDataProviding {
+    func dayState(for day: Date) async -> TodayDayState
+    func updateClassification(appID: AppIdentity.ID, classification: AppClassification) async
+}
+
 struct LiveTodayDataPipeline: TodayDataProviding {
     private let usageDataService: UsageDataServicing
     private let appGroupStore: AppGroupStore

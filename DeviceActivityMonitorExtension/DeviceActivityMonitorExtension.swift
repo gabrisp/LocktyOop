@@ -17,7 +17,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 private struct RuntimeRepairCoordinator {
     private let store = AppGroupStore()
     private let selectionStore = ScreenTimeSelectionStore()
-    private let resolver = ExtensionShieldPolicyResolver()
+    private let resolver = ShieldPolicyResolver()
     private let managedSettingsStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("lockty"))
 
     func repair(afterEnding activity: DeviceActivityName) {
@@ -99,48 +99,5 @@ private struct RuntimeRepairCoordinator {
             state.recoveryFlags.insert(.expiredPauseNeedsRelock)
             state.recoveryFlags.insert(.expiredBreakNeedsFinalization)
         }
-    }
-}
-
-private struct ExtensionShieldPolicyResolver {
-    func resolve(
-        activeRoutine: ActiveRoutine?,
-        activeBreak: ActiveBreak?,
-        activePauseAllowance: ActivePauseAllowance?,
-        pauseRules: [PauseRule]
-    ) -> ShieldPolicy {
-        var blockedApplications = Set<AppIdentity.ID>()
-        var blockedDomains = Set<String>()
-        var reasons: [ShieldReason] = []
-
-        if let activeRoutine, activeBreak == nil {
-            blockedApplications.formUnion(activeRoutine.shieldPolicy.blockedApplications)
-            blockedDomains.formUnion(activeRoutine.shieldPolicy.blockedDomains)
-            reasons.append(activeRoutine.shieldPolicy.reason)
-        }
-
-        for rule in pauseRules where rule.isEnabled {
-            let isTemporarilyAllowed = activePauseAllowance?.context.appID == rule.application.id
-            if !isTemporarilyAllowed {
-                blockedApplications.insert(rule.application.id)
-                reasons.append(.pause(rule.application.id))
-            }
-        }
-
-        let reason: ShieldReason
-        switch reasons.count {
-        case 0:
-            reason = .none
-        case 1:
-            reason = reasons[0]
-        default:
-            reason = .combined
-        }
-
-        return ShieldPolicy(
-            blockedApplications: blockedApplications,
-            blockedDomains: blockedDomains,
-            reason: reason
-        )
     }
 }

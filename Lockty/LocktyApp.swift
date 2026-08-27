@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct LocktyApp: App {
+    @State private var container = AppContainer.live()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(container: container)
+                .preferredColorScheme(.dark)
+                .tint(container.theme.accent.color)
         }
     }
 }

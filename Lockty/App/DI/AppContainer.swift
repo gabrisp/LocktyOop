@@ -1,0 +1,240 @@
+import Foundation
+
+final class AppContainer {
+    let session: AppSession
+    let router: AppRouter
+    let theme: ThemeManager
+
+    let appGroupStore: AppGroupStore
+    let persistenceStore: PersistenceStore
+    let systemCapabilities: SystemCapabilities
+    let haptics: HapticsFactory
+
+    let screenTimeAuthorizationService: ScreenTimeAuthorizationServicing
+    let usageDataService: UsageDataServicing
+    let shieldService: ShieldServicing
+    let deviceActivityService: DeviceActivityServicing
+
+    let routineEngine: RoutineEngine
+    let pauseEngine: PauseEngine
+
+    let alarmService: AlarmServicing
+    let nfcService: NFCServicing
+    let locationService: LocationTriggerServicing
+    let notificationService: NotificationServicing
+
+    let todayViewModel: TodayViewModel
+    let routinesViewModel: RoutinesViewModel
+    let focusViewModel: FocusViewModel
+    let pausesViewModel: PausesViewModel
+    let lifetimeViewModel: LifetimeViewModel
+    let systemAccessViewModel: SystemAccessViewModel
+    let selectionStore: ScreenTimeSelectionStore
+    let editorStore: EditorViewModelStore
+
+    let featureFactory: FeatureFactory
+    let destinationFactory: DestinationFactory
+    let startupCoordinator: StartupCoordinator
+
+    private init(
+        session: AppSession,
+        router: AppRouter,
+        theme: ThemeManager,
+        appGroupStore: AppGroupStore,
+        persistenceStore: PersistenceStore,
+        systemCapabilities: SystemCapabilities,
+        haptics: HapticsFactory,
+        screenTimeAuthorizationService: ScreenTimeAuthorizationServicing,
+        usageDataService: UsageDataServicing,
+        shieldService: ShieldServicing,
+        deviceActivityService: DeviceActivityServicing,
+        routineEngine: RoutineEngine,
+        pauseEngine: PauseEngine,
+        alarmService: AlarmServicing,
+        nfcService: NFCServicing,
+        locationService: LocationTriggerServicing,
+        notificationService: NotificationServicing,
+        todayViewModel: TodayViewModel,
+        routinesViewModel: RoutinesViewModel,
+        focusViewModel: FocusViewModel,
+        pausesViewModel: PausesViewModel,
+        lifetimeViewModel: LifetimeViewModel,
+        systemAccessViewModel: SystemAccessViewModel,
+        selectionStore: ScreenTimeSelectionStore,
+        editorStore: EditorViewModelStore,
+        featureFactory: FeatureFactory,
+        destinationFactory: DestinationFactory,
+        startupCoordinator: StartupCoordinator
+    ) {
+        self.session = session
+        self.router = router
+        self.theme = theme
+        self.appGroupStore = appGroupStore
+        self.persistenceStore = persistenceStore
+        self.systemCapabilities = systemCapabilities
+        self.haptics = haptics
+        self.screenTimeAuthorizationService = screenTimeAuthorizationService
+        self.usageDataService = usageDataService
+        self.shieldService = shieldService
+        self.deviceActivityService = deviceActivityService
+        self.routineEngine = routineEngine
+        self.pauseEngine = pauseEngine
+        self.alarmService = alarmService
+        self.nfcService = nfcService
+        self.locationService = locationService
+        self.notificationService = notificationService
+        self.todayViewModel = todayViewModel
+        self.routinesViewModel = routinesViewModel
+        self.focusViewModel = focusViewModel
+        self.pausesViewModel = pausesViewModel
+        self.lifetimeViewModel = lifetimeViewModel
+        self.systemAccessViewModel = systemAccessViewModel
+        self.selectionStore = selectionStore
+        self.editorStore = editorStore
+        self.featureFactory = featureFactory
+        self.destinationFactory = destinationFactory
+        self.startupCoordinator = startupCoordinator
+    }
+
+    static func live() -> AppContainer {
+        let session = AppSession()
+        let router = AppRouter()
+        let theme = ThemeManager()
+        let appGroupStore = AppGroupStore()
+        let persistenceStore = PersistenceStore()
+        let capabilities = SystemCapabilities.current
+        let haptics = HapticsFactory()
+
+        let authorizationService = LiveScreenTimeAuthorizationService()
+        let classificationRepository = SwiftDataAppClassificationRepository(store: persistenceStore)
+        let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        let editorStore = EditorViewModelStore()
+        let usageDataService = LiveUsageDataService(
+            appGroupStore: appGroupStore,
+            classificationRepository: classificationRepository
+        )
+        let shieldService = LiveShieldService(appGroupStore: appGroupStore, selectionStore: selectionStore)
+        let deviceActivityService = LiveDeviceActivityService()
+        let pauseRuleRepository = SwiftDataPauseRuleRepository(
+            store: persistenceStore,
+            appGroupStore: appGroupStore,
+            selectionStore: selectionStore
+        )
+        let pauseEventRepository = SwiftDataPauseEventRepository(store: persistenceStore)
+        let routineExecutionRepository = SwiftDataRoutineExecutionRepository(store: persistenceStore)
+        let routineRepository = SwiftDataRoutineRepository(
+            store: persistenceStore,
+            selectionStore: selectionStore
+        )
+        let routineEngine = RoutineEngine(
+            shieldService: shieldService,
+            deviceActivityService: deviceActivityService,
+            appGroupStore: appGroupStore,
+            pauseRuleRepository: pauseRuleRepository,
+            executionRepository: routineExecutionRepository
+        )
+        let pauseEngine = PauseEngine(
+            shieldService: shieldService,
+            deviceActivityService: deviceActivityService,
+            appGroupStore: appGroupStore,
+            pauseRuleRepository: pauseRuleRepository,
+            pauseEventRepository: pauseEventRepository
+        )
+        let alarmService = LiveAlarmService()
+        let nfcService = LiveNFCService()
+        let locationService = LiveLocationTriggerService()
+        let notificationService = LiveNotificationService()
+
+        let todayPipeline = LiveTodayDataPipeline(
+            usageDataService: usageDataService,
+            appGroupStore: appGroupStore,
+            classificationRepository: classificationRepository,
+            pauseEventRepository: pauseEventRepository,
+            routineExecutionRepository: routineExecutionRepository
+        )
+        let todayViewModel = TodayViewModel(dataProvider: todayPipeline)
+        let routinesViewModel = RoutinesViewModel(routineEngine: routineEngine, repository: routineRepository)
+        let focusViewModel = FocusViewModel()
+        let pausesViewModel = PausesViewModel(
+            ruleRepository: pauseRuleRepository,
+            eventRepository: pauseEventRepository,
+            calculator: PauseSuccessCalculator()
+        )
+        let lifetimeViewModel = LifetimeViewModel(
+            usageDataService: usageDataService,
+            pauseEventRepository: pauseEventRepository,
+            routineExecutionRepository: routineExecutionRepository,
+            appGroupStore: appGroupStore
+        )
+        let systemAccessViewModel = SystemAccessViewModel(
+            screenTime: authorizationService,
+            notifications: notificationService,
+            location: locationService,
+            alarms: alarmService
+        )
+        let featureFactory = FeatureFactory(
+            router: router,
+            theme: theme,
+            todayViewModel: todayViewModel,
+            routinesViewModel: routinesViewModel,
+            focusViewModel: focusViewModel,
+            pausesViewModel: pausesViewModel,
+            lifetimeViewModel: lifetimeViewModel,
+            systemAccessViewModel: systemAccessViewModel,
+            selectionStore: selectionStore,
+            pauseEngine: pauseEngine,
+            routineEngine: routineEngine,
+            routineRepository: routineRepository,
+            routineExecutionRepository: routineExecutionRepository,
+            pauseRuleRepository: pauseRuleRepository,
+            pauseEventRepository: pauseEventRepository,
+            classificationRepository: classificationRepository,
+            haptics: haptics,
+            editorStore: editorStore
+        )
+        let destinationFactory = DestinationFactory(featureFactory: featureFactory)
+        let startupCoordinator = StartupCoordinator(
+            session: session,
+            router: router,
+            appGroupStore: appGroupStore,
+            pauseEngine: pauseEngine,
+            routineEngine: routineEngine,
+            shieldService: shieldService
+        )
+
+        return AppContainer(
+            session: session,
+            router: router,
+            theme: theme,
+            appGroupStore: appGroupStore,
+            persistenceStore: persistenceStore,
+            systemCapabilities: capabilities,
+            haptics: haptics,
+            screenTimeAuthorizationService: authorizationService,
+            usageDataService: usageDataService,
+            shieldService: shieldService,
+            deviceActivityService: deviceActivityService,
+            routineEngine: routineEngine,
+            pauseEngine: pauseEngine,
+            alarmService: alarmService,
+            nfcService: nfcService,
+            locationService: locationService,
+            notificationService: notificationService,
+            todayViewModel: todayViewModel,
+            routinesViewModel: routinesViewModel,
+            focusViewModel: focusViewModel,
+            pausesViewModel: pausesViewModel,
+            lifetimeViewModel: lifetimeViewModel,
+            systemAccessViewModel: systemAccessViewModel,
+            selectionStore: selectionStore,
+            editorStore: editorStore,
+            featureFactory: featureFactory,
+            destinationFactory: destinationFactory,
+            startupCoordinator: startupCoordinator
+        )
+    }
+
+    static func make() -> AppContainer {
+        live()
+    }
+}

@@ -1,0 +1,10 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+Lockty.xcodeproj/xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store

@@ -76,6 +76,22 @@ final class AppPickerViewModel {
         return newApplications.count == 1 && newApplications != previousApplications
     }
 
+    /// FamilyActivityPicker can emit a transient change event that resets the
+    /// selection to fully empty during its own open/close lifecycle. Persisting
+    /// that event would silently wipe out a real selection the user just made.
+    /// Guard against auto-saving exactly that transition; an explicit "Done" tap
+    /// still persists whatever the true final state is, including an
+    /// intentionally-cleared selection.
+    func isSpuriousEmptyReset(from previousSelection: FamilyActivitySelection) -> Bool {
+        let becameFullyEmpty = selection.applicationTokens.isEmpty
+            && selection.categoryTokens.isEmpty
+            && selection.webDomainTokens.isEmpty
+        let wasNonEmpty = !previousSelection.applicationTokens.isEmpty
+            || !previousSelection.categoryTokens.isEmpty
+            || !previousSelection.webDomainTokens.isEmpty
+        return becameFullyEmpty && wasNonEmpty
+    }
+
     private var isSingleApplicationScope: Bool {
         if case .pause = scope {
             return true
@@ -167,19 +183,19 @@ struct AppPickerSheet: View {
                 guard oldValue != newValue else { return }
                 viewModel.selectionDidChange(from: oldValue)
 
-                // Only auto-persist for single-application scopes (Pause), where a
-                // fresh one-app pick should save-and-dismiss immediately. For
-                // multi-select scopes (Routine/Library), FamilyActivityPicker can
-                // emit a transient/empty change event during its own open/close
-                // lifecycle; saving on every change risked persisting that empty
-                // state over a real selection. Those scopes save only on "Done".
-                guard viewModel.shouldAutoCommitSelection(after: oldValue) else { return }
+                // Skip persisting a spurious reset-to-empty event (see
+                // isSpuriousEmptyReset); every other real selection change still
+                // auto-saves immediately, matching the original auto-save-as-you-go
+                // behavior. "Done" always persists the final state regardless.
+                guard !viewModel.isSpuriousEmptyReset(from: oldValue) else { return }
+
                 do {
                     try viewModel.persistCurrentSelection()
                 } catch {
                     errorMessage = error.localizedDescription
                     return
                 }
+                guard viewModel.shouldAutoCommitSelection(after: oldValue) else { return }
                 dismiss()
             }
         }

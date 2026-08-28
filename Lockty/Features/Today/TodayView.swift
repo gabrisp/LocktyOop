@@ -13,7 +13,9 @@ struct TodayView: View {
     }
 
     private var collapseProgress: CGFloat {
-        MetricsHeaderGeometry.collapseProgress(for: scrollOffset)
+        // Sticky header collapse animation paused.
+        0
+//        MetricsHeaderGeometry.collapseProgress(for: scrollOffset)
     }
 
     private var overscrollPullDistance: CGFloat {
@@ -139,11 +141,12 @@ struct TodayView: View {
         .task(id: DayKey(date: day)) {
             await viewModel.load(day: day)
         }
-        .onChange(of: collapseProgress, initial: true) { _, newValue in
-            router.todayChromeCollapseProgress = newValue
-        }
-        .onDisappear {
-            router.todayChromeCollapseProgress = 0
-        }
+        // Sticky header / calendar-hide animation paused.
+//        .onChange(of: collapseProgress, initial: true) { _, newValue in
+//            router.todayChromeCollapseProgress = newValue
+//        }
+//        .onDisappear {
+//            router.todayChromeCollapseProgress = 0
+//        }
     }
 }

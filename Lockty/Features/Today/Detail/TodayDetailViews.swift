@@ -245,7 +245,7 @@ struct ApplicationDetailView: View {
     let router: AppRouter
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if let appUsage = viewModel.appUsage {
                     CardView {
@@ -365,7 +365,7 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
     private var state: TodayDayState { viewModel.state(for: day) }
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 content(state)
             }

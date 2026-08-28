@@ -4,7 +4,7 @@ struct LifetimeView: View {
     @Bindable var viewModel: LifetimeViewModel
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Text("Lifetime")
                     .font(LocktyTypography.largeTitle)

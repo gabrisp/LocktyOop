@@ -33,11 +33,12 @@ struct HomeView: View {
             .safeSafeAreaBar(edge: .top, spacing: 0) {
                 switch router.selectedTab {
                 case .today:
-                    let sliderProgress = MetricsHeaderGeometry.rangedProgress(
-                        router.todayChromeCollapseProgress,
-                        from: 0.14,
-                        to: 0.74
-                    )
+                    // Calendar-hide animation paused: always shown at full height.
+//                    let sliderProgress = MetricsHeaderGeometry.rangedProgress(
+//                        router.todayChromeCollapseProgress,
+//                        from: 0.14,
+//                        to: 0.74
+//                    )
 
                     DateSliderView(
                         dates: router.dayNavigationDays,
@@ -45,10 +46,10 @@ struct HomeView: View {
                         scrollOffset: $router.daySliderOffset,
                         onSelectionChanged: featureFactory.haptics.selectionChanged
                     )
-                    .opacity(1 - sliderProgress)
-                    .frame(height: DayPageSliderMetrics.barHeight * (1 - sliderProgress))
-                    .clipped()
-                    .allowsHitTesting(sliderProgress < 0.05)
+//                    .opacity(1 - sliderProgress)
+//                    .frame(height: DayPageSliderMetrics.barHeight * (1 - sliderProgress))
+//                    .clipped()
+//                    .allowsHitTesting(sliderProgress < 0.05)
 
                 case .focus:
                     EmptyView()

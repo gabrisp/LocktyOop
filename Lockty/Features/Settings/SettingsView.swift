@@ -4,7 +4,7 @@ struct SettingsView: View {
     let theme: ThemeManager
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
                 CardView {
                     VStack(alignment: .leading, spacing: LocktySpacing.md) {

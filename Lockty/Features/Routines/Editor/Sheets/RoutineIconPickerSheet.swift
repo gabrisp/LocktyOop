@@ -7,7 +7,7 @@ struct RoutineIconPickerSheet: View {
     private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
                 ForEach(RoutineIconCatalog.icons, id: \.self) { iconName in
                     let isSelected = iconName == selectedIcon

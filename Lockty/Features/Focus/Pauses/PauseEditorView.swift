@@ -445,22 +445,20 @@ struct PauseAppPickerSheet: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        LocktyDynamicSheet {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(title: "Choose App", onClose: { dismiss() })
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            EditorTopBar(title: "Choose App", onClose: { dismiss() })
 
-                FamilyActivityPicker(selection: Binding(
-                    get: { viewModel.selectionPreview },
-                    set: { newValue in
-                        viewModel.replaceSelection(newValue)
-                    }
-                ))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.md)
+            FamilyActivityPicker(selection: Binding(
+                get: { viewModel.selectionPreview },
+                set: { newValue in
+                    viewModel.replaceSelection(newValue)
+                }
+            ))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.top, LocktySpacing.sm)
+        .padding(.bottom, LocktySpacing.md)
     }
 }
 

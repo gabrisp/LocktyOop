@@ -7,7 +7,7 @@ struct DetoxDetailView: View {
     private var state: TodayDayState { viewModel.state(for: day) }
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 CardView {
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {

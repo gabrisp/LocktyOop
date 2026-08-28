@@ -7,9 +7,9 @@ struct FocusView: View {
     let router: AppRouter
 
     var body: some View {
-        ScrollView(.horizontal) {
+        ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
-                ScrollView(.vertical) {
+                ScrollView(.vertical, showsIndicators: false) {
                     RoutinesView(viewModel: routinesViewModel, router: router)
                         .padding(.horizontal, LocktySpacing.md)
                         .padding(.bottom, LocktySpacing.xl)
@@ -19,7 +19,7 @@ struct FocusView: View {
                 .containerRelativeFrame(.horizontal)
                 .id(FocusSection.routines)
 
-                ScrollView(.vertical) {
+                ScrollView(.vertical, showsIndicators: false) {
                     PausesView(viewModel: pausesViewModel, router: router)
                         .padding(.horizontal, LocktySpacing.md)
                         .padding(.bottom, LocktySpacing.xl)

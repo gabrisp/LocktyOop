@@ -85,7 +85,7 @@ struct ActiveRoutineView: View {
     }
 
     private var content: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if let activeRoutine = viewModel.activeRoutine {
                     CardView {

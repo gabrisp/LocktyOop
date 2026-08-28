@@ -8,8 +8,8 @@ struct CardView<Content: View>: View {
     let content: Content
 
     init(
-        radius: CGFloat = LocktyRadius.large,
-        padding: CGFloat = LocktySpacing.lg,
+        radius: CGFloat = LocktyRadius.medium,
+        padding: CGFloat = LocktySpacing.md,
         interactive: Bool = false,
         height: CGFloat? = nil,
         @ViewBuilder content: () -> Content

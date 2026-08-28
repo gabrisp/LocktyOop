@@ -65,7 +65,7 @@ struct RoutineDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
                 if let routine = viewModel.routine {
                     CardView {

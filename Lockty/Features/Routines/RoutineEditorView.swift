@@ -346,35 +346,33 @@ struct RoutineAppPickerSheet: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        LocktyDynamicSheet {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
 
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    if !viewModel.mostUsedApplications.isEmpty {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Recommended Restrictions")
-                                .font(LocktyTypography.headline)
-                                .foregroundStyle(LocktyColors.primaryText)
-                            RoutineAppsMostUsedSection(viewModel: viewModel)
-                        }
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                if !viewModel.mostUsedApplications.isEmpty {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Text("Recommended Restrictions")
+                            .font(LocktyTypography.headline)
+                            .foregroundStyle(LocktyColors.primaryText)
+                        RoutineAppsMostUsedSection(viewModel: viewModel)
                     }
                 }
+            }
 
-                FamilyActivityPicker(selection: Binding(
-                    get: { viewModel.selectionPreview },
-                    set: { newValue in
-                        viewModel.replaceSelection(newValue)
-                    }
-                ))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.md)
-            .task {
-                await viewModel.loadMostUsedApplications()
-            }
+            FamilyActivityPicker(selection: Binding(
+                get: { viewModel.selectionPreview },
+                set: { newValue in
+                    viewModel.replaceSelection(newValue)
+                }
+            ))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.top, LocktySpacing.sm)
+        .padding(.bottom, LocktySpacing.md)
+        .task {
+            await viewModel.loadMostUsedApplications()
         }
     }
 }
@@ -672,6 +670,7 @@ private struct RoutineEditorHero: View {
                     .tappable()
                     .popover(isPresented: $showIconPicker) {
                         RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
+                            .presentationCompactAdaptation(.popover)
                     }
                 }
                 .frame(width: 74, alignment: .leading)

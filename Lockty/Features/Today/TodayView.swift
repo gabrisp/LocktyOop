@@ -3,7 +3,7 @@ import SwiftUI
 struct TodayView: View {
     let day: Date
     let viewModel: TodayViewModel
-    let router: AppRouter
+    @Bindable var router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
 
@@ -111,6 +111,7 @@ struct TodayView: View {
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xl)
         }
+        .adoptForIGTabBar($router.tabBarProgress)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, newValue in

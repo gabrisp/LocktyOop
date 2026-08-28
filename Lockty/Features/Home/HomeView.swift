@@ -7,43 +7,55 @@ struct HomeView: View {
     let destinationFactory: DestinationFactory
 
     var body: some View {
-        NavigationStack(path: $router.path) {
-            TabView(selection: $router.selectedTab) {
-                Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
+        TabView(selection: $router.selectedTab) {
+            Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
+                NavigationStack(path: $router.todayPath) {
                     featureFactory.makeTodayView(day: router.selectedDay)
+                        .navigationDestination(for: AppRoute.self) { route in
+                            destinationFactory.destination(for: route)
+                        }
                 }
+            }
 
-                Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
+            Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
+                NavigationStack(path: $router.focusPath) {
                     featureFactory.makeFocusView()
+                        .navigationDestination(for: AppRoute.self) { route in
+                            destinationFactory.destination(for: route)
+                        }
                 }
+            }
 
-                Tab(AppTab.lifetime.title, systemImage: AppTab.lifetime.systemImage, value: AppTab.lifetime) {
+            Tab(AppTab.lifetime.title, systemImage: AppTab.lifetime.systemImage, value: AppTab.lifetime) {
+                NavigationStack(path: $router.lifetimePath) {
                     featureFactory.makeLifetimeView()
+                        .navigationDestination(for: AppRoute.self) { route in
+                            destinationFactory.destination(for: route)
+                        }
                 }
             }
-            .hideNativeTabBar()
-            .safeAreaInset(edge: .bottom) {
-                IGStyleTabBar(selection: $router.selectedTab) { tab, isSelected in
-                    UIImage(
-                        systemName: tab.systemImage,
-                        withConfiguration: UIImage.SymbolConfiguration(weight: isSelected ? .semibold : .regular)
-                    ) ?? UIImage()
-                } onInteraction: {
-                    featureFactory.haptics.selectionChanged()
-                }
-                .frame(height: 50)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, LocktySpacing.sm)
+        }
+        .hideNativeTabBar()
+        .safeAreaInset(edge: .bottom) {
+            IGStyleTabBar(selection: $router.selectedTab) { tab, isSelected in
+                UIImage(
+                    systemName: tab.systemImage,
+                    withConfiguration: UIImage.SymbolConfiguration(weight: isSelected ? .semibold : .regular)
+                ) ?? UIImage()
+            } onInteraction: {
+                featureFactory.haptics.selectionChanged()
             }
-            .navigationDestination(for: AppRoute.self) { route in
-                destinationFactory.destination(for: route)
-            }
-            .sheet(item: $router.sheet) { route in
-                destinationFactory.sheet(for: route)
-            }
-            .fullScreenCover(item: $router.fullScreen) { route in
-                destinationFactory.fullScreen(for: route)
-            }
+            .frame(height: 50)
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, LocktySpacing.sm)
+            .opacity(1 - router.tabBarProgress)
+            .offset(y: router.tabBarProgress * 80)
+        }
+        .sheet(item: $router.sheet) { route in
+            destinationFactory.sheet(for: route)
+        }
+        .fullScreenCover(item: $router.fullScreen) { route in
+            destinationFactory.fullScreen(for: route)
         }
     }
 }

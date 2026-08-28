@@ -4,7 +4,7 @@ struct FocusView: View {
     @Bindable var viewModel: FocusViewModel
     let routinesViewModel: RoutinesViewModel
     let pausesViewModel: PausesViewModel
-    let router: AppRouter
+    @Bindable var router: AppRouter
 
     var body: some View {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -15,6 +15,7 @@ struct FocusView: View {
                             .padding(.bottom, LocktySpacing.xl)
                             .padding(.top, LocktySpacing.md)
                     }
+                    .adoptForIGTabBar($router.tabBarProgress)
                     .scrollIndicators(.hidden)
                     .containerRelativeFrame(.horizontal)
                     .id(FocusSection.routines)
@@ -25,6 +26,7 @@ struct FocusView: View {
                             .padding(.bottom, LocktySpacing.xl)
                             .padding(.top, LocktySpacing.md)
                     }
+                    .adoptForIGTabBar($router.tabBarProgress)
                     .scrollIndicators(.hidden)
                     .containerRelativeFrame(.horizontal)
                     .id(FocusSection.pauses)

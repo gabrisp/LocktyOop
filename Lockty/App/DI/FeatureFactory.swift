@@ -30,7 +30,7 @@ struct FeatureFactory {
     }
 
     func makeLifetimeView() -> LifetimeView {
-        LifetimeView(viewModel: lifetimeViewModel)
+        LifetimeView(viewModel: lifetimeViewModel, router: router)
     }
 
     func makeSystemAccessSheet() -> SystemAccessSheet {

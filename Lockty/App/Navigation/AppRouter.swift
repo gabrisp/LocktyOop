@@ -4,14 +4,39 @@ import Observation
 
 @Observable
 final class AppRouter {
-    var path: [AppRoute] = []
+    // Each tab keeps its own independent push history, matching the custom
+    // per-tab NavigationStack setup in HomeView (a single shared path across
+    // tabs doesn't work with that — pushes from one tab would show up
+    // when switching to another).
+    var todayPath: [AppRoute] = []
+    var focusPath: [AppRoute] = []
+    var lifetimePath: [AppRoute] = []
     var selectedTab: AppTab = .today
     var sheet: SheetRoute?
     var fullScreen: FullScreenRoute?
     var selectedDay: Date
     var daySliderOffset: CGFloat
     var todayChromeCollapseProgress: CGFloat = 0
+    /// Drives IGStyleTabBar's scroll-hide behavior: 0 = expanded/visible, 1 = minimized/hidden.
+    var tabBarProgress: CGFloat = 0
     let dayNavigationDays: [Date]
+
+    var path: [AppRoute] {
+        get {
+            switch selectedTab {
+            case .today: todayPath
+            case .focus: focusPath
+            case .lifetime: lifetimePath
+            }
+        }
+        set {
+            switch selectedTab {
+            case .today: todayPath = newValue
+            case .focus: focusPath = newValue
+            case .lifetime: lifetimePath = newValue
+            }
+        }
+    }
 
     init(today: Date = Date(), calendar: Calendar = .current) {
         let normalizedToday = calendar.startOfDay(for: today)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LifetimeView: View {
     @Bindable var viewModel: LifetimeViewModel
+    @Bindable var router: AppRouter
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -84,6 +85,7 @@ struct LifetimeView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
+        .adoptForIGTabBar($router.tabBarProgress)
         .scrollIndicators(.hidden)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task {

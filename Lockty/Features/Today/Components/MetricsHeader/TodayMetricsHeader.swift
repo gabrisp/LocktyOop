@@ -21,7 +21,7 @@ struct TodayMetricsHeader: View {
     /// Exactly the area the backdrop should cover: the safe area above the header plus
     /// the header's own current content height (which shrinks as it collapses), plus 2.
     private var backdropHeight: CGFloat {
-        safeAreaTop + geometry.height + topInset + 2
+        safeAreaTop + geometry.height + topInset + 6
     }
 
     var body: some View {
@@ -54,6 +54,8 @@ struct TodayMetricsHeader: View {
             )
             .frame(maxWidth: .infinity)
             .frame(height: backdropHeight)
+            // Invisible while expanded, fading in as the header collapses.
+            .opacity(collapseProgress)
             .ignoresSafeArea(edges: .top)
         }
     }

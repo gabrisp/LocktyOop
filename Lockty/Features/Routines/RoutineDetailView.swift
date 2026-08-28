@@ -1,3 +1,4 @@
+import FamilyControls
 import SwiftUI
 
 @MainActor
@@ -7,26 +8,31 @@ final class RoutineDetailViewModel {
     private let repository: RoutineRepository
     private let executionRepository: RoutineExecutionRepository
     private let routineEngine: RoutineEngine
+    private let selectionStore: ScreenTimeSelectionStore
 
     private(set) var routine: Routine?
     private(set) var recentExecutions: [RoutineExecution] = []
+    private(set) var selection = FamilyActivitySelection()
     var errorMessage: String?
 
     init(
         routineID: UUID,
         repository: RoutineRepository,
         executionRepository: RoutineExecutionRepository,
-        routineEngine: RoutineEngine
+        routineEngine: RoutineEngine,
+        selectionStore: ScreenTimeSelectionStore
     ) {
         self.routineID = routineID
         self.repository = repository
         self.executionRepository = executionRepository
         self.routineEngine = routineEngine
+        self.selectionStore = selectionStore
     }
 
     func load() async {
         let routines = try? await repository.routines()
         routine = routines?.first(where: { $0.id == routineID })
+        selection = (try? selectionStore.load(scope: .routine(routineID))) ?? FamilyActivitySelection()
         recentExecutions = ((try? await executionRepository.executions(from: nil, to: nil)) ?? [])
             .filter { $0.routineID == routineID }
             .sorted { $0.startedAt > $1.startedAt }
@@ -71,6 +77,40 @@ struct RoutineDetailView: View {
                             Text("\(routine.blockedApplications.count) apps · \(routine.blockedDomains.count) websites blocked")
                                 .font(LocktyTypography.caption)
                                 .foregroundStyle(LocktyColors.secondaryText)
+                        }
+                    }
+
+                    if !viewModel.selection.applicationTokens.isEmpty || !routine.blockedDomains.isEmpty {
+                        CardView {
+                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                                Text("Restrictions")
+                                    .font(LocktyTypography.headline)
+                                    .foregroundStyle(LocktyColors.primaryText)
+
+                                ForEach(Array(viewModel.selection.applicationTokens), id: \.self) { token in
+                                    HStack(spacing: LocktySpacing.md) {
+                                        Label(token)
+                                            .labelStyle(.titleAndIcon)
+                                            .foregroundStyle(LocktyColors.primaryText)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, LocktySpacing.sm)
+                                    .padding(.vertical, LocktySpacing.sm)
+                                    .safeGlass(radius: 12)
+                                }
+
+                                ForEach(routine.blockedDomains.sorted(), id: \.self) { domain in
+                                    HStack {
+                                        Text(domain)
+                                            .font(LocktyTypography.callout)
+                                            .foregroundStyle(LocktyColors.primaryText)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, LocktySpacing.sm)
+                                    .padding(.vertical, LocktySpacing.sm)
+                                    .safeGlass(radius: 12)
+                                }
+                            }
                         }
                     }
 

@@ -74,6 +74,8 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
+                TodayDebugCard(rawText: state.rawDebugText)
+
                 DailyPerspectiveCard(perspective: state.perspective)
 
                 MyDaySection(activities: state.activities)
@@ -102,8 +104,6 @@ struct TodayView: View {
                         classification: classification,
                         day: day
                     )
-                } onAppSelected: { appUsage in
-                    router.push(.applicationDetails(appUsage.app.id, day: day))
                 }
 
                 PatternsSection(patterns: state.patterns)

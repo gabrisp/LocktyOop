@@ -3,7 +3,7 @@ import SwiftUI
 struct AppUsageRow: View {
     let state: AppUsageState
     let onClassificationChange: (AppClassification) -> Void
-    let onSelected: () -> Void
+    let onSelected: (() -> Void)?
 
     var body: some View {
         HStack(spacing: LocktySpacing.md) {
@@ -40,8 +40,10 @@ struct AppUsageRow: View {
                 .foregroundStyle(LocktyColors.primaryText)
                 .locktyNumericTransition(trigger: state.durationText)
         }
-        .tappable()
-        .onTapGesture(perform: onSelected)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelected?()
+        }
     }
 }
 

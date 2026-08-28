@@ -2,8 +2,8 @@ import DeviceActivity
 import _DeviceActivity_SwiftUI
 import SwiftUI
 
-/// The usage duration comes from Apple's DeviceActivityReport extension. The
-/// main app cannot read Screen Time history directly through DeviceActivityCenter.
+/// This report view is the privacy-preserving fallback path when the app
+/// doesn't have direct `DeviceActivityData` access for the selected day yet.
 struct LiveScreenTimeReportCard: View {
     let day: Date
 
@@ -25,10 +25,14 @@ struct ScreenTimeReportLoaderView: View {
     private var filter: DeviceActivityFilter {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: day)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        let end = min(dayEnd, Date())
         return DeviceActivityFilter(
-            segment: .daily(during: DateInterval(start: start, end: end)),
-            devices: .all
+            segment: .hourly(during: DateInterval(start: start, end: end)),
+            devices: nil,
+            applications: [],
+            categories: [],
+            webDomains: []
         )
     }
 
@@ -38,5 +42,8 @@ struct ScreenTimeReportLoaderView: View {
             filter: filter
         )
         .id(DayKey(date: day).id)
+        .task(id: DayKey(date: day).id) {
+            print("Rendering DeviceActivityReport for \(DayKey(date: day).id)")
+        }
     }
 }

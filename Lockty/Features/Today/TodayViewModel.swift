@@ -21,11 +21,13 @@ final class TodayViewModel {
         if force || days[key] == nil {
             days[key] = .loading(day: day)
             todayLogger().debug("Today load started for \(key.id, privacy: .public)")
+            print("Today load started for \(key.id)")
         }
 
         var loadedState = await dataProvider.dayState(for: day)
         days[key] = loadedState
         todayLogger().debug("Today initial state for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
+        print("Today initial state for \(key.id): \(String(describing: loadedState.loadingState))")
 
         guard case .unavailable = loadedState.loadingState else { return }
 
@@ -34,8 +36,10 @@ final class TodayViewModel {
             loadedState = await dataProvider.dayState(for: day)
             days[key] = loadedState
             todayLogger().debug("Today retry \(attempt) for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
+            print("Today retry \(attempt) for \(key.id): \(String(describing: loadedState.loadingState))")
 
             if case .loaded = loadedState.loadingState {
+                print("Today loaded successfully for \(key.id) on retry \(attempt)")
                 break
             }
         }
@@ -63,6 +67,7 @@ final class TodayViewModel {
                 classification: classification
             )
             days[key] = await dataProvider.dayState(for: day)
+            print("Today classification updated for \(appID.rawValue) day=\(key.id) classification=\(classification.rawValue)")
         }
     }
 }

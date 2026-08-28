@@ -10,6 +10,7 @@ final class PauseRuleEntity: NSManagedObject {
     @NSManaged var appIconSystemName: String?
     @NSManaged var appIconArtworkURL: String?
     @NSManaged var appTokenData: Data?
+    @NSManaged var familyActivitySelectionData: Data?
     @NSManaged var isEnabled: Bool
     @NSManaged var allowanceDuration: Double
     @NSManaged var relockAfterAllowance: Bool

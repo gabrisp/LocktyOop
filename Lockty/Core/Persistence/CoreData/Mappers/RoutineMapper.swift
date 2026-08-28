@@ -39,7 +39,7 @@ struct RoutineMapper {
         entity.breakPolicyData = try encoder.encode(routine.breakPolicy)
         entity.familyActivitySelectionData = try selection?.archivedData()
 
-        try ChildDiffSync.apply(
+        ChildDiffSync.apply(
             context: context,
             domainItems: routine.tasks,
             domainID: { $0.id },

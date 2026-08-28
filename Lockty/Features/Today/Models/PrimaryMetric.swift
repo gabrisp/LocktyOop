@@ -35,9 +35,9 @@ enum DailyScoreTone: String, Codable, Hashable {
 
     nonisolated static func tone(for value: Double) -> DailyScoreTone {
         switch value {
-        case 70...100:
+        case 80...100:
             .strong
-        case 40..<70:
+        case 45..<80:
             .balanced
         default:
             .weak

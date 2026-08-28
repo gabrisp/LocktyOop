@@ -62,12 +62,19 @@ final class LiveScreenTimeAuthorizationService: ScreenTimeAuthorizationServicing
     }
 
     private static func map(_ status: AuthorizationStatus) -> ScreenTimeAuthorizationState {
+        if #available(iOS 26.4, *), status == .approvedWithDataAccess {
+            return .authorizedWithDataAccess
+        }
+
         switch status {
-        case .notDetermined: .notDetermined
-        case .approved: .authorized
-        case .approvedWithDataAccess: .authorizedWithDataAccess
-        case .denied: .denied
-        @unknown default: .unavailable
+        case .notDetermined:
+            return .notDetermined
+        case .approved:
+            return .authorized
+        case .denied:
+            return .denied
+        default:
+            return .unavailable
         }
     }
 }

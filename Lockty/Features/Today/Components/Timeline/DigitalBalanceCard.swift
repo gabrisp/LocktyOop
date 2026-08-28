@@ -9,14 +9,23 @@ struct DigitalBalanceCard: View {
             SectionHeader(title: "Digital Balance")
 
             Button(action: action) {
-            CardView(radius: LocktyRadius.large, padding: LocktySpacing.md, interactive: true) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    UsageTimelineChart(state: state)
-                        .frame(height: 176)
+                CardView(radius: LocktyRadius.large, padding: LocktySpacing.md, interactive: true) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                        if state.buckets.isEmpty {
+                            EmptyStateView(
+                                title: "No timeline available",
+                                message: "This graph appears when Lockty has Screen Time activity buckets for the selected day.",
+                                systemImage: "waveform.path.ecg.rectangle"
+                            )
+                            .frame(height: 176)
+                        } else {
+                            UsageTimelineChart(state: state)
+                                .frame(height: 176)
+                        }
 
-                    TimelineLegend()
+                        TimelineLegend()
+                    }
                 }
-            }
             }
             .buttonStyle(.plain)
             .tappable()

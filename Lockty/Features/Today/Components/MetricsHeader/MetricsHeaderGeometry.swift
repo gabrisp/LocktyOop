@@ -7,7 +7,7 @@ struct MetricsHeaderGeometry {
     static let expandedDiameter: CGFloat = 92
     static let collapsedDiameter: CGFloat = 26
     static let labelHeight: CGFloat = 16
-    static let expandedLabelGap: CGFloat = 6
+    static let expandedLabelGap: CGFloat = 8
     static let collapsedLabelGap: CGFloat = 4
     static let expandedLabelWidth: CGFloat = 108
     static let collapsedLabelWidth: CGFloat = 88

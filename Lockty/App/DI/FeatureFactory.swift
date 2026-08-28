@@ -55,7 +55,8 @@ struct FeatureFactory {
                 routineID: routineID,
                 repository: routineRepository,
                 executionRepository: routineExecutionRepository,
-                routineEngine: routineEngine
+                routineEngine: routineEngine,
+                selectionStore: selectionStore
             ),
             router: router
         )
@@ -93,6 +94,20 @@ struct FeatureFactory {
     func makeRoutineTriggersSheet(draftID: UUID) -> some View {
         if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
             RoutineTriggersSheet(viewModel: viewModel)
+        }
+    }
+
+    @ViewBuilder
+    func makeRoutineAppPickerSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
+            RoutineAppPickerSheet(viewModel: viewModel)
+        }
+    }
+
+    @ViewBuilder
+    func makePauseAppPickerSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingPauseEditor(draftID: draftID) {
+            PauseAppPickerSheet(viewModel: viewModel)
         }
     }
 

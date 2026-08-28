@@ -146,6 +146,7 @@ final class RoutineEditorViewModel {
     func loadMostUsedApplications() async {
         guard let usage = try? await usageDataService.mostUsedApplications(for: Date()) else { return }
         mostUsedApplications = Array(usage.sorted { $0.duration > $1.duration }.prefix(6))
+        print("Routine editor loaded most used applications count=\(mostUsedApplications.count)")
     }
 
     func isMostUsedApplicationSelected(_ usage: ApplicationUsage) -> Bool {
@@ -155,19 +156,19 @@ final class RoutineEditorViewModel {
 
     func toggleMostUsedApplication(_ usage: ApplicationUsage) async {
         guard let token = usage.app.applicationToken else { return }
-        var selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
+        var selection = selectionPreview
         if selection.applicationTokens.contains(token) {
             selection.applicationTokens.remove(token)
         } else {
             selection.applicationTokens.insert(token)
         }
-        try? selectionStore.save(selection, scope: selectionScope)
-        refreshSelectionState()
+        replaceSelection(selection)
     }
 
     func load() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        print("Routine editor load started routineID=\(initialRoutineID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         guard let initialRoutineID else { return }
         guard let routines = try? await repository.routines(), let routine = routines.first(where: { $0.id == initialRoutineID }) else {
             return
@@ -194,12 +195,24 @@ final class RoutineEditorViewModel {
         breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
         blockedDomains = routine.blockedDomains.sorted()
         refreshSelectionState()
+        print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
     }
 
     func refreshSelectionState() {
         let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
         selectionPreview = selection
         selectedApplicationCount = selection.applicationTokens.count
+        print("Routine editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+    }
+
+    func replaceSelection(_ selection: FamilyActivitySelection) {
+        var normalized = selection
+        normalized.categoryTokens = []
+        normalized.webDomainTokens = []
+        selectionPreview = normalized
+        selectedApplicationCount = normalized.applicationTokens.count
+        try? selectionStore.save(normalized, scope: selectionScope)
+        print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count)")
     }
 
     func addTask() {
@@ -247,6 +260,11 @@ final class RoutineEditorViewModel {
         }
 
         let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
+        guard !selection.applicationTokens.isEmpty || !blockedDomains.isEmpty else {
+            errorMessage = "Select at least one app or add at least one domain."
+            print("Routine editor refused save because no app/domain restrictions were configured")
+            return false
+        }
         let tasks = sanitizedTasks()
         let breakPolicy = makeBreakPolicy()
         let routine = Routine(
@@ -268,9 +286,11 @@ final class RoutineEditorViewModel {
         do {
             try await repository.save(routine)
             routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(self.blockedDomains.count)")
+            print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(blockedDomains.count)")
             return true
         } catch {
             routineEditorLogger.error("Routine editor failed saving id=\(routine.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            print("Routine editor failed saving id=\(routine.id.uuidString): \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
         }
@@ -319,6 +339,52 @@ final class RoutineEditorViewModel {
         guard !trimmed.isEmpty else { return nil }
         guard trimmed.contains("."), !trimmed.contains(" ") else { return nil }
         return trimmed
+    }
+}
+
+struct RoutineAppPickerSheet: View {
+    @State private var viewModel: RoutineEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    init(viewModel: RoutineEditorViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            EditorTopBar(
+                title: "Choose Apps",
+                confirmTitle: "Done",
+                onClose: { dismiss() },
+                onConfirm: { dismiss() }
+            )
+
+            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+                    Text("Choose the applications this routine will restrict.")
+                        .font(LocktyTypography.callout)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                    Text("Selection is saved instantly.")
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                }
+            }
+
+            FamilyActivityPicker(selection: Binding(
+                get: { viewModel.selectionPreview },
+                set: { newValue in
+                    viewModel.replaceSelection(newValue)
+                }
+            ))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.top, LocktySpacing.sm)
+        .padding(.bottom, LocktySpacing.md)
+        .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
     }
 }
 
@@ -373,7 +439,7 @@ struct RoutineEditorView: View {
                         RoutineAppsMostUsedSection(viewModel: viewModel)
 
                         Button {
-                            router.presentSheet(.appPicker(viewModel.selectionScope))
+                            router.presentSheet(.routineAppPicker(viewModel.draftID))
                         } label: {
                             EditorActionCard(
                                 title: "Blocked apps",
@@ -636,40 +702,18 @@ private struct SelectionPreviewCard: View {
                     .font(LocktyTypography.headline)
                     .foregroundStyle(LocktyColors.primaryText)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: LocktySpacing.md) {
-                        ForEach(Array(selection.applicationTokens), id: \.self) { token in
-                            Label(token)
-                                .labelStyle(.tokenTile)
-                                .frame(width: 64)
-                                .padding(.vertical, LocktySpacing.sm)
-                                .safeGlass(radius: 12)
-                        }
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    ForEach(Array(selection.applicationTokens), id: \.self) { token in
+                        Label(token)
+                            .labelStyle(.titleAndIcon)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, LocktySpacing.xs)
                     }
-                    .padding(.vertical, 1)
                 }
             }
         }
     }
-}
-
-private struct TokenTileLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(spacing: LocktySpacing.xs) {
-            configuration.icon
-                .font(.system(size: 22, weight: .semibold))
-                .frame(width: 34, height: 34)
-            configuration.title
-                .font(LocktyTypography.caption)
-                .foregroundStyle(LocktyColors.primaryText)
-                .lineLimit(1)
-                .multilineTextAlignment(.center)
-        }
-    }
-}
-
-private extension LabelStyle where Self == TokenTileLabelStyle {
-    static var tokenTile: TokenTileLabelStyle { TokenTileLabelStyle() }
 }
 
 struct EditorTopBar: View {

@@ -3,7 +3,7 @@ import SwiftUI
 struct AppUsageListCard: View {
     let state: TodayDayState
     let onClassificationChange: (AppUsageState, AppClassification) -> Void
-    let onAppSelected: (AppUsageState) -> Void
+    let onAppSelected: ((AppUsageState) -> Void)? = nil
 
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
@@ -22,15 +22,26 @@ struct AppUsageListCard: View {
                 }
                 .padding(.bottom, LocktySpacing.xs)
 
-                ForEach(Array(state.appUsages.enumerated()), id: \.element.id) { index, appUsage in
-                    AppUsageListItem(
-                        state: appUsage,
-                        showsDivider: index < state.appUsages.count - 1,
-                        onClassificationChange: { classification in
-                            onClassificationChange(appUsage, classification)
-                        },
-                        onSelected: { onAppSelected(appUsage) }
+                if state.appUsages.isEmpty {
+                    EmptyStateView(
+                        title: "No apps yet",
+                        message: "Lockty will list the applications used on this day as soon as Screen Time data is available.",
+                        systemImage: "app.badge"
                     )
+                    .padding(.vertical, LocktySpacing.md)
+                } else {
+                    ForEach(Array(state.appUsages.enumerated()), id: \.element.id) { index, appUsage in
+                        AppUsageListItem(
+                            state: appUsage,
+                            showsDivider: index < state.appUsages.count - 1,
+                            onClassificationChange: { classification in
+                                onClassificationChange(appUsage, classification)
+                            },
+                            onSelected: {
+                                onAppSelected?(appUsage)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -41,7 +52,19 @@ private struct AppUsageListItem: View {
     let state: AppUsageState
     let showsDivider: Bool
     let onClassificationChange: (AppClassification) -> Void
-    let onSelected: () -> Void
+    let onSelected: (() -> Void)?
+
+    init(
+        state: AppUsageState,
+        showsDivider: Bool,
+        onClassificationChange: @escaping (AppClassification) -> Void,
+        onSelected: (() -> Void)? = nil
+    ) {
+        self.state = state
+        self.showsDivider = showsDivider
+        self.onClassificationChange = onClassificationChange
+        self.onSelected = onSelected
+    }
 
     var body: some View {
         VStack(spacing: 0) {

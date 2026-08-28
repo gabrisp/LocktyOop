@@ -1,3 +1,4 @@
+import FamilyControls
 import Foundation
 
 protocol TodayDataProviding {
@@ -167,10 +168,22 @@ struct LiveTodayDataPipeline: TodayDataProviding {
 
             let averageUsage = await rollingAverageUsage(endingBefore: dayStart, days: 7)
             let averageDistractions = await rollingAveragePauseEvents(endingBefore: dayStart, days: 7)
+            let rawDebugText = makeRawDebugText(
+                day: dayStart,
+                loadingState: .loaded,
+                summary: summary,
+                snapshot: snapshot,
+                pauseEvents: pauseEvents,
+                routineExecutions: routineExecutions,
+                timelineBuckets: timelineBuckets,
+                errorMessage: nil
+            )
+            print(rawDebugText)
 
             return TodayDayState(
                 day: dayStart,
                 loadingState: .loaded,
+                rawDebugText: rawDebugText,
                 primaryMetrics: PrimaryMetricsState(
                     metrics: [
                         PrimaryMetric(kind: .productivity, value: productivityResult.rawValue ?? 0),
@@ -230,7 +243,8 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 patterns: patterns
             )
         } catch {
-            return unavailableState(day: dayStart, message: error.localizedDescription)
+            print("Today pipeline falling back to partial unavailable state for \(DayKey(date: dayStart).id): \(error.localizedDescription)")
+            return await unavailableState(day: dayStart, dayEnd: dayEnd, message: error.localizedDescription)
         }
     }
 
@@ -343,10 +357,173 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         return longest
     }
 
-    private func unavailableState(day: Date, message: String) -> TodayDayState {
-        var state = TodayDayState.loading(day: day)
-        state.loadingState = .unavailable(message)
-        return state
+    private func unavailableState(day: Date, dayEnd: Date, message: String) async -> TodayDayState {
+        let pauseEvents = await pauseEventRepository.events(from: day, to: dayEnd)
+        let routineExecutions = (try? await routineExecutionRepository.executions(from: day, to: dayEnd)) ?? []
+        let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
+
+        let completedRoutineTasks = routineExecutions.flatMap(\.taskCompletions).filter { $0.completedAt != nil }.count
+        let totalRoutineTasks = routineExecutions.flatMap(\.taskCompletions).count
+        let completedRoutines = routineExecutions.filter { $0.endedAt != nil }.count
+        let pauseSummary = PauseSuccessCalculator().summary(from: pauseEvents)
+        let routineCompletionRate = totalRoutineTasks == 0 ? (completedRoutines > 0 ? 1 : 0) : Double(completedRoutineTasks) / Double(totalRoutineTasks)
+        let pauseAbandonmentRate = pauseSummary.decisionCount == 0 ? 0 : Double(pauseSummary.stoppedCount) / Double(pauseSummary.decisionCount)
+        let restrictionAdherenceRate = max(0, 1 - (Double(pauseSummary.continuedCount) / Double(max(pauseSummary.triggeredCount, 1))))
+        let controlResult = controlCalculator.score(
+            from: ControlScoreInput(
+                routineCompletionRate: routineCompletionRate,
+                pauseAbandonmentRate: pauseAbandonmentRate,
+                restrictionAdherenceRate: restrictionAdherenceRate,
+                fragmentedUsagePenalty: 0
+            )
+        )
+        let activities = makeDigitalActivities(
+            dayStart: day,
+            dayEnd: dayEnd,
+            timelineBuckets: [],
+            routineExecutions: routineExecutions,
+            pauseEvents: pauseEvents,
+            bestDetoxDuration: 0
+        )
+        let rawDebugText = makeRawDebugText(
+            day: day,
+            loadingState: .unavailable(message),
+            summary: nil,
+            snapshot: snapshot,
+            pauseEvents: pauseEvents,
+            routineExecutions: routineExecutions,
+            timelineBuckets: [],
+            errorMessage: message
+        )
+        print(rawDebugText)
+
+        return TodayDayState(
+            day: day,
+            loadingState: .unavailable(message),
+            rawDebugText: rawDebugText,
+            primaryMetrics: PrimaryMetricsState(
+                metrics: [
+                    PrimaryMetric(kind: .productivity, value: 0),
+                    PrimaryMetric(kind: .control, value: controlResult.rawValue),
+                    PrimaryMetric(kind: .detox, value: 0)
+                ]
+            ),
+            perspective: DailyPerspective(
+                title: "Usage data unavailable",
+                body: "Lockty still shows routine and Pause events for this day, but Screen Time usage has not been delivered yet.",
+                tone: .balanced
+            ),
+            activities: activities,
+            metrics: TodayMetricsState(
+                screenTime: ScreenTimeCardState(durationText: "--", comparisonText: "Waiting for Screen Time data"),
+                bestDetox: BestDetoxCardState(durationText: "--", comparisonText: "Needs activity data"),
+                routines: RoutineSummaryCardState(
+                    valueText: routineSummaryValue(completedRoutines: completedRoutines, totalRoutines: routineExecutions.count),
+                    detailText: routineSummaryDetail(completedTasks: completedRoutineTasks, totalTasks: totalRoutineTasks)
+                ),
+                distractions: DistractionsCardState(
+                    valueText: "\(pauseEvents.count)",
+                    comparisonText: "Measured from Lockty events"
+                ),
+                pauseSuccess: PauseSuccessDayCardState(
+                    valueText: pauseSummary.successRateValue.map { "\($0)%" } ?? "--",
+                    detailText: "\(pauseSummary.stoppedCount) of \(pauseSummary.triggeredCount) stopped"
+                ),
+                intentionalTime: IntentionalTimeCardState(
+                    valueText: "--",
+                    detailText: "Needs Screen Time usage data"
+                )
+            ),
+            timeline: .empty,
+            appUsages: [],
+            patterns: patternAnalyzer.patterns(
+                from: PatternInput(
+                    productivityScore: 0,
+                    controlScore: controlResult.roundedValue,
+                    longestDetoxText: "--",
+                    completedRoutines: completedRoutines,
+                    totalRoutines: max(routineExecutions.count, completedRoutines)
+                )
+            )
+        )
+    }
+
+    private func makeRawDebugText(
+        day: Date,
+        loadingState: TodayLoadingState,
+        summary: DayUsageSummary?,
+        snapshot: ScreenTimeReportSnapshot?,
+        pauseEvents: [PauseEvent],
+        routineExecutions: [RoutineExecution],
+        timelineBuckets: [UsageTimelineBucket],
+        errorMessage: String?
+    ) -> String {
+        let key = DayKey(date: day)
+        let authStatus = AuthorizationCenter.shared.authorizationStatus
+        let allSnapshotCount = appGroupStore.loadAllScreenTimeReportSnapshots().count
+        var lines: [String] = []
+        lines.append("day=\(key.id)")
+        lines.append("loadingState=\(String(describing: loadingState))")
+        lines.append("authorizationStatus=\(authStatus.description)")
+        if #available(iOS 26.4, *) {
+            lines.append("approvedWithDataAccess=\(authStatus == .approvedWithDataAccess)")
+        } else {
+            lines.append("approvedWithDataAccess=unsupported_before_iOS_26_4")
+        }
+        lines.append("snapshotCachedForDay=\(snapshot != nil)")
+        lines.append("allSnapshotsCached=\(allSnapshotCount)")
+        lines.append("pauseEvents=\(pauseEvents.count)")
+        lines.append("routineExecutions=\(routineExecutions.count)")
+        lines.append("timelineBuckets=\(timelineBuckets.count)")
+
+        if let errorMessage {
+            lines.append("error=\(errorMessage)")
+        }
+
+        if let summary {
+            lines.append("summary.totalUsage=\(summary.totalUsage)")
+            lines.append("summary.applications=\(summary.applications.count)")
+            for (index, app) in summary.applications.enumerated() {
+                lines.append("app[\(index)]=\(app.app.displayName) bundle=\(app.app.bundleIdentifier ?? "nil") duration=\(app.duration) classification=\(app.classification.rawValue)")
+            }
+        } else {
+            lines.append("summary=nil")
+        }
+
+        if let snapshot {
+            lines.append("snapshot.totalActivityDuration=\(snapshot.totalActivityDuration)")
+            lines.append("snapshot.totalPickupsWithoutApplicationActivity=\(snapshot.totalPickupsWithoutApplicationActivity)")
+            lines.append("snapshot.firstPickup=\(snapshot.firstPickup?.description ?? "nil")")
+            lines.append("snapshot.lastUpdatedAt=\(snapshot.lastUpdatedAt)")
+            lines.append("snapshot.applications=\(snapshot.applications.count)")
+            for (index, app) in snapshot.applications.enumerated() {
+                lines.append("snapshot.app[\(index)]=\(app.app.displayName) bundle=\(app.app.bundleIdentifier ?? "nil") duration=\(app.totalActivityDuration) pickups=\(app.pickups) notifications=\(app.notifications)")
+            }
+            lines.append("snapshot.segments=\(snapshot.activitySegments.count)")
+            for (index, segment) in snapshot.activitySegments.enumerated() {
+                lines.append("segment[\(index)]=\(segment.dateInterval.start) -> \(segment.dateInterval.end) total=\(segment.totalActivityDuration) pickupsWithoutApp=\(segment.totalPickupsWithoutApplicationActivity) appDurations=\(segment.applicationDurations.count)")
+            }
+            lines.append("snapshot.webDomains=\(snapshot.webDomains.count)")
+            for (index, domain) in snapshot.webDomains.enumerated() {
+                lines.append("domain[\(index)]=\(domain.domain) duration=\(domain.totalActivityDuration)")
+            }
+        } else {
+            lines.append("snapshot=nil")
+        }
+
+        if !pauseEvents.isEmpty {
+            for (index, event) in pauseEvents.enumerated() {
+                lines.append("pause[\(index)]=app=\(event.application.displayName) decision=\(event.decision.rawValue) triggeredAt=\(event.triggeredAt) completedAt=\(event.completedAt?.description ?? "nil") intention=\(event.intention ?? "nil")")
+            }
+        }
+
+        if !routineExecutions.isEmpty {
+            for (index, execution) in routineExecutions.enumerated() {
+                lines.append("routine[\(index)]=\(execution.routineName) startedAt=\(execution.startedAt) endedAt=\(execution.endedAt?.description ?? "nil") tasks=\(execution.taskCompletions.count) breaks=\(execution.breakHistory.count)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
     }
 
     private func rollingAverageUsage(endingBefore day: Date, days: Int) async -> TimeInterval {

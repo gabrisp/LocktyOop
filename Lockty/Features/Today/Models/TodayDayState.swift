@@ -9,6 +9,7 @@ enum TodayLoadingState: Equatable {
 struct TodayDayState: Equatable {
     var day: Date
     var loadingState: TodayLoadingState
+    var rawDebugText: String
     var primaryMetrics: PrimaryMetricsState
     var perspective: DailyPerspective
     var activities: [DigitalActivity]
@@ -21,6 +22,7 @@ struct TodayDayState: Equatable {
         TodayDayState(
             day: day,
             loadingState: .loading,
+            rawDebugText: "Preparing Today diagnostics...",
             primaryMetrics: .loading,
             perspective: .loading,
             activities: [],

@@ -36,6 +36,7 @@ enum EditablePauseStep: String, CaseIterable, Identifiable {
 @Observable
 final class PauseEditorViewModel {
     let editingID: UUID
+    let draftID: UUID
 
     var isEnabled = true
     var allowanceMinutes = 5
@@ -53,11 +54,13 @@ final class PauseEditorViewModel {
 
     init(
         pauseID: UUID?,
+        draftID: UUID,
         repository: PauseRuleRepository,
         selectionStore: ScreenTimeSelectionStore
     ) {
         initialPauseID = pauseID
         editingID = pauseID ?? UUID()
+        self.draftID = draftID
         self.repository = repository
         self.selectionStore = selectionStore
         createdAt = Date()
@@ -82,6 +85,7 @@ final class PauseEditorViewModel {
     func load() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        print("Pause editor load started pauseID=\(initialPauseID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         guard let initialPauseID, let rule = await repository.rule(id: initialPauseID) else { return }
         createdAt = rule.createdAt
         isEnabled = rule.isEnabled
@@ -89,6 +93,7 @@ final class PauseEditorViewModel {
         relockAfterAllowance = rule.relockAfterAllowance
         steps = rule.steps
         refreshSelectionState()
+        print("Pause editor loaded pauseID=\(initialPauseID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) steps=\(steps.count)")
     }
 
     func refreshSelectionState() {
@@ -96,6 +101,21 @@ final class PauseEditorViewModel {
         selectionPreview = selection
         let applications = selection.applicationTokens.map(AppIdentity.init(token:))
         selectedApplication = applications.count == 1 ? applications[0] : nil
+        print("Pause editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+    }
+
+    func replaceSelection(_ selection: FamilyActivitySelection) {
+        var normalized = selection
+        normalized.categoryTokens = []
+        normalized.webDomainTokens = []
+        if normalized.applicationTokens.count > 1, let kept = normalized.applicationTokens.first {
+            normalized.applicationTokens = [kept]
+        }
+        selectionPreview = normalized
+        let applications = normalized.applicationTokens.map(AppIdentity.init(token:))
+        selectedApplication = applications.count == 1 ? applications[0] : nil
+        try? selectionStore.save(normalized, scope: selectionScope)
+        print("Pause editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count)")
     }
 
     func addStep(_ type: EditablePauseStep) {
@@ -147,6 +167,7 @@ final class PauseEditorViewModel {
 
         await repository.save(rule)
         pauseEditorLogger.notice("Pause editor saved id=\(rule.id.uuidString, privacy: .public) app=\(application.displayName, privacy: .public) steps=\(sanitizedSteps.count)")
+        print("Pause editor saved id=\(rule.id.uuidString) app=\(application.displayName) steps=\(sanitizedSteps.count)")
         return true
     }
 
@@ -252,11 +273,11 @@ struct PauseEditorView: View {
             EditorTopBar(
                 title: viewModel.title,
                 confirmTitle: "Save",
-                onClose: { dismiss() },
+                onClose: { close() },
                 onConfirm: {
                     Task {
                         if await viewModel.save() {
-                            dismiss()
+                            close()
                         }
                     }
                 }
@@ -312,7 +333,7 @@ struct PauseEditorView: View {
         CardView(radius: LocktyRadius.large, padding: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
                 Button {
-                    router.presentSheet(.appPicker(viewModel.selectionScope))
+                    router.presentSheet(.pauseAppPicker(viewModel.draftID))
                 } label: {
                     HStack(spacing: LocktySpacing.md) {
                         if let token = viewModel.selectionPreview.applicationTokens.first {
@@ -361,6 +382,52 @@ struct PauseEditorView: View {
                 }
             }
         }
+    }
+}
+
+struct PauseAppPickerSheet: View {
+    @State private var viewModel: PauseEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    init(viewModel: PauseEditorViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            EditorTopBar(
+                title: "Choose App",
+                confirmTitle: "Done",
+                onClose: { dismiss() },
+                onConfirm: { dismiss() }
+            )
+
+            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+                    Text("Pick the one application that should trigger this Pause.")
+                        .font(LocktyTypography.callout)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                    Text("Selection is saved instantly.")
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                }
+            }
+
+            FamilyActivityPicker(selection: Binding(
+                get: { viewModel.selectionPreview },
+                set: { newValue in
+                    viewModel.replaceSelection(newValue)
+                }
+            ))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.top, LocktySpacing.sm)
+        .padding(.bottom, LocktySpacing.md)
+        .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
     }
 }
 

@@ -74,9 +74,48 @@ extension AppIdentity.ID {
 }
 
 extension AppIdentity {
+    nonisolated static func preferredDisplayName(
+        localizedDisplayName: String?,
+        bundleIdentifier: String?
+    ) -> String {
+        if let localizedDisplayName,
+           !localizedDisplayName.isEmpty,
+           !localizedDisplayName.contains(".") {
+            return localizedDisplayName
+        }
+
+        if let bundleIdentifier,
+           !bundleIdentifier.isEmpty {
+            let candidate = bundleIdentifier
+                .split(separator: ".")
+                .last
+                .map(String.init)?
+                .replacingOccurrences(of: "-", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let candidate,
+               !candidate.isEmpty {
+                return candidate
+                    .split(separator: " ")
+                    .map { part in
+                        let value = String(part)
+                        guard let first = value.first else { return value }
+                        return first.uppercased() + value.dropFirst()
+                    }
+                    .joined(separator: " ")
+            }
+        }
+
+        return "App"
+    }
+
     nonisolated init(token: ManagedSettings.ApplicationToken) {
         let application = ManagedSettings.Application(token: token)
-        let displayName = application.localizedDisplayName ?? application.bundleIdentifier ?? "App"
+        let displayName = AppIdentity.preferredDisplayName(
+            localizedDisplayName: application.localizedDisplayName,
+            bundleIdentifier: application.bundleIdentifier
+        )
         let bundleIdentifier = application.bundleIdentifier
         let iconSystemName = bundleIdentifier == nil ? "app.fill" : nil
         self.init(

@@ -19,9 +19,6 @@ enum AppGroupStoreError: LocalizedError {
 }
 
 final class AppGroupStore {
-    private static let persistenceLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "persistence")
-    private static let screenTimeLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time")
-
     nonisolated(unsafe) private let defaults: UserDefaults?
     nonisolated(unsafe) private let fileManager: FileManager
     nonisolated private let key: String
@@ -56,20 +53,22 @@ final class AppGroupStore {
             fileName: "runtime-state.json",
             legacyDefaultsKey: key
         ) else {
-            Self.persistenceLogger.debug("No runtime state found in shared storage.")
+            Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("No runtime state found in shared storage.")
             return .empty
         }
 
         do {
             let envelope = try decoder.decode(RuntimeEnvelope.self, from: data)
             guard envelope.schemaVersion == RuntimeEnvelope.currentSchemaVersion else {
-                Self.persistenceLogger.error("Runtime state schema mismatch: \(envelope.schemaVersion)")
+                Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").error("Runtime state schema mismatch: \(envelope.schemaVersion)")
                 throw AppGroupStoreError.decodeFailed
             }
-            Self.persistenceLogger.debug("Loaded runtime state successfully.")
+            Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Loaded runtime state successfully.")
+            print("Loaded runtime state successfully.")
             return envelope.state
         } catch {
-            Self.persistenceLogger.error("Failed decoding runtime state: \(error.localizedDescription, privacy: .public)")
+            Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").error("Failed decoding runtime state: \(error.localizedDescription, privacy: .public)")
+            print("Failed decoding runtime state: \(error.localizedDescription)")
             throw AppGroupStoreError.decodeFailed
         }
     }
@@ -82,7 +81,8 @@ final class AppGroupStore {
             fileName: "runtime-state.json",
             legacyDefaultsKey: key
         )
-        Self.persistenceLogger.notice("Saved runtime state.")
+        Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").notice("Saved runtime state.")
+        print("Saved runtime state.")
     }
 
     nonisolated func updateRuntimeState(_ transform: (inout RuntimeState) -> Void) throws {
@@ -110,18 +110,21 @@ final class AppGroupStore {
             do {
                 let envelope = try decoder.decode(ScreenTimeReportSnapshotEnvelope.self, from: data)
                 guard envelope.schemaVersion == ScreenTimeReportSnapshotEnvelope.currentSchemaVersion else {
-                    Self.screenTimeLogger.error("Snapshot schema mismatch for day \(day.id, privacy: .public)")
+                    Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").error("Snapshot schema mismatch for day \(day.id, privacy: .public)")
                     throw AppGroupStoreError.snapshotDecodeFailed
                 }
-                Self.screenTimeLogger.notice("Loaded snapshot for day \(day.id, privacy: .public) apps=\(envelope.snapshot.applications.count)")
+                Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").notice("Loaded snapshot for day \(day.id, privacy: .public) apps=\(envelope.snapshot.applications.count)")
+                print("Loaded snapshot for day \(day.id) apps=\(envelope.snapshot.applications.count)")
                 return envelope.snapshot
             } catch {
-                Self.screenTimeLogger.error("Failed decoding snapshot for day \(day.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").error("Failed decoding snapshot for day \(day.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                print("Failed decoding snapshot for day \(day.id): \(error.localizedDescription)")
                 throw AppGroupStoreError.snapshotDecodeFailed
             }
         }
 
-        Self.screenTimeLogger.debug("No direct snapshot file for day \(day.id, privacy: .public), checking aggregated files.")
+        Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").debug("No direct snapshot file for day \(day.id, privacy: .public), checking aggregated files.")
+        print("No direct snapshot file for day \(day.id), checking aggregated files.")
         return loadAllScreenTimeReportSnapshots().first { snapshot in
             snapshot.day.year == day.year &&
             snapshot.day.month == day.month &&
@@ -137,7 +140,8 @@ final class AppGroupStore {
             fileName: reportFileName(for: snapshot.day),
             legacyDefaultsKey: SharedKeys.screenTimeReportSnapshotPrefix + snapshot.day.id
         )
-        Self.screenTimeLogger.notice("Saved snapshot for day \(snapshot.day.id, privacy: .public) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
+        Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").notice("Saved snapshot for day \(snapshot.day.id, privacy: .public) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
+        print("Saved snapshot for day \(snapshot.day.id) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
     }
 
     nonisolated func loadAllScreenTimeReportSnapshots() -> [ScreenTimeReportSnapshot] {
@@ -206,6 +210,7 @@ final class AppGroupStore {
             fileName: "selection-records.json",
             legacyDefaultsKey: SharedKeys.screenTimeSelectionRecordsKey
         )
+        print("Saved selection records count=\(records.count)")
     }
 
     nonisolated func loadPauseRuleSnapshots() -> [PauseRuleSnapshot] {
@@ -233,17 +238,18 @@ final class AppGroupStore {
         legacyDefaultsKey: String
     ) throws -> Data? {
         if let fileURL = fileURL(named: fileName), fileManager.fileExists(atPath: fileURL.path) {
-            Self.persistenceLogger.debug("Reading shared file \(fileName, privacy: .public) at \(fileURL.path(percentEncoded: false), privacy: .public)")
+            Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Reading shared file \(fileName, privacy: .public) at \(fileURL.path(percentEncoded: false), privacy: .public)")
+            print("Reading shared file \(fileName) at \(fileURL.path(percentEncoded: false))")
             return try Data(contentsOf: fileURL)
         }
 
         if let defaults, let data = defaults.data(forKey: legacyDefaultsKey) {
-            Self.persistenceLogger.debug("Reading shared defaults key \(legacyDefaultsKey, privacy: .public)")
+            Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Reading shared defaults key \(legacyDefaultsKey, privacy: .public)")
             try? writeData(data, fileName: fileName, legacyDefaultsKey: legacyDefaultsKey)
             return data
         }
 
-        Self.persistenceLogger.debug("No shared data for file \(fileName, privacy: .public)")
+        Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("No shared data for file \(fileName, privacy: .public)")
         return nil
     }
 
@@ -257,7 +263,8 @@ final class AppGroupStore {
         try ensureDirectoryExists(at: fileURL.deletingLastPathComponent())
         try data.write(to: fileURL, options: .atomic)
         defaults?.set(data, forKey: legacyDefaultsKey)
-        Self.persistenceLogger.notice("Wrote shared file \(fileName, privacy: .public) to \(fileURL.path(percentEncoded: false), privacy: .public)")
+        Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").notice("Wrote shared file \(fileName, privacy: .public) to \(fileURL.path(percentEncoded: false), privacy: .public)")
+        print("Wrote shared file \(fileName) to \(fileURL.path(percentEncoded: false))")
     }
 
     nonisolated private func removeData(

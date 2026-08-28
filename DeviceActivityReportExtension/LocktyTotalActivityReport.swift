@@ -14,18 +14,23 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
         representing data: DeviceActivityResults<DeviceActivityData>
     ) async -> LocktyActivityReportConfiguration {
         reportLogger.notice("makeConfiguration invoked")
+        print("DeviceActivityReport makeConfiguration invoked")
         let snapshot = await buildSnapshot(from: data)
 
         if let snapshot {
             reportLogger.notice("Built snapshot day=\(snapshot.day.id, privacy: .public) totalActivityDuration=\(snapshot.totalActivityDuration, privacy: .public) apps=\(snapshot.applications.count, privacy: .public) segments=\(snapshot.activitySegments.count, privacy: .public)")
+            print("Built DeviceActivityReport snapshot day=\(snapshot.day.id) total=\(snapshot.totalActivityDuration) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
             do {
                 try AppGroupStore().saveScreenTimeReportSnapshot(snapshot)
                 reportLogger.notice("Saved snapshot to App Group for day=\(snapshot.day.id, privacy: .public)")
+                print("Saved DeviceActivityReport snapshot to App Group for day=\(snapshot.day.id)")
             } catch {
                 reportLogger.error("Failed to save snapshot: \(error.localizedDescription, privacy: .public)")
+                print("Failed to save DeviceActivityReport snapshot: \(error.localizedDescription)")
             }
         } else {
             reportLogger.notice("buildSnapshot returned nil (no activity segments in the received data)")
+            print("DeviceActivityReport buildSnapshot returned nil")
         }
 
         return LocktyActivityReportConfiguration(totalActivityDuration: snapshot?.totalActivityDuration ?? 0)
@@ -45,9 +50,11 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
         var firstSegmentDate: Date?
 
         for await activityData in data {
+            print("DeviceActivityReport received data chunk updatedAt=\(activityData.lastUpdatedDate)")
             lastUpdatedAt = max(lastUpdatedAt, activityData.lastUpdatedDate)
 
             for await segment in activityData.activitySegments {
+                print("DeviceActivityReport segment \(segment.dateInterval.start) -> \(segment.dateInterval.end) total=\(segment.totalActivityDuration)")
                 totalActivityDuration += segment.totalActivityDuration
                 totalPickupsWithoutApplicationActivity += segment.totalPickupsWithoutApplicationActivity
                 if let longestActivity = segment.longestActivity {
@@ -68,7 +75,10 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
                             appIdentity = AppIdentity(token: token)
                         } else {
                             let bundleIdentifier = applicationActivity.application.bundleIdentifier
-                            let displayName = applicationActivity.application.localizedDisplayName ?? bundleIdentifier ?? "App"
+                            let displayName = AppIdentity.preferredDisplayName(
+                                localizedDisplayName: applicationActivity.application.localizedDisplayName,
+                                bundleIdentifier: bundleIdentifier
+                            )
                             appIdentity = AppIdentity(
                                 id: AppIdentity.ID(rawValue: bundleIdentifier ?? "display.\(displayName.lowercased())"),
                                 displayName: displayName,

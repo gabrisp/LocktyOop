@@ -43,11 +43,16 @@ final class EditorViewModelStore {
 
         let created = PauseEditorViewModel(
             pauseID: route.pauseID,
+            draftID: route.draftID,
             repository: repository,
             selectionStore: selectionStore
         )
         pauseEditors[route.draftID] = created
         return created
+    }
+
+    func existingPauseEditor(draftID: UUID) -> PauseEditorViewModel? {
+        pauseEditors[draftID]
     }
 
     func releaseRoutineEditor(draftID: UUID) {

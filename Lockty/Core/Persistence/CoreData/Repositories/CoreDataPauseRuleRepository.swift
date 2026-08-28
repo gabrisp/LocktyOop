@@ -25,9 +25,10 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
     func rules() async -> [PauseRule] {
         guard let context = controller.viewContext else { return [] }
         guard let entities = try? context.fetch(PauseRuleEntity.fetchRequest()) else { return [] }
+        print("Loaded pause rules from Core Data count=\(entities.count)")
         return entities.compactMap { entity in
             guard let domain = try? mapper.makeDomain(from: entity) else { return nil }
-            syncSelectionStore(for: domain)
+            syncSelectionStore(for: domain, entity: entity)
             return domain
         }.sorted { $0.application.displayName < $1.application.displayName }
     }
@@ -40,7 +41,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         guard let entity = try? context.fetch(request).first, let rule = try? mapper.makeDomain(from: entity) else {
             return nil
         }
-        syncSelectionStore(for: rule)
+        syncSelectionStore(for: rule, entity: entity)
         return rule
     }
 
@@ -52,7 +53,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         guard let entity = try? context.fetch(request).first, let rule = try? mapper.makeDomain(from: entity) else {
             return nil
         }
-        syncSelectionStore(for: rule)
+        syncSelectionStore(for: rule, entity: entity)
         return rule
     }
 
@@ -71,7 +72,8 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         }
 
         pauseRepositoryLogger.notice("Saved pause rule id=\(rule.id.uuidString, privacy: .public) app=\(rule.application.displayName, privacy: .public) steps=\(rule.steps.count)")
-        syncSelectionStore(for: rule)
+        print("Saved pause rule id=\(rule.id.uuidString) app=\(rule.application.displayName) steps=\(rule.steps.count)")
+        syncSelectionStore(for: rule, entity: entity)
         syncSharedSnapshots()
     }
 
@@ -83,6 +85,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         if let entity = try? context.fetch(request).first {
             context.delete(entity)
             try? context.save()
+            print("Deleted pause rule id=\(id.uuidString)")
             syncSharedSnapshots()
         }
     }
@@ -106,10 +109,17 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         .sorted { $0.application.displayName.localizedCaseInsensitiveCompare($1.application.displayName) == .orderedAscending }
     }
 
-    private func syncSelectionStore(for rule: PauseRule) {
+    private func syncSelectionStore(for rule: PauseRule, entity: PauseRuleEntity) {
+        if let selection = try? mapper.selection(from: entity) {
+            try? selectionStore.save(selection, scope: .pause(rule.id))
+            print("Synced pause selection from entity ruleID=\(rule.id.uuidString) apps=\(selection.applicationTokens.count)")
+            return
+        }
+
         guard let token = rule.application.applicationToken else { return }
         var selection = FamilyActivitySelection()
         selection.applicationTokens = [token]
         try? selectionStore.save(selection, scope: .pause(rule.id))
+        print("Synced reconstructed pause selection ruleID=\(rule.id.uuidString)")
     }
 }

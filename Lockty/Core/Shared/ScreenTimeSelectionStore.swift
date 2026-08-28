@@ -17,6 +17,7 @@ struct ScreenTimeSelectionStore {
     func load(scope: ScreenTimeSelectionScope) throws -> FamilyActivitySelection {
         let selection = records().first(where: { $0.scope == scope })?.selection ?? FamilyActivitySelection()
         selectionLogger().debug("Loaded selection for scope=\(scope.id, privacy: .public) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
+        print("Loaded selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
         return selection
     }
 
@@ -30,6 +31,7 @@ struct ScreenTimeSelectionStore {
         }
         try appGroupStore.saveSelectionRecords(storedRecords)
         selectionLogger().notice("Saved selection for scope=\(scope.id, privacy: .public) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
+        print("Saved selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
     }
 
     func record(scope: ScreenTimeSelectionScope) -> ScreenTimeSelectionRecord? {
@@ -81,6 +83,7 @@ struct ScreenTimeSelectionStore {
     func records() -> [ScreenTimeSelectionRecord] {
         let loadedRecords = appGroupStore.loadSelectionRecords()
         selectionLogger().debug("Loaded selection record count=\(loadedRecords.count)")
+        print("Loaded selection record count=\(loadedRecords.count)")
         return loadedRecords
     }
 }

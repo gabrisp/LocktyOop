@@ -22,7 +22,7 @@ extension View {
     /// Small tracked-caps label above a value, e.g. "RESTRICTIONS", "SCHEDULE".
     func locktyEyebrow() -> some View {
         self
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .tracking(0.06)
             .foregroundStyle(.secondary)
     }

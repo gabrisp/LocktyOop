@@ -160,6 +160,7 @@ struct DateSliderView: View {
     @Binding var scrollOffset: CGFloat
     var onDateChanged: ((Date) -> Void)?
     var onSelectionChanged: () -> Void
+    var horizontalPadding: CGFloat = LocktySpacing.md
 
     private var selectedIndex: Int? {
         dates.firstIndex { Calendar.current.isDate($0, inSameDayAs: selectedDate) }
@@ -167,7 +168,7 @@ struct DateSliderView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let width = max(proxy.size.width - LocktySpacing.md * 2, DayPageSliderMetrics.itemWidth)
+            let width = max(proxy.size.width - horizontalPadding * 2, DayPageSliderMetrics.itemWidth)
 
             DayPageSlider(
                 pickerCount: dates.count,
@@ -180,8 +181,7 @@ struct DateSliderView: View {
                 sliderContent(width: width)
             }
             .frame(width: width, height: DayPageSliderMetrics.height)
-            .safeGlass(radius: LocktyRadius.medium, interactive: true)
-            .padding(.horizontal, LocktySpacing.md)
+            .padding(.horizontal, horizontalPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: DayPageSliderMetrics.barHeight)

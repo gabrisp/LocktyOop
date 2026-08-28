@@ -54,6 +54,7 @@ final class CoreDataRoutineRepository: RoutineRepository {
         if let entity = try context.fetch(request).first {
             context.delete(entity)
             try context.save()
+            try? selectionStore.remove(scope: .routine(id))
             print("Deleted routine id=\(id.uuidString)")
         }
     }

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import SwiftUI
 
 private func todayLogger() -> Logger {
     Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time")
@@ -10,22 +11,29 @@ private func todayLogger() -> Logger {
 @Observable
 final class TodayViewModel {
     private let dataProvider: TodayDataProviding
+    private let routineEngine: RoutineEngine
     private(set) var days: [DayKey: TodayDayState] = [:]
+    private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
 
-    init(dataProvider: TodayDataProviding) {
+    init(dataProvider: TodayDataProviding, routineEngine: RoutineEngine) {
         self.dataProvider = dataProvider
+        self.routineEngine = routineEngine
     }
 
     func load(day: Date, force: Bool = false) async {
         let key = DayKey(date: day)
         if force || days[key] == nil {
-            days[key] = .loading(day: day)
+            withAnimation(.smooth(duration: 0.24)) {
+                days[key] = .loading(day: day)
+            }
             todayLogger().debug("Today load started for \(key.id, privacy: .public)")
             print("Today load started for \(key.id)")
         }
 
         var loadedState = await dataProvider.dayState(for: day)
-        days[key] = loadedState
+        withAnimation(.smooth(duration: 0.28)) {
+            days[key] = loadedState
+        }
         todayLogger().debug("Today initial state for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
         print("Today initial state for \(key.id): \(String(describing: loadedState.loadingState))")
 
@@ -34,7 +42,9 @@ final class TodayViewModel {
         for attempt in 1...8 {
             try? await Task.sleep(nanoseconds: 750_000_000)
             loadedState = await dataProvider.dayState(for: day)
-            days[key] = loadedState
+            withAnimation(.smooth(duration: 0.28)) {
+                days[key] = loadedState
+            }
             todayLogger().debug("Today retry \(attempt) for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
             print("Today retry \(attempt) for \(key.id): \(String(describing: loadedState.loadingState))")
 
@@ -59,6 +69,20 @@ final class TodayViewModel {
         await load(day: day, force: true)
     }
 
+    func visiblePerspectives(for day: Date) -> [DailyPerspective] {
+        let key = DayKey(date: day)
+        let dismissedIDs = dismissedPerspectiveIDsByDay[key, default: []]
+        let items = (days[key] ?? .loading(day: day)).perspectives
+        return items.filter { !dismissedIDs.contains($0.id) }
+    }
+
+    func dismissPerspective(_ perspectiveID: String, day: Date) {
+        let key = DayKey(date: day)
+        withAnimation(.smooth(duration: 0.3)) {
+            dismissedPerspectiveIDsByDay[key, default: []].insert(perspectiveID)
+        }
+    }
+
     func updateClassification(
         appID: AppIdentity.ID,
         classification: AppClassification,
@@ -71,9 +95,17 @@ final class TodayViewModel {
                 appID: appID,
                 classification: classification
             )
-            days[key] = await dataProvider.dayState(for: day)
+            let updated = await dataProvider.dayState(for: day)
+            withAnimation(.smooth(duration: 0.28)) {
+                days[key] = updated
+            }
             print("Today classification updated for \(appID.rawValue) day=\(key.id) classification=\(classification.rawValue)")
         }
+    }
+
+    func toggleActiveRoutineTask(_ taskID: UUID, day: Date) async {
+        await routineEngine.completeTask(taskID)
+        await load(day: day, force: true)
     }
 
     private func shouldRetry(after loadingState: TodayLoadingState) -> Bool {

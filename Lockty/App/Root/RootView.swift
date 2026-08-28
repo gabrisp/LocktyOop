@@ -28,6 +28,7 @@ struct RootView: View {
                 )
             }
         }
+        .locktyScreenBackground()
         .task {
             await container.startupCoordinator.startIfNeeded()
         }

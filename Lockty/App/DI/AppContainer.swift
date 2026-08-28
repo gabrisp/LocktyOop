@@ -122,9 +122,11 @@ final class AppContainer {
             controller: persistenceController,
             selectionStore: selectionStore
         )
+        let alarmService = LiveAlarmService()
         let routineEngine = RoutineEngine(
             shieldService: shieldService,
             deviceActivityService: deviceActivityService,
+            alarmService: alarmService,
             appGroupStore: appGroupStore,
             pauseRuleRepository: pauseRuleRepository,
             executionRepository: routineExecutionRepository
@@ -136,7 +138,6 @@ final class AppContainer {
             pauseRuleRepository: pauseRuleRepository,
             pauseEventRepository: pauseEventRepository
         )
-        let alarmService = LiveAlarmService()
         let nfcService = LiveNFCService()
         let locationService = LiveLocationTriggerService()
         let notificationService = LiveNotificationService()
@@ -148,8 +149,12 @@ final class AppContainer {
             pauseEventRepository: pauseEventRepository,
             routineExecutionRepository: routineExecutionRepository
         )
-        let todayViewModel = TodayViewModel(dataProvider: todayPipeline)
-        let routinesViewModel = RoutinesViewModel(routineEngine: routineEngine, repository: routineRepository)
+        let todayViewModel = TodayViewModel(dataProvider: todayPipeline, routineEngine: routineEngine)
+        let routinesViewModel = RoutinesViewModel(
+            routineEngine: routineEngine,
+            repository: routineRepository,
+            shieldService: shieldService
+        )
         let focusViewModel = FocusViewModel()
         let pausesViewModel = PausesViewModel(
             ruleRepository: pauseRuleRepository,

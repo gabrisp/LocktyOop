@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 struct PauseRuleSummaryState: Identifiable, Equatable {
     let id: UUID
@@ -37,7 +38,7 @@ final class PausesViewModel {
     func load() async {
         let rules = await ruleRepository.rules()
         let events = await eventRepository.events(from: nil, to: nil)
-        state = PausesOverviewState(
+        let loaded = PausesOverviewState(
             summary: calculator.summary(from: events),
             reclaimedTimeText: LocktyDurationFormatter.abbreviated(TimeInterval(events.filter { $0.decision == .abandoned }.count) * 4 * 60),
             rules: rules.map { rule in
@@ -53,5 +54,9 @@ final class PausesViewModel {
                 )
             }
         )
+
+        withAnimation(.smooth(duration: 0.28)) {
+            state = loaded
+        }
     }
 }

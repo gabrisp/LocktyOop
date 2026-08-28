@@ -15,6 +15,7 @@ enum RoutineEngineState: Equatable {
 final class RoutineEngine {
     private let shieldService: ShieldServicing
     private let deviceActivityService: DeviceActivityServicing
+    private let alarmService: AlarmServicing
     private let appGroupStore: AppGroupStore
     private let pauseRuleRepository: PauseRuleRepository
     private let executionRepository: RoutineExecutionRepository
@@ -26,6 +27,7 @@ final class RoutineEngine {
     init(
         shieldService: ShieldServicing,
         deviceActivityService: DeviceActivityServicing,
+        alarmService: AlarmServicing,
         appGroupStore: AppGroupStore,
         pauseRuleRepository: PauseRuleRepository,
         executionRepository: RoutineExecutionRepository,
@@ -33,6 +35,7 @@ final class RoutineEngine {
     ) {
         self.shieldService = shieldService
         self.deviceActivityService = deviceActivityService
+        self.alarmService = alarmService
         self.appGroupStore = appGroupStore
         self.pauseRuleRepository = pauseRuleRepository
         self.executionRepository = executionRepository
@@ -109,6 +112,7 @@ final class RoutineEngine {
                 )
             )
             state = .active(activeRoutine)
+            try? await alarmService.triggerRoutineStartAlarm(for: routine)
         } catch {
             state = .failed(error.localizedDescription)
         }

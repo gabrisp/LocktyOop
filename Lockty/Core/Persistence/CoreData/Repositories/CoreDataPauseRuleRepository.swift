@@ -110,6 +110,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
                 print("Failed deleting pause rule id=\(id.uuidString): \(error.localizedDescription)")
                 throw PauseRuleRepositoryError.deleteFailed(error.localizedDescription)
             }
+            try? selectionStore.remove(scope: .pause(id))
             print("Deleted pause rule id=\(id.uuidString)")
             syncSharedSnapshots()
         }

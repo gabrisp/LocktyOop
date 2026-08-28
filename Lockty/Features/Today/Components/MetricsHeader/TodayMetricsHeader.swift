@@ -24,23 +24,23 @@ struct TodayMetricsHeader: View {
         .padding(.top, topInset)
         .frame(maxWidth: .infinity)
         .frame(height: geometry.height + topInset, alignment: .top)
-        // The backdrop is applied as a background (not a sibling in a ZStack) so it can extend
-        // past this view's own bounds into the status bar area without the layout clipping it,
-        // and spans the full width because no horizontal padding is applied outside this view.
-        .background {
-            LocktyColors.background
-                .mask {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.65),
-                            .init(color: .clear, location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-                .ignoresSafeArea(edges: .top)
+        // Solid fill behind the rings (extended up under the status bar), then a real
+        // gradient fade below it. Splitting the two means the solid part can grow upward
+        // via ignoresSafeArea without the mask's gradient stops shifting with it.
+        .background(alignment: .top) {
+            VStack(spacing: 0) {
+                LocktyColors.background
+                    .frame(height: geometry.backdropHeight + topInset)
+
+                LinearGradient(
+                    colors: [LocktyColors.background, LocktyColors.background.opacity(0)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 36)
+            }
+            .frame(maxWidth: .infinity)
+            .ignoresSafeArea(edges: .top)
         }
     }
 }

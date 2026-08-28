@@ -23,7 +23,9 @@ struct SystemCapabilities: Codable, Hashable {
             supportsAppBlocking: true,
             supportsDomainBlocking: true,
             supportsUsageReporting: true,
-            supportsAlarmRoutineTriggers: false,
+            supportsAlarmRoutineTriggers: ProcessInfo.processInfo.isOperatingSystemAtLeast(
+                OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0)
+            ),
             supportsNFC: !simulator,
             supportsLocationTriggers: true,
             supportsLiquidGlass: ProcessInfo.processInfo.isOperatingSystemAtLeast(

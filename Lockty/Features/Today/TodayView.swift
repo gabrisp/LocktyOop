@@ -6,6 +6,7 @@ struct TodayView: View {
     @Bindable var router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
+    @State private var showTodoInfo = false
 
     private var state: TodayDayState {
         viewModel.state(for: day)
@@ -21,6 +22,22 @@ struct TodayView: View {
         max(0, -scrollOffset)
     }
 
+    private var dateSliderHideProgress: CGFloat {
+        MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0.08, to: 0.34)
+    }
+
+    private var topChromeSpacing: CGFloat {
+        6
+    }
+
+    private var topChromeExpandedHeight: CGFloat {
+        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset + MetricsHeaderGeometry.expandedHeight
+    }
+
+    private var metricsHeaderOffsetY: CGFloat {
+        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
+    }
+
     private var headerTopInset: CGFloat {
         LocktySpacing.sm
     }
@@ -29,7 +46,47 @@ struct TodayView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Color.clear
-                    .frame(height: headerTopInset + MetricsHeaderGeometry.expandedHeight + LocktySpacing.sm)
+                    .frame(height: topChromeExpandedHeight + LocktySpacing.sm)
+
+                if let checklist = state.activeRoutineChecklist {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        HStack(spacing: LocktySpacing.xs) {
+                            Text("TO DO")
+                                .locktyEyebrow()
+                                .padding(.top, 16)
+
+                            Button {
+                                showTodoInfo = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundStyle(LocktyColors.tertiaryText)
+                            }
+                            .buttonStyle(.plain)
+                            .tappable()
+                            .popover(isPresented: $showTodoInfo) {
+                                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                                    Text("Tasks from the active routine. Completing them updates this session only and resets on the next routine run.")
+                                        .font(LocktyTypography.callout)
+                                        .foregroundStyle(LocktyColors.primaryText)
+                                        .frame(width: 220, alignment: .leading)
+                                }
+                                .presentationCompactAdaptation(.popover)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+
+                        ActiveRoutineChecklistCard(
+                            state: checklist,
+                            onToggle: { item in
+                                Task {
+                                    await viewModel.toggleActiveRoutineTask(item.id, day: day)
+                                }
+                            }
+                        )
+                    }
+                }
 
                 if case .loading = state.loadingState {
                     VStack(spacing: LocktySpacing.md) {
@@ -65,7 +122,12 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
-                DailyPerspectiveCard(perspective: state.perspective)
+                DailyPerspectiveStackSection(
+                    perspectives: viewModel.visiblePerspectives(for: day),
+                    onDismiss: { perspective in
+                        viewModel.dismissPerspective(perspective.id, day: day)
+                    }
+                )
 
                 MyDaySection(activities: state.activities)
 
@@ -97,8 +159,6 @@ struct TodayView: View {
                     )
                 }
 
-                PatternsSection(patterns: state.patterns)
-
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)
                     .opacity(0.01)
@@ -117,18 +177,39 @@ struct TodayView: View {
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .overlay(alignment: .top) {
-            TodayMetricsHeader(
-                metrics: state.primaryMetrics.metrics,
-                collapseProgress: collapseProgress,
-                topInset: headerTopInset,
-                onMetricSelected: { metric in
-                    switch metric.kind {
-                    case .productivity: router.presentSheet(.productivityDetail(day))
-                    case .control: router.presentSheet(.controlDetail(day))
-                    case .detox: router.presentSheet(.detoxDetail(day))
+            ZStack(alignment: .top) {
+                DateSliderView(
+                    dates: router.dayNavigationDays,
+                    selectedDate: Binding(
+                        get: { router.selectedDay },
+                        set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
+                    ),
+                    scrollOffset: Binding(
+                        get: { router.daySliderOffset },
+                        set: { router.daySliderOffset = $0 }
+                    ),
+                    onDateChanged: { newDate in
+                        router.selectedDay = Calendar.current.startOfDay(for: newDate)
+                    },
+                    onSelectionChanged: {}
+                )
+                .opacity(1 - dateSliderHideProgress)
+                .offset(y: -dateSliderHideProgress * 12)
+
+                TodayMetricsHeader(
+                    metrics: state.primaryMetrics.metrics,
+                    collapseProgress: collapseProgress,
+                    topInset: headerTopInset,
+                    onMetricSelected: { metric in
+                        switch metric.kind {
+                        case .productivity: router.presentSheet(.productivityDetail(day))
+                        case .control: router.presentSheet(.controlDetail(day))
+                        case .detox: router.presentSheet(.detoxDetail(day))
+                        }
                     }
-                }
-            )
+                )
+                .offset(y: metricsHeaderOffsetY)
+            }
             .offset(y: overscrollPullDistance)
         }
         .task(id: DayKey(date: day)) {

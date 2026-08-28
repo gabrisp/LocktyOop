@@ -70,10 +70,10 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
         case .breathing(let configuration):
             return "\(configuration.breathCount) breaths"
         case .intention(let configuration):
-            if let minimumLength = configuration.minimumLength, configuration.isRequired {
-                return "Required, \(minimumLength)+ chars"
+            if let minimumLength = configuration.minimumLength, minimumLength > 0 {
+                return "\(minimumLength)+ chars"
             }
-            return configuration.isRequired ? "Required" : "Optional"
+            return "Write briefly"
         case .confirmation:
             return "Deliberate choice"
         }

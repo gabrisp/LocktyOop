@@ -8,12 +8,10 @@ private let routineEditorLogger = Logger(subsystem: "com.gabrisp.Lockty", catego
 struct EditableRoutineTask: Identifiable, Hashable {
     let id: UUID
     var title: String
-    var isOptional: Bool
 
-    init(id: UUID = UUID(), title: String = "", isOptional: Bool = false) {
+    init(id: UUID = UUID(), title: String = "") {
         self.id = id
         self.title = title
-        self.isOptional = isOptional
     }
 }
 
@@ -32,6 +30,7 @@ final class RoutineEditorViewModel {
     var maximumBreaks = 0
     var maximumBreakMinutes = 10
     var minimumBreakIntervalMinutes = 30
+    var startAlarmEnabled = false
     var breakTriggerManual = true
     var breakTriggerNFC = false
     var breakTriggerLocation = false
@@ -162,13 +161,14 @@ final class RoutineEditorViewModel {
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         tasks = routine.tasks
             .sorted { $0.order < $1.order }
-            .map { EditableRoutineTask(id: $0.id, title: $0.title, isOptional: $0.isOptional) }
+            .map { EditableRoutineTask(id: $0.id, title: $0.title) }
         if tasks.isEmpty {
             tasks = [EditableRoutineTask()]
         }
         maximumBreaks = routine.breakPolicy.maximumBreaks
         maximumBreakMinutes = max(Int(routine.breakPolicy.maximumDuration / 60), 1)
         minimumBreakIntervalMinutes = max(Int(routine.breakPolicy.minimumInterval / 60), 1)
+        startAlarmEnabled = routine.startAlarmEnabled
         breakTriggerManual = routine.breakPolicy.allowedTriggers.contains(.manual)
         breakTriggerNFC = routine.breakPolicy.allowedTriggers.contains(.nfc)
         breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
@@ -254,7 +254,7 @@ final class RoutineEditorViewModel {
             return false
         }
 
-        let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
+        let selection = selectionPreview
         guard !selection.applicationTokens.isEmpty || !blockedDomains.isEmpty else {
             errorMessage = "Select at least one app or add at least one domain."
             print("Routine editor refused save because no app/domain restrictions were configured")
@@ -271,6 +271,7 @@ final class RoutineEditorViewModel {
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             blockedDomains: Set(blockedDomains),
             tasks: tasks,
+            startAlarmEnabled: startAlarmEnabled,
             breakPolicy: breakPolicy,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
             createdAt: createdAt,
@@ -278,6 +279,7 @@ final class RoutineEditorViewModel {
         )
 
         do {
+            try selectionStore.save(selection, scope: selectionScope)
             try await repository.save(routine)
             routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(self.blockedDomains.count)")
             print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(blockedDomains.count)")
@@ -298,7 +300,7 @@ final class RoutineEditorViewModel {
                 id: task.id,
                 title: trimmed,
                 order: index,
-                isOptional: task.isOptional
+                isOptional: false
             )
         }
     }
@@ -492,23 +494,64 @@ struct RoutineEditorView: View {
                         )
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
+                    
+                    if !viewModel.scheduleTrigger.weekdays.isEmpty {
+                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                            ToggleRow(
+                                title: "Sound when routine starts",
+                                subtitle: "Only when the routine actually starts.",
+                                isOn: $viewModel.startAlarmEnabled
+                            )
+                        }
+                    }
                 }
 
-//                editorSection(title: "Checklist") {
-//                    VStack(spacing: LocktySpacing.md) {
-//                        ForEach($viewModel.tasks) { $task in
-//                            RoutineTaskEditorCard(
-//                                task: $task,
-//                                onRemove: { viewModel.removeTask(id: task.id) }
-//                            )
-//                        }
-//
-//                        SecondaryButton("Add task", systemImage: "plus") {
-//                            viewModel.addTask()
-//                        }
-//                    }
-//                }
-//
+                editorSection(title: "Checklist") {
+                    CardView(radius: LocktyRadius.medium, padding: 0) {
+                        VStack(spacing: 0) {
+                            ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { index, $task in
+                                RoutineTaskEditorRow(
+                                    task: $task,
+                                    onRemove: {
+                                        withAnimation(.smooth(duration: 0.24)) {
+                                            viewModel.removeTask(id: task.id)
+                                        }
+                                    }
+                                )
+
+                                if index < viewModel.tasks.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 20)
+                                }
+                            }
+
+                            Divider()
+                                .padding(.leading, 20)
+
+                            Button {
+                                withAnimation(.smooth(duration: 0.24)) {
+                                    viewModel.addTask()
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 18, weight: .regular))
+                                    Text("Add task")
+                                        .font(LocktyTypography.callout)
+                                    Spacer(minLength: 0)
+                                }
+                                .foregroundStyle(LocktyColors.secondaryText)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .tappable()
+                        }
+                    }
+                }
+
 //                editorSection(title: "Breaks") {
 //                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
 //                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
@@ -620,16 +663,28 @@ private struct RoutineEditorHero: View {
                         .presentationCompactAdaptation(.popover)
                 }
 
-                TextField("Routine name", text: $viewModel.name)
-                    .font(LocktyTypography.body)
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 2)
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(LocktyColors.separator)
-                            .frame(height: 0.5)
+                CardView(
+                    radius: 14,
+                    padding: 0,
+                    expandsHorizontally: false
+                ) {
+                    ZStack {
+                        Text(viewModel.name.isEmpty ? "Routine name" : "\(viewModel.name) ")
+                            .font(LocktyTypography.body)
+                            .foregroundStyle(.clear)
+                            .lineLimit(1)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
+
+                        TextField("Routine name", text: $viewModel.name)
+                            .font(LocktyTypography.body)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
                     }
+                }
+                .frame(minWidth: 180, maxWidth: 320)
             }
             .frame(maxWidth: .infinity)
 
@@ -647,47 +702,43 @@ private struct RoutineEditorHero: View {
 //                    isDisabled: viewModel.mode == .normal
 //                )
 
-                HStack(spacing: LocktySpacing.sm) {
-//                    BadgeView(
-//                        title: viewModel.mode == .strict ? "Strict" : "Normal",
-//                        color: viewModel.mode == .strict ? LocktyColors.warning : .accentColor
-//                    )
-                    BadgeView(
-                        title: viewModel.trimmedTasksCount == 1 ? "1 task" : "\(viewModel.trimmedTasksCount) tasks",
-                        color: LocktyColors.neutral
-                    )
-                    BadgeView(
-                        title: viewModel.selectedApplicationCount == 1 ? "1 restriction" : "\(viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount) restrictions",
-                        color: LocktyColors.warning
-                    )
+                if (viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount) > 0 {
+                    HStack(spacing: LocktySpacing.sm) {
+                        let restrictionCount = viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount
+                        if restrictionCount > 0 {
+                            BadgeView(
+                                title: restrictionCount == 1 ? "1 restriction" : "\(restrictionCount) restrictions",
+                                color: LocktyColors.warning
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-private struct RoutineTaskEditorCard: View {
+private struct RoutineTaskEditorRow: View {
     @Binding var task: EditableRoutineTask
     let onRemove: () -> Void
 
     var body: some View {
-        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                HStack {
-                    TextField("Task", text: $task.title)
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-                    Spacer()
-                    Button(role: .destructive, action: onRemove) {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(LocktyColors.unproductive)
-                    }
-                    .buttonStyle(.plain)
-                }
+        HStack(spacing: 12) {
+            TextField("Task", text: $task.title)
+                .font(LocktyTypography.headline)
+                .foregroundStyle(LocktyColors.primaryText)
 
-                ToggleRow(title: "Optional", isOn: $task.isOptional)
+            Spacer(minLength: 0)
+
+            Button(role: .destructive, action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(LocktyColors.tertiaryText)
             }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 }
 
@@ -716,7 +767,7 @@ private struct ScheduleTimeField: View {
                 Text(label.uppercased())
                     .locktyEyebrow()
                 Text(displayText)
-                    .font(.system(size: 20, weight: .light, design: .rounded))
+                    .font(.system(size: 20, weight: .light, design: .default))
                     .foregroundStyle(LocktyColors.primaryText)
                     .monospacedDigit()
                     .contentTransition(.numericText())

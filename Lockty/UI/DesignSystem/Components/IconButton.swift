@@ -29,7 +29,7 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .light))
+                .font(.system(size: 17, weight: .medium))
                 .frame(width: size, height: size)
         }
         .buttonStyle(.plain)

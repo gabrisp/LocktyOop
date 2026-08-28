@@ -5,6 +5,7 @@ extension View {
     @ViewBuilder
     func hideNativeTabBar() -> some View {
         self
+            .toolbar(.hidden, for: .tabBar)
             .toolbarVisibility(.hidden, for: .tabBar)
     }
 }
@@ -17,13 +18,13 @@ extension ScrollView {
     }
 }
 
-struct IGStyleTabBar<Value: CaseIterable>: UIViewRepresentable where Value: Hashable {
+struct IGStyleTabBar<Value: Hashable>: UIViewRepresentable {
     @Binding var selection: Value
+    let values: [Value]
     var symbolImage: (Value, Bool) -> UIImage
     var onInteraction: () -> Void = {}
 
     func makeUIView(context: Context) -> CustomSegmentedControl {
-        let values = Array(Value.allCases)
         let images = values.map { symbolImage($0, $0 == selection) }
         let control = CustomSegmentedControl(items: images)
         control.selectedSegmentIndex = values.firstIndex(of: selection) ?? 0
@@ -58,7 +59,6 @@ struct IGStyleTabBar<Value: CaseIterable>: UIViewRepresentable where Value: Hash
         // single tabBarProgress update — up to 120/sec on ProMotion. Regenerating both segments'
         // UIImage(systemName:) unconditionally on each of those was pure waste; only touch the
         // control at all when the selection actually changed.
-        let values = Array(Value.allCases)
         let selectedIndex = values.firstIndex(of: selection) ?? 0
         guard uiView.selectedSegmentIndex != selectedIndex else { return }
         uiView.selectedSegmentIndex = selectedIndex
@@ -73,7 +73,7 @@ struct IGStyleTabBar<Value: CaseIterable>: UIViewRepresentable where Value: Hash
     /// Custom Sizing!
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: CustomSegmentedControl, context: Context) -> CGSize? {
         .init(
-            width: CGFloat(Array(Value.allCases).count) * 80,
+            width: CGFloat(values.count) * 80,
             height: 50
         )
     }
@@ -90,9 +90,8 @@ struct IGStyleTabBar<Value: CaseIterable>: UIViewRepresentable where Value: Hash
 
         @objc
         func valueChanged(_ sender: UISegmentedControl) {
-            let values = Array(Value.allCases)
-            guard values.indices.contains(sender.selectedSegmentIndex) else { return }
-            parent.selection = values[sender.selectedSegmentIndex]
+            guard parent.values.indices.contains(sender.selectedSegmentIndex) else { return }
+            parent.selection = parent.values[sender.selectedSegmentIndex]
             parent.onInteraction()
         }
     }

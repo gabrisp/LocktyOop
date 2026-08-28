@@ -23,6 +23,7 @@ protocol ShieldServicing {
     func apply(_ policy: ShieldPolicy) async throws
     func remove(_ policy: ShieldPolicy) async throws
     func restoreFromRuntimeState() async throws
+    func clearAllRestrictions() async throws
 }
 
 final class LiveShieldService: ShieldServicing {
@@ -39,8 +40,18 @@ final class LiveShieldService: ShieldServicing {
         let selection = try selectionStore.selection(for: policy)
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
         guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty else {
+            print("Shield apply failed because no selection matched policy reason=\(String(describing: policy.reason)) blockedApps=\(policy.blockedApplications.count) blockedDomains=\(policy.blockedDomains.count)")
             throw ShieldServiceError.selectionNotConfigured
         }
+        print(
+            """
+            Applying shield policy reason=\(String(describing: policy.reason)) \
+            apps=\(selection.applicationTokens.count) \
+            categories=\(selection.categoryTokens.count) \
+            selectionDomains=\(selection.webDomainTokens.count) \
+            manualDomains=\(blockedDomains.count)
+            """
+        )
         managedSettingsStore.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
         managedSettingsStore.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
         managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
@@ -49,6 +60,7 @@ final class LiveShieldService: ShieldServicing {
     }
 
     func remove(_ policy: ShieldPolicy) async throws {
+        print("Removing shield policy reason=\(String(describing: policy.reason))")
         managedSettingsStore.shield.applications = nil
         managedSettingsStore.shield.webDomains = nil
         managedSettingsStore.shield.applicationCategories = nil
@@ -61,5 +73,14 @@ final class LiveShieldService: ShieldServicing {
     func restoreFromRuntimeState() async throws {
         let state = try appGroupStore.loadRuntimeState()
         if state.shieldPolicy != .empty { try await apply(state.shieldPolicy) }
+    }
+
+    func clearAllRestrictions() async throws {
+        managedSettingsStore.shield.applications = nil
+        managedSettingsStore.shield.webDomains = nil
+        managedSettingsStore.shield.applicationCategories = nil
+        managedSettingsStore.webContent.blockedByFilter = nil
+        try appGroupStore.saveRuntimeState(.empty)
+        print("Cleared all ManagedSettings restrictions and reset runtime state.")
     }
 }

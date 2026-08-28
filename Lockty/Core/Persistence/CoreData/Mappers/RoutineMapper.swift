@@ -33,6 +33,7 @@ struct RoutineMapper {
         entity.allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         entity.createdAt = routine.createdAt
         entity.updatedAt = routine.updatedAt
+        entity.startAlarmEnabled = routine.startAlarmEnabled
         entity.blockedApplicationIDsData = try encoder.encode(routine.blockedApplications)
         entity.blockedDomainsData = try encoder.encode(routine.blockedDomains)
         entity.breakPolicyData = try encoder.encode(routine.breakPolicy)
@@ -115,6 +116,7 @@ struct RoutineMapper {
                 blockedApplications: try decoder.decode(Set<AppIdentity.ID>.self, from: entity.blockedApplicationIDsData),
                 blockedDomains: try decoder.decode(Set<String>.self, from: entity.blockedDomainsData),
                 tasks: tasks,
+                startAlarmEnabled: entity.startAlarmEnabled,
                 breakPolicy: try decoder.decode(BreakPolicy.self, from: entity.breakPolicyData),
                 allowsPauseDuringStrictMode: entity.allowsPauseDuringStrictMode,
                 createdAt: entity.createdAt,

@@ -6,6 +6,8 @@ struct HomeView: View {
     let featureFactory: FeatureFactory
     let destinationFactory: DestinationFactory
 
+    private let visibleTabs = AppTab.visiblePrimaryTabs
+
     var body: some View {
         TabView(selection: $router.selectedTab) {
             Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
@@ -15,6 +17,8 @@ struct HomeView: View {
                             destinationFactory.destination(for: route)
                         }
                 }
+                .toolbar(.hidden, for: .tabBar)
+                .toolbarVisibility(.hidden, for: .tabBar)
             }
 
             Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
@@ -24,20 +28,29 @@ struct HomeView: View {
                             destinationFactory.destination(for: route)
                         }
                 }
+                .toolbar(.hidden, for: .tabBar)
+                .toolbarVisibility(.hidden, for: .tabBar)
             }
 
-            Tab(AppTab.lifetime.title, systemImage: AppTab.lifetime.systemImage, value: AppTab.lifetime) {
-                NavigationStack(path: $router.lifetimePath) {
-                    featureFactory.makeLifetimeView()
-                        .navigationDestination(for: AppRoute.self) { route in
-                            destinationFactory.destination(for: route)
-                        }
-                }
-            }
+//            Tab(AppTab.lifetime.title, systemImage: AppTab.lifetime.systemImage, value: AppTab.lifetime) {
+//                NavigationStack(path: $router.lifetimePath) {
+//                    featureFactory.makeLifetimeView()
+//                        .navigationDestination(for: AppRoute.self) { route in
+//                            destinationFactory.destination(for: route)
+//                        }
+//                }
+//                .toolbar(.hidden, for: .tabBar)
+//                .toolbarVisibility(.hidden, for: .tabBar)
+//            }
         }
         .hideNativeTabBar()
+        .onAppear {
+            if router.selectedTab == .lifetime {
+                router.selectedTab = .today
+            }
+        }
         .safeAreaInset(edge: .bottom) {
-            IGStyleTabBar(selection: $router.selectedTab) { tab, isSelected in
+            IGStyleTabBar(selection: $router.selectedTab, values: visibleTabs) { tab, isSelected in
                 UIImage(
                     systemName: tab.systemImage,
                     withConfiguration: UIImage.SymbolConfiguration(weight: isSelected ? .semibold : .regular)

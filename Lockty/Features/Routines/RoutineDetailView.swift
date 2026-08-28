@@ -91,7 +91,7 @@ struct RoutineDetailView: View {
                             .foregroundStyle(LocktyColors.tertiaryText)
 
                         Image(systemName: (routine.icon?.isEmpty == false ? routine.icon! : "repeat"))
-                            .font(.system(size: 22, weight: .light))
+                            .font(.system(size: 22, weight: .medium))
                             .foregroundStyle(LocktyColors.primaryText)
                             .frame(width: 50, height: 50)
                             .safeGlass(radius: 12)
@@ -173,9 +173,6 @@ struct RoutineDetailView: View {
                                     HStack {
                                         Text(task.title)
                                         Spacer()
-                                        if task.isOptional {
-                                            Text("Optional").font(LocktyTypography.caption).foregroundStyle(LocktyColors.tertiaryText)
-                                        }
                                     }
                                 }
                             }

@@ -10,26 +10,28 @@ struct TodayDayState: Equatable {
     var day: Date
     var loadingState: TodayLoadingState
     var rawDebugText: String
+    var activeRoutineChecklist: ActiveRoutineChecklistState?
     var primaryMetrics: PrimaryMetricsState
     var perspective: DailyPerspective
+    var perspectives: [DailyPerspective]
     var activities: [DigitalActivity]
     var metrics: TodayMetricsState
     var timeline: UsageTimelineChartState
     var appUsages: [AppUsageState]
-    var patterns: [BehaviorPattern]
 
     static func loading(day: Date) -> TodayDayState {
         TodayDayState(
             day: day,
             loadingState: .loading,
             rawDebugText: "Preparing Today diagnostics...",
+            activeRoutineChecklist: nil,
             primaryMetrics: .loading,
             perspective: .loading,
+            perspectives: DailyPerspective.loadingStack,
             activities: [],
             metrics: .loading,
             timeline: .empty,
-            appUsages: [],
-            patterns: []
+            appUsages: []
         )
     }
 }
@@ -92,4 +94,21 @@ struct AppUsageState: Codable, Hashable, Identifiable {
     var duration: TimeInterval
     var classification: AppClassification
     var comparisonText: String?
+}
+
+struct ActiveRoutineChecklistState: Equatable, Identifiable {
+    let id: UUID
+    var routineID: UUID
+    var title: String
+    var subtitle: String
+    var completedCount: Int
+    var totalCount: Int
+    var items: [ActiveRoutineChecklistItemState]
+}
+
+struct ActiveRoutineChecklistItemState: Equatable, Identifiable {
+    let id: UUID
+    var title: String
+    var isCompleted: Bool
+    var completedAtText: String?
 }

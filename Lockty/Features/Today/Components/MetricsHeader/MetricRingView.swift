@@ -38,21 +38,22 @@ struct MetricRingView: View {
             let diameter = geometry.ringDiameter
             let collapsedGroupWidth = diameter + geometry.labelGap + labelWidth
             let collapsedGroupOriginX = max((itemWidth - collapsedGroupWidth) / 2, 0)
+            let horizontalProgress = geometry.labelProgress
             let ringCenterX = MetricsHeaderGeometry.lerp(
                 itemWidth / 2,
                 collapsedGroupOriginX + (diameter / 2),
-                progress: collapseProgress
+                progress: horizontalProgress
             )
             let ringCenterY = geometry.contentTopOffset + (diameter / 2)
             let labelCenterX = MetricsHeaderGeometry.lerp(
                 itemWidth / 2,
                 collapsedGroupOriginX + diameter + geometry.labelGap + (labelWidth / 2),
-                progress: geometry.labelProgress
+                progress: horizontalProgress
             )
             let labelCenterY = geometry.contentTopOffset + MetricsHeaderGeometry.lerp(
                 MetricsHeaderGeometry.expandedDiameter + geometry.labelGap + (MetricsHeaderGeometry.labelHeight / 2),
                 diameter / 2,
-                progress: geometry.labelProgress
+                progress: horizontalProgress
             )
 
             ZStack(alignment: .topLeading) {

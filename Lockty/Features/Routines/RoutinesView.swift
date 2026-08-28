@@ -36,6 +36,14 @@ struct RoutinesView: View {
                 PrimaryButton("Create Routine", systemImage: "plus") {
                     router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
                 }
+
+                #if DEBUG
+                SecondaryButton("Unblock Everything", systemImage: "lock.open") {
+                    Task {
+                        await viewModel.debugUnblockEverything()
+                    }
+                }
+                #endif
             }
         }
         .onAppear {

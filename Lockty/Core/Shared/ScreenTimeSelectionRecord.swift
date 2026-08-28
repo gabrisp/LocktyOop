@@ -55,4 +55,14 @@ extension ScreenTimeSelectionRecord {
             .map(AppIdentity.init(token:))
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
+
+    func isContained(in policy: ShieldPolicy) -> Bool {
+        let hasAnySelection = !selection.applicationTokens.isEmpty
+            || !selection.categoryTokens.isEmpty
+            || !selection.webDomainTokens.isEmpty
+        guard hasAnySelection else { return false }
+
+        return blockedApplications.isSubset(of: policy.blockedApplications)
+            && blockedDomains.isSubset(of: policy.blockedDomains)
+    }
 }

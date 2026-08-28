@@ -9,6 +9,7 @@ struct Routine: Codable, Hashable, Identifiable {
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
     var tasks: [RoutineTask]
+    var startAlarmEnabled: Bool
     var breakPolicy: BreakPolicy
     var allowsPauseDuringStrictMode: Bool
     var createdAt: Date
@@ -23,6 +24,7 @@ struct Routine: Codable, Hashable, Identifiable {
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
         tasks: [RoutineTask],
+        startAlarmEnabled: Bool = false,
         breakPolicy: BreakPolicy,
         allowsPauseDuringStrictMode: Bool = true,
         createdAt: Date = Date(),
@@ -36,6 +38,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
         self.tasks = tasks
+        self.startAlarmEnabled = startAlarmEnabled
         self.breakPolicy = breakPolicy
         self.allowsPauseDuringStrictMode = allowsPauseDuringStrictMode
         self.createdAt = createdAt
@@ -58,6 +61,7 @@ extension Routine {
             RoutineTask(title: "Journal", icon: "pencil", order: 1),
             RoutineTask(title: "Stretch", icon: "figure.cooldown", order: 2, isOptional: true)
         ],
+        startAlarmEnabled: true,
         breakPolicy: BreakPolicy(
             maximumBreaks: 2,
             maximumDuration: 10 * 60,
@@ -78,6 +82,7 @@ extension Routine {
             RoutineTask(title: "Coffee", icon: "cup.and.saucer", order: 1),
             RoutineTask(title: "Meditate", icon: "figure.mind.and.body", order: 2)
         ],
+        startAlarmEnabled: false,
         breakPolicy: .none
     )
 }

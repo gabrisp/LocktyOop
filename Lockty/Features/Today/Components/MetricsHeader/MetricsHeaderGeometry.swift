@@ -2,13 +2,13 @@ import CoreGraphics
 
 struct MetricsHeaderGeometry {
     static let expandedHeight: CGFloat = 152
-    static let collapsedHeight: CGFloat = 54
+    static let collapsedHeight: CGFloat = 60
     static let collapseDistance: CGFloat = 112
     static let expandedDiameter: CGFloat = 92
     static let collapsedDiameter: CGFloat = 26
     static let labelHeight: CGFloat = 16
-    static let expandedLabelGap: CGFloat = 10
-    static let collapsedLabelGap: CGFloat = 6
+    static let expandedLabelGap: CGFloat = 6
+    static let collapsedLabelGap: CGFloat = 4
     static let expandedLabelWidth: CGFloat = 112
     static let collapsedLabelWidth: CGFloat = 92
 
@@ -38,10 +38,14 @@ struct MetricsHeaderGeometry {
         Self.rangedProgress(progress, from: 0.45, to: 1)
     }
 
+    var backdropHeight: CGFloat {
+        contentTopOffset + ringDiameter + 2
+    }
+
     var contentTopOffset: CGFloat {
         Self.lerp(
             ((Self.expandedHeight - Self.expandedDiameter - Self.expandedLabelGap - Self.labelHeight) / 2) + 2,
-            (Self.collapsedHeight - Self.collapsedDiameter) / 2,
+            ((Self.collapsedHeight - Self.collapsedDiameter) / 2) + 1,
             progress: progress
         )
     }

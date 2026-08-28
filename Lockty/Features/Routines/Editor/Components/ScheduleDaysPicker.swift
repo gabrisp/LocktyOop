@@ -10,10 +10,12 @@ struct ScheduleDaysPicker: View {
             ForEach(orderedWeekdays) { weekday in
                 let isSelected = selectedWeekdays.contains(weekday)
                 Button {
-                    if isSelected {
-                        selectedWeekdays.remove(weekday)
-                    } else {
-                        selectedWeekdays.insert(weekday)
+                    withAnimation(.snappy(duration: 0.2)) {
+                        if isSelected {
+                            selectedWeekdays.remove(weekday)
+                        } else {
+                            selectedWeekdays.insert(weekday)
+                        }
                     }
                 } label: {
                     Text(weekday.shortLabel)

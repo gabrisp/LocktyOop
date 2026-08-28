@@ -24,7 +24,9 @@ struct RoutineDomainsSheet: View {
                                 .locktyGlassInputStyle()
 
                             Button("Add") {
-                                viewModel.addDomain()
+                                withAnimation(.smooth(duration: 0.24)) {
+                                    viewModel.addDomain()
+                                }
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, LocktySpacing.md)
@@ -35,7 +37,9 @@ struct RoutineDomainsSheet: View {
                         if !viewModel.blockedDomains.isEmpty {
                             CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                                 DomainChipFlow(domains: viewModel.blockedDomains) { domain in
-                                    viewModel.removeDomain(domain)
+                                    withAnimation(.smooth(duration: 0.24)) {
+                                        viewModel.removeDomain(domain)
+                                    }
                                 }
                             }
                         }

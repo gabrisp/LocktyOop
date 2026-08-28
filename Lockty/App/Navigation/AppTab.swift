@@ -7,6 +7,12 @@ enum AppTab: String, CaseIterable, Hashable, Identifiable {
 
     var id: String { rawValue }
 
+    static let visiblePrimaryTabs: [AppTab] = [
+        .today,
+        .focus
+        // .lifetime
+    ]
+
     var title: String {
         switch self {
         case .today: "Today"

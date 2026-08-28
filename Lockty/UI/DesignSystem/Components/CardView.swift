@@ -5,6 +5,7 @@ struct CardView<Content: View>: View {
     let padding: CGFloat
     let interactive: Bool
     let height: CGFloat?
+    let expandsHorizontally: Bool
     let content: Content
 
     init(
@@ -12,12 +13,14 @@ struct CardView<Content: View>: View {
         padding: CGFloat = LocktySpacing.md,
         interactive: Bool = false,
         height: CGFloat? = nil,
+        expandsHorizontally: Bool = true,
         @ViewBuilder content: () -> Content
     ) {
         self.radius = radius
         self.padding = padding
         self.interactive = interactive
         self.height = height
+        self.expandsHorizontally = expandsHorizontally
         self.content = content()
     }
 
@@ -25,7 +28,7 @@ struct CardView<Content: View>: View {
         content
             .padding(padding)
             .frame(
-                maxWidth: .infinity,
+                maxWidth: expandsHorizontally ? .infinity : nil,
                 minHeight: height,
                 maxHeight: height,
                 alignment: .leading

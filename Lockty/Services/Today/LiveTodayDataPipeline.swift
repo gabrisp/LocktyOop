@@ -19,7 +19,6 @@ struct LiveTodayDataPipeline: TodayDataProviding {
     private let intentionalTimeCalculator: IntentionalTimeCalculating
     private let bestDetoxCalculator: BestDetoxCalculator
     private let perspectiveAnalyzer: DailyPerspectiveAnalyzing
-    private let patternAnalyzer: PatternAnalyzing
 
     init(
         usageDataService: UsageDataServicing,
@@ -33,8 +32,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         distractionCalculator: DistractionMetricCalculating = DistractionMetricCalculator(),
         intentionalTimeCalculator: IntentionalTimeCalculating = IntentionalTimeCalculator(),
         bestDetoxCalculator: BestDetoxCalculator = BestDetoxCalculator(),
-        perspectiveAnalyzer: DailyPerspectiveAnalyzing = DailyPerspectiveAnalyzer(),
-        patternAnalyzer: PatternAnalyzing = PatternAnalyzer()
+        perspectiveAnalyzer: DailyPerspectiveAnalyzing = DailyPerspectiveAnalyzer()
     ) {
         self.usageDataService = usageDataService
         self.appGroupStore = appGroupStore
@@ -48,7 +46,6 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         self.intentionalTimeCalculator = intentionalTimeCalculator
         self.bestDetoxCalculator = bestDetoxCalculator
         self.perspectiveAnalyzer = perspectiveAnalyzer
-        self.patternAnalyzer = patternAnalyzer
     }
 
     func dayState(for day: Date) async -> TodayDayState {
@@ -58,6 +55,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         do {
             let summary = try await usageDataService.usageSummary(for: dayStart)
             let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: dayStart))
+            let runtimeState = try? appGroupStore.loadRuntimeState()
 
             let pauseEvents = await pauseEventRepository.events(from: dayStart, to: dayEnd)
             let routineExecutions = (try? await routineExecutionRepository.executions(from: dayStart, to: dayEnd)) ?? []
@@ -139,16 +137,6 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 bestDetoxDuration: bestDetox.duration ?? 0
             )
 
-            let patterns = patternAnalyzer.patterns(
-                from: PatternInput(
-                    productivityScore: productivityResult.roundedValue ?? 0,
-                    controlScore: controlResult.roundedValue,
-                    longestDetoxText: LocktyDurationFormatter.abbreviated(bestDetox.duration ?? 0),
-                    completedRoutines: completedRoutines,
-                    totalRoutines: max(routineExecutions.count, completedRoutines)
-                )
-            )
-
             let mostProductiveBucket = timelineBuckets.max(by: { $0.productive < $1.productive })
             let distractionBucket = timelineBuckets.max(by: { $0.unproductive < $1.unproductive })
             let perspective = perspectiveAnalyzer.perspective(
@@ -184,6 +172,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 day: dayStart,
                 loadingState: .loaded,
                 rawDebugText: rawDebugText,
+                activeRoutineChecklist: makeActiveRoutineChecklist(day: dayStart, runtimeState: runtimeState),
                 primaryMetrics: PrimaryMetricsState(
                     metrics: [
                         PrimaryMetric(kind: .productivity, value: productivityResult.rawValue ?? 0),
@@ -192,6 +181,17 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     ]
                 ),
                 perspective: perspective,
+                perspectives: makeDummyPerspectiveStack(
+                    primary: perspective,
+                    mostProductivePeriodText: timeRangeText(start: mostProductiveBucket?.start, end: mostProductiveBucket?.end),
+                    distractionPeriodText: timeRangeText(start: distractionBucket?.start, end: distractionBucket?.end),
+                    leadingDistractionApps: summary.applications
+                        .filter { $0.classification == .unproductive }
+                        .sorted { $0.duration > $1.duration }
+                        .prefix(2)
+                        .map { $0.app.displayName },
+                    bestDetoxText: LocktyDurationFormatter.abbreviated(bestDetox.duration ?? 0)
+                ),
                 activities: activities,
                 metrics: TodayMetricsState(
                     screenTime: ScreenTimeCardState(
@@ -239,8 +239,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                         classification: usage.classification,
                         comparisonText: nil
                     )
-                },
-                patterns: patterns
+                }
             )
         } catch {
             print("Today pipeline falling back to partial unavailable state for \(DayKey(date: dayStart).id): \(error.localizedDescription)")
@@ -361,6 +360,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         let pauseEvents = await pauseEventRepository.events(from: day, to: dayEnd)
         let routineExecutions = (try? await routineExecutionRepository.executions(from: day, to: dayEnd)) ?? []
         let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
+        let runtimeState = try? appGroupStore.loadRuntimeState()
 
         let completedRoutineTasks = routineExecutions.flatMap(\.taskCompletions).filter { $0.completedAt != nil }.count
         let totalRoutineTasks = routineExecutions.flatMap(\.taskCompletions).count
@@ -401,6 +401,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             day: day,
             loadingState: .unavailable(message),
             rawDebugText: rawDebugText,
+            activeRoutineChecklist: makeActiveRoutineChecklist(day: day, runtimeState: runtimeState),
             primaryMetrics: PrimaryMetricsState(
                 metrics: [
                     PrimaryMetric(kind: .productivity, value: 0),
@@ -409,10 +410,31 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 ]
             ),
             perspective: DailyPerspective(
+                id: "primary",
                 title: "Usage data unavailable",
                 body: "Lockty still shows routine and Pause events for this day, but Screen Time usage has not been delivered yet.",
                 tone: .balanced
             ),
+            perspectives: [
+                DailyPerspective(
+                    id: "primary",
+                    title: "Usage data unavailable",
+                    body: "Lockty still shows routine and Pause events for this day, but Screen Time usage has not been delivered yet.",
+                    tone: .balanced
+                ),
+                DailyPerspective(
+                    id: "fallback-routines",
+                    title: "Lockty events are still visible",
+                    body: "Routine runs, breaks and Pause decisions already recorded for this day still appear normally.",
+                    tone: .focused
+                ),
+                DailyPerspective(
+                    id: "fallback-retry",
+                    title: "Still retrying Screen Time",
+                    body: "The app is retrying direct usage access and any cached report available for this date.",
+                    tone: .distracted
+                )
+            ],
             activities: activities,
             metrics: TodayMetricsState(
                 screenTime: ScreenTimeCardState(durationText: "--", comparisonText: "Waiting for Screen Time data"),
@@ -435,17 +457,60 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 )
             ),
             timeline: .empty,
-            appUsages: [],
-            patterns: patternAnalyzer.patterns(
-                from: PatternInput(
-                    productivityScore: 0,
-                    controlScore: controlResult.roundedValue,
-                    longestDetoxText: "--",
-                    completedRoutines: completedRoutines,
-                    totalRoutines: max(routineExecutions.count, completedRoutines)
-                )
-            )
+            appUsages: []
         )
+    }
+
+    private func makeActiveRoutineChecklist(day: Date, runtimeState: RuntimeState?) -> ActiveRoutineChecklistState? {
+        guard Calendar.current.isDateInToday(day) else { return nil }
+        guard let activeRoutine = runtimeState?.activeRoutine else { return nil }
+        guard !activeRoutine.taskCompletions.isEmpty else { return nil }
+
+        let sortedItems = activeRoutine.taskCompletions.sorted { $0.orderSnapshot < $1.orderSnapshot }
+        let completedCount = sortedItems.filter { $0.completedAt != nil }.count
+
+        return ActiveRoutineChecklistState(
+            id: activeRoutine.id,
+            routineID: activeRoutine.routineID,
+            title: activeRoutine.nameSnapshot,
+            subtitle: "\(completedCount) of \(sortedItems.count) completed",
+            completedCount: completedCount,
+            totalCount: sortedItems.count,
+            items: sortedItems.map {
+                ActiveRoutineChecklistItemState(
+                    id: $0.taskID,
+                    title: $0.titleSnapshot,
+                    isCompleted: $0.completedAt != nil,
+                    completedAtText: $0.completedAt?.formatted(date: .omitted, time: .shortened)
+                )
+            }
+        )
+    }
+
+    private func makeDummyPerspectiveStack(
+        primary: DailyPerspective,
+        mostProductivePeriodText: String,
+        distractionPeriodText: String,
+        leadingDistractionApps: [String],
+        bestDetoxText: String
+    ) -> [DailyPerspective] {
+        let appsText = leadingDistractionApps.isEmpty ? "your unproductive apps" : leadingDistractionApps.joined(separator: " and ")
+
+        return [
+            primary,
+            DailyPerspective(
+                id: "focus-window",
+                title: "Focus window",
+                body: "Your strongest focused stretch landed around \(mostProductivePeriodText).",
+                tone: .focused
+            ),
+            DailyPerspective(
+                id: "detox-distraction",
+                title: "Detox and drift",
+                body: "Your best detox was \(bestDetoxText), while distraction pressure rose near \(distractionPeriodText) from \(appsText).",
+                tone: .balanced
+            )
+        ]
     }
 
     private func makeRawDebugText(

@@ -65,7 +65,9 @@ private struct ClassificationMenu: View {
         Menu {
             ForEach(AppClassification.allCases) { option in
                 Button(option.title) {
-                    onClassificationChange(option)
+                    withAnimation(.smooth(duration: 0.24)) {
+                        onClassificationChange(option)
+                    }
                 }
             }
         } label: {

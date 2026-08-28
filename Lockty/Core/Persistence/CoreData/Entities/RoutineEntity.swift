@@ -13,6 +13,7 @@ final class RoutineEntity: NSManagedObject {
     @NSManaged var blockedApplicationIDsData: Data
     @NSManaged var blockedDomainsData: Data
     @NSManaged var breakPolicyData: Data
+    @NSManaged var startAlarmEnabled: Bool
     @NSManaged var familyActivitySelectionData: Data?
 
     @NSManaged var tasks: Set<RoutineTaskEntity>

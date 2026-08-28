@@ -34,6 +34,19 @@ struct ScreenTimeSelectionStore {
         print("Saved selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
     }
 
+    func remove(scope: ScreenTimeSelectionScope) throws {
+        var storedRecords = records()
+        let previousCount = storedRecords.count
+        storedRecords.removeAll { $0.scope == scope }
+        guard storedRecords.count != previousCount else {
+            print("No selection record found to remove for scope=\(scope.id)")
+            return
+        }
+        try appGroupStore.saveSelectionRecords(storedRecords)
+        selectionLogger().notice("Removed selection for scope=\(scope.id, privacy: .public)")
+        print("Removed selection scope=\(scope.id)")
+    }
+
     func record(scope: ScreenTimeSelectionScope) -> ScreenTimeSelectionRecord? {
         records().first(where: { $0.scope == scope })
     }
@@ -53,12 +66,17 @@ struct ScreenTimeSelectionStore {
         case .routine(let routineID):
             return try load(scope: .routine(routineID))
         case .pause(let appID):
-            if let matched = records().first(where: { record in
+            if let matched = records()
+                .filter({ record in
                 guard case .pause = record.scope else { return false }
                 return record.blockedApplications.contains(appID)
-            }) {
+                })
+                .sorted(by: { $0.updatedAt > $1.updatedAt })
+                .first {
+                print("Resolved pause selection for appID=\(appID.rawValue) from scope=\(matched.scope.id)")
                 return matched.selection
             }
+            print("No pause selection found for appID=\(appID.rawValue)")
             return FamilyActivitySelection()
         case .combined:
             return mergedSelection(for: policy)
@@ -69,9 +87,17 @@ struct ScreenTimeSelectionStore {
 
     func mergedSelection(for policy: ShieldPolicy) -> FamilyActivitySelection {
         let matchingRecords = records().filter { record in
-            !record.blockedApplications.isDisjoint(with: policy.blockedApplications)
-                || !record.blockedDomains.isDisjoint(with: policy.blockedDomains)
+            record.isContained(in: policy)
         }
+
+        print(
+            """
+            Merging selection for policy reason=\(String(describing: policy.reason)) \
+            policyApps=\(policy.blockedApplications.count) \
+            policyDomains=\(policy.blockedDomains.count) \
+            matchedScopes=\(matchingRecords.map(\.scope.id))
+            """
+        )
 
         return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
             partialResult.applicationTokens.formUnion(record.selection.applicationTokens)

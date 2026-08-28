@@ -149,10 +149,7 @@ final class PauseEditorViewModel {
     }
 
     func save() async -> Bool {
-        guard let selection = try? selectionStore.load(scope: selectionScope) else {
-            errorMessage = "App selection is unavailable."
-            return false
-        }
+        let selection = selectionPreview
 
         let selectedApps = selection.applicationTokens.map(AppIdentity.init(token:))
         guard selectedApps.count == 1, let application = selectedApps.first else {
@@ -178,6 +175,7 @@ final class PauseEditorViewModel {
         )
 
         do {
+            try selectionStore.save(selection, scope: selectionScope)
             try await repository.save(rule)
             pauseEditorLogger.notice("Pause editor saved id=\(rule.id.uuidString, privacy: .public) app=\(application.displayName, privacy: .public) steps=\(sanitizedSteps.count)")
             print("Pause editor saved id=\(rule.id.uuidString) app=\(application.displayName) steps=\(sanitizedSteps.count)")
@@ -203,7 +201,7 @@ final class PauseEditorViewModel {
                         id: configuration.id,
                         prompt: prompt,
                         minimumLength: configuration.minimumLength,
-                        isRequired: configuration.isRequired
+                        isRequired: true
                     )
                 )
             case .confirmation(let configuration):
@@ -255,14 +253,20 @@ struct PauseEditorView: View {
                         ForEach(Array(viewModel.steps.enumerated()), id: \.element.id) { _, step in
                             PauseStepEditorCard(
                                 step: binding(for: step.id),
-                                onRemove: { viewModel.removeStep(id: step.id) }
+                                onRemove: {
+                                    withAnimation(.smooth(duration: 0.24)) {
+                                        viewModel.removeStep(id: step.id)
+                                    }
+                                }
                             )
                         }
 
                         Menu {
                             ForEach(EditablePauseStep.allCases) { type in
                                 Button(type.rawValue.capitalized) {
-                                    viewModel.addStep(type)
+                                    withAnimation(.smooth(duration: 0.24)) {
+                                        viewModel.addStep(type)
+                                    }
                                 }
                             }
                         } label: {
@@ -405,7 +409,7 @@ struct PauseEditorView: View {
                                 .labelStyle(.iconOnly)
                         } else {
                             Image(systemName: "app.badge")
-                                .font(.system(size: 22, weight: .light))
+                                .font(.system(size: 22, weight: .medium))
                                 .foregroundStyle(LocktyColors.primaryText)
                         }
                     }
@@ -427,6 +431,7 @@ struct PauseEditorView: View {
 struct PauseAppPickerSheet: View {
     @State private var viewModel: PauseEditorViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var pickerSelection = FamilyActivitySelection()
 
     init(viewModel: PauseEditorViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -439,9 +444,30 @@ struct PauseAppPickerSheet: View {
             EditorTopBar(title: "Choose App", onClose: { dismiss() })
 
             FamilyActivityPicker(selection: Binding(
-                get: { viewModel.selectionPreview },
+                get: { pickerSelection },
                 set: { newValue in
-                    viewModel.replaceSelection(newValue)
+                    let previousSelection = pickerSelection
+                    var normalized = newValue
+                    normalized.categoryTokens = []
+                    normalized.webDomainTokens = []
+
+                    let addedApplication = normalized.applicationTokens
+                        .subtracting(previousSelection.applicationTokens)
+                        .first
+
+                    if let addedApplication {
+                        normalized.applicationTokens = [addedApplication]
+                    } else if let keptApplication = normalized.applicationTokens.first {
+                        normalized.applicationTokens = [keptApplication]
+                    } else {
+                        normalized.applicationTokens = []
+                    }
+
+                    pickerSelection = normalized
+
+                    guard normalized.applicationTokens.count == 1 else { return }
+                    viewModel.replaceSelection(normalized)
+                    dismiss()
                 }
             ))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -449,6 +475,10 @@ struct PauseAppPickerSheet: View {
         .padding(.horizontal, LocktySpacing.md)
         .padding(.top, LocktySpacing.sm)
         .padding(.bottom, LocktySpacing.md)
+        .onAppear {
+            pickerSelection = FamilyActivitySelection()
+            print("Pause app picker opened with empty picker selection; current saved app remains outside the sheet.")
+        }
     }
 }
 
@@ -466,7 +496,7 @@ private struct PauseStepEditorCard: View {
                 Spacer()
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .light))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(LocktyColors.tertiaryText)
                 }
                 .buttonStyle(.plain)
@@ -494,14 +524,10 @@ private struct PauseStepEditorCard: View {
                 DurationSlider(value: binding(configuration: configuration).breathCount.doubleProxy, range: 1...10)
 
             case .intention(let configuration):
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
-                        .font(LocktyTypography.body)
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(2...4)
-
-                    ToggleRow(title: "Required", isOn: binding(configuration: configuration).isRequired)
-                }
+                TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
+                    .font(LocktyTypography.body)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .lineLimit(2...4)
 
             case .confirmation(let configuration):
                 TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
@@ -566,24 +592,12 @@ private extension Binding where Value == Int {
     }
 }
 
-/// A duration slider styled after the system HIG slider pattern, with a
-/// "slow"/"fast" (tortoise/hare) glyph at each end.
 private struct DurationSlider: View {
     let value: Binding<Double>
     let range: ClosedRange<Double>
 
     var body: some View {
-        Slider(value: value, in: range) {
-            EmptyView()
-        } minimumValueLabel: {
-            Image(systemName: "tortoise.fill")
-                .font(.system(size: 13, weight: .light))
-                .foregroundStyle(LocktyColors.tertiaryText)
-        } maximumValueLabel: {
-            Image(systemName: "hare.fill")
-                .font(.system(size: 13, weight: .light))
-                .foregroundStyle(LocktyColors.tertiaryText)
-        }
-        .tint(LocktyColors.primaryText)
+        Slider(value: value, in: range)
+            .tint(LocktyColors.primaryText)
     }
 }

@@ -6,16 +6,6 @@ struct PausesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            HStack {
-                Text("Pauses")
-                    .font(.title3.weight(.regular))
-                    .foregroundStyle(LocktyColors.primaryText)
-                Spacer()
-                IconButton(systemImage: "plus", accessibilityLabel: "Add Pause") {
-                    router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
-                }
-            }
-
             CardView {
                 HStack(spacing: LocktySpacing.lg) {
                     MetricRingView(metric: PrimaryMetric(kind: .control, value: Double(viewModel.state.summary.successRateValue ?? 0)), collapseProgress: 0)

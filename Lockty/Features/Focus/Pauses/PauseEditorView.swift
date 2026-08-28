@@ -268,10 +268,10 @@ struct PauseEditorView: View {
                         } label: {
                             Text("New Step")
                                 .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
+                                .foregroundStyle(LocktyColors.primaryText)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, LocktySpacing.md)
-                                .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
+                                .safeGlass(radius: LocktyRadius.medium, interactive: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -314,7 +314,6 @@ struct PauseEditorView: View {
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xxl)
         }
-        .navigationTitle(viewModel.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -323,6 +322,7 @@ struct PauseEditorView: View {
                     close()
                 } label: {
                     Image(systemName: "xmark")
+                        .fontWeight(.ultraLight)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -334,6 +334,7 @@ struct PauseEditorView: View {
                     }
                 } label: {
                     Image(systemName: "checkmark")
+                        .fontWeight(.ultraLight)
                 }
             }
         }
@@ -419,14 +420,6 @@ struct PauseEditorView: View {
                     .foregroundStyle(LocktyColors.primaryText)
             }
             .frame(maxWidth: .infinity)
-
-            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                ToggleRow(
-                    title: "Pause enabled",
-                    subtitle: "Shield secondary action will offer this flow.",
-                    isOn: $viewModel.isEnabled
-                )
-            }
         }
     }
 }
@@ -486,6 +479,7 @@ private struct PauseStepEditorCard: View {
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.2), value: configuration.duration)
 
                 DurationSlider(value: binding(configuration: configuration).duration, range: 1...60)
 
@@ -495,6 +489,7 @@ private struct PauseStepEditorCard: View {
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.2), value: configuration.breathCount)
 
                 DurationSlider(value: binding(configuration: configuration).breathCount.doubleProxy, range: 1...10)
 

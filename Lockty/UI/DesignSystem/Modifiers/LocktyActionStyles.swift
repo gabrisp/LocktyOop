@@ -11,7 +11,7 @@ extension View {
 
     func locktySheetDismissStyle() -> some View {
         self
-            .font(.system(size: 18, weight: .semibold))
+            .font(.system(size: 18, weight: .ultraLight))
             .foregroundStyle(LocktyColors.primaryText)
             .frame(width: 46, height: 46)
             .contentShape(Circle())

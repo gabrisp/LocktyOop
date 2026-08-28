@@ -531,7 +531,6 @@ struct RoutineEditorView: View {
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xxl)
         }
-        .navigationTitle(viewModel.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -540,6 +539,7 @@ struct RoutineEditorView: View {
                     close()
                 } label: {
                     Image(systemName: "xmark")
+                        .fontWeight(.ultraLight)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -551,6 +551,7 @@ struct RoutineEditorView: View {
                     }
                 } label: {
                     Image(systemName: "checkmark")
+                        .fontWeight(.ultraLight)
                 }
             }
         }
@@ -603,50 +604,41 @@ private struct RoutineEditorHero: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            HStack(alignment: .top, spacing: LocktySpacing.lg) {
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Name")
-                        .font(LocktyTypography.headline)
+            VStack(spacing: LocktySpacing.sm) {
+                Text(viewModel.title)
+                    .font(.footnote)
+                    .foregroundStyle(LocktyColors.tertiaryText)
+
+                Button {
+                    showIconPicker = true
+                } label: {
+                    Image(systemName: viewModel.icon.isEmpty ? "square.and.arrow.up.fill" : viewModel.icon)
+                        .font(.system(size: 22, weight: .ultraLight))
                         .foregroundStyle(LocktyColors.primaryText)
-
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, height: 50) {
-                        TextField("Routine name", text: $viewModel.name)
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(LocktyColors.primaryText)
-                    }
+                        .frame(width: 50, height: 50)
+                        .safeGlass(radius: 12, interactive: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Icon")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    Button {
-                        showIconPicker = true
-                    } label: {
-                        CardView(radius: LocktyRadius.medium, padding: 0, height: 50) {
-                            Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 50, height: 50)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .tappable()
-                    .popover(isPresented: $showIconPicker) {
-                        RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
-                            .presentationCompactAdaptation(.popover)
-                    }
+                .buttonStyle(.plain)
+                .tappable()
+                .popover(isPresented: $showIconPicker) {
+                    RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
+                        .presentationCompactAdaptation(.popover)
                 }
-                .frame(width: 74, alignment: .leading)
+
+                TextField("Routine name", text: $viewModel.name)
+                    .font(LocktyTypography.body)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 2)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                    }
             }
+            .frame(maxWidth: .infinity)
 
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                Text("Apps and websites will be blocked while this routine runs.")
-                    .font(LocktyTypography.callout)
-                    .foregroundStyle(LocktyColors.secondaryText)
-
 //                Picker("Mode", selection: $viewModel.mode) {
 //                    Text("Normal").tag(RoutineMode.normal)
 //                    Text("Strict").tag(RoutineMode.strict)

@@ -73,6 +73,7 @@ struct ActiveRoutineView: View {
                             dismiss()
                         } label: {
                             Image(systemName: "xmark")
+                                .fontWeight(.ultraLight)
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {

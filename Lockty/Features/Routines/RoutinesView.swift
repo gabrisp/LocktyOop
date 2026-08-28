@@ -6,17 +6,6 @@ struct RoutinesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            HStack(alignment: .center) {
-                Text("Routines")
-                    .font(.title3.weight(.regular))
-                    .foregroundStyle(LocktyColors.primaryText)
-                Spacer()
-
-                IconButton(systemImage: "plus", accessibilityLabel: "Create Routine") {
-                    router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
-                }
-            }
-
             VStack(spacing: LocktySpacing.md) {
                 if viewModel.routines.isEmpty {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {

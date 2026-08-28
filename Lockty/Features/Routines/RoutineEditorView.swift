@@ -626,11 +626,15 @@ struct RoutineEditorView: View {
     }
 
     @ViewBuilder
+    /// Matches the RESTRICTIONS/SCHEDULE sections: hairline separator above an
+    /// uppercase eyebrow caption, sitting outside the section's content.
     private func editorSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text(title)
-                .font(LocktyTypography.title)
-                .foregroundStyle(LocktyColors.primaryText)
+            Rectangle()
+                .fill(LocktyColors.separator)
+                .frame(height: 0.5)
+            Text(title.uppercased())
+                .locktyEyebrow()
             content()
         }
     }

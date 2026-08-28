@@ -7,26 +7,51 @@ struct FocusView: View {
     let router: AppRouter
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                Text("Focus")
-                    .font(LocktyTypography.largeTitle)
-                    .foregroundStyle(LocktyColors.primaryText)
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            Text("Focus")
+                .font(LocktyTypography.largeTitle)
+                .foregroundStyle(LocktyColors.primaryText)
+                .padding(.horizontal, LocktySpacing.md)
 
-                FocusSectionPicker(viewModel: viewModel)
+            FocusSectionPicker(viewModel: viewModel)
+                .padding(.horizontal, LocktySpacing.md)
 
-                switch viewModel.selectedSection {
-                case .routines:
-                    RoutinesView(viewModel: routinesViewModel, router: router)
-                case .pauses:
-                    PausesView(viewModel: pausesViewModel, router: router)
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ScrollView(.vertical) {
+                        RoutinesView(viewModel: routinesViewModel, router: router)
+                            .padding(.horizontal, LocktySpacing.md)
+                            .padding(.bottom, LocktySpacing.xl)
+                    }
+                    .scrollIndicators(.hidden)
+                    .containerRelativeFrame(.horizontal)
+                    .id(FocusSection.routines)
+
+                    ScrollView(.vertical) {
+                        PausesView(viewModel: pausesViewModel, router: router)
+                            .padding(.horizontal, LocktySpacing.md)
+                            .padding(.bottom, LocktySpacing.xl)
+                    }
+                    .scrollIndicators(.hidden)
+                    .containerRelativeFrame(.horizontal)
+                    .id(FocusSection.pauses)
                 }
+                .scrollTargetLayout()
             }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.xl)
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(
+                id: Binding(
+                    get: { viewModel.selectedSection },
+                    set: { newValue in
+                        if let newValue {
+                            viewModel.selectedSection = newValue
+                        }
+                    }
+                )
+            )
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
+        .padding(.top, LocktySpacing.lg)
         .locktyScreenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task {

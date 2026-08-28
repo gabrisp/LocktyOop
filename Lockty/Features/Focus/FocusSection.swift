@@ -1,6 +1,6 @@
 import Foundation
 
-enum FocusSection: String, CaseIterable, Identifiable {
+enum FocusSection: String, CaseIterable, Identifiable, Hashable {
     case routines
     case pauses
 

@@ -6,10 +6,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                Text("Settings")
-                    .font(LocktyTypography.largeTitle)
-                    .foregroundStyle(LocktyColors.primaryText)
-
                 CardView {
                     VStack(alignment: .leading, spacing: LocktySpacing.md) {
                         SectionHeader(title: "Accent")
@@ -60,23 +56,8 @@ struct SettingsView: View {
             .padding(.vertical, LocktySpacing.xl)
         }
         .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .safeSafeAreaBar(edge: .top, spacing: 0) {
-            LocktyTopBar(
-                title: "Settings",
-                leading: {
-                    Color.clear
-                        .frame(width: 44, height: 44)
-                },
-                trailing: {
-                    Color.clear
-                        .frame(width: 44, height: 44)
-                }
-            )
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.xs)
-            .padding(.bottom, LocktySpacing.sm)
-        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 

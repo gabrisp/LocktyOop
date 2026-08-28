@@ -63,6 +63,28 @@ struct ActiveRoutineView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        NavigationStack {
+            content
+                .navigationTitle("Active Routine")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Open") {
+                            router.push(.routineDetail(viewModel.routineID))
+                        }
+                    }
+                }
+        }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if let activeRoutine = viewModel.activeRoutine {
@@ -159,19 +181,7 @@ struct ActiveRoutineView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .safeSafeAreaBar(edge: .top, spacing: 0) {
-            LocktyTopBar(title: "Active Routine") {
-                LocktyTopBarIconAction(systemImage: "xmark", label: "Close") {
-                    dismiss()
-                }
-            } trailing: {
-                LocktyTopBarTextAction(title: "Open") {
-                    router.push(.routineDetail(viewModel.routineID))
-                }
-            }
-        }
         .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(role: .destructive) {
                 Task {

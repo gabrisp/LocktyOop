@@ -155,27 +155,23 @@ struct RoutineDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .safeSafeAreaBar(edge: .top, spacing: 0) {
-            LocktyTopBar(title: viewModel.routine?.name ?? "Routine") {
-                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
-                    dismiss()
-                }
-            } trailing: {
-                HStack(spacing: LocktySpacing.sm) {
-                    if let routine = viewModel.routine {
-                        LocktyTopBarTextAction(title: "Edit") {
-                            router.push(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
-                        }
-                    }
-
-                    LocktyTopBarTextAction(title: "Start") {
-                        Task { await viewModel.start() }
+        .locktyScreenBackground()
+        .navigationTitle(viewModel.routine?.name ?? "Routine")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let routine = viewModel.routine {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Edit") {
+                        router.push(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
                     }
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Start") {
+                    Task { await viewModel.start() }
+                }
+            }
         }
-        .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load()
         }

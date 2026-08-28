@@ -101,21 +101,18 @@ struct PauseDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .safeSafeAreaBar(edge: .top, spacing: 0) {
-            LocktyTopBar(title: viewModel.rule?.application.displayName ?? "Pause") {
-                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
-                    dismiss()
-                }
-            } trailing: {
-                if let rule = viewModel.rule {
-                    LocktyTopBarTextAction(title: "Edit") {
+        .locktyScreenBackground()
+        .navigationTitle(viewModel.rule?.application.displayName ?? "Pause")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let rule = viewModel.rule {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Edit") {
                         router.push(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
                     }
                 }
             }
         }
-        .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load()
         }

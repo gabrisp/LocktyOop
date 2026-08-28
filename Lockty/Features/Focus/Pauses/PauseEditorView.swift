@@ -291,20 +291,28 @@ struct PauseEditorView: View {
             .padding(.bottom, LocktySpacing.xxl)
         }
         .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .safeSafeAreaBar(edge: .top, spacing: 0) {
-            EditorTopBar(
-                title: viewModel.title,
-                confirmTitle: "Save",
-                onClose: { close() },
-                onConfirm: {
+        .navigationTitle(viewModel.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    close()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     Task {
                         if await viewModel.save() {
                             close()
                         }
                     }
+                } label: {
+                    Image(systemName: "checkmark")
                 }
-            )
+            }
         }
         .task {
             await viewModel.load()

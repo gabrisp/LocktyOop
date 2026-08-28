@@ -1,3 +1,4 @@
+import FamilyControls
 import SwiftUI
 
 struct AppUsageRow: View {
@@ -16,10 +17,17 @@ struct AppUsageRow: View {
             )
 
             VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                Text(state.app.displayName)
-                    .font(LocktyTypography.headline)
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .lineLimit(1)
+                Group {
+                    if let token = state.app.applicationToken {
+                        Label(token)
+                            .labelStyle(.titleOnly)
+                    } else {
+                        Text(state.app.displayName)
+                    }
+                }
+                .font(LocktyTypography.headline)
+                .foregroundStyle(LocktyColors.primaryText)
+                .lineLimit(1)
 
                 ClassificationMenu(
                     classification: state.classification,

@@ -22,36 +22,24 @@ struct RoutineDomainsSheet: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: LocktySpacing.md) {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                            Text("Add a website domain to block while this routine runs.")
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
+                        HStack(spacing: LocktySpacing.sm) {
+                            TextField("google.com", text: $viewModel.pendingDomain)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(LocktyColors.primaryText)
 
-                            HStack(spacing: LocktySpacing.sm) {
-                                TextField("google.com", text: $viewModel.pendingDomain)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .font(LocktyTypography.body)
-                                    .foregroundStyle(LocktyColors.primaryText)
-
-                                Button("Add") {
-                                    viewModel.addDomain()
-                                }
-                                .buttonStyle(.borderedProminent)
+                            Button("Add") {
+                                viewModel.addDomain()
                             }
+                            .buttonStyle(.borderedProminent)
                         }
                     }
 
                     if !viewModel.blockedDomains.isEmpty {
                         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                Text("Websites (\(viewModel.blockedDomains.count))")
-                                    .font(LocktyTypography.headline)
-                                    .foregroundStyle(LocktyColors.primaryText)
-
-                                DomainChipFlow(domains: viewModel.blockedDomains) { domain in
-                                    viewModel.removeDomain(domain)
-                                }
+                            DomainChipFlow(domains: viewModel.blockedDomains) { domain in
+                                viewModel.removeDomain(domain)
                             }
                         }
                     }
@@ -63,5 +51,6 @@ struct RoutineDomainsSheet: View {
         }
         .locktyScreenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .presentationDetents([.medium])
     }
 }

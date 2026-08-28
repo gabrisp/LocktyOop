@@ -13,7 +13,7 @@ struct IconButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(LocktyColors.primaryText)
-        .safeGlass(radius: 22, interactive: true)
+        .background(LocktyColors.cardFill, in: Circle())
         .accessibilityLabel(accessibilityLabel)
         .tappable()
     }

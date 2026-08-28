@@ -20,6 +20,10 @@ enum LocktyColors {
         light: UIColor.black.withAlphaComponent(0.06),
         dark: UIColor.white.withAlphaComponent(0.08)
     )
+    static let cardFill = adaptive(
+        light: UIColor.black.withAlphaComponent(0.05),
+        dark: UIColor.white.withAlphaComponent(0.05)
+    )
     static let cardStroke = adaptive(
         light: UIColor.black.withAlphaComponent(0.10),
         dark: UIColor.white.withAlphaComponent(0.12)

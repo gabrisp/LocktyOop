@@ -404,17 +404,6 @@ struct PauseAppPickerSheet: View {
                 onConfirm: { dismiss() }
             )
 
-            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                    Text("Pick the one application that should trigger this Pause.")
-                        .font(LocktyTypography.callout)
-                        .foregroundStyle(LocktyColors.secondaryText)
-                    Text("Selection is saved instantly.")
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.tertiaryText)
-                }
-            }
-
             FamilyActivityPicker(selection: Binding(
                 get: { viewModel.selectionPreview },
                 set: { newValue in

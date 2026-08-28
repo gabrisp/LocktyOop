@@ -104,42 +104,22 @@ final class RoutineEditorViewModel {
         !editingBlockDecision.isAllowed
     }
 
-    var isScheduleEnabled: Bool {
-        scheduleTrigger != nil
-    }
-
-    var scheduleTrigger: RoutineSchedule? {
+    /// Displayed and edited directly in the editor, always -- with no weekdays
+    /// selected this has no practical effect (manual start only), so there is
+    /// no separate enable/disable toggle.
+    var scheduleTrigger: RoutineSchedule {
         for trigger in triggers {
             if case .schedule(let schedule) = trigger { return schedule }
         }
-        return nil
-    }
-
-    var triggersSummary: String {
-        isScheduleEnabled ? "Manual + Schedule" : "Manual"
-    }
-
-    func setScheduleEnabled(_ enabled: Bool) {
-        if enabled {
-            guard scheduleTrigger == nil else { return }
-            triggers.append(.schedule(RoutineSchedule(
-                hour: 9,
-                minute: 0,
-                weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
-            )))
-        } else {
-            triggers.removeAll { if case .schedule = $0 { true } else { false } }
-        }
-        if triggers.isEmpty {
-            triggers = [.manual]
-        }
+        return RoutineSchedule(hour: 9, minute: 0, weekdays: [])
     }
 
     func updateSchedule(_ transform: (inout RoutineSchedule) -> Void) {
-        guard let index = triggers.firstIndex(where: { if case .schedule = $0 { true } else { false } }) else { return }
-        guard case .schedule(var schedule) = triggers[index] else { return }
+        var schedule = scheduleTrigger
         transform(&schedule)
-        triggers[index] = .schedule(schedule)
+        var newTriggers = triggers.filter { if case .schedule = $0 { false } else { true } }
+        newTriggers.append(.schedule(schedule))
+        triggers = newTriggers
     }
 
     func loadMostUsedApplications() async {
@@ -359,17 +339,6 @@ struct RoutineAppPickerSheet: View {
             )
 
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                        Text("Choose the applications this routine will restrict.")
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(LocktyColors.secondaryText)
-                        Text("Selection is saved instantly.")
-                            .font(LocktyTypography.caption)
-                            .foregroundStyle(LocktyColors.tertiaryText)
-                    }
-                }
-
                 if !viewModel.mostUsedApplications.isEmpty {
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                         Text("Recommended Restrictions")
@@ -479,58 +448,45 @@ struct RoutineEditorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Triggers")
+                    Text("Schedule")
                         .font(LocktyTypography.title)
                         .foregroundStyle(LocktyColors.primaryText)
 
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                         VStack(spacing: LocktySpacing.md) {
-                            ToggleRow(
-                                title: "Schedule",
-                                subtitle: viewModel.isScheduleEnabled ? "Starts automatically on selected days." : "Manual start only.",
-                                isOn: Binding(
-                                    get: { viewModel.isScheduleEnabled },
-                                    set: { viewModel.setScheduleEnabled($0) }
+                            ScheduleDaysPicker(
+                                selectedWeekdays: Binding(
+                                    get: { viewModel.scheduleTrigger.weekdays },
+                                    set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
                                 )
                             )
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                            if let schedule = viewModel.scheduleTrigger {
-                                VStack(spacing: LocktySpacing.md) {
-                                    ScheduleDaysPicker(
-                                        selectedWeekdays: Binding(
-                                            get: { schedule.weekdays },
-                                            set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
-                                        )
-                                    )
-                                    .frame(maxWidth: .infinity, alignment: .center)
-
-                                    HStack(spacing: LocktySpacing.md) {
-                                        Picker("Hour", selection: Binding(
-                                            get: { schedule.hour },
-                                            set: { newValue in viewModel.updateSchedule { $0.hour = newValue } }
-                                        )) {
-                                            ForEach(0..<24, id: \.self) { hour in
-                                                Text(String(format: "%02d", hour)).tag(hour)
-                                            }
+                            HStack(spacing: LocktySpacing.xl) {
+                                ScheduleTimeField(
+                                    label: "Start",
+                                    hour: viewModel.scheduleTrigger.hour,
+                                    minute: viewModel.scheduleTrigger.minute,
+                                    onChange: { hour, minute in
+                                        viewModel.updateSchedule {
+                                            $0.hour = hour
+                                            $0.minute = minute
                                         }
-                                        .pickerStyle(.wheel)
-                                        .frame(maxWidth: .infinity)
-
-                                        Picker("Minute", selection: Binding(
-                                            get: { schedule.minute },
-                                            set: { newValue in viewModel.updateSchedule { $0.minute = newValue } }
-                                        )) {
-                                            ForEach([0, 15, 30, 45], id: \.self) { minute in
-                                                Text(String(format: "%02d", minute)).tag(minute)
-                                            }
-                                        }
-                                        .pickerStyle(.wheel)
-                                        .frame(maxWidth: .infinity)
                                     }
-                                    .frame(height: 120)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .center)
+                                )
+                                ScheduleTimeField(
+                                    label: "End",
+                                    hour: viewModel.scheduleTrigger.endHour,
+                                    minute: viewModel.scheduleTrigger.endMinute,
+                                    onChange: { hour, minute in
+                                        viewModel.updateSchedule {
+                                            $0.endHour = hour
+                                            $0.endMinute = minute
+                                        }
+                                    }
+                                )
                             }
+                            .frame(maxWidth: .infinity, alignment: .center)
                         }
                     }
                 }
@@ -630,7 +586,7 @@ private struct RoutineEditorHero: View {
                         .font(LocktyTypography.headline)
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, height: 48) {
                         TextField("Routine name", text: $viewModel.name)
                             .font(LocktyTypography.body)
                             .foregroundStyle(LocktyColors.primaryText)
@@ -645,11 +601,10 @@ private struct RoutineEditorHero: View {
                     Button {
                         router.presentSheet(.routineIconPicker(viewModel.draftID))
                     } label: {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.sm) {
+                        CardView(radius: LocktyRadius.medium, padding: 0) {
                             Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 24, height: 24)
                                 .frame(width: 48, height: 48)
                         }
                     }
@@ -664,11 +619,11 @@ private struct RoutineEditorHero: View {
                     .font(LocktyTypography.callout)
                     .foregroundStyle(LocktyColors.secondaryText)
 
-                Picker("Mode", selection: $viewModel.mode) {
-                    Text("Normal").tag(RoutineMode.normal)
-                    Text("Strict").tag(RoutineMode.strict)
-                }
-                .pickerStyle(.segmented)
+//                Picker("Mode", selection: $viewModel.mode) {
+//                    Text("Normal").tag(RoutineMode.normal)
+//                    Text("Strict").tag(RoutineMode.strict)
+//                }
+//                .pickerStyle(.segmented)
 
 //                ToggleRow(
 //                    title: "Allow Pause during Strict Mode",
@@ -678,10 +633,10 @@ private struct RoutineEditorHero: View {
 //                )
 
                 HStack(spacing: LocktySpacing.sm) {
-                    BadgeView(
-                        title: viewModel.mode == .strict ? "Strict" : "Normal",
-                        color: viewModel.mode == .strict ? LocktyColors.warning : .accentColor
-                    )
+//                    BadgeView(
+//                        title: viewModel.mode == .strict ? "Strict" : "Normal",
+//                        color: viewModel.mode == .strict ? LocktyColors.warning : .accentColor
+//                    )
                     BadgeView(
                         title: "\(viewModel.trimmedTasksCount) tasks",
                         color: LocktyColors.neutral
@@ -717,8 +672,60 @@ private struct RoutineTaskEditorCard: View {
     }
 }
 
+private struct ScheduleTimeField: View {
+    let label: String
+    let hour: Int
+    let minute: Int
+    let onChange: (Int, Int) -> Void
+
+    @State private var isPresented = false
+    @State private var draftDate = Date()
+
+    private var displayText: String {
+        String(format: "%02d:%02d", hour, minute)
+    }
+
+    var body: some View {
+        Button {
+            var components = DateComponents()
+            components.hour = hour
+            components.minute = minute
+            draftDate = Calendar.current.date(from: components) ?? Date()
+            isPresented = true
+        } label: {
+            VStack(spacing: LocktySpacing.xs) {
+                Text(label)
+                    .font(LocktyTypography.caption)
+                    .foregroundStyle(LocktyColors.secondaryText)
+                Text(displayText)
+                    .font(LocktyTypography.headline)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.vertical, LocktySpacing.sm)
+            .safeGlass(radius: 12, interactive: true)
+        }
+        .buttonStyle(.plain)
+        .tappable()
+        .popover(isPresented: $isPresented) {
+            DatePicker("", selection: $draftDate, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .padding()
+                .onChange(of: draftDate) { _, newValue in
+                    let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                    onChange(components.hour ?? hour, components.minute ?? minute)
+                }
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
 private struct SelectionPreviewCard: View {
     let selection: FamilyActivitySelection
+
+    private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
@@ -727,18 +734,35 @@ private struct SelectionPreviewCard: View {
                     .font(LocktyTypography.headline)
                     .foregroundStyle(LocktyColors.primaryText)
 
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
                     ForEach(Array(selection.applicationTokens), id: \.self) { token in
                         Label(token)
-                            .labelStyle(.titleAndIcon)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, LocktySpacing.xs)
+                            .labelStyle(.tokenTile)
                     }
                 }
             }
         }
     }
+}
+
+private struct TokenTileLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: LocktySpacing.xs) {
+            configuration.icon
+                .font(.system(size: 22, weight: .semibold))
+                .frame(width: 34, height: 34)
+            configuration.title
+                .font(LocktyTypography.caption)
+                .foregroundStyle(LocktyColors.primaryText)
+                .lineLimit(1)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private extension LabelStyle where Self == TokenTileLabelStyle {
+    static var tokenTile: TokenTileLabelStyle { TokenTileLabelStyle() }
 }
 
 struct EditorTopBar: View {

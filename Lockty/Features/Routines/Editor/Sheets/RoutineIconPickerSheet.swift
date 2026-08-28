@@ -7,7 +7,14 @@ struct RoutineIconPickerSheet: View {
     private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
-        NavigationStack {
+        VStack(alignment: .leading, spacing: 0) {
+            EditorTopBar(
+                title: "Icon",
+                confirmTitle: "Done",
+                onClose: { dismiss() },
+                onConfirm: { dismiss() }
+            )
+
             ScrollView {
                 LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
                     ForEach(RoutineIconCatalog.icons, id: \.self) { iconName in
@@ -31,15 +38,9 @@ struct RoutineIconPickerSheet: View {
                 }
                 .padding(LocktySpacing.lg)
             }
-            .locktyScreenBackground()
-            .navigationTitle("Icon")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    IconButton(systemImage: "xmark", accessibilityLabel: "Close") { dismiss() }
-                }
-            }
         }
-        .presentationDetents([.large])
+        .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .presentationDetents([.medium])
     }
 }

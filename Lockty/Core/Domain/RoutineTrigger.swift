@@ -27,6 +27,8 @@ nonisolated struct RoutineSchedule: Codable, Hashable, Identifiable {
     let id: UUID
     var hour: Int
     var minute: Int
+    var endHour: Int
+    var endMinute: Int
     var weekdays: Set<Weekday>
     var timeZoneIdentifier: String
 
@@ -34,12 +36,16 @@ nonisolated struct RoutineSchedule: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         hour: Int,
         minute: Int,
+        endHour: Int = 17,
+        endMinute: Int = 0,
         weekdays: Set<Weekday>,
         timeZoneIdentifier: String = TimeZone.current.identifier
     ) {
         self.id = id
         self.hour = hour
         self.minute = minute
+        self.endHour = endHour
+        self.endMinute = endMinute
         self.weekdays = weekdays
         self.timeZoneIdentifier = timeZoneIdentifier
     }

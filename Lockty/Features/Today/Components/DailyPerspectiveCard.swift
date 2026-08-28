@@ -80,17 +80,13 @@ private struct DismissibleDailyPerspectiveCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        // Straight horizontal slide only — the card must not rotate as it's dismissed.
         .offset(x: dragOffsetX)
-        // Pivot from below the card so the swipe reads as a flick rather than a
-        // spin about the middle; the divisor is what makes the tilt legible while
-        // dragging (~7 degrees by the dismiss threshold, ~30 on the way out).
-        .rotationEffect(.degrees(Double(dragOffsetX / 14)), anchor: .bottom)
         .opacity(isDismissing ? 0 : 1)
         // simultaneousGesture, not gesture: the enclosing vertical ScrollView wins an
-        // exclusive .gesture(), so onChanged barely fired and the card never visibly
-        // rotated (dismissal still worked, since that only needs the end velocity).
-        // Running alongside the scroll and only tracking horizontally-dominant drags
-        // keeps vertical scrolling intact.
+        // exclusive .gesture(), so onChanged barely fires and the card doesn't follow
+        // the finger. Running alongside the scroll and only tracking
+        // horizontally-dominant drags keeps vertical scrolling intact.
         .simultaneousGesture(isTopCard ? dragGesture : nil)
         .animation(.smooth(duration: 0.26), value: isDismissing)
     }

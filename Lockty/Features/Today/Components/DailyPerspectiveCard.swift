@@ -34,9 +34,18 @@ struct DailyPerspectiveStackSection: View {
             .frame(height: stackHeight, alignment: .top)
         }
         .frame(maxHeight: visiblePerspectives.isEmpty ? 0 : stackHeight + 22, alignment: .top)
-        .clipped()
+        // Clip vertically so the section can collapse to zero height cleanly, but not
+        // horizontally — a plain .clipped() sheared the card mid-swipe as it flew out.
+        .clipShape(VerticalOnlyClip())
         .opacity(visiblePerspectives.isEmpty ? 0 : 1)
         .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
+    }
+}
+
+/// Clips top/bottom only, leaving horizontal overflow visible.
+private struct VerticalOnlyClip: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: -1_000, dy: 0))
     }
 }
 
@@ -83,10 +92,13 @@ private struct DismissibleDailyPerspectiveCard: View {
             }
         }
         .offset(x: dragOffsetX)
-        .rotationEffect(.degrees(Double(dragOffsetX / 28)))
+        // Pivot from below the card so the swipe reads as a flick rather than a
+        // spin about the middle; the divisor is what makes the tilt legible while
+        // dragging (~7 degrees by the dismiss threshold, ~30 on the way out).
+        .rotationEffect(.degrees(Double(dragOffsetX / 14)), anchor: .bottom)
         .opacity(isDismissing ? 0 : 1)
         .gesture(isTopCard ? dragGesture : nil)
-        .animation(.smooth(duration: 0.24), value: isDismissing)
+        .animation(.smooth(duration: 0.26), value: isDismissing)
     }
 
     private var dragGesture: some Gesture {
@@ -112,7 +124,9 @@ private struct DismissibleDailyPerspectiveCard: View {
                     isDismissing = true
                 }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                // Let the fly-out actually play before the card is pulled from the
+                // stack — removing it mid-animation cut the rotation off early.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
                     onDismiss()
                 }
             }

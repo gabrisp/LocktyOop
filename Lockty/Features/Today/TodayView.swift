@@ -74,9 +74,9 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
-                TodayDebugCard(rawText: state.rawDebugText)
+//                TodayDebugCard(rawText: state.rawDebugText)
 
-                DailyPerspectiveCard(perspective: state.perspective)
+//                DailyPerspectiveCard(perspective: state.perspective)
 
                 MyDaySection(activities: state.activities)
 
@@ -106,7 +106,7 @@ struct TodayView: View {
                     )
                 }
 
-                PatternsSection(patterns: state.patterns)
+//                PatternsSection(patterns: state.patterns)
 
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)

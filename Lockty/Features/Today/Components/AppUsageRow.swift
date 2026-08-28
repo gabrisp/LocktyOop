@@ -10,7 +10,9 @@ struct AppUsageRow: View {
             AppIconView(
                 source: state.app.iconSource,
                 applicationToken: state.app.applicationToken,
-                fallbackSystemImage: state.app.iconSystemName
+                fallbackSystemImage: state.app.iconSystemName,
+                size: 50,
+                chrome: .plain
             )
 
             VStack(alignment: .leading, spacing: LocktySpacing.xs) {

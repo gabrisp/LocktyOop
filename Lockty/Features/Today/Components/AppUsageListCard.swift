@@ -5,6 +5,14 @@ struct AppUsageListCard: View {
     let onClassificationChange: (AppUsageState, AppClassification) -> Void
     let onAppSelected: ((AppUsageState) -> Void)? = nil
 
+    private var visibleAppUsages: [AppUsageState] {
+        state.appUsages.filter { $0.duration >= 60 }
+    }
+
+    private var collapsedAppUsages: [AppUsageState] {
+        state.appUsages.filter { $0.duration < 60 }
+    }
+
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 0) {
@@ -30,10 +38,10 @@ struct AppUsageListCard: View {
                     )
                     .padding(.vertical, LocktySpacing.md)
                 } else {
-                    ForEach(Array(state.appUsages.enumerated()), id: \.element.id) { index, appUsage in
+                    ForEach(Array(visibleAppUsages.enumerated()), id: \.element.id) { index, appUsage in
                         AppUsageListItem(
                             state: appUsage,
-                            showsDivider: index < state.appUsages.count - 1,
+                            showsDivider: index < visibleAppUsages.count - 1 || !collapsedAppUsages.isEmpty,
                             onClassificationChange: { classification in
                                 onClassificationChange(appUsage, classification)
                             },
@@ -41,6 +49,11 @@ struct AppUsageListCard: View {
                                 onAppSelected?(appUsage)
                             }
                         )
+                    }
+
+                    if !collapsedAppUsages.isEmpty {
+                        MoreAppsRow(appUsages: collapsedAppUsages)
+                            .padding(.vertical, LocktySpacing.sm)
                     }
                 }
             }
@@ -79,6 +92,46 @@ private struct AppUsageListItem: View {
                 Divider()
                     .overlay(LocktyColors.cardStroke.opacity(0.6))
             }
+        }
+    }
+}
+
+private struct MoreAppsRow: View {
+    let appUsages: [AppUsageState]
+
+    private var previewApps: [AppUsageState] {
+        Array(appUsages.prefix(3))
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: -6) {
+                ForEach(Array(previewApps.enumerated()), id: \.element.id) { index, appUsage in
+                    ZStack {
+                        AppIconView(
+                            source: appUsage.app.iconSource,
+                            applicationToken: appUsage.app.applicationToken,
+                            fallbackSystemImage: appUsage.app.iconSystemName,
+                            size: 34,
+                            chrome: .plain
+                        )
+
+                        if index == previewApps.count - 1, appUsages.count > previewApps.count {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(.black.opacity(0.55))
+                                .frame(width: 34, height: 34)
+                                .overlay {
+                                    Text("+\(appUsages.count - previewApps.count)")
+                                        .font(.system(size: 10, weight: .bold, design: .default))
+                                        .foregroundStyle(.white)
+                                        .monospacedDigit()
+                                        .minimumScaleFactor(0.7)
+                                }
+                        }
+                    }
+                }
+            }
+            Spacer()
         }
     }
 }

@@ -29,6 +29,7 @@ struct HomeView: View {
             .fullScreenCover(item: $router.fullScreen) { route in
                 destinationFactory.fullScreen(for: route)
             }
+            .locktyScreenBackground()
             .safeSafeAreaBar(edge: .top, spacing: 0) {
                 switch router.selectedTab {
                 case .today:

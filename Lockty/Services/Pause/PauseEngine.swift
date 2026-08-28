@@ -21,6 +21,7 @@ final class PauseEngine {
     private let pauseRuleRepository: PauseRuleRepository
     private let pauseEventRepository: PauseEventRepository
     private let shieldPolicyResolver: ShieldPolicyResolver
+    private let liveActivityController: PauseAllowanceLiveActivityControlling
 
     private(set) var state: PauseEngineState = .idle
 
@@ -30,8 +31,10 @@ final class PauseEngine {
         appGroupStore: AppGroupStore,
         pauseRuleRepository: PauseRuleRepository,
         pauseEventRepository: PauseEventRepository,
-        shieldPolicyResolver: ShieldPolicyResolver = ShieldPolicyResolver()
+        shieldPolicyResolver: ShieldPolicyResolver = ShieldPolicyResolver(),
+        liveActivityController: PauseAllowanceLiveActivityControlling = PauseAllowanceLiveActivityController()
     ) {
+        self.liveActivityController = liveActivityController
         self.shieldService = shieldService
         self.deviceActivityService = deviceActivityService
         self.appGroupStore = appGroupStore
@@ -102,11 +105,21 @@ final class PauseEngine {
                 runtime.activePauseAllowance = allowance
                 runtime.shieldPolicy = effectivePolicy
             }
-            try await deviceActivityService.schedulePauseRelock(allowance)
+            // Lift the shield first. Relock scheduling used to run before this and its
+            // failure aborted the whole unlock: DeviceActivitySchedule requires at least
+            // a 15 minute interval, so any shorter allowance (the default is 5) threw and
+            // the app stayed locked. The allowance expiry is also enforced on foreground,
+            // so a missing schedule degrades rather than breaks.
             if effectivePolicy == .empty {
                 try await shieldService.remove(runtime.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
+            }
+
+            do {
+                try await deviceActivityService.schedulePauseRelock(allowance)
+            } catch {
+                print("Pause relock scheduling failed (allowance \(Int(context.allowanceDuration / 60))m): \(error.localizedDescription)")
             }
             await pauseEventRepository.save(
                 PauseEvent(
@@ -123,6 +136,7 @@ final class PauseEngine {
                     actualUsageDuration: nil
                 )
             )
+            await liveActivityController.start(for: allowance)
             state = .temporarilyAllowed(allowance)
         } catch {
             state = .failed(error.localizedDescription)
@@ -178,6 +192,7 @@ final class PauseEngine {
                 runtime.pendingPause = nil
                 runtime.shieldPolicy = effectivePolicy
             }
+            await liveActivityController.end()
             state = .locked(context)
         } catch {
             state = .failed(error.localizedDescription)

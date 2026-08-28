@@ -465,7 +465,11 @@ struct PauseAppPickerSheet: View {
 
                     pickerSelection = normalized
 
-                    guard normalized.applicationTokens.count == 1 else { return }
+                    // Commit/close only when an application was actually just picked.
+                    // Categories are invalid for a Pause (it targets exactly one app), so
+                    // tapping one strips it and leaves the sheet open rather than
+                    // committing whatever app happened to already be selected.
+                    guard addedApplication != nil else { return }
                     viewModel.replaceSelection(normalized)
                     dismiss()
                 }

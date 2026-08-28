@@ -348,11 +348,12 @@ struct RoutineAppPickerSheet: View {
 
     var body: some View {
         @Bindable var viewModel = viewModel
-        // Read the selection here in the body rather than only inside the binding's
-        // getter: the getter runs after body evaluation, so observation never
-        // registered it as a dependency and toggling an app from "Most Used" left
-        // the picker below showing stale state.
-        let selection = viewModel.selectionPreview
+        // Touch the selection during body evaluation purely so observation registers it
+        // as a dependency — otherwise a change made from "Most Used" never re-renders
+        // this view and the picker below keeps showing stale state. The binding itself
+        // must still read it live: handing the picker a value captured here made it read
+        // back its own taps as stale and revert them.
+        _ = viewModel.selectionPreview
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
@@ -369,7 +370,7 @@ struct RoutineAppPickerSheet: View {
             }
 
             FamilyActivityPicker(selection: Binding(
-                get: { selection },
+                get: { viewModel.selectionPreview },
                 set: { newValue in
                     viewModel.replaceSelection(newValue)
                 }

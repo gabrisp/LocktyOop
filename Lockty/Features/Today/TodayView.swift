@@ -43,6 +43,62 @@ struct TodayView: View {
     }
 
     var body: some View {
+        // Root ZStack rather than an .overlay on the ScrollView: an overlay is laid out
+        // (and clipped) to the scroll view's frame, which starts below the safe area, so
+        // the header's backdrop could never reach up into the status bar.
+        ZStack(alignment: .top) {
+            scrollContent
+            topChrome
+        }
+        .task(id: DayKey(date: day)) {
+            await viewModel.load(day: day)
+        }
+        .onChange(of: collapseProgress, initial: true) { _, newValue in
+            router.todayChromeCollapseProgress = newValue
+        }
+        .onDisappear {
+            router.todayChromeCollapseProgress = 0
+        }
+    }
+
+    private var topChrome: some View {
+        ZStack(alignment: .top) {
+            DateSliderView(
+                dates: router.dayNavigationDays,
+                selectedDate: Binding(
+                    get: { router.selectedDay },
+                    set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
+                ),
+                scrollOffset: Binding(
+                    get: { router.daySliderOffset },
+                    set: { router.daySliderOffset = $0 }
+                ),
+                onDateChanged: { newDate in
+                    router.selectedDay = Calendar.current.startOfDay(for: newDate)
+                },
+                onSelectionChanged: {}
+            )
+            .opacity(1 - dateSliderHideProgress)
+            .offset(y: -dateSliderHideProgress * 12)
+
+            TodayMetricsHeader(
+                metrics: state.primaryMetrics.metrics,
+                collapseProgress: collapseProgress,
+                topInset: headerTopInset,
+                onMetricSelected: { metric in
+                    switch metric.kind {
+                    case .productivity: router.presentSheet(.productivityDetail(day))
+                    case .control: router.presentSheet(.controlDetail(day))
+                    case .detox: router.presentSheet(.detoxDetail(day))
+                    }
+                }
+            )
+            .offset(y: metricsHeaderOffsetY)
+        }
+        .offset(y: overscrollPullDistance)
+    }
+
+    private var scrollContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Color.clear
@@ -176,51 +232,5 @@ struct TodayView: View {
             scrollOffset = newValue
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .overlay(alignment: .top) {
-            ZStack(alignment: .top) {
-                DateSliderView(
-                    dates: router.dayNavigationDays,
-                    selectedDate: Binding(
-                        get: { router.selectedDay },
-                        set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
-                    ),
-                    scrollOffset: Binding(
-                        get: { router.daySliderOffset },
-                        set: { router.daySliderOffset = $0 }
-                    ),
-                    onDateChanged: { newDate in
-                        router.selectedDay = Calendar.current.startOfDay(for: newDate)
-                    },
-                    onSelectionChanged: {}
-                )
-                .opacity(1 - dateSliderHideProgress)
-                .offset(y: -dateSliderHideProgress * 12)
-
-                TodayMetricsHeader(
-                    metrics: state.primaryMetrics.metrics,
-                    collapseProgress: collapseProgress,
-                    topInset: headerTopInset,
-                    onMetricSelected: { metric in
-                        switch metric.kind {
-                        case .productivity: router.presentSheet(.productivityDetail(day))
-                        case .control: router.presentSheet(.controlDetail(day))
-                        case .detox: router.presentSheet(.detoxDetail(day))
-                        }
-                    }
-                )
-                .offset(y: metricsHeaderOffsetY)
-            }
-            .offset(y: overscrollPullDistance)
-        }
-        .task(id: DayKey(date: day)) {
-            await viewModel.load(day: day)
-        }
-        // Sticky header / calendar-hide animation paused.
-        .onChange(of: collapseProgress, initial: true) { _, newValue in
-            router.todayChromeCollapseProgress = newValue
-        }
-        .onDisappear {
-            router.todayChromeCollapseProgress = 0
-        }
     }
 }

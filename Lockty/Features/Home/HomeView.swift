@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @Bindable var router: AppRouter
@@ -19,6 +20,20 @@ struct HomeView: View {
                 Tab(AppTab.lifetime.title, systemImage: AppTab.lifetime.systemImage, value: AppTab.lifetime) {
                     featureFactory.makeLifetimeView()
                 }
+            }
+            .hideNativeTabBar()
+            .safeAreaInset(edge: .bottom) {
+                IGStyleTabBar(selection: $router.selectedTab) { tab, isSelected in
+                    UIImage(
+                        systemName: tab.systemImage,
+                        withConfiguration: UIImage.SymbolConfiguration(weight: isSelected ? .semibold : .regular)
+                    ) ?? UIImage()
+                } onInteraction: {
+                    featureFactory.haptics.selectionChanged()
+                }
+                .frame(height: 50)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, LocktySpacing.sm)
             }
             .navigationDestination(for: AppRoute.self) { route in
                 destinationFactory.destination(for: route)

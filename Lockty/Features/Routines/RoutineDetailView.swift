@@ -57,6 +57,23 @@ final class RoutineDetailViewModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    var schedule: RoutineSchedule? {
+        guard let routine else { return nil }
+        for trigger in routine.triggers {
+            if case .schedule(let schedule) = trigger { return schedule }
+        }
+        return nil
+    }
+
+    var lastUsedText: String {
+        guard let last = recentExecutions.first else { return "Never run yet" }
+        return "Last run \(last.startedAt.formatted(date: .abbreviated, time: .shortened))"
+    }
+}
+
+private func timeText(hour: Int, minute: Int) -> String {
+    String(format: "%02d:%02d", hour, minute)
 }
 
 struct RoutineDetailView: View {
@@ -68,49 +85,86 @@ struct RoutineDetailView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
                 if let routine = viewModel.routine {
-                    CardView {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text(routine.name).font(LocktyTypography.title)
-                            Text(routine.mode == .strict ? "Strict routine" : "Normal routine")
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
-                            Text("\(routine.blockedApplications.count) apps · \(routine.blockedDomains.count) websites blocked")
-                                .font(LocktyTypography.caption)
-                                .foregroundStyle(LocktyColors.secondaryText)
+                    VStack(spacing: LocktySpacing.sm) {
+                        Text(viewModel.lastUsedText)
+                            .font(.footnote)
+                            .foregroundStyle(LocktyColors.tertiaryText)
+
+                        Image(systemName: (routine.icon?.isEmpty == false ? routine.icon! : "repeat"))
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(width: 50, height: 50)
+                            .safeGlass(radius: 12)
+
+                        Text(routine.name)
+                            .font(LocktyTypography.body)
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        Text(routine.mode == .strict ? "Strict routine" : "Normal routine")
+                            .font(LocktyTypography.caption)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, LocktySpacing.lg)
+
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("RESTRICTIONS")
+                            .locktyEyebrow()
+
+                        VStack(spacing: LocktySpacing.sm) {
+                            RestrictionRow(
+                                label: "Apps",
+                                summary: viewModel.selection.applicationTokens.isEmpty ? nil :
+                                    (viewModel.selection.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selection.applicationTokens.count) Apps")
+                            )
+                            RestrictionRow(
+                                label: "Categories",
+                                summary: viewModel.selection.categoryTokens.isEmpty ? nil :
+                                    (viewModel.selection.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selection.categoryTokens.count) Categories")
+                            )
+                            RestrictionRow(
+                                label: "Domains",
+                                summary: routine.blockedDomains.isEmpty ? nil :
+                                    (routine.blockedDomains.count == 1 ? "1 Website" : "\(routine.blockedDomains.count) Websites")
+                            )
                         }
                     }
 
-                    if !viewModel.selection.applicationTokens.isEmpty || !routine.blockedDomains.isEmpty {
-                        CardView {
-                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                Text("Restrictions")
-                                    .font(LocktyTypography.headline)
-                                    .foregroundStyle(LocktyColors.primaryText)
+                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("SCHEDULE")
+                            .locktyEyebrow()
 
-                                ForEach(Array(viewModel.selection.applicationTokens), id: \.self) { token in
-                                    HStack(spacing: LocktySpacing.md) {
-                                        Label(token)
-                                            .labelStyle(.titleAndIcon)
-                                            .foregroundStyle(LocktyColors.primaryText)
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, LocktySpacing.sm)
-                                    .padding(.vertical, LocktySpacing.sm)
-                                    .safeGlass(radius: 12)
+                        if let schedule = viewModel.schedule {
+                            ScheduleDaysPicker(selectedWeekdays: .constant(schedule.weekdays))
+                                .disabled(true)
+
+                            VStack(spacing: LocktySpacing.sm) {
+                                HStack {
+                                    Text("Start :")
+                                    Spacer()
+                                    Text(timeText(hour: schedule.hour, minute: schedule.minute))
+                                        .foregroundStyle(LocktyColors.primaryText)
                                 }
-
-                                ForEach(routine.blockedDomains.sorted(), id: \.self) { domain in
-                                    HStack {
-                                        Text(domain)
-                                            .font(LocktyTypography.callout)
-                                            .foregroundStyle(LocktyColors.primaryText)
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, LocktySpacing.sm)
-                                    .padding(.vertical, LocktySpacing.sm)
-                                    .safeGlass(radius: 12)
+                                HStack {
+                                    Text("Finish :")
+                                    Spacer()
+                                    Text(timeText(hour: schedule.endHour, minute: schedule.endMinute))
+                                        .foregroundStyle(LocktyColors.primaryText)
                                 }
                             }
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                            .padding(.vertical, LocktySpacing.sm)
+                        } else {
+                            Text("Manual start only")
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.secondaryText)
                         }
                     }
 

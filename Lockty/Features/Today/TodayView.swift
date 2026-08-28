@@ -122,12 +122,13 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
-                DailyPerspectiveStackSection(
-                    perspectives: viewModel.visiblePerspectives(for: day),
-                    onDismiss: { perspective in
-                        viewModel.dismissPerspective(perspective.id, day: day)
-                    }
-                )
+                // Temporarily commented out to isolate the scroll overflow.
+//                DailyPerspectiveStackSection(
+//                    perspectives: viewModel.visiblePerspectives(for: day),
+//                    onDismiss: { perspective in
+//                        viewModel.dismissPerspective(perspective.id, day: day)
+//                    }
+//                )
 
                 MyDaySection(activities: state.activities)
 

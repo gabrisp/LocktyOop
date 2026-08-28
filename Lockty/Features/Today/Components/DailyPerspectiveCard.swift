@@ -94,16 +94,26 @@ private struct DismissibleDailyPerspectiveCard: View {
         // dragging (~7 degrees by the dismiss threshold, ~30 on the way out).
         .rotationEffect(.degrees(Double(dragOffsetX / 14)), anchor: .bottom)
         .opacity(isDismissing ? 0 : 1)
-        .gesture(isTopCard ? dragGesture : nil)
+        // simultaneousGesture, not gesture: the enclosing vertical ScrollView wins an
+        // exclusive .gesture(), so onChanged barely fired and the card never visibly
+        // rotated (dismissal still worked, since that only needs the end velocity).
+        // Running alongside the scroll and only tracking horizontally-dominant drags
+        // keeps vertical scrolling intact.
+        .simultaneousGesture(isTopCard ? dragGesture : nil)
         .animation(.smooth(duration: 0.26), value: isDismissing)
     }
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .local)
             .onChanged { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 dragOffsetX = value.translation.width
             }
             .onEnded { value in
+                // Only a drag we actually tracked horizontally can dismiss; otherwise a
+                // vertical scroll flick over the card would throw it away.
+                guard dragOffsetX != 0 else { return }
+
                 let translation = value.translation.width
                 let predicted = value.predictedEndTranslation.width
                 let shouldDismiss = abs(translation) > threshold || abs(predicted) > 160

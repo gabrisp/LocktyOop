@@ -31,8 +31,10 @@ struct TodayMetricsHeader: View {
             VStack(spacing: 0) {
                 // Full content height (ring + its label below it), not just the ring —
                 // backdropHeight stops at the ring, so the labels sat outside the fill.
+                // The extra padding keeps solid fill under the content once collapsed,
+                // where the header's own height shrinks tight around the small rings.
                 LocktyColors.background
-                    .frame(height: geometry.height + topInset)
+                    .frame(height: geometry.height + topInset + LocktySpacing.md)
 
                 LinearGradient(
                     colors: [LocktyColors.background, LocktyColors.background.opacity(0)],

@@ -6,7 +6,6 @@ struct TodayView: View {
     @Bindable var router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
-    @State private var showTodoInfo = false
 
     private var state: TodayDayState {
         viewModel.state(for: day)
@@ -105,43 +104,16 @@ struct TodayView: View {
                     .frame(height: topChromeExpandedHeight + LocktySpacing.sm)
 
                 if let checklist = state.activeRoutineChecklist {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        HStack(spacing: LocktySpacing.xs) {
-                            Text("TO DO")
-                                .locktyEyebrow()
-                                .padding(.top, 16)
-
-                            Button {
-                                showTodoInfo = true
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 14, weight: .regular))
-                                    .foregroundStyle(LocktyColors.tertiaryText)
+                    // Just the card on Today — the label and its explanation live in the
+                    // routine editor's Checklist section instead.
+                    ActiveRoutineChecklistCard(
+                        state: checklist,
+                        onToggle: { item in
+                            Task {
+                                await viewModel.toggleActiveRoutineTask(item.id, day: day)
                             }
-                            .buttonStyle(.plain)
-                            .tappable()
-                            .popover(isPresented: $showTodoInfo) {
-                                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                                    Text("Tasks from the active routine. Completing them updates this session only and resets on the next routine run.")
-                                        .font(LocktyTypography.callout)
-                                        .foregroundStyle(LocktyColors.primaryText)
-                                        .frame(width: 220, alignment: .leading)
-                                }
-                                .presentationCompactAdaptation(.popover)
-                            }
-
-                            Spacer(minLength: 0)
                         }
-
-                        ActiveRoutineChecklistCard(
-                            state: checklist,
-                            onToggle: { item in
-                                Task {
-                                    await viewModel.toggleActiveRoutineTask(item.id, day: day)
-                                }
-                            }
-                        )
-                    }
+                    )
                 }
 
                 if case .loading = state.loadingState {

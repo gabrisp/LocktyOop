@@ -172,10 +172,13 @@ final class RoutineEngine {
         }
     }
 
+    /// Toggles the task: tapping a completed item clears it again. The checklist is the
+    /// only way to change these, so it has to work in both directions.
     func completeTask(_ taskID: UUID) async {
         guard case .active(var activeRoutine) = state else { return }
         guard let index = activeRoutine.taskCompletions.firstIndex(where: { $0.taskID == taskID }) else { return }
-        activeRoutine.taskCompletions[index].completedAt = Date()
+        activeRoutine.taskCompletions[index].completedAt =
+            activeRoutine.taskCompletions[index].completedAt == nil ? Date() : nil
 
         do {
             try appGroupStore.updateRuntimeState { runtime in

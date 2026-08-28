@@ -23,10 +23,6 @@ struct ActiveRoutineChecklistCard: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Image(systemName: "xmark")
-                                .font(.system(size: 22, weight: .regular))
-                                .foregroundStyle(LocktyColors.tertiaryText)
                         }
                         .padding(.horizontal, 22)
                         .padding(.vertical, 16)

@@ -399,6 +399,8 @@ struct RoutineEditorView: View {
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RoutineEditorLocalSheet?
+    /// Which section's (i) popover is showing, keyed by its info text.
+    @State private var infoSectionText: String?
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -512,7 +514,10 @@ struct RoutineEditorView: View {
                     }
                 }
 
-                editorSection(title: "Checklist") {
+                editorSection(
+                    title: "Checklist",
+                    info: "Tasks from the active routine. Completing them updates this session only and resets on the next routine run."
+                ) {
                     CardView(radius: LocktyRadius.medium, padding: 0) {
                         VStack(spacing: 0) {
                             ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { index, $task in
@@ -633,14 +638,49 @@ struct RoutineEditorView: View {
 
     @ViewBuilder
     /// Matches the RESTRICTIONS/SCHEDULE sections: hairline separator above an
-    /// uppercase eyebrow caption, sitting outside the section's content.
-    private func editorSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    /// uppercase eyebrow caption, sitting outside the section's content. `info`, when
+    /// given, adds a tappable (i) beside the caption explaining the section.
+    private func editorSection<Content: View>(
+        title: String,
+        info: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
             Rectangle()
                 .fill(LocktyColors.separator)
                 .frame(height: 0.5)
-            Text(title.uppercased())
-                .locktyEyebrow()
+
+            HStack(spacing: LocktySpacing.xs) {
+                Text(title.uppercased())
+                    .locktyEyebrow()
+
+                if let info {
+                    Button {
+                        infoSectionText = info
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(LocktyColors.tertiaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .tappable()
+                    .popover(isPresented: Binding(
+                        get: { infoSectionText == info },
+                        set: { if !$0 { infoSectionText = nil } }
+                    )) {
+                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                            Text(info)
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .frame(width: 220, alignment: .leading)
+                        }
+                        .presentationCompactAdaptation(.popover)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
             content()
         }
     }

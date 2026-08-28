@@ -105,7 +105,24 @@ final class TodayViewModel {
 
     func toggleActiveRoutineTask(_ taskID: UUID, day: Date) async {
         await routineEngine.completeTask(taskID)
-        await load(day: day, force: true)
+
+        // Patch just this checklist item rather than reloading the whole day: a full
+        // reload refetches usage/pauses/routines and replaces the day state, which
+        // re-renders all of Today to flip one checkbox.
+        let key = DayKey(date: day)
+        guard var dayState = days[key],
+              var checklist = dayState.activeRoutineChecklist,
+              let index = checklist.items.firstIndex(where: { $0.id == taskID })
+        else { return }
+
+        checklist.items[index].isCompleted.toggle()
+        checklist.items[index].completedAtText = nil
+        checklist.completedCount = checklist.items.filter(\.isCompleted).count
+        dayState.activeRoutineChecklist = checklist
+
+        withAnimation(.smooth(duration: 0.2)) {
+            days[key] = dayState
+        }
     }
 
     private func shouldRetry(after loadingState: TodayLoadingState) -> Bool {

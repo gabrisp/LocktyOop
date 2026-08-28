@@ -29,8 +29,10 @@ struct TodayMetricsHeader: View {
         // via ignoresSafeArea without the mask's gradient stops shifting with it.
         .background(alignment: .top) {
             VStack(spacing: 0) {
+                // Full content height (ring + its label below it), not just the ring —
+                // backdropHeight stops at the ring, so the labels sat outside the fill.
                 LocktyColors.background
-                    .frame(height: geometry.backdropHeight + topInset)
+                    .frame(height: geometry.height + topInset)
 
                 LinearGradient(
                     colors: [LocktyColors.background, LocktyColors.background.opacity(0)],

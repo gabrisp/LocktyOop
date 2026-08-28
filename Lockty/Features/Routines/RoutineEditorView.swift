@@ -348,8 +348,13 @@ struct RoutineAppPickerSheet: View {
 
     var body: some View {
         @Bindable var viewModel = viewModel
+        // Read the selection here in the body rather than only inside the binding's
+        // getter: the getter runs after body evaluation, so observation never
+        // registered it as a dependency and toggling an app from "Most Used" left
+        // the picker below showing stale state.
+        let selection = viewModel.selectionPreview
 
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+        return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
 
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
@@ -364,7 +369,7 @@ struct RoutineAppPickerSheet: View {
             }
 
             FamilyActivityPicker(selection: Binding(
-                get: { viewModel.selectionPreview },
+                get: { selection },
                 set: { newValue in
                     viewModel.replaceSelection(newValue)
                 }
@@ -695,7 +700,7 @@ private struct RoutineEditorHero: View {
             }
             .frame(maxWidth: .infinity)
 
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+//            VStack(alignment: .leading, spacing: LocktySpacing.md) {
 //                Picker("Mode", selection: $viewModel.mode) {
 //                    Text("Normal").tag(RoutineMode.normal)
 //                    Text("Strict").tag(RoutineMode.strict)
@@ -708,19 +713,7 @@ private struct RoutineEditorHero: View {
 //                    isOn: $viewModel.allowsPauseDuringStrictMode,
 //                    isDisabled: viewModel.mode == .normal
 //                )
-
-                if (viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount) > 0 {
-                    HStack(spacing: LocktySpacing.sm) {
-                        let restrictionCount = viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount
-                        if restrictionCount > 0 {
-                            BadgeView(
-                                title: restrictionCount == 1 ? "1 restriction" : "\(restrictionCount) restrictions",
-                                color: LocktyColors.warning
-                            )
-                        }
-                    }
-                }
-            }
+//            }
         }
     }
 }

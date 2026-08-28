@@ -14,9 +14,6 @@ struct DailyPerspectiveStackSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text("DAILY PERSPECTIVE")
-                .locktyEyebrow()
-
             ZStack(alignment: .top) {
                 ForEach(Array(visiblePerspectives.enumerated().reversed()), id: \.element.id) { index, perspective in
                     DismissibleDailyPerspectiveCard(

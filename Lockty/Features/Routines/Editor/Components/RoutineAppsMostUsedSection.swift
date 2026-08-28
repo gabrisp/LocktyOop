@@ -6,10 +6,6 @@ struct RoutineAppsMostUsedSection: View {
     var body: some View {
         if !viewModel.mostUsedApplications.isEmpty {
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text("Most used")
-                    .font(LocktyTypography.headline)
-                    .foregroundStyle(LocktyColors.primaryText)
-
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: LocktySpacing.sm) {
                         ForEach(viewModel.mostUsedApplications) { usage in

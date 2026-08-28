@@ -39,7 +39,6 @@ final class RoutineEditorViewModel {
     var errorMessage: String?
     private(set) var selectedApplicationCount = 0
     private(set) var selectionPreview = FamilyActivitySelection()
-    private(set) var mostUsedApplications: [ApplicationUsage] = []
 
     private let repository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
@@ -120,28 +119,6 @@ final class RoutineEditorViewModel {
         var newTriggers = triggers.filter { if case .schedule = $0 { false } else { true } }
         newTriggers.append(.schedule(schedule))
         triggers = newTriggers
-    }
-
-    func loadMostUsedApplications() async {
-        guard let usage = try? await usageDataService.mostUsedApplications(for: Date()) else { return }
-        mostUsedApplications = Array(usage.sorted { $0.duration > $1.duration }.prefix(6))
-        print("Routine editor loaded most used applications count=\(mostUsedApplications.count)")
-    }
-
-    func isMostUsedApplicationSelected(_ usage: ApplicationUsage) -> Bool {
-        guard let token = usage.app.applicationToken else { return false }
-        return selectionPreview.applicationTokens.contains(token)
-    }
-
-    func toggleMostUsedApplication(_ usage: ApplicationUsage) async {
-        guard let token = usage.app.applicationToken else { return }
-        var selection = selectionPreview
-        if selection.applicationTokens.contains(token) {
-            selection.applicationTokens.remove(token)
-        } else {
-            selection.applicationTokens.insert(token)
-        }
-        replaceSelection(selection)
     }
 
     func load() async {
@@ -348,26 +325,9 @@ struct RoutineAppPickerSheet: View {
 
     var body: some View {
         @Bindable var viewModel = viewModel
-        // Touch the selection during body evaluation purely so observation registers it
-        // as a dependency — otherwise a change made from "Most Used" never re-renders
-        // this view and the picker below keeps showing stale state. The binding itself
-        // must still read it live: handing the picker a value captured here made it read
-        // back its own taps as stale and revert them.
-        _ = viewModel.selectionPreview
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
-
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                if !viewModel.mostUsedApplications.isEmpty {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Text("Recommended Restrictions")
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                        RoutineAppsMostUsedSection(viewModel: viewModel)
-                    }
-                }
-            }
 
             FamilyActivityPicker(selection: Binding(
                 get: { viewModel.selectionPreview },
@@ -380,9 +340,6 @@ struct RoutineAppPickerSheet: View {
         .padding(.horizontal, LocktySpacing.md)
         .padding(.top, LocktySpacing.sm)
         .padding(.bottom, LocktySpacing.md)
-        .task {
-            await viewModel.loadMostUsedApplications()
-        }
     }
 }
 
@@ -606,7 +563,6 @@ struct RoutineEditorView: View {
         }
         .task {
             await viewModel.load()
-            await viewModel.loadMostUsedApplications()
         }
         .onChange(of: activeSheet) { _, newValue in
             if newValue == nil {
@@ -869,7 +825,9 @@ struct RestrictionRow: View {
             // the overlap is produced by sizing a transparent Color that *hosts* the label as a
             // background — the Color's frame is what the HStack lays out.
             HStack(spacing: 0) {
-                ForEach(Array(tokens.prefix(3).enumerated()), id: \.offset) { _, token in
+                // Keyed by token, not by offset: with an offset key SwiftUI reuses the
+                // same row when the selection changes and keeps drawing the old icons.
+                ForEach(Array(tokens.prefix(3)), id: \.self) { token in
                     Color.clear
                         .frame(width: 20, height: 32)
                         .background {
@@ -877,6 +835,7 @@ struct RestrictionRow: View {
                                 .labelStyle(.iconOnly)
                                 .frame(width: 32, height: 32)
                         }
+                        .id(token)
                 }
             }
         }

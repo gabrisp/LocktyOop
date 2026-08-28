@@ -405,8 +405,12 @@ struct PauseEditorView: View {
                 } label: {
                     Group {
                         if let token = viewModel.selectionPreview.applicationTokens.first {
+                            // .id(token): SwiftUI reuses the existing Label in place when
+                            // the token changes, so without this it keeps drawing the
+                            // previously selected app's icon.
                             Label(token)
                                 .labelStyle(.iconOnly)
+                                .id(token)
                         } else {
                             Image(systemName: "app.badge")
                                 .font(.system(size: 22, weight: .medium))

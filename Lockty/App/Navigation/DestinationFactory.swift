@@ -12,17 +12,11 @@ struct DestinationFactory {
         case .routineDetail(let id):
             featureFactory.makeRoutineDetail(routineID: id)
 
-        case .routineEditor(let route):
-            featureFactory.makeRoutineEditor(route: route)
-
         case .settings:
             featureFactory.makeSettingsView()
 
         case .pauseDetail(let id):
             featureFactory.makePauseDetail(pauseID: id)
-
-        case .pauseEditor(let route):
-            featureFactory.makePauseEditor(route: route)
 
         case .productivityDetail(let day):
             featureFactory.makeProductivityDetail(day: day)
@@ -74,17 +68,11 @@ struct DestinationFactory {
         case .systemAccess:
             featureFactory.makeSystemAccessSheet()
 
-        case .routineIconPicker(let draftID):
-            featureFactory.makeRoutineIconPickerSheet(draftID: draftID)
+        case .routineEditor(let route):
+            featureFactory.makeRoutineEditor(route: route)
 
-        case .routineAppPicker(let draftID):
-            featureFactory.makeRoutineAppPickerSheet(draftID: draftID)
-
-        case .pauseAppPicker(let draftID):
-            featureFactory.makePauseAppPickerSheet(draftID: draftID)
-
-        case .routineDomains(let draftID):
-            featureFactory.makeRoutineDomainsSheet(draftID: draftID)
+        case .pauseEditor(let route):
+            featureFactory.makePauseEditor(route: route)
         }
     }
 

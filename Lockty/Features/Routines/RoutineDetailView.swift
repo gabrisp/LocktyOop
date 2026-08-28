@@ -162,7 +162,7 @@ struct RoutineDetailView: View {
             if let routine = viewModel.routine {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Edit") {
-                        router.push(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+                        router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
                     }
                 }
             }

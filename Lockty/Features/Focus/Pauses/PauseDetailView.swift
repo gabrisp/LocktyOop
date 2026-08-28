@@ -108,7 +108,7 @@ struct PauseDetailView: View {
             if let rule = viewModel.rule {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Edit") {
-                        router.push(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
+                        router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
                     }
                 }
             }

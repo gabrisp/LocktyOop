@@ -33,12 +33,7 @@ struct AppClassificationSheet: View {
     var body: some View {
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "Classification",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Classification", onClose: { dismiss() })
 
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -84,8 +79,6 @@ struct AppClassificationSheet: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.lg)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
         .task {
             await viewModel.load()
@@ -101,12 +94,7 @@ struct RoutineBreakSheet: View {
     var body: some View {
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "Routine Break",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Routine Break", onClose: { dismiss() })
 
                 if let activeRoutine = viewModel.activeRoutine, activeRoutine.routineID == viewModel.routineID {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
@@ -145,8 +133,6 @@ struct RoutineBreakSheet: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.lg)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
         .task {
             viewModel.refresh()

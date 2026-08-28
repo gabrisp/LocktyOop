@@ -7,12 +7,7 @@ struct AccentPickerView: View {
     var body: some View {
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "Accent",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Accent", onClose: { dismiss() })
 
                 VStack(spacing: LocktySpacing.sm) {
                     ForEach(LocktyAccent.allCases) { accent in
@@ -47,8 +42,6 @@ struct AccentPickerView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.md)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
     }
 }

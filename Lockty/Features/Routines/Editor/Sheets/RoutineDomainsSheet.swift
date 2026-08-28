@@ -13,12 +13,7 @@ struct RoutineDomainsSheet: View {
 
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: 0) {
-                EditorTopBar(
-                    title: "Websites",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Websites", onClose: { dismiss() })
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: LocktySpacing.md) {
@@ -50,8 +45,6 @@ struct RoutineDomainsSheet: View {
                     .padding(.bottom, LocktySpacing.md)
                 }
             }
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
     }
 }

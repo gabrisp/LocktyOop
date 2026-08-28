@@ -7,12 +7,7 @@ struct SystemAccessSheet: View {
     var body: some View {
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "System Access",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "System Access", onClose: { dismiss() })
 
                 PrimaryButton("Request available access", systemImage: "checkmark.shield") {
                     Task { await viewModel.requestAllAvailable() }
@@ -45,8 +40,6 @@ struct SystemAccessSheet: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.lg)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
             .task { await viewModel.refresh() }
         }
     }

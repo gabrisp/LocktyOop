@@ -348,12 +348,7 @@ struct RoutineAppPickerSheet: View {
 
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "Choose Apps",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
 
                 VStack(alignment: .leading, spacing: LocktySpacing.md) {
                     if !viewModel.mostUsedApplications.isEmpty {
@@ -380,10 +375,15 @@ struct RoutineAppPickerSheet: View {
             .task {
                 await viewModel.loadMostUsedApplications()
             }
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
     }
+}
+
+private enum RoutineEditorLocalSheet: String, Identifiable {
+    case apps
+    case domains
+
+    var id: String { rawValue }
 }
 
 struct RoutineEditorView: View {
@@ -391,6 +391,7 @@ struct RoutineEditorView: View {
     let router: AppRouter
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var activeSheet: RoutineEditorLocalSheet?
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -408,15 +409,22 @@ struct RoutineEditorView: View {
     }
 
     var body: some View {
+        NavigationStack {
+            editorContent
+        }
+        .presentationDetents([.large])
+    }
+
+    private var editorContent: some View {
         @Bindable var viewModel = viewModel
 
-        ScrollView(.vertical, showsIndicators: false) {
+        return ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if viewModel.isEditingBlocked {
                     EditingDisabledBanner(message: viewModel.editingBlockDecision.reason ?? "This routine cannot be edited right now.")
                 }
 
-                RoutineEditorHero(viewModel: viewModel, router: router)
+                RoutineEditorHero(viewModel: viewModel)
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     HStack {
@@ -426,12 +434,12 @@ struct RoutineEditorView: View {
                         Spacer()
                         Menu {
                             Button {
-                                router.presentSheet(.routineAppPicker(viewModel.draftID))
+                                activeSheet = .apps
                             } label: {
                                 Text("Apps")
                             }
                             Button {
-                                router.presentSheet(.routineDomains(viewModel.draftID))
+                                activeSheet = .domains
                             } label: {
                                 Text("Websites")
                             }
@@ -586,9 +594,17 @@ struct RoutineEditorView: View {
             await viewModel.load()
             await viewModel.loadMostUsedApplications()
         }
-        .onChange(of: router.sheet) { _, newValue in
+        .onChange(of: activeSheet) { _, newValue in
             if newValue == nil {
                 viewModel.refreshSelectionState()
+            }
+        }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .apps:
+                RoutineAppPickerSheet(viewModel: viewModel)
+            case .domains:
+                RoutineDomainsSheet(viewModel: viewModel)
             }
         }
         .alert(
@@ -619,7 +635,7 @@ struct RoutineEditorView: View {
 
 private struct RoutineEditorHero: View {
     @Bindable var viewModel: RoutineEditorViewModel
-    let router: AppRouter
+    @State private var showIconPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
@@ -643,7 +659,7 @@ private struct RoutineEditorHero: View {
                         .foregroundStyle(LocktyColors.primaryText)
 
                     Button {
-                        router.presentSheet(.routineIconPicker(viewModel.draftID))
+                        showIconPicker = true
                     } label: {
                         CardView(radius: LocktyRadius.medium, padding: 0, height: 50) {
                             Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
@@ -654,6 +670,9 @@ private struct RoutineEditorHero: View {
                     }
                     .buttonStyle(.plain)
                     .tappable()
+                    .popover(isPresented: $showIconPicker) {
+                        RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
+                    }
                 }
                 .frame(width: 74, alignment: .leading)
             }
@@ -813,32 +832,31 @@ private struct EditorTokenLabelStyle: LabelStyle {
 
 struct EditorTopBar: View {
     let title: String
-    let confirmTitle: String
+    var subtitle: String? = nil
     let onClose: () -> Void
-    let onConfirm: () -> Void
 
     var body: some View {
-        HStack(spacing: LocktySpacing.md) {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline.weight(.light))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
             Button(action: onClose) {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.plain)
             .locktySheetDismissStyle()
-
-            Spacer()
-            Text(title)
-                .font(.title3.weight(.regular))
-                .foregroundStyle(LocktyColors.primaryText)
-                .lineLimit(1)
-            Spacer()
-
-            Button(action: onConfirm) {
-                Image(systemName: "checkmark")
-            }
-            .buttonStyle(.plain)
-            .locktySheetDismissStyle()
         }
-        .padding(.horizontal, LocktySpacing.sm)
+        .padding(.horizontal, LocktySpacing.md)
         .padding(.top, LocktySpacing.xs)
         .padding(.bottom, LocktySpacing.sm)
     }

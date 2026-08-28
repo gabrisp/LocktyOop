@@ -76,34 +76,6 @@ struct FeatureFactory {
         )
     }
 
-    @ViewBuilder
-    func makeRoutineIconPickerSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
-            RoutineIconPickerSheet(selectedIcon: Bindable(viewModel).icon)
-        }
-    }
-
-    @ViewBuilder
-    func makeRoutineAppPickerSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
-            RoutineAppPickerSheet(viewModel: viewModel)
-        }
-    }
-
-    @ViewBuilder
-    func makePauseAppPickerSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingPauseEditor(draftID: draftID) {
-            PauseAppPickerSheet(viewModel: viewModel)
-        }
-    }
-
-    @ViewBuilder
-    func makeRoutineDomainsSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
-            RoutineDomainsSheet(viewModel: viewModel)
-        }
-    }
-
     func makeApplicationDetails(appID: AppIdentity.ID, day: Date?) -> ApplicationDetailView {
         ApplicationDetailView(
             viewModel: ApplicationDetailViewModel(

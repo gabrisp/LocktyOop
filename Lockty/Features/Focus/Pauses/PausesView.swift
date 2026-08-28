@@ -12,7 +12,7 @@ struct PausesView: View {
                     .foregroundStyle(LocktyColors.primaryText)
                 Spacer()
                 IconButton(systemImage: "plus", accessibilityLabel: "Add Pause") {
-                    router.push(.pauseEditor(PauseEditorRoute(pauseID: nil)))
+                    router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
                 }
             }
 
@@ -47,7 +47,7 @@ struct PausesView: View {
                         )
 
                         PrimaryButton("Create Pause", systemImage: "plus") {
-                            router.push(.pauseEditor(PauseEditorRoute(pauseID: nil)))
+                            router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
                         }
                     }
                 }

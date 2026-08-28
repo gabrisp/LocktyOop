@@ -28,10 +28,6 @@ final class EditorViewModelStore {
         return created
     }
 
-    func existingRoutineEditor(draftID: UUID) -> RoutineEditorViewModel? {
-        routineEditors[draftID]
-    }
-
     func pauseEditor(
         route: PauseEditorRoute,
         repository: PauseRuleRepository,
@@ -49,10 +45,6 @@ final class EditorViewModelStore {
         )
         pauseEditors[route.draftID] = created
         return created
-    }
-
-    func existingPauseEditor(draftID: UUID) -> PauseEditorViewModel? {
-        pauseEditors[draftID]
     }
 
     func releaseRoutineEditor(draftID: UUID) {

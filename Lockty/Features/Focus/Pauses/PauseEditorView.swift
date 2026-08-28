@@ -219,6 +219,7 @@ struct PauseEditorView: View {
     let router: AppRouter
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showAppPicker = false
 
     init(
         viewModel: PauseEditorViewModel,
@@ -236,9 +237,16 @@ struct PauseEditorView: View {
     }
 
     var body: some View {
+        NavigationStack {
+            editorContent
+        }
+        .presentationDetents([.large])
+    }
+
+    private var editorContent: some View {
         @Bindable var viewModel = viewModel
 
-        ScrollView(.vertical, showsIndicators: false) {
+        return ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 pauseHero(viewModel: viewModel)
 
@@ -317,10 +325,13 @@ struct PauseEditorView: View {
         .task {
             await viewModel.load()
         }
-        .onChange(of: router.sheet) { _, newValue in
-            if newValue == nil {
+        .onChange(of: showAppPicker) { _, newValue in
+            if !newValue {
                 viewModel.refreshSelectionState()
             }
+        }
+        .sheet(isPresented: $showAppPicker) {
+            PauseAppPickerSheet(viewModel: viewModel)
         }
         .alert(
             "Could not save Pause",
@@ -368,7 +379,7 @@ struct PauseEditorView: View {
                     .foregroundStyle(LocktyColors.primaryText)
 
                 Button {
-                    router.presentSheet(.pauseAppPicker(viewModel.draftID))
+                    showAppPicker = true
                 } label: {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, interactive: true) {
                         HStack(spacing: LocktySpacing.md) {
@@ -436,12 +447,7 @@ struct PauseAppPickerSheet: View {
 
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: "Choose App",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
+                EditorTopBar(title: "Choose App", onClose: { dismiss() })
 
                 FamilyActivityPicker(selection: Binding(
                     get: { viewModel.selectionPreview },
@@ -454,8 +460,6 @@ struct PauseAppPickerSheet: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.md)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
         }
     }
 }

@@ -6,10 +6,8 @@ enum SheetRoute: Hashable, Identifiable {
     case accentPicker
     case appPicker(ScreenTimeSelectionScope)
     case systemAccess
-    case routineIconPicker(UUID)
-    case routineAppPicker(UUID)
-    case pauseAppPicker(UUID)
-    case routineDomains(UUID)
+    case routineEditor(RoutineEditorRoute)
+    case pauseEditor(PauseEditorRoute)
 
     var id: String {
         switch self {
@@ -18,10 +16,8 @@ enum SheetRoute: Hashable, Identifiable {
         case .accentPicker: "accent-picker"
         case .appPicker(let scope): "app-picker-\(scope.id)"
         case .systemAccess: "system-access"
-        case .routineIconPicker(let draftID): "routine-icon-picker-\(draftID.uuidString)"
-        case .routineAppPicker(let draftID): "routine-app-picker-\(draftID.uuidString)"
-        case .pauseAppPicker(let draftID): "pause-app-picker-\(draftID.uuidString)"
-        case .routineDomains(let draftID): "routine-domains-\(draftID.uuidString)"
+        case .routineEditor(let route): "routine-editor-\(route.draftID.uuidString)"
+        case .pauseEditor(let route): "pause-editor-\(route.draftID.uuidString)"
         }
     }
 }

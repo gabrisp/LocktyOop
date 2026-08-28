@@ -139,19 +139,7 @@ struct AppPickerSheet: View {
     var body: some View {
         LocktyDynamicSheet(fixedHeight: nil) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(
-                    title: viewModel.navigationTitle,
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: {
-                        do {
-                            try viewModel.persistCurrentSelection()
-                            dismiss()
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                )
+                EditorTopBar(title: viewModel.navigationTitle, onClose: { dismiss() })
 
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                     VStack(alignment: .leading, spacing: LocktySpacing.xs) {
@@ -173,8 +161,6 @@ struct AppPickerSheet: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.md)
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
             .alert("Could not save selection", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) { errorMessage = nil }
             } message: {

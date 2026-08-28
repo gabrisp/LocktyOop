@@ -13,7 +13,7 @@ struct RoutinesView: View {
                 Spacer()
 
                 IconButton(systemImage: "plus", accessibilityLabel: "Create Routine") {
-                    router.push(.routineEditor(RoutineEditorRoute(routineID: nil)))
+                    router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
                 }
             }
 
@@ -28,7 +28,7 @@ struct RoutinesView: View {
                             )
 
                             PrimaryButton("Create Routine", systemImage: "plus") {
-                                router.push(.routineEditor(RoutineEditorRoute(routineID: nil)))
+                                router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
                             }
                         }
                     }

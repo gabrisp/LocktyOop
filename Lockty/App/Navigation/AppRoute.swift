@@ -3,9 +3,7 @@ import Foundation
 enum AppRoute: Hashable {
     case today(Date)
     case routineDetail(UUID)
-    case routineEditor(RoutineEditorRoute)
     case pauseDetail(UUID)
-    case pauseEditor(PauseEditorRoute)
     case settings
     case productivityDetail(Date)
     case controlDetail(Date)

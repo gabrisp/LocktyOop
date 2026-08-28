@@ -7,43 +7,31 @@ struct RoutineIconPickerSheet: View {
     private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
-        LocktyDynamicSheet {
-            VStack(alignment: .leading, spacing: 0) {
-                EditorTopBar(
-                    title: "Icon",
-                    confirmTitle: "Done",
-                    onClose: { dismiss() },
-                    onConfirm: { dismiss() }
-                )
-
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
-                        ForEach(RoutineIconCatalog.icons, id: \.self) { iconName in
-                            let isSelected = iconName == selectedIcon
-                            Button {
-                                selectedIcon = iconName
-                                dismiss()
-                            } label: {
-                                Image(systemName: iconName)
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(isSelected ? Color.black : LocktyColors.primaryText)
-                                    .frame(width: 56, height: 56)
-                                    .safeGlass(
-                                        radius: 28,
-                                        interactive: true,
-                                        tint: isSelected ? .accentColor : nil
-                                    )
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .tappable()
-                        }
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
+                ForEach(RoutineIconCatalog.icons, id: \.self) { iconName in
+                    let isSelected = iconName == selectedIcon
+                    Button {
+                        selectedIcon = iconName
+                        dismiss()
+                    } label: {
+                        Image(systemName: iconName)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(isSelected ? Color.black : LocktyColors.primaryText)
+                            .frame(width: 46, height: 46)
+                            .safeGlass(
+                                radius: 23,
+                                interactive: true,
+                                tint: isSelected ? .accentColor : nil
+                            )
+                            .clipShape(Circle())
                     }
-                    .padding(LocktySpacing.lg)
+                    .buttonStyle(.plain)
+                    .tappable()
                 }
             }
-            .locktyScreenBackground()
-            .toolbarVisibility(.hidden, for: .navigationBar)
+            .padding(LocktySpacing.md)
         }
+        .frame(width: 280, height: 320)
     }
 }

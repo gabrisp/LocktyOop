@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct TodayMetricsHeader: View {
     let metrics: [PrimaryMetric]
@@ -8,6 +9,19 @@ struct TodayMetricsHeader: View {
 
     private var geometry: MetricsHeaderGeometry {
         MetricsHeaderGeometry(progress: collapseProgress)
+    }
+
+    /// The status bar / notch inset. Read from the window rather than a GeometryReader
+    /// because this view is positioned inside a ZStack that already sits below it.
+    private var safeAreaTop: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        return scene?.keyWindow?.safeAreaInsets.top ?? 0
+    }
+
+    /// Exactly the area the backdrop should cover: the safe area above the header plus
+    /// the header's own current content height (which shrinks as it collapses), plus 2.
+    private var backdropHeight: CGFloat {
+        safeAreaTop + geometry.height + topInset + 2
     }
 
     var body: some View {
@@ -24,26 +38,22 @@ struct TodayMetricsHeader: View {
         .padding(.top, topInset)
         .frame(maxWidth: .infinity)
         .frame(height: geometry.height + topInset, alignment: .top)
-        // Solid fill behind the rings (extended up under the status bar), then a real
-        // gradient fade below it. Splitting the two means the solid part can grow upward
-        // via ignoresSafeArea without the mask's gradient stops shifting with it.
+        // One gradient spanning the safe area plus the current (collapsing) content
+        // height, so it always ends just below the rings instead of being sized to the
+        // expanded layout. It stays opaque for most of that span and fades out at the
+        // very bottom edge.
         .background(alignment: .top) {
-            VStack(spacing: 0) {
-                // Full content height (ring + its label below it), not just the ring —
-                // backdropHeight stops at the ring, so the labels sat outside the fill.
-                // The extra padding keeps solid fill under the content once collapsed,
-                // where the header's own height shrinks tight around the small rings.
-                LocktyColors.background
-                    .frame(height: geometry.height + topInset + LocktySpacing.md)
-
-                LinearGradient(
-                    colors: [LocktyColors.background, LocktyColors.background.opacity(0)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 36)
-            }
+            LinearGradient(
+                stops: [
+                    .init(color: LocktyColors.background, location: 0),
+                    .init(color: LocktyColors.background, location: 0.82),
+                    .init(color: LocktyColors.background.opacity(0), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
             .frame(maxWidth: .infinity)
+            .frame(height: backdropHeight)
             .ignoresSafeArea(edges: .top)
         }
     }

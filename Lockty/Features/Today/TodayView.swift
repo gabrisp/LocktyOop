@@ -184,6 +184,10 @@ struct TodayView: View {
                         viewModel.dismissPerspective(perspective.id, day: day)
                     }
                 )
+                // Cancel the column's horizontal padding and re-apply it inside the
+                // section, so the swipe-out is clipped at the screen edge rather than
+                // at the padding inset (which looked cut off mid-card).
+                .padding(.horizontal, -LocktySpacing.md)
 
                 MyDaySection(activities: state.activities)
 

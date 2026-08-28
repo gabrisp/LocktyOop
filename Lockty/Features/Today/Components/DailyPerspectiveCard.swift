@@ -34,6 +34,9 @@ struct DailyPerspectiveStackSection: View {
                 .zIndex(Double(visiblePerspectives.count - index))
             }
         }
+        // Padding lives inside the clip so cards sit inset from the screen edge while
+        // the fly-out still runs all the way to that edge before being clipped.
+        .padding(.horizontal, LocktySpacing.md)
         .padding(.bottom, peekInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()
@@ -48,6 +51,9 @@ private struct DismissibleDailyPerspectiveCard: View {
 
     @State private var dragOffsetX: CGFloat = 0
     @State private var isDismissing = false
+    /// Tracks crossing the dismiss threshold so the haptic fires once per crossing
+    /// (in both directions) rather than on every drag update past it.
+    @State private var isPastThreshold = false
 
     private var threshold: CGFloat {
         92
@@ -92,6 +98,10 @@ private struct DismissibleDailyPerspectiveCard: View {
         // horizontally-dominant drags keeps vertical scrolling intact.
         .simultaneousGesture(isTopCard ? dragGesture : nil)
         .animation(.smooth(duration: 0.26), value: isDismissing)
+        // A light tick as the swipe passes the point where releasing would dismiss,
+        // and a firmer one when it actually goes.
+        .sensoryFeedback(.impact(weight: .light), trigger: isPastThreshold) { _, new in new }
+        .sensoryFeedback(.impact(weight: .medium), trigger: isDismissing) { _, new in new }
     }
 
     private var dragGesture: some Gesture {
@@ -99,6 +109,11 @@ private struct DismissibleDailyPerspectiveCard: View {
             .onChanged { value in
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 dragOffsetX = value.translation.width
+
+                let past = abs(dragOffsetX) > threshold
+                if past != isPastThreshold {
+                    isPastThreshold = past
+                }
             }
             .onEnded { value in
                 // Only a drag we actually tracked horizontally can dismiss; otherwise a
@@ -113,6 +128,7 @@ private struct DismissibleDailyPerspectiveCard: View {
                     withAnimation(.smooth(duration: 0.24)) {
                         dragOffsetX = 0
                     }
+                    isPastThreshold = false
                     return
                 }
 

@@ -8,41 +8,33 @@ struct DailyPerspectiveStackSection: View {
         Array(perspectives.prefix(3))
     }
 
-    private var stackHeight: CGFloat {
-        visiblePerspectives.isEmpty ? 0 : 152 + CGFloat(max(visiblePerspectives.count - 1, 0)) * 12
+    /// Vertical inset the stacked cards behind the top one peek out by.
+    private var peekInset: CGFloat {
+        CGFloat(max(visiblePerspectives.count - 1, 0)) * 12
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            ZStack(alignment: .top) {
-                ForEach(Array(visiblePerspectives.enumerated().reversed()), id: \.element.id) { index, perspective in
-                    DismissibleDailyPerspectiveCard(
-                        perspective: perspective,
-                        isTopCard: index == 0,
-                        onDismiss: { onDismiss(perspective) }
-                    )
-                    .scaleEffect(index == 0 ? 1 : 1 - CGFloat(index) * 0.025, anchor: .top)
-                    .offset(y: CGFloat(index) * 12)
-                    .opacity(index == 0 ? 1 : 0.82 - CGFloat(index) * 0.14)
-                    .allowsHitTesting(index == 0)
-                    .zIndex(Double(visiblePerspectives.count - index))
-                }
+        // No fixed height and no clip shape: the height comes from the tallest card
+        // (previously hardcoded to 152, so longer copy overflowed), and the section
+        // collapses on its own once every card is dismissed. The clip that used to
+        // live here was inset by -1000pt horizontally to keep the swipe-out visible,
+        // which made this section 2000pt wider than the screen and broke the scroll.
+        ZStack(alignment: .top) {
+            ForEach(Array(visiblePerspectives.enumerated().reversed()), id: \.element.id) { index, perspective in
+                DismissibleDailyPerspectiveCard(
+                    perspective: perspective,
+                    isTopCard: index == 0,
+                    onDismiss: { onDismiss(perspective) }
+                )
+                .scaleEffect(index == 0 ? 1 : 1 - CGFloat(index) * 0.025, anchor: .top)
+                .offset(y: CGFloat(index) * 12)
+                .opacity(index == 0 ? 1 : 0.82 - CGFloat(index) * 0.14)
+                .allowsHitTesting(index == 0)
+                .zIndex(Double(visiblePerspectives.count - index))
             }
-            .frame(height: stackHeight, alignment: .top)
         }
-        .frame(maxHeight: visiblePerspectives.isEmpty ? 0 : stackHeight + 22, alignment: .top)
-        // Clip vertically so the section can collapse to zero height cleanly, but not
-        // horizontally — a plain .clipped() sheared the card mid-swipe as it flew out.
-        .clipShape(VerticalOnlyClip())
-        .opacity(visiblePerspectives.isEmpty ? 0 : 1)
+        .padding(.bottom, peekInset)
         .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
-    }
-}
-
-/// Clips top/bottom only, leaving horizontal overflow visible.
-private struct VerticalOnlyClip: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path(rect.insetBy(dx: -1_000, dy: 0))
     }
 }
 

@@ -35,6 +35,14 @@ struct TodayMetricsHeader: View {
                 // where the header's own height shrinks tight around the small rings.
                 LocktyColors.background
                     .frame(height: geometry.height + topInset + LocktySpacing.md)
+                    // This view is laid out inside an overlay that already sits below the
+                    // safe area, so ignoresSafeArea alone left the status bar strip bare.
+                    // Drawing a tall block anchored above the fill covers it regardless.
+                    .background(alignment: .top) {
+                        LocktyColors.background
+                            .frame(height: 300)
+                            .offset(y: -300)
+                    }
 
                 LinearGradient(
                     colors: [LocktyColors.background, LocktyColors.background.opacity(0)],

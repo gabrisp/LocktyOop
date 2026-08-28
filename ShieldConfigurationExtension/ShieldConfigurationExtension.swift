@@ -4,24 +4,58 @@ import UIKit
 
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
-        makeConfiguration(resourceName: application.localizedDisplayName ?? "this app")
+        makeConfiguration(
+            resourceName: application.localizedDisplayName ?? "this app",
+            application: application
+        )
     }
 
     override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration {
-        makeConfiguration(resourceName: application.localizedDisplayName ?? category.localizedDisplayName ?? "this app")
+        makeConfiguration(
+            resourceName: application.localizedDisplayName ?? category.localizedDisplayName ?? "this app",
+            application: application
+        )
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
-        makeConfiguration(resourceName: webDomain.domain ?? "this website")
+        // Pauses target a single application, so a shielded website never has one.
+        makeConfiguration(resourceName: webDomain.domain ?? "this website", application: nil)
     }
 
     override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration {
-        makeConfiguration(resourceName: webDomain.domain ?? category.localizedDisplayName ?? "this website")
+        makeConfiguration(
+            resourceName: webDomain.domain ?? category.localizedDisplayName ?? "this website",
+            application: nil
+        )
     }
 
-    private func makeConfiguration(resourceName: String) -> ShieldConfiguration {
+    /// True only when an enabled Pause rule exists for this specific app — the
+    /// secondary button offers the Pause flow, so it must not appear otherwise.
+    private func hasPauseRule(for application: Application?) -> Bool {
+        guard let application else { return false }
+
+        let snapshots = AppGroupStore().loadPauseRuleSnapshots().filter(\.isEnabled)
+        guard !snapshots.isEmpty else { return false }
+
+        if let token = application.token,
+           snapshots.contains(where: { $0.application.applicationToken == token }) {
+            return true
+        }
+
+        if let bundleIdentifier = application.bundleIdentifier,
+           snapshots.contains(where: {
+               $0.application.bundleIdentifier == bundleIdentifier
+                   || $0.application.id.rawValue == bundleIdentifier
+           }) {
+            return true
+        }
+
+        return false
+    }
+
+    private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
-        let allowsPause = runtime?.pendingPause == nil
+        let allowsPause = runtime?.pendingPause == nil && hasPauseRule(for: application)
         let activeRoutineName = runtime?.activeRoutine?.nameSnapshot
 
         return ShieldConfiguration(

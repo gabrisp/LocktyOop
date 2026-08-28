@@ -78,6 +78,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     Text("BREAKDOWN")
                         .locktyEyebrow()
+                        .padding(.top, 16)
                 TodayMetricGrid(state: state) { metric in
                     switch metric {
                     case .screenTime: router.push(.screenTimeDetail(day))

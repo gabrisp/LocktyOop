@@ -62,7 +62,7 @@ struct MetricRingView: View {
                     .position(x: ringCenterX, y: ringCenterY)
 
                 Text(metric.kind.title.uppercased())
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2)
                     .foregroundStyle(LocktyColors.secondaryText)
                     .lineLimit(1)
                     .frame(

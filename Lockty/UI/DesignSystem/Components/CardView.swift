@@ -31,5 +31,9 @@ struct CardView<Content: View>: View {
                 alignment: .leading
             )
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.black.opacity(0.03), lineWidth: 1)
+            }
     }
 }

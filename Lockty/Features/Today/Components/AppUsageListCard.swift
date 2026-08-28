@@ -26,6 +26,7 @@ struct AppUsageListCard: View {
                     .foregroundStyle(LocktyColors.tertiaryText)
                     .locktyNumericTransition(trigger: state.appUsages.count)
             }
+            .padding(.top, 16)
 
             CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 0) {

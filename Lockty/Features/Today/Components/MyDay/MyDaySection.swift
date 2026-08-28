@@ -13,6 +13,7 @@ struct MyDaySection: View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
             Text("MY DAY")
                 .locktyEyebrow()
+                .padding(.top, 16)
 
             if activities.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {

@@ -8,6 +8,7 @@ struct DigitalBalanceCard: View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
             Text("DIGITAL BALANCE")
                 .locktyEyebrow()
+                .padding(.top, 16)
 
             Button(action: action) {
                 CardView(radius: LocktyRadius.large, padding: LocktySpacing.md, interactive: true) {

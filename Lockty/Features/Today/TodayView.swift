@@ -65,7 +65,7 @@ struct TodayView: View {
                             Text(message)
                                 .font(LocktyTypography.callout)
                                 .foregroundStyle(LocktyColors.secondaryText)
-                            Text("Lockty is requesting the report extension and retrying this day automatically.")
+                            Text("Lockty is retrying direct usage access and any cached Screen Time report available for this day.")
                                 .font(LocktyTypography.caption)
                                 .foregroundStyle(LocktyColors.tertiaryText)
                         }

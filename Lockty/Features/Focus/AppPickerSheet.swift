@@ -137,7 +137,7 @@ struct AppPickerSheet: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
+        LocktyDynamicSheet(fixedHeight: nil) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
                 EditorTopBar(
                     title: viewModel.navigationTitle,
@@ -169,32 +169,9 @@ struct AppPickerSheet: View {
 
                 FamilyActivityPicker(selection: $viewModel.selection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                if !viewModel.selection.applicationTokens.isEmpty {
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Selected Apps")
-                                .font(LocktyTypography.headline)
-                                .foregroundStyle(LocktyColors.primaryText)
-
-                            VStack(spacing: LocktySpacing.sm) {
-                                ForEach(Array(viewModel.selection.applicationTokens), id: \.self) { token in
-                                    HStack(spacing: LocktySpacing.md) {
-                                        Label(token)
-                                            .labelStyle(.titleAndIcon)
-                                            .foregroundStyle(LocktyColors.primaryText)
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, LocktySpacing.sm)
-                                    .padding(.vertical, LocktySpacing.sm)
-                                    .safeGlass(radius: 12)
-                                }
-                            }
-                        }
-                    }
-                }
             }
             .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.md)
             .locktyScreenBackground()
             .toolbarVisibility(.hidden, for: .navigationBar)

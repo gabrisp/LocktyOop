@@ -155,30 +155,27 @@ struct RoutineDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle(viewModel.routine?.name ?? "Routine")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if let routine = viewModel.routine {
-                    Button("Edit") {
-                        router.push(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: viewModel.routine?.name ?? "Routine") {
+                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
+                    dismiss()
+                }
+            } trailing: {
+                HStack(spacing: LocktySpacing.sm) {
+                    if let routine = viewModel.routine {
+                        LocktyTopBarTextAction(title: "Edit") {
+                            router.push(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+                        }
                     }
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Start") {
-                    Task { await viewModel.start() }
-                }
-            }
-            ToolbarItem(placement: .bottomBar) {
-                Button("Delete", role: .destructive) {
-                    Task {
-                        await viewModel.delete()
-                        dismiss()
+
+                    LocktyTopBarTextAction(title: "Start") {
+                        Task { await viewModel.start() }
                     }
                 }
             }
         }
         .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load()
         }
@@ -194,6 +191,20 @@ struct RoutineDetailView: View {
             }
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.delete()
+                    dismiss()
+                }
+            } label: {
+                Text("Delete Routine")
+            }
+            .buttonStyle(.plain)
+            .locktySecondaryActionStyle()
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.sm)
         }
     }
 }

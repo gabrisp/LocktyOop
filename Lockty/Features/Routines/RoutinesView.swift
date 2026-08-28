@@ -6,17 +6,10 @@ struct RoutinesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                    Text("Routines")
-                        .font(LocktyTypography.largeTitle)
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    Text("Repeatable focus flows, not a task inbox.")
-                        .font(LocktyTypography.callout)
-                        .foregroundStyle(LocktyColors.secondaryText)
-                }
-
+            HStack(alignment: .center) {
+                Text("Routines")
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(LocktyColors.primaryText)
                 Spacer()
 
                 IconButton(systemImage: "plus", accessibilityLabel: "Create Routine") {
@@ -30,7 +23,7 @@ struct RoutinesView: View {
                         VStack(alignment: .leading, spacing: LocktySpacing.md) {
                             EmptyStateView(
                                 title: "No Routines Yet",
-                                message: "Create your first routine and attach real app or website restrictions.",
+                                message: "Create your first routine and attach app or website restrictions.",
                                 systemImage: "repeat"
                             )
 

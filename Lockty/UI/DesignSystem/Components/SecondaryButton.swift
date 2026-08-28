@@ -21,13 +21,9 @@ struct SecondaryButton: View {
                     Image(systemName: systemImage)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, LocktySpacing.md)
-            .padding(.horizontal, LocktySpacing.lg)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(LocktyColors.primaryText)
-        .safeGlass(radius: LocktyRadius.medium, interactive: true)
+        .locktySecondaryActionStyle()
         .tappable()
     }
 }

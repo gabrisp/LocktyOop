@@ -30,6 +30,6 @@ struct CardView<Content: View>: View {
                 maxHeight: height,
                 alignment: .leading
             )
-            .background(LocktyColors.cardFill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 }

@@ -21,13 +21,9 @@ struct PrimaryButton: View {
                     Image(systemName: systemImage)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, LocktySpacing.md)
-            .padding(.horizontal, LocktySpacing.lg)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.black)
-        .background(.tint, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
+        .locktyPrimaryActionStyle()
         .tappable()
     }
 }

@@ -5,6 +5,23 @@ import OSLog
 
 private let pauseRepositoryLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "pauses")
 
+enum PauseRuleRepositoryError: LocalizedError {
+    case unavailable
+    case saveFailed(String)
+    case deleteFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            "Pause storage is unavailable."
+        case .saveFailed(let message):
+            "Could not save Pause: \(message)"
+        case .deleteFailed(let message):
+            "Could not delete Pause: \(message)"
+        }
+    }
+}
+
 @MainActor
 final class CoreDataPauseRuleRepository: PauseRuleRepository {
     private let controller: PersistenceController
@@ -57,8 +74,8 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         return rule
     }
 
-    func save(_ rule: PauseRule) async {
-        guard let context = controller.viewContext else { return }
+    func save(_ rule: PauseRule) async throws {
+        guard let context = controller.viewContext else { throw PauseRuleRepositoryError.unavailable }
         let request = PauseRuleEntity.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", rule.id as CVarArg)
         request.fetchLimit = 1
@@ -68,7 +85,9 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
             try mapper.apply(rule, to: entity, context: context)
             try context.save()
         } catch {
-            return
+            pauseRepositoryLogger.error("Failed saving pause rule id=\(rule.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            print("Failed saving pause rule id=\(rule.id.uuidString): \(error.localizedDescription)")
+            throw PauseRuleRepositoryError.saveFailed(error.localizedDescription)
         }
 
         pauseRepositoryLogger.notice("Saved pause rule id=\(rule.id.uuidString, privacy: .public) app=\(rule.application.displayName, privacy: .public) steps=\(rule.steps.count)")
@@ -77,14 +96,20 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
         syncSharedSnapshots()
     }
 
-    func delete(id: UUID) async {
-        guard let context = controller.viewContext else { return }
+    func delete(id: UUID) async throws {
+        guard let context = controller.viewContext else { throw PauseRuleRepositoryError.unavailable }
         let request = PauseRuleEntity.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         request.fetchLimit = 1
         if let entity = try? context.fetch(request).first {
             context.delete(entity)
-            try? context.save()
+            do {
+                try context.save()
+            } catch {
+                pauseRepositoryLogger.error("Failed deleting pause rule id=\(id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                print("Failed deleting pause rule id=\(id.uuidString): \(error.localizedDescription)")
+                throw PauseRuleRepositoryError.deleteFailed(error.localizedDescription)
+            }
             print("Deleted pause rule id=\(id.uuidString)")
             syncSharedSnapshots()
         }

@@ -11,46 +11,47 @@ struct RoutineDomainsSheet: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        VStack(alignment: .leading, spacing: 0) {
-            EditorTopBar(
-                title: "Websites",
-                confirmTitle: "Done",
-                onClose: { dismiss() },
-                onConfirm: { dismiss() }
-            )
+        LocktyDynamicSheet {
+            VStack(alignment: .leading, spacing: 0) {
+                EditorTopBar(
+                    title: "Websites",
+                    confirmTitle: "Done",
+                    onClose: { dismiss() },
+                    onConfirm: { dismiss() }
+                )
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
                         HStack(spacing: LocktySpacing.sm) {
                             TextField("google.com", text: $viewModel.pendingDomain)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
-                                .font(LocktyTypography.body)
-                                .foregroundStyle(LocktyColors.primaryText)
+                                .locktyGlassInputStyle()
 
                             Button("Add") {
                                 viewModel.addDomain()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, LocktySpacing.md)
+                            .frame(height: 52)
+                            .safeGlass(radius: LocktyRadius.medium, interactive: true, tint: .accentColor)
                         }
-                    }
 
-                    if !viewModel.blockedDomains.isEmpty {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            DomainChipFlow(domains: viewModel.blockedDomains) { domain in
-                                viewModel.removeDomain(domain)
+                        if !viewModel.blockedDomains.isEmpty {
+                            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                                DomainChipFlow(domains: viewModel.blockedDomains) { domain in
+                                    viewModel.removeDomain(domain)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, LocktySpacing.md)
+                    .padding(.top, LocktySpacing.sm)
+                    .padding(.bottom, LocktySpacing.md)
                 }
-                .padding(.horizontal, LocktySpacing.md)
-                .padding(.top, LocktySpacing.sm)
-                .padding(.bottom, LocktySpacing.md)
             }
+            .locktyScreenBackground()
+            .toolbarVisibility(.hidden, for: .navigationBar)
         }
-        .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .presentationDetents([.medium])
     }
 }

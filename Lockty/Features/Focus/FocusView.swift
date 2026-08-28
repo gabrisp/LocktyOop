@@ -7,51 +7,58 @@ struct FocusView: View {
     let router: AppRouter
 
     var body: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            Text("Focus")
-                .font(LocktyTypography.largeTitle)
-                .foregroundStyle(LocktyColors.primaryText)
-                .padding(.horizontal, LocktySpacing.md)
-
-            FocusSectionPicker(viewModel: viewModel)
-                .padding(.horizontal, LocktySpacing.md)
-
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 0) {
-                    ScrollView(.vertical) {
-                        RoutinesView(viewModel: routinesViewModel, router: router)
-                            .padding(.horizontal, LocktySpacing.md)
-                            .padding(.bottom, LocktySpacing.xl)
-                    }
-                    .scrollIndicators(.hidden)
-                    .containerRelativeFrame(.horizontal)
-                    .id(FocusSection.routines)
-
-                    ScrollView(.vertical) {
-                        PausesView(viewModel: pausesViewModel, router: router)
-                            .padding(.horizontal, LocktySpacing.md)
-                            .padding(.bottom, LocktySpacing.xl)
-                    }
-                    .scrollIndicators(.hidden)
-                    .containerRelativeFrame(.horizontal)
-                    .id(FocusSection.pauses)
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ScrollView(.vertical) {
+                    RoutinesView(viewModel: routinesViewModel, router: router)
+                        .padding(.horizontal, LocktySpacing.md)
+                        .padding(.bottom, LocktySpacing.xl)
+                        .padding(.top, LocktySpacing.md)
                 }
-                .scrollTargetLayout()
+                .scrollIndicators(.hidden)
+                .containerRelativeFrame(.horizontal)
+                .id(FocusSection.routines)
+
+                ScrollView(.vertical) {
+                    PausesView(viewModel: pausesViewModel, router: router)
+                        .padding(.horizontal, LocktySpacing.md)
+                        .padding(.bottom, LocktySpacing.xl)
+                        .padding(.top, LocktySpacing.md)
+                }
+                .scrollIndicators(.hidden)
+                .containerRelativeFrame(.horizontal)
+                .id(FocusSection.pauses)
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(
-                id: Binding(
-                    get: { viewModel.selectedSection },
-                    set: { newValue in
-                        if let newValue {
-                            viewModel.selectedSection = newValue
-                        }
-                    }
-                )
-            )
-            .scrollIndicators(.hidden)
+            .scrollTargetLayout()
         }
-        .padding(.top, LocktySpacing.lg)
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(
+            id: Binding(
+                get: { viewModel.selectedSection },
+                set: { newValue in
+                    if let newValue {
+                        viewModel.selectedSection = newValue
+                    }
+                }
+            )
+        )
+        .scrollIndicators(.hidden)
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            ZStack {
+                FocusSectionPicker(viewModel: viewModel)
+                    .frame(maxWidth: 232)
+
+                HStack {
+                    Spacer()
+                    IconButton(systemImage: "gearshape", accessibilityLabel: "System Access", chrome: .plain) {
+                        router.presentSheet(.systemAccess)
+                    }
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.xs)
+            .padding(.bottom, LocktySpacing.sm)
+        }
         .locktyScreenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task {

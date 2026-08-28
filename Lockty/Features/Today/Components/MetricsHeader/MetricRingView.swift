@@ -46,11 +46,6 @@ struct MetricRingView: View {
                 diameter / 2,
                 progress: geometry.labelProgress
             )
-            let labelTextShift = MetricsHeaderGeometry.lerp(
-                0,
-                -(max(labelWidth - metric.kind.collapsedTextWidth, 0) / 2),
-                progress: geometry.labelTextShiftProgress
-            )
 
             ZStack(alignment: .topLeading) {
                 ring(diameter: diameter)
@@ -76,7 +71,6 @@ struct MetricRingView: View {
                         alignment: .center
                     )
                     .multilineTextAlignment(.center)
-                    .offset(x: labelTextShift)
                     .position(x: labelCenterX, y: labelCenterY)
             }
             .frame(width: itemWidth, height: geometry.height, alignment: .topLeading)

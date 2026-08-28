@@ -7,7 +7,10 @@ struct PausesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                SectionHeader(title: "Pauses")
+                Text("Pauses")
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+                Spacer()
                 IconButton(systemImage: "plus", accessibilityLabel: "Add Pause") {
                     router.push(.pauseEditor(PauseEditorRoute(pauseID: nil)))
                 }
@@ -31,7 +34,9 @@ struct PausesView: View {
                 }
             }
 
-            SectionHeader(title: "Your Pauses")
+            Text("Your Pauses")
+                .font(LocktyTypography.headline)
+                .foregroundStyle(LocktyColors.primaryText)
             if viewModel.state.rules.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                     VStack(alignment: .leading, spacing: LocktySpacing.md) {

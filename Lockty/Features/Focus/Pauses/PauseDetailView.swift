@@ -28,7 +28,11 @@ final class PauseDetailViewModel {
     }
 
     func delete() async {
-        await repository.delete(id: pauseID)
+        do {
+            try await repository.delete(id: pauseID)
+        } catch {
+            print("Pause detail failed deleting id=\(pauseID.uuidString): \(error.localizedDescription)")
+        }
     }
 }
 
@@ -97,27 +101,37 @@ struct PauseDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle(viewModel.rule?.application.displayName ?? "Pause")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if let rule = viewModel.rule {
-                    Button("Edit") {
-                        router.push(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
-                    }
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: viewModel.rule?.application.displayName ?? "Pause") {
+                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
+                    dismiss()
                 }
-            }
-            ToolbarItem(placement: .bottomBar) {
-                Button("Delete", role: .destructive) {
-                    Task {
-                        await viewModel.delete()
-                        dismiss()
+            } trailing: {
+                if let rule = viewModel.rule {
+                    LocktyTopBarTextAction(title: "Edit") {
+                        router.push(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
                     }
                 }
             }
         }
         .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load()
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.delete()
+                    dismiss()
+                }
+            } label: {
+                Text("Delete Pause")
+            }
+            .buttonStyle(.plain)
+            .locktySecondaryActionStyle()
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.sm)
         }
     }
 }

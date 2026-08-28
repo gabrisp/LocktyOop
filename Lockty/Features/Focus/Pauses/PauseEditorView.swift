@@ -97,11 +97,18 @@ final class PauseEditorViewModel {
     }
 
     func refreshSelectionState() {
-        let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
-        selectionPreview = selection
-        let applications = selection.applicationTokens.map(AppIdentity.init(token:))
-        selectedApplication = applications.count == 1 ? applications[0] : nil
-        print("Pause editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+        do {
+            let selection = try selectionStore.load(scope: selectionScope)
+            selectionPreview = selection
+            let applications = selection.applicationTokens.map(AppIdentity.init(token:))
+            selectedApplication = applications.count == 1 ? applications[0] : nil
+            print("Pause editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+        } catch {
+            selectionPreview = FamilyActivitySelection()
+            selectedApplication = nil
+            errorMessage = error.localizedDescription
+            print("Pause editor failed refreshing selection scope=\(selectionScope.id): \(error.localizedDescription)")
+        }
     }
 
     func replaceSelection(_ selection: FamilyActivitySelection) {
@@ -114,8 +121,13 @@ final class PauseEditorViewModel {
         selectionPreview = normalized
         let applications = normalized.applicationTokens.map(AppIdentity.init(token:))
         selectedApplication = applications.count == 1 ? applications[0] : nil
-        try? selectionStore.save(normalized, scope: selectionScope)
-        print("Pause editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count)")
+        do {
+            try selectionStore.save(normalized, scope: selectionScope)
+            print("Pause editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count)")
+        } catch {
+            errorMessage = error.localizedDescription
+            print("Pause editor failed replacing selection scope=\(selectionScope.id): \(error.localizedDescription)")
+        }
     }
 
     func addStep(_ type: EditablePauseStep) {
@@ -165,10 +177,16 @@ final class PauseEditorViewModel {
             updatedAt: Date()
         )
 
-        await repository.save(rule)
-        pauseEditorLogger.notice("Pause editor saved id=\(rule.id.uuidString, privacy: .public) app=\(application.displayName, privacy: .public) steps=\(sanitizedSteps.count)")
-        print("Pause editor saved id=\(rule.id.uuidString) app=\(application.displayName) steps=\(sanitizedSteps.count)")
-        return true
+        do {
+            try await repository.save(rule)
+            pauseEditorLogger.notice("Pause editor saved id=\(rule.id.uuidString, privacy: .public) app=\(application.displayName, privacy: .public) steps=\(sanitizedSteps.count)")
+            print("Pause editor saved id=\(rule.id.uuidString) app=\(application.displayName) steps=\(sanitizedSteps.count)")
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            print("Pause editor failed saving id=\(rule.id.uuidString): \(error.localizedDescription)")
+            return false
+        }
     }
 
     private func sanitizeSteps() -> [PauseStep] {
@@ -244,7 +262,12 @@ struct PauseEditorView: View {
                                 }
                             }
                         } label: {
-                            SecondaryButton("Add step", systemImage: "plus") { }
+                            Text("Add step")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .padding(.horizontal, 14)
+                                .frame(height: 36)
+                                .safeGlass(radius: 18, interactive: true)
                                 .allowsHitTesting(false)
                         }
                     }
@@ -330,56 +353,63 @@ struct PauseEditorView: View {
 
     @ViewBuilder
     private func pauseHero(viewModel: PauseEditorViewModel) -> some View {
-        CardView(radius: LocktyRadius.large, padding: LocktySpacing.md) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                Text("App")
+                    .font(LocktyTypography.headline)
+                    .foregroundStyle(LocktyColors.primaryText)
+
                 Button {
                     router.presentSheet(.pauseAppPicker(viewModel.draftID))
                 } label: {
-                    HStack(spacing: LocktySpacing.md) {
-                        if let token = viewModel.selectionPreview.applicationTokens.first {
-                            Label(token)
-                                .labelStyle(.iconOnly)
-                                .frame(width: 48, height: 48)
-                                .safeGlass(radius: 16)
-                        } else {
-                            Image(systemName: "hand.raised.app")
-                                .font(.system(size: 22, weight: .semibold))
-                                .frame(width: 48, height: 48)
-                                .safeGlass(radius: 16)
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, interactive: true) {
+                        HStack(spacing: LocktySpacing.md) {
+                            if let token = viewModel.selectionPreview.applicationTokens.first {
+                                Label(token)
+                                    .labelStyle(.iconOnly)
+                                    .frame(width: 42, height: 42)
+                            }
+
+                            VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+                                Text(viewModel.selectedAppSummary)
+                                    .font(LocktyTypography.body)
+                                    .foregroundStyle(LocktyColors.primaryText)
+                                Text("A Pause targets exactly one application.")
+                                    .font(LocktyTypography.caption)
+                                    .foregroundStyle(LocktyColors.secondaryText)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(LocktyColors.tertiaryText)
                         }
-
-                        VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                            Text(viewModel.selectedAppSummary)
-                                .font(LocktyTypography.title)
-                                .foregroundStyle(LocktyColors.primaryText)
-                            Text("A Pause targets exactly one application.")
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(LocktyColors.tertiaryText)
                     }
                 }
                 .buttonStyle(.plain)
                 .tappable()
+            }
 
+            if let token = viewModel.selectionPreview.applicationTokens.first {
+                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Text("Selected App")
+                            .font(LocktyTypography.headline)
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        Label(token)
+                            .labelStyle(PauseSelectionTokenLabelStyle())
+                    }
+                }
+            }
+
+            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                 ToggleRow(
                     title: "Pause enabled",
                     subtitle: "Shield secondary action will offer this flow.",
                     isOn: $viewModel.isEnabled
                 )
-
-                if let token = viewModel.selectionPreview.applicationTokens.first {
-                    Label(token)
-                        .font(LocktyTypography.caption)
-                        .padding(.horizontal, LocktySpacing.sm)
-                        .padding(.vertical, LocktySpacing.sm)
-                        .safeGlass(radius: 12)
-                }
             }
         }
     }
@@ -396,27 +426,45 @@ struct PauseAppPickerSheet: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            EditorTopBar(
-                title: "Choose App",
-                confirmTitle: "Done",
-                onClose: { dismiss() },
-                onConfirm: { dismiss() }
-            )
+        LocktyDynamicSheet {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                EditorTopBar(
+                    title: "Choose App",
+                    confirmTitle: "Done",
+                    onClose: { dismiss() },
+                    onConfirm: { dismiss() }
+                )
 
-            FamilyActivityPicker(selection: Binding(
-                get: { viewModel.selectionPreview },
-                set: { newValue in
-                    viewModel.replaceSelection(newValue)
-                }
-            ))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                FamilyActivityPicker(selection: Binding(
+                    get: { viewModel.selectionPreview },
+                    set: { newValue in
+                        viewModel.replaceSelection(newValue)
+                    }
+                ))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.md)
+            .locktyScreenBackground()
+            .toolbarVisibility(.hidden, for: .navigationBar)
         }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.top, LocktySpacing.sm)
-        .padding(.bottom, LocktySpacing.md)
-        .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
+    }
+}
+
+private struct PauseSelectionTokenLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            configuration.icon
+                .frame(width: 42, height: 42)
+
+            configuration.title
+                .font(LocktyTypography.body)
+                .foregroundStyle(LocktyColors.primaryText)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
     }
 }
 

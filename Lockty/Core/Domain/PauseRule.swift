@@ -171,6 +171,8 @@ nonisolated struct PauseEvent: Codable, Hashable, Identifiable {
     }
 }
 
+// Preview/test fixtures only.
+#if DEBUG
 extension PauseRule {
     static let mockInstagram = PauseRule(
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000701")!,
@@ -244,3 +246,4 @@ extension AppIdentity {
         iconSource: .systemImage("xmark")
     )
 }
+#endif

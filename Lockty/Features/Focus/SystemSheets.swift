@@ -28,37 +28,128 @@ final class AppClassificationSheetViewModel {
 
 struct AppClassificationSheet: View {
     @Bindable var viewModel: AppClassificationSheetViewModel
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(AppClassification.allCases) { classification in
-                        Button {
-                            Task {
-                                await viewModel.update(classification)
-                            }
-                        } label: {
-                            HStack {
-                                Text(classification.title)
-                                    .foregroundStyle(LocktyColors.classification(classification))
-                                Spacer()
-                                if classification == viewModel.selection {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(LocktyColors.primaryText)
+        LocktyDynamicSheet {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                EditorTopBar(
+                    title: "Classification",
+                    confirmTitle: "Done",
+                    onClose: { dismiss() },
+                    onConfirm: { dismiss() }
+                )
+
+                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Text(
+                            AppIdentity.preferredDisplayName(
+                                localizedDisplayName: nil,
+                                bundleIdentifier: viewModel.appID.rawValue
+                            )
+                        )
+                            .font(LocktyTypography.headline)
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        ForEach(AppClassification.allCases) { classification in
+                            Button {
+                                Task {
+                                    await viewModel.update(classification)
                                 }
+                            } label: {
+                                HStack {
+                                    Text(classification.title)
+                                        .foregroundStyle(LocktyColors.classification(classification))
+                                    Spacer()
+                                    if classification == viewModel.selection {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(LocktyColors.primaryText)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, LocktySpacing.sm)
+                                .frame(height: 44)
+                                .safeGlass(
+                                    radius: 14,
+                                    interactive: classification != viewModel.selection,
+                                    tint: classification == viewModel.selection ? LocktyColors.elevatedBackground : nil
+                                )
                             }
+                            .buttonStyle(.plain)
+                            .tappable()
                         }
-                        .buttonStyle(.plain)
                     }
-                } header: {
-                    Text(viewModel.appID.rawValue)
                 }
             }
-            .navigationTitle("Classification")
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.lg)
+            .locktyScreenBackground()
+            .toolbarVisibility(.hidden, for: .navigationBar)
         }
         .task {
             await viewModel.load()
+        }
+    }
+}
+
+struct RoutineBreakSheet: View {
+    @Bindable var viewModel: RoutineBreakSheetViewModel
+    let router: AppRouter
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        LocktyDynamicSheet {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                EditorTopBar(
+                    title: "Routine Break",
+                    confirmTitle: "Done",
+                    onClose: { dismiss() },
+                    onConfirm: { dismiss() }
+                )
+
+                if let activeRoutine = viewModel.activeRoutine, activeRoutine.routineID == viewModel.routineID {
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                            Text(activeRoutine.nameSnapshot)
+                                .font(LocktyTypography.title)
+                            Text("Manual breaks are controlled by the routine policy.")
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.secondaryText)
+                        }
+                    }
+
+                    if let errorMessage = viewModel.errorMessage {
+                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                            Text(errorMessage)
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.unproductive)
+                        }
+                    }
+
+                    PrimaryButton("Start Break", systemImage: "pause.fill") {
+                        Task {
+                            await viewModel.startBreak()
+                            dismiss()
+                        }
+                    }
+                    .disabled(!viewModel.canStartBreak)
+                } else {
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                        Text("This routine is not currently active.")
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                    }
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.lg)
+            .locktyScreenBackground()
+            .toolbarVisibility(.hidden, for: .navigationBar)
+        }
+        .task {
+            viewModel.refresh()
         }
     }
 }
@@ -98,65 +189,5 @@ final class RoutineBreakSheetViewModel {
         guard let activeRoutine, activeRoutine.routineID == routineID else { return false }
         return activeRoutine.breakPolicySnapshot.maximumBreaks > 0
             && activeRoutine.breakPolicySnapshot.allowedTriggers.contains(.manual)
-    }
-}
-
-struct RoutineBreakSheet: View {
-    @Bindable var viewModel: RoutineBreakSheetViewModel
-    let router: AppRouter
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                if let activeRoutine = viewModel.activeRoutine, activeRoutine.routineID == viewModel.routineID {
-                    CardView {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text(activeRoutine.nameSnapshot)
-                                .font(LocktyTypography.title)
-                            Text("Manual breaks are controlled by the routine policy.")
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
-                        }
-                    }
-
-                    if let errorMessage = viewModel.errorMessage {
-                        CardView {
-                            Text(errorMessage)
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.unproductive)
-                        }
-                    }
-
-                    PrimaryButton("Start Break", systemImage: "pause.fill") {
-                        Task {
-                            await viewModel.startBreak()
-                            dismiss()
-                        }
-                    }
-                    .disabled(!viewModel.canStartBreak)
-                } else {
-                    CardView {
-                        Text("This routine is not currently active.")
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(LocktyColors.secondaryText)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(LocktySpacing.md)
-            .navigationTitle("Routine Break")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .task {
-            viewModel.refresh()
-        }
     }
 }

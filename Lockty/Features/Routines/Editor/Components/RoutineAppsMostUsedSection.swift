@@ -36,18 +36,43 @@ private struct MostUsedAppChip: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: LocktySpacing.sm) {
-                Text(usage.app.displayName)
-                    .font(LocktyTypography.caption)
-                    .foregroundStyle(LocktyColors.primaryText)
-                Text(LocktyDurationFormatter.abbreviated(usage.duration))
-                    .font(LocktyTypography.caption)
-                    .foregroundStyle(LocktyColors.secondaryText)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
-                    .foregroundStyle(isSelected ? LocktyColors.productive : LocktyColors.secondaryText)
+                AppIconView(
+                    source: usage.app.iconSource,
+                    applicationToken: usage.app.applicationToken,
+                    fallbackSystemImage: usage.app.iconSystemName,
+                    size: 28,
+                    chrome: .plain
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(usage.app.displayName)
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
+
+                    Text(LocktyDurationFormatter.abbreviated(usage.duration))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .lineLimit(1)
+                }
+
+                if isSelected {
+                    Text("Added")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(LocktyColors.productive)
+                } else {
+                    Text("Add")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
             }
             .padding(.horizontal, LocktySpacing.sm)
             .padding(.vertical, LocktySpacing.sm)
-            .safeGlass(radius: 12, interactive: true, tint: isSelected ? LocktyColors.productive.opacity(0.18) : nil)
+            .safeGlass(
+                radius: 14,
+                interactive: true,
+                tint: isSelected ? LocktyColors.productive.opacity(0.16) : nil
+            )
         }
         .buttonStyle(.plain)
         .tappable()

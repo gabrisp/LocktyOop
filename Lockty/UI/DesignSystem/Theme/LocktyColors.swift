@@ -8,12 +8,12 @@ private func adaptive(light: UIColor, dark: UIColor) -> Color {
 }
 
 enum LocktyColors {
-    // Light-mode background is #F4F4F4, dark-mode background is #545454.
+    // Light-mode background is #F4F4F4, dark-mode background is #525252.
     // Dark mode is no longer forced app-wide, so every token here adapts to the
     // system appearance instead of assuming dark.
     static let secondaryDarkModeBg = adaptive(
         light: UIColor(red: 0.957, green: 0.957, blue: 0.957, alpha: 1),
-        dark: UIColor(red: 0.329, green: 0.329, blue: 0.329, alpha: 1)
+        dark: UIColor(red: 0.3215686275, green: 0.3215686275, blue: 0.3215686275, alpha: 1)
     )
     static let background = secondaryDarkModeBg
     static let elevatedBackground = adaptive(

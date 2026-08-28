@@ -4,12 +4,20 @@ struct FocusSectionPicker: View {
     @Bindable var viewModel: FocusViewModel
 
     var body: some View {
-        Picker("Focus area", selection: $viewModel.selectedSection) {
+        Picker("", selection: Binding(
+            get: { viewModel.selectedSection },
+            set: { newValue in
+                withAnimation(.snappy) {
+                    viewModel.selectedSection = newValue
+                }
+            }
+        )) {
             ForEach(FocusSection.allCases) { section in
                 Text(section.title).tag(section)
             }
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
         .accessibilityLabel("Focus area")
     }
 }

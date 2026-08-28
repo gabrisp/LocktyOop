@@ -116,15 +116,15 @@ private struct MoreAppsRow: View {
                             source: appUsage.app.iconSource,
                             applicationToken: appUsage.app.applicationToken,
                             fallbackSystemImage: appUsage.app.iconSystemName,
-                            size: 40,
+                            size: 46,
                             chrome: .plain
                         )
-                        .frame(width: 40, height: 40)
+                        .frame(width: 46, height: 46)
 
                         if index == previewApps.count - 1, appUsages.count > previewApps.count {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(.black.opacity(0.55))
-                                .frame(width: 40, height: 40)
+                                .frame(width: 46, height: 46)
                                 .overlay {
                                     Text("+\(appUsages.count - previewApps.count)")
                                         .font(.system(size: 12, weight: .bold, design: .default))
@@ -134,11 +134,11 @@ private struct MoreAppsRow: View {
                                 }
                         }
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 46, height: 46)
                 }
             }
 
-            Text("\(appUsages.count) more apps")
+            Text("More apps +\(appUsages.count)")
                 .font(LocktyTypography.caption)
                 .foregroundStyle(LocktyColors.secondaryText)
 

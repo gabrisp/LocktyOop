@@ -59,8 +59,24 @@ struct SettingsView: View {
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.xl)
         }
-        .navigationTitle("Settings")
         .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(
+                title: "Settings",
+                leading: {
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                },
+                trailing: {
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                }
+            )
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.xs)
+            .padding(.bottom, LocktySpacing.sm)
+        }
     }
 }
 

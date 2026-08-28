@@ -3,6 +3,7 @@ import SwiftUI
 struct DetoxDetailView: View {
     let day: Date
     let viewModel: TodayViewModel
+    @Environment(\.dismiss) private var dismiss
 
     private var state: TodayDayState { viewModel.state(for: day) }
 
@@ -23,7 +24,18 @@ struct DetoxDetailView: View {
             .padding(LocktySpacing.md)
         }
         .task { await viewModel.load(day: day) }
-        .navigationTitle(day.formatted(date: .abbreviated, time: .omitted))
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: "Best Detox") {
+                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
+                    dismiss()
+                }
+            } trailing: {
+                Text(day.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+        }
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .locktyScreenBackground()
     }
 }

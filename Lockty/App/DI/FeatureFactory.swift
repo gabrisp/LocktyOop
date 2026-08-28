@@ -35,7 +35,7 @@ struct FeatureFactory {
     }
 
     func makeSystemAccessSheet() -> SystemAccessSheet {
-        SystemAccessSheet(viewModel: systemAccessViewModel, router: router)
+        SystemAccessSheet(viewModel: systemAccessViewModel)
     }
 
     func makeSettingsView() -> SettingsView {

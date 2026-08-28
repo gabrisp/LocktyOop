@@ -177,10 +177,17 @@ final class RoutineEditorViewModel {
     }
 
     func refreshSelectionState() {
-        let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
-        selectionPreview = selection
-        selectedApplicationCount = selection.applicationTokens.count + selection.categoryTokens.count
-        print("Routine editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+        do {
+            let selection = try selectionStore.load(scope: selectionScope)
+            selectionPreview = selection
+            selectedApplicationCount = selection.applicationTokens.count + selection.categoryTokens.count
+            print("Routine editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
+        } catch {
+            selectionPreview = FamilyActivitySelection()
+            selectedApplicationCount = 0
+            errorMessage = error.localizedDescription
+            print("Routine editor failed refreshing selection scope=\(selectionScope.id): \(error.localizedDescription)")
+        }
     }
 
     func replaceSelection(_ selection: FamilyActivitySelection) {
@@ -193,8 +200,13 @@ final class RoutineEditorViewModel {
         normalized.webDomainTokens = []
         selectionPreview = normalized
         selectedApplicationCount = normalized.applicationTokens.count + normalized.categoryTokens.count
-        try? selectionStore.save(normalized, scope: selectionScope)
-        print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count) categories=\(normalized.categoryTokens.count)")
+        do {
+            try selectionStore.save(normalized, scope: selectionScope)
+            print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count) categories=\(normalized.categoryTokens.count)")
+        } catch {
+            errorMessage = error.localizedDescription
+            print("Routine editor failed replacing selection scope=\(selectionScope.id): \(error.localizedDescription)")
+        }
     }
 
     func addTask() {
@@ -334,41 +346,43 @@ struct RoutineAppPickerSheet: View {
     var body: some View {
         @Bindable var viewModel = viewModel
 
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            EditorTopBar(
-                title: "Choose Apps",
-                confirmTitle: "Done",
-                onClose: { dismiss() },
-                onConfirm: { dismiss() }
-            )
-
+        LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                if !viewModel.mostUsedApplications.isEmpty {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Text("Recommended Restrictions")
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                        RoutineAppsMostUsedSection(viewModel: viewModel)
+                EditorTopBar(
+                    title: "Choose Apps",
+                    confirmTitle: "Done",
+                    onClose: { dismiss() },
+                    onConfirm: { dismiss() }
+                )
+
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    if !viewModel.mostUsedApplications.isEmpty {
+                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                            Text("Recommended Restrictions")
+                                .font(LocktyTypography.headline)
+                                .foregroundStyle(LocktyColors.primaryText)
+                            RoutineAppsMostUsedSection(viewModel: viewModel)
+                        }
                     }
                 }
-            }
 
-            FamilyActivityPicker(selection: Binding(
-                get: { viewModel.selectionPreview },
-                set: { newValue in
-                    viewModel.replaceSelection(newValue)
-                }
-            ))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                FamilyActivityPicker(selection: Binding(
+                    get: { viewModel.selectionPreview },
+                    set: { newValue in
+                        viewModel.replaceSelection(newValue)
+                    }
+                ))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.md)
+            .task {
+                await viewModel.loadMostUsedApplications()
+            }
+            .locktyScreenBackground()
+            .toolbarVisibility(.hidden, for: .navigationBar)
         }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.top, LocktySpacing.sm)
-        .padding(.bottom, LocktySpacing.md)
-        .task {
-            await viewModel.loadMostUsedApplications()
-        }
-        .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
     }
 }
 
@@ -414,31 +428,48 @@ struct RoutineEditorView: View {
                             Button {
                                 router.presentSheet(.routineAppPicker(viewModel.draftID))
                             } label: {
-                                Label("Apps", systemImage: "app.badge.checkmark")
+                                Text("Apps")
                             }
                             Button {
                                 router.presentSheet(.routineDomains(viewModel.draftID))
                             } label: {
-                                Label("Websites", systemImage: "globe")
+                                Text("Websites")
                             }
                         } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .semibold))
+                            Text("Add")
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 32, height: 32)
-                                .safeGlass(radius: 16, interactive: true)
+                                .padding(.horizontal, 14)
+                                .frame(height: 36)
+                                .safeGlass(radius: 18, interactive: true)
                         }
                     }
 
                     VStack(spacing: LocktySpacing.md) {
                         if !viewModel.selectionPreview.applicationTokens.isEmpty {
-                            SelectionPreviewCard(selection: viewModel.selectionPreview)
+                            SelectionPreviewCard(
+                                title: viewModel.selectionPreview.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selectionPreview.applicationTokens.count) Apps",
+                                tokens: Array(viewModel.selectionPreview.applicationTokens)
+                            ) { token in
+                                Label(token)
+                                    .labelStyle(EditorTokenLabelStyle())
+                            }
+                        }
+
+                        if !viewModel.selectionPreview.categoryTokens.isEmpty {
+                            SelectionPreviewCard(
+                                title: viewModel.selectionPreview.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selectionPreview.categoryTokens.count) Categories",
+                                tokens: Array(viewModel.selectionPreview.categoryTokens)
+                            ) { token in
+                                Label(token)
+                                    .labelStyle(EditorTokenLabelStyle())
+                            }
                         }
 
                         if !viewModel.blockedDomains.isEmpty {
                             CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                    Text("Websites (\(viewModel.blockedDomains.count))")
+                                    Text(viewModel.blockedDomains.count == 1 ? "1 Website" : "\(viewModel.blockedDomains.count) Websites")
                                         .font(LocktyTypography.headline)
                                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -583,19 +614,20 @@ private struct RoutineEditorHero: View {
     let router: AppRouter
 
     var body: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            HStack(alignment: .top, spacing: LocktySpacing.md) {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            HStack(alignment: .top, spacing: LocktySpacing.lg) {
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     Text("Name")
                         .font(LocktyTypography.headline)
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, height: 48) {
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, height: 50) {
                         TextField("Routine name", text: $viewModel.name)
                             .font(LocktyTypography.body)
                             .foregroundStyle(LocktyColors.primaryText)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     Text("Icon")
@@ -605,17 +637,17 @@ private struct RoutineEditorHero: View {
                     Button {
                         router.presentSheet(.routineIconPicker(viewModel.draftID))
                     } label: {
-                        CardView(radius: LocktyRadius.medium, padding: 0) {
+                        CardView(radius: LocktyRadius.medium, padding: 0, height: 50) {
                             Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 48, height: 48)
+                                .frame(width: 50, height: 50)
                         }
                     }
                     .buttonStyle(.plain)
                     .tappable()
                 }
-                .frame(width: 72, alignment: .leading)
+                .frame(width: 74, alignment: .leading)
             }
 
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
@@ -642,8 +674,12 @@ private struct RoutineEditorHero: View {
 //                        color: viewModel.mode == .strict ? LocktyColors.warning : .accentColor
 //                    )
                     BadgeView(
-                        title: "\(viewModel.trimmedTasksCount) tasks",
+                        title: viewModel.trimmedTasksCount == 1 ? "1 task" : "\(viewModel.trimmedTasksCount) tasks",
                         color: LocktyColors.neutral
+                    )
+                    BadgeView(
+                        title: viewModel.selectedApplicationCount == 1 ? "1 restriction" : "\(viewModel.selectedApplicationCount + viewModel.selectedWebsiteCount) restrictions",
+                        color: LocktyColors.warning
                     )
                 }
             }
@@ -698,13 +734,14 @@ private struct ScheduleTimeField: View {
             isPresented = true
         } label: {
             VStack(spacing: LocktySpacing.xs) {
-                Text(label)
-                    .font(LocktyTypography.caption)
-                    .foregroundStyle(LocktyColors.secondaryText)
+                Text(label.uppercased())
+                    .locktyEyebrow()
                 Text(displayText)
-                    .font(LocktyTypography.headline)
+                    .font(.system(size: 20, weight: .light, design: .rounded))
                     .foregroundStyle(LocktyColors.primaryText)
                     .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.25), value: displayText)
             }
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.sm)
@@ -726,34 +763,43 @@ private struct ScheduleTimeField: View {
     }
 }
 
-private struct SelectionPreviewCard: View {
-    let selection: FamilyActivitySelection
+private struct SelectionPreviewCard<Token: Hashable, TokenView: View>: View {
+    let title: String
+    let tokens: [Token]
+    let tokenView: (Token) -> TokenView
 
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text("Apps (\(selection.applicationTokens.count))")
+                Text(title)
                     .font(LocktyTypography.headline)
                     .foregroundStyle(LocktyColors.primaryText)
 
-                HStack(spacing: -10) {
-                    ForEach(Array(selection.applicationTokens), id: \.self) { token in
-                        AppIconView(
-                            source: .screenTimeToken,
-                            applicationToken: token,
-                            fallbackSystemImage: nil,
-                            size: 34,
-                            chrome: .plain
-                        )
-                        .frame(width: 34, height: 34)
-                        .clipShape(Circle())
-                        .overlay {
-                            Circle().stroke(LocktyColors.background, lineWidth: 2)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: LocktySpacing.sm) {
+                        ForEach(tokens, id: \.self) { token in
+                            tokenView(token)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+private struct EditorTokenLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: LocktySpacing.sm) {
+            configuration.icon
+                .frame(width: 42, height: 42)
+
+            configuration.title
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .lineLimit(1)
+                .frame(maxWidth: 82)
+        }
+        .frame(width: 82, alignment: .center)
     }
 }
 
@@ -765,15 +811,26 @@ struct EditorTopBar: View {
 
     var body: some View {
         HStack(spacing: LocktySpacing.md) {
-            IconButton(systemImage: "xmark", accessibilityLabel: "Close", action: onClose)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .locktySheetDismissStyle()
+
             Spacer()
             Text(title)
-                .font(LocktyTypography.headline)
+                .font(.title3.weight(.regular))
                 .foregroundStyle(LocktyColors.primaryText)
+                .lineLimit(1)
             Spacer()
-            IconButton(systemImage: "checkmark", accessibilityLabel: confirmTitle, action: onConfirm)
+
+            Button(action: onConfirm) {
+                Image(systemName: "checkmark")
+            }
+            .buttonStyle(.plain)
+            .locktySheetDismissStyle()
         }
-        .padding(.horizontal, LocktySpacing.md)
+        .padding(.horizontal, LocktySpacing.sm)
         .padding(.top, LocktySpacing.xs)
         .padding(.bottom, LocktySpacing.sm)
     }

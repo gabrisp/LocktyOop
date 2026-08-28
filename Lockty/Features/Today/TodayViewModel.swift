@@ -29,9 +29,9 @@ final class TodayViewModel {
         todayLogger().debug("Today initial state for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
         print("Today initial state for \(key.id): \(String(describing: loadedState.loadingState))")
 
-        guard case .unavailable = loadedState.loadingState else { return }
+        guard shouldRetry(after: loadedState.loadingState) else { return }
 
-        for attempt in 1...20 {
+        for attempt in 1...8 {
             try? await Task.sleep(nanoseconds: 750_000_000)
             loadedState = await dataProvider.dayState(for: day)
             days[key] = loadedState
@@ -40,6 +40,11 @@ final class TodayViewModel {
 
             if case .loaded = loadedState.loadingState {
                 print("Today loaded successfully for \(key.id) on retry \(attempt)")
+                break
+            }
+
+            guard shouldRetry(after: loadedState.loadingState) else {
+                print("Today stopped retrying for \(key.id) after attempt \(attempt)")
                 break
             }
         }
@@ -69,5 +74,11 @@ final class TodayViewModel {
             days[key] = await dataProvider.dayState(for: day)
             print("Today classification updated for \(appID.rawValue) day=\(key.id) classification=\(classification.rawValue)")
         }
+    }
+
+    private func shouldRetry(after loadingState: TodayLoadingState) -> Bool {
+        guard case .unavailable(let message) = loadingState else { return false }
+        return message.localizedCaseInsensitiveContains("no screen time usage data")
+            || message.localizedCaseInsensitiveContains("not available for the requested date yet")
     }
 }

@@ -50,12 +50,19 @@ struct LiveUsageDataService: UsageDataServicing {
     private func snapshot(for day: Date) async throws -> ScreenTimeReportSnapshot {
         let dayKey = DayKey(date: Calendar.current.startOfDay(for: day))
         print("Resolving snapshot for \(dayKey.id)")
-        if hasApprovedWithDataAccess,
-           let directSnapshot = try await directSnapshot(for: dayKey) {
-            try? appGroupStore.saveScreenTimeReportSnapshot(directSnapshot)
-            usageLogger().notice("Using direct DeviceActivityData access for \(dayKey.id, privacy: .public)")
-            print("Using direct DeviceActivityData access for \(dayKey.id)")
-            return directSnapshot
+        if supportsDirectActivityData {
+            do {
+                if let directSnapshot = try await directSnapshot(for: dayKey) {
+                    try? appGroupStore.saveScreenTimeReportSnapshot(directSnapshot)
+                    usageLogger().notice("Using direct DeviceActivityData access for \(dayKey.id, privacy: .public)")
+                    print("Using direct DeviceActivityData access for \(dayKey.id)")
+                    return directSnapshot
+                }
+                print("Direct DeviceActivityData returned no snapshot for \(dayKey.id)")
+            } catch {
+                usageLogger().error("Direct DeviceActivityData failed for \(dayKey.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                print("Direct DeviceActivityData failed for \(dayKey.id): \(error.localizedDescription)")
+            }
         }
 
         if let cachedSnapshot = try appGroupStore.loadScreenTimeReportSnapshot(for: dayKey) {
@@ -64,7 +71,7 @@ struct LiveUsageDataService: UsageDataServicing {
             return cachedSnapshot
         }
 
-        if hasApprovedWithDataAccess {
+        if supportsDirectActivityData {
             usageLogger().error("Direct DeviceActivityData access returned no snapshot for \(dayKey.id, privacy: .public)")
             print("Direct DeviceActivityData access returned no snapshot for \(dayKey.id)")
             throw UsageDataError.noData
@@ -75,11 +82,10 @@ struct LiveUsageDataService: UsageDataServicing {
         throw UsageDataError.dataAccessUnavailable
     }
 
-    private var hasApprovedWithDataAccess: Bool {
+    private var supportsDirectActivityData: Bool {
         if #available(iOS 26.4, *) {
-            let hasAccess = AuthorizationCenter.shared.authorizationStatus == .approvedWithDataAccess
-            print("AuthorizationCenter status=\(AuthorizationCenter.shared.authorizationStatus.description) approvedWithDataAccess=\(hasAccess)")
-            return hasAccess
+            print("AuthorizationCenter status=\(AuthorizationCenter.shared.authorizationStatus.description)")
+            return true
         }
         print("Direct DeviceActivityData access unavailable before iOS 26.4")
         return false

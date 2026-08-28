@@ -243,6 +243,7 @@ final class ApplicationDetailViewModel {
 struct ApplicationDetailView: View {
     @Bindable var viewModel: ApplicationDetailViewModel
     let router: AppRouter
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
@@ -335,7 +336,16 @@ struct ApplicationDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle(viewModel.appUsage?.app.displayName ?? "Application")
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: viewModel.appUsage?.app.displayName ?? "Application") {
+                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
+                    dismiss()
+                }
+            } trailing: {
+                EmptyView()
+            }
+        }
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .locktyScreenBackground()
         .task {
             await viewModel.load()
@@ -348,6 +358,7 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
     let title: String
     let viewModel: TodayViewModel
     let content: (TodayDayState) -> Content
+    @Environment(\.dismiss) private var dismiss
 
     init(
         day: Date,
@@ -371,7 +382,16 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle(title)
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: title) {
+                LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back") {
+                    dismiss()
+                }
+            } trailing: {
+                EmptyView()
+            }
+        }
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load(day: day)
         }

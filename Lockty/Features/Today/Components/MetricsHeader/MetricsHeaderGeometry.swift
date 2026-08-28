@@ -7,10 +7,10 @@ struct MetricsHeaderGeometry {
     static let expandedDiameter: CGFloat = 92
     static let collapsedDiameter: CGFloat = 26
     static let labelHeight: CGFloat = 16
-    static let expandedLabelGap: CGFloat = 8
+    static let expandedLabelGap: CGFloat = 6
     static let collapsedLabelGap: CGFloat = 4
-    static let expandedLabelWidth: CGFloat = 108
-    static let collapsedLabelWidth: CGFloat = 88
+    static let expandedLabelWidth: CGFloat = 112
+    static let collapsedLabelWidth: CGFloat = 92
 
     let progress: CGFloat
 
@@ -40,7 +40,7 @@ struct MetricsHeaderGeometry {
 
     var contentTopOffset: CGFloat {
         Self.lerp(
-            ((Self.expandedHeight - Self.expandedDiameter - Self.expandedLabelGap - Self.labelHeight) / 2) + 8,
+            ((Self.expandedHeight - Self.expandedDiameter - Self.expandedLabelGap - Self.labelHeight) / 2) + 2,
             (Self.collapsedHeight - Self.collapsedDiameter) / 2,
             progress: progress
         )
@@ -49,11 +49,6 @@ struct MetricsHeaderGeometry {
     var labelGap: CGFloat {
         Self.lerp(Self.expandedLabelGap, Self.collapsedLabelGap, progress: progress)
     }
-
-    var labelTextShiftProgress: CGFloat {
-        Self.rangedProgress(progress, from: 0.55, to: 1)
-    }
-
     static func collapseProgress(for scrollOffset: CGFloat) -> CGFloat {
         clamp(scrollOffset / collapseDistance)
     }

@@ -159,23 +159,32 @@ struct ActiveRoutineView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle("Active Routine")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Open Detail") {
-                    router.push(.routineDetail(viewModel.routineID))
+        .safeSafeAreaBar(edge: .top, spacing: 0) {
+            LocktyTopBar(title: "Active Routine") {
+                LocktyTopBarIconAction(systemImage: "xmark", label: "Close") {
+                    dismiss()
                 }
-            }
-
-            ToolbarItem(placement: .bottomBar) {
-                Button("Stop", role: .destructive) {
-                    Task {
-                        await viewModel.stopRoutine()
-                        dismiss()
-                    }
+            } trailing: {
+                LocktyTopBarTextAction(title: "Open") {
+                    router.push(.routineDetail(viewModel.routineID))
                 }
             }
         }
         .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.stopRoutine()
+                    dismiss()
+                }
+            } label: {
+                Text("Stop Routine")
+            }
+            .buttonStyle(.plain)
+            .locktySecondaryActionStyle()
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.sm)
+        }
     }
 }

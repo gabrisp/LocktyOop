@@ -51,15 +51,7 @@ struct HomeView: View {
                     .allowsHitTesting(sliderProgress < 0.05)
 
                 case .focus:
-                    HStack {
-                        Spacer()
-                        IconButton(systemImage: "gearshape", accessibilityLabel: "System Access") {
-                            router.presentSheet(.systemAccess)
-                        }
-                    }
-                    .padding(.horizontal, LocktySpacing.md)
-                    .padding(.top, LocktySpacing.xs)
-                    .padding(.bottom, LocktySpacing.sm)
+                    EmptyView()
 
                 case .lifetime:
                     EmptyView()

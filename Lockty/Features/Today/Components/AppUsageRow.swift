@@ -12,7 +12,7 @@ struct AppUsageRow: View {
                 source: state.app.iconSource,
                 applicationToken: state.app.applicationToken,
                 fallbackSystemImage: state.app.iconSystemName,
-                size: 50,
+                size: 56,
                 chrome: .plain
             )
 

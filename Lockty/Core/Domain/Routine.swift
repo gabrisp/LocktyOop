@@ -43,6 +43,8 @@ struct Routine: Codable, Hashable, Identifiable {
     }
 }
 
+// Preview/test fixtures only.
+#if DEBUG
 extension Routine {
     static let mockDeepWork = Routine(
         name: "Deep Work",
@@ -79,3 +81,4 @@ extension Routine {
         breakPolicy: .none
     )
 }
+#endif

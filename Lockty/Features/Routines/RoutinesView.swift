@@ -20,17 +20,11 @@ struct RoutinesView: View {
             VStack(spacing: LocktySpacing.md) {
                 if viewModel.routines.isEmpty {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                            EmptyStateView(
-                                title: "No Routines Yet",
-                                message: "Create your first routine and attach app or website restrictions.",
-                                systemImage: "repeat"
-                            )
-
-                            PrimaryButton("Create Routine", systemImage: "plus") {
-                                router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
-                            }
-                        }
+                        EmptyStateView(
+                            title: "No Routines Yet",
+                            message: "Create your first routine and attach app or website restrictions.",
+                            systemImage: "repeat"
+                        )
                     }
                 } else {
                     ForEach(viewModel.routines) { routine in
@@ -48,6 +42,10 @@ struct RoutinesView: View {
                             }
                         )
                     }
+                }
+
+                PrimaryButton("Create Routine", systemImage: "plus") {
+                    router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
                 }
             }
         }

@@ -23,11 +23,7 @@ struct TodayView: View {
     }
 
     private var headerTopInset: CGFloat {
-        MetricsHeaderGeometry.lerp(
-            DayPageSliderMetrics.barHeight + LocktySpacing.sm,
-            LocktySpacing.xs,
-            progress: MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0.12, to: 1)
-        )
+        LocktySpacing.sm
     }
 
     var body: some View {

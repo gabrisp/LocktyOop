@@ -3,7 +3,6 @@ import Foundation
 final class AppContainer {
     let session: AppSession
     let router: AppRouter
-    let theme: ThemeManager
 
     let appGroupStore: AppGroupStore
     let persistenceController: PersistenceController
@@ -39,7 +38,6 @@ final class AppContainer {
     private init(
         session: AppSession,
         router: AppRouter,
-        theme: ThemeManager,
         appGroupStore: AppGroupStore,
         persistenceController: PersistenceController,
         systemCapabilities: SystemCapabilities,
@@ -68,7 +66,6 @@ final class AppContainer {
     ) {
         self.session = session
         self.router = router
-        self.theme = theme
         self.appGroupStore = appGroupStore
         self.persistenceController = persistenceController
         self.systemCapabilities = systemCapabilities
@@ -99,7 +96,6 @@ final class AppContainer {
     static func live() -> AppContainer {
         let session = AppSession()
         let router = AppRouter()
-        let theme = ThemeManager()
         let appGroupStore = AppGroupStore()
         let persistenceController = PersistenceController()
         let capabilities = SystemCapabilities.current
@@ -174,7 +170,6 @@ final class AppContainer {
         )
         let featureFactory = FeatureFactory(
             router: router,
-            theme: theme,
             todayViewModel: todayViewModel,
             routinesViewModel: routinesViewModel,
             focusViewModel: focusViewModel,
@@ -206,7 +201,6 @@ final class AppContainer {
         return AppContainer(
             session: session,
             router: router,
-            theme: theme,
             appGroupStore: appGroupStore,
             persistenceController: persistenceController,
             systemCapabilities: capabilities,

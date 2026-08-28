@@ -19,12 +19,12 @@ extension View {
             .safeGlass(radius: 23, interactive: true)
     }
 
-    /// Small tracked-caps label above a value, e.g. "START", "SELECTED".
+    /// Small tracked-caps label above a value, e.g. "RESTRICTIONS", "SCHEDULE".
     func locktyEyebrow() -> some View {
         self
-            .font(.caption2.weight(.medium))
-            .tracking(1.4)
-            .foregroundStyle(LocktyColors.secondaryText)
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.06)
+            .foregroundStyle(.secondary)
     }
 
     func locktyGlassInputStyle(height: CGFloat = 52) -> some View {

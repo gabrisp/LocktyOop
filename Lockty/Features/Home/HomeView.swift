@@ -29,34 +29,6 @@ struct HomeView: View {
             .fullScreenCover(item: $router.fullScreen) { route in
                 destinationFactory.fullScreen(for: route)
             }
-          /*  .safeSafeAreaBar(edge: .top, spacing: 0) {
-                switch router.selectedTab {
-                case .today:
-                    // Calendar-hide animation paused: always shown at full height.
-                    let sliderProgress = MetricsHeaderGeometry.rangedProgress(
-                        router.todayChromeCollapseProgress,
-                        from: 0.14,
-                        to: 0.74
-                    )
-
-                    DateSliderView(
-                        dates: router.dayNavigationDays,
-                        selectedDate: $router.selectedDay,
-                        scrollOffset: $router.daySliderOffset,
-                        onSelectionChanged: featureFactory.haptics.selectionChanged
-                    )
-                    .opacity(1 - sliderProgress)
-                    .frame(height: DayPageSliderMetrics.barHeight * (1 - sliderProgress))
-                    .clipped()
-                    .allowsHitTesting(sliderProgress < 0.05)
-
-                case .focus:
-                    EmptyView()
-
-                case .lifetime:
-                    EmptyView()
-                }
-            }*/
         }
     }
 }

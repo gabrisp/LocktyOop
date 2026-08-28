@@ -59,9 +59,6 @@ struct DestinationFactory {
         case .routineBreak(let routineID):
             featureFactory.makeRoutineBreakSheet(routineID: routineID)
 
-        case .accentPicker:
-            featureFactory.makeAccentPickerSheet()
-
         case .appPicker(let scope):
             featureFactory.makeAppPickerSheet(scope: scope)
 

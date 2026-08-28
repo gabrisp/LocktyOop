@@ -7,7 +7,6 @@ struct FocusView: View {
     let router: AppRouter
 
     var body: some View {
-        NavigationStack{
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ScrollView(.vertical, showsIndicators: false) {
@@ -65,6 +64,5 @@ struct FocusView: View {
                 await routinesViewModel.load()
                 await pausesViewModel.load()
             }
-        }
     }
 }

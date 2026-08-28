@@ -39,17 +39,11 @@ struct PausesView: View {
                 .foregroundStyle(LocktyColors.primaryText)
             if viewModel.state.rules.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                        EmptyStateView(
-                            title: "No Pauses Yet",
-                            message: "Create a Pause to force a deliberate decision before opening one distracting app.",
-                            systemImage: "pause.circle"
-                        )
-
-                        PrimaryButton("Create Pause", systemImage: "plus") {
-                            router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
-                        }
-                    }
+                    EmptyStateView(
+                        title: "No Pauses Yet",
+                        message: "Create a Pause to force a deliberate decision before opening one distracting app.",
+                        systemImage: "pause.circle"
+                    )
                 }
             } else {
                 ForEach(viewModel.state.rules) { rule in
@@ -71,6 +65,10 @@ struct PausesView: View {
                     .buttonStyle(.plain)
                     .tappable()
                 }
+            }
+
+            PrimaryButton("Create Pause", systemImage: "plus") {
+                router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
             }
         }
         .onAppear {

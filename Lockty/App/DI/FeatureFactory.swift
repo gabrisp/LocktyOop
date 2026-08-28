@@ -3,7 +3,6 @@ import SwiftUI
 
 struct FeatureFactory {
     let router: AppRouter
-    let theme: ThemeManager
     let todayViewModel: TodayViewModel
     let routinesViewModel: RoutinesViewModel
     let focusViewModel: FocusViewModel
@@ -39,7 +38,7 @@ struct FeatureFactory {
     }
 
     func makeSettingsView() -> SettingsView {
-        SettingsView(theme: theme)
+        SettingsView()
     }
 
     func makePauseView(context: PauseContext) -> PauseView {
@@ -165,10 +164,6 @@ struct FeatureFactory {
             ),
             router: router
         )
-    }
-
-    func makeAccentPickerSheet() -> AccentPickerView {
-        AccentPickerView(theme: theme)
     }
 
     func makeAppPickerSheet(scope: ScreenTimeSelectionScope) -> AppPickerSheet {

@@ -6,11 +6,11 @@ struct AppUsageListCard: View {
     let onAppSelected: ((AppUsageState) -> Void)? = nil
 
     private var visibleAppUsages: [AppUsageState] {
-        state.appUsages.filter { $0.duration >= 60 }
+        Array(state.appUsages.prefix(4))
     }
 
     private var collapsedAppUsages: [AppUsageState] {
-        state.appUsages.filter { $0.duration < 60 }
+        Array(state.appUsages.dropFirst(4))
     }
 
     var body: some View {
@@ -109,31 +109,15 @@ private struct MoreAppsRow: View {
 
     var body: some View {
         HStack(spacing: LocktySpacing.sm) {
-            HStack(spacing: -8) {
-                ForEach(Array(previewApps.enumerated()), id: \.element.id) { index, appUsage in
-                    ZStack {
-                        AppIconView(
-                            source: appUsage.app.iconSource,
-                            applicationToken: appUsage.app.applicationToken,
-                            fallbackSystemImage: appUsage.app.iconSystemName,
-                            size: 46,
-                            chrome: .plain
-                        )
-                        .frame(width: 46, height: 46)
-
-                        if index == previewApps.count - 1, appUsages.count > previewApps.count {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(.black.opacity(0.55))
-                                .frame(width: 46, height: 46)
-                                .overlay {
-                                    Text("+\(appUsages.count - previewApps.count)")
-                                        .font(.system(size: 12, weight: .bold, design: .default))
-                                        .foregroundStyle(.white)
-                                        .monospacedDigit()
-                                        .minimumScaleFactor(0.7)
-                                }
-                        }
-                    }
+            HStack(spacing: -14) {
+                ForEach(previewApps) { appUsage in
+                    AppIconView(
+                        source: appUsage.app.iconSource,
+                        applicationToken: appUsage.app.applicationToken,
+                        fallbackSystemImage: appUsage.app.iconSystemName,
+                        size: 46,
+                        chrome: .plain
+                    )
                     .frame(width: 46, height: 46)
                 }
             }

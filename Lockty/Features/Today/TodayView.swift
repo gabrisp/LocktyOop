@@ -6,7 +6,6 @@ struct TodayView: View {
     let router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
-    @State private var isRefreshing = false
 
     private var state: TodayDayState {
         viewModel.state(for: day)
@@ -27,13 +26,7 @@ struct TodayView: View {
     }
 
     var body: some View {
-        PullEffectScrollView(
-            actionTopPadding: headerTopInset + LocktySpacing.sm,
-            centerRefreshing: $isRefreshing,
-            scrollOffset: $scrollOffset
-        ) {
-            await viewModel.refresh(day: day)
-        } content: {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Color.clear
                     .frame(height: headerTopInset + MetricsHeaderGeometry.expandedHeight + LocktySpacing.sm)
@@ -116,6 +109,11 @@ struct TodayView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xl)
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, newValue in
+            scrollOffset = newValue
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .overlay(alignment: .top) {

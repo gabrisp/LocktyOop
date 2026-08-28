@@ -3,16 +3,10 @@ import SwiftUI
 struct MyDaySection: View {
     let activities: [DigitalActivity]
 
+    private let rowHeight: CGFloat = 44
+
     private var orderedActivities: [DigitalActivity] {
         activities.sorted { $0.startDate < $1.startDate }
-    }
-
-    private var spanStart: Date? { orderedActivities.first?.startDate }
-    private var spanEnd: Date? { orderedActivities.last?.endDate }
-
-    private var totalDuration: TimeInterval {
-        guard let spanStart, let spanEnd else { return 0 }
-        return max(spanEnd.timeIntervalSince(spanStart), 0)
     }
 
     var body: some View {
@@ -20,7 +14,7 @@ struct MyDaySection: View {
             Text("MY DAY")
                 .locktyEyebrow()
 
-            if activities.isEmpty || totalDuration <= 0 {
+            if activities.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                     EmptyStateView(
                         title: "No day events yet",
@@ -30,35 +24,65 @@ struct MyDaySection: View {
                 }
             } else {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        HStack(spacing: 2) {
+                    HStack(alignment: .top, spacing: LocktySpacing.md) {
+                        VStack(spacing: 0) {
+                            ForEach(orderedActivities) { activity in
+                                Text(activity.startDate, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+                                    .font(.caption.weight(.semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(LocktyColors.primaryText)
+                                    .frame(height: rowHeight)
+                            }
+                        }
+
+                        VStack(spacing: 0) {
                             ForEach(orderedActivities) { activity in
                                 Rectangle()
                                     .fill(color(for: activity.type))
-                                    .frame(width: max(CGFloat(activity.duration / totalDuration) * 320, 3))
+                                    .frame(width: 4, height: rowHeight)
                             }
                         }
-                        .frame(height: 8)
                         .clipShape(Capsule())
-                        .frame(maxWidth: .infinity)
 
-                        HStack {
-                            if let spanStart {
-                                Text(spanStart, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
-                                    .monospacedDigit()
-                            }
-                            Spacer()
-                            if let last = orderedActivities.last {
-                                Text(last.title)
-                                    .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(orderedActivities) { activity in
+                                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(activity.title)
+                                            .font(LocktyTypography.headline)
+                                            .foregroundStyle(LocktyColors.primaryText)
+                                            .lineLimit(1)
+
+                                        Spacer(minLength: LocktySpacing.sm)
+
+                                        Text(LocktyDurationFormatter.abbreviated(activity.duration))
+                                            .font(LocktyTypography.caption)
+                                            .monospacedDigit()
+                                            .foregroundStyle(LocktyColors.secondaryText)
+                                            .locktyNumericTransition(trigger: activity.duration)
+                                    }
+
+                                    Text(detail(for: activity))
+                                        .font(LocktyTypography.caption)
+                                        .foregroundStyle(LocktyColors.secondaryText)
+                                        .lineLimit(1)
+                                }
+                                .frame(height: rowHeight, alignment: .top)
                             }
                         }
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.secondaryText)
                     }
                 }
             }
         }
+    }
+
+    private func detail(for activity: DigitalActivity) -> String {
+        if let productivityScore = activity.productivityScore {
+            return "\(Int(productivityScore.rounded()))% productive"
+        }
+
+        let appNames = activity.relatedApplications.map(\.displayName).prefix(2).joined(separator: " - ")
+        return appNames.isEmpty ? activity.type.title : appNames
     }
 
     private func color(for type: DigitalActivityType) -> Color {

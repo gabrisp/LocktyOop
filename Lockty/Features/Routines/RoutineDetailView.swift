@@ -117,18 +117,15 @@ struct RoutineDetailView: View {
                         VStack(spacing: LocktySpacing.sm) {
                             RestrictionRow(
                                 label: "Apps",
-                                summary: viewModel.selection.applicationTokens.isEmpty ? nil :
-                                    (viewModel.selection.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selection.applicationTokens.count) Apps")
-                            )
-                            RestrictionRow(
-                                label: "Categories",
-                                summary: viewModel.selection.categoryTokens.isEmpty ? nil :
-                                    (viewModel.selection.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selection.categoryTokens.count) Categories")
+                                summary: RestrictionSummary.appsAndCategories(
+                                    apps: viewModel.selection.applicationTokens.count,
+                                    categories: viewModel.selection.categoryTokens.count
+                                ),
+                                tokens: Array(viewModel.selection.applicationTokens.suffix(3))
                             )
                             RestrictionRow(
                                 label: "Domains",
-                                summary: routine.blockedDomains.isEmpty ? nil :
-                                    (routine.blockedDomains.count == 1 ? "1 Website" : "\(routine.blockedDomains.count) Websites")
+                                summary: RestrictionSummary.domains(routine.blockedDomains.count)
                             )
                         }
                     }

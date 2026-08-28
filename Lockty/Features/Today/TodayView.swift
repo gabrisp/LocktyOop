@@ -65,14 +65,12 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
-//                TodayDebugCard(rawText: state.rawDebugText)
-
-//                DailyPerspectiveCard(perspective: state.perspective)
+                DailyPerspectiveCard(perspective: state.perspective)
 
                 MyDaySection(activities: state.activities)
 
                 DigitalBalanceCard(state: state.timeline) {
-                    router.push(.digitalBalanceDetail(day))
+                    router.presentSheet(.digitalBalanceDetail(day))
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -81,12 +79,12 @@ struct TodayView: View {
                         .padding(.top, 16)
                 TodayMetricGrid(state: state) { metric in
                     switch metric {
-                    case .screenTime: router.push(.screenTimeDetail(day))
-                    case .bestDetox: router.push(.detoxDetail(day))
-                    case .routines: router.push(.routineDaySummary(day))
-                    case .pauseSuccess: router.push(.pauseDaySummary(day))
-                    case .distractions: router.push(.distractionsDetail(day))
-                    case .intentionalTime: router.push(.intentionalTimeDetail(day))
+                    case .screenTime: router.presentSheet(.screenTimeDetail(day))
+                    case .bestDetox: router.presentSheet(.detoxDetail(day))
+                    case .routines: router.presentSheet(.routineDaySummary(day))
+                    case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
+                    case .distractions: router.presentSheet(.distractionsDetail(day))
+                    case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
                     }
                 }
                 }
@@ -99,7 +97,7 @@ struct TodayView: View {
                     )
                 }
 
-//                PatternsSection(patterns: state.patterns)
+                PatternsSection(patterns: state.patterns)
 
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)
@@ -122,16 +120,15 @@ struct TodayView: View {
             TodayMetricsHeader(
                 metrics: state.primaryMetrics.metrics,
                 collapseProgress: collapseProgress,
+                topInset: headerTopInset,
                 onMetricSelected: { metric in
                     switch metric.kind {
-                    case .productivity: router.push(.productivityDetail(day))
-                    case .control: router.push(.controlDetail(day))
-                    case .detox: router.push(.detoxDetail(day))
+                    case .productivity: router.presentSheet(.productivityDetail(day))
+                    case .control: router.presentSheet(.controlDetail(day))
+                    case .detox: router.presentSheet(.detoxDetail(day))
                     }
                 }
             )
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, headerTopInset)
             .offset(y: overscrollPullDistance)
         }
         .task(id: DayKey(date: day)) {

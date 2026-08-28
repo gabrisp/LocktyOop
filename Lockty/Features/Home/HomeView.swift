@@ -46,7 +46,8 @@ struct HomeView: View {
                 featureFactory.haptics.selectionChanged()
             }
             .frame(height: 50)
-            .frame(maxWidth: .infinity)
+            .fixedSize()
+            .safeGlass(radius: 25, interactive: true)
             .padding(.bottom, LocktySpacing.sm)
             .opacity(1 - router.tabBarProgress)
             .offset(y: router.tabBarProgress * 80)

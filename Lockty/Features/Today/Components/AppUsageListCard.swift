@@ -5,6 +5,8 @@ struct AppUsageListCard: View {
     let onClassificationChange: (AppUsageState, AppClassification) -> Void
     let onAppSelected: ((AppUsageState) -> Void)? = nil
 
+    @State private var showAllApps = false
+
     private var visibleAppUsages: [AppUsageState] {
         Array(state.appUsages.prefix(4))
     }
@@ -52,12 +54,35 @@ struct AppUsageListCard: View {
                     }
 
                     if !collapsedAppUsages.isEmpty {
-                        MoreAppsRow(appUsages: collapsedAppUsages)
-                            .padding(.vertical, LocktySpacing.sm)
+                        Button {
+                            showAllApps = true
+                        } label: {
+                            MoreAppsRow(appUsages: collapsedAppUsages)
+                                .padding(.vertical, LocktySpacing.sm)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 }
             }
+        }
+        .sheet(isPresented: $showAllApps) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(state.appUsages.enumerated()), id: \.element.id) { index, appUsage in
+                        AppUsageListItem(
+                            state: appUsage,
+                            showsDivider: index < state.appUsages.count - 1,
+                            onClassificationChange: { classification in
+                                onClassificationChange(appUsage, classification)
+                            }
+                        )
+                    }
+                }
+                .padding(LocktySpacing.md)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 }
@@ -110,16 +135,16 @@ private struct MoreAppsRow: View {
 
     var body: some View {
         HStack(spacing: LocktySpacing.sm) {
-            HStack(spacing: -14) {
+            HStack(spacing: -26) {
                 ForEach(previewApps) { appUsage in
                     AppIconView(
                         source: appUsage.app.iconSource,
                         applicationToken: appUsage.app.applicationToken,
                         fallbackSystemImage: appUsage.app.iconSystemName,
-                        size: 46,
+                        size: 56,
                         chrome: .plain
                     )
-                    .frame(width: 46, height: 46)
+                    .frame(width: 56, height: 56)
                 }
             }
 

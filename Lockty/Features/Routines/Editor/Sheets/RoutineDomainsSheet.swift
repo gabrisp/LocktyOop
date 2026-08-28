@@ -29,7 +29,7 @@ struct RoutineDomainsSheet: View {
                             .buttonStyle(.plain)
                             .padding(.horizontal, LocktySpacing.md)
                             .frame(height: 52)
-                            .safeGlass(radius: LocktyRadius.medium, interactive: true, tint: .accentColor)
+                            .safeGlass(radius: LocktyRadius.medium, interactive: true, tint: LocktyColors.primaryText)
                         }
 
                         if !viewModel.blockedDomains.isEmpty {

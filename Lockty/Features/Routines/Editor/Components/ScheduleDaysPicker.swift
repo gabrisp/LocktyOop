@@ -18,10 +18,10 @@ struct ScheduleDaysPicker: View {
                 } label: {
                     Text(weekday.shortLabel)
                         .font(LocktyTypography.callout)
-                        .foregroundStyle(isSelected ? Color.black : LocktyColors.secondaryText)
+                        .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : LocktyColors.secondaryText)
                         .frame(width: 50, height: 50)
                         .background(
-                            isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(LocktyColors.elevatedBackground),
+                            isSelected ? AnyShapeStyle(LocktyColors.primaryText) : AnyShapeStyle(LocktyColors.elevatedBackground),
                             in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous)
                         )
                 }

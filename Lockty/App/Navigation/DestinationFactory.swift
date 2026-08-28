@@ -18,33 +18,6 @@ struct DestinationFactory {
         case .pauseDetail(let id):
             featureFactory.makePauseDetail(pauseID: id)
 
-        case .productivityDetail(let day):
-            featureFactory.makeProductivityDetail(day: day)
-
-        case .controlDetail(let day):
-            featureFactory.makeControlDetail(day: day)
-
-        case .detoxDetail(let day):
-            featureFactory.makeDetoxDetail(day: day)
-
-        case .screenTimeDetail(let day):
-            featureFactory.makeScreenTimeDetail(day: day)
-
-        case .routineDaySummary(let day):
-            featureFactory.makeRoutineDaySummary(day: day)
-
-        case .pauseDaySummary(let day):
-            featureFactory.makePauseDaySummary(day: day)
-
-        case .distractionsDetail(let day):
-            featureFactory.makeDistractionsDetail(day: day)
-
-        case .intentionalTimeDetail(let day):
-            featureFactory.makeIntentionalTimeDetail(day: day)
-
-        case .digitalBalanceDetail(let day):
-            featureFactory.makeDigitalBalanceDetail(day: day)
-
         case .applicationDetails(let id, let day):
             featureFactory.makeApplicationDetails(appID: id, day: day)
         }
@@ -70,7 +43,43 @@ struct DestinationFactory {
 
         case .pauseEditor(let route):
             featureFactory.makePauseEditor(route: route)
+
+        case .productivityDetail(let day):
+            todaySheet { featureFactory.makeProductivityDetail(day: day) }
+
+        case .controlDetail(let day):
+            todaySheet { featureFactory.makeControlDetail(day: day) }
+
+        case .detoxDetail(let day):
+            todaySheet { featureFactory.makeDetoxDetail(day: day) }
+
+        case .screenTimeDetail(let day):
+            todaySheet { featureFactory.makeScreenTimeDetail(day: day) }
+
+        case .routineDaySummary(let day):
+            todaySheet { featureFactory.makeRoutineDaySummary(day: day) }
+
+        case .pauseDaySummary(let day):
+            todaySheet { featureFactory.makePauseDaySummary(day: day) }
+
+        case .distractionsDetail(let day):
+            todaySheet { featureFactory.makeDistractionsDetail(day: day) }
+
+        case .intentionalTimeDetail(let day):
+            todaySheet { featureFactory.makeIntentionalTimeDetail(day: day) }
+
+        case .digitalBalanceDetail(let day):
+            todaySheet { featureFactory.makeDigitalBalanceDetail(day: day) }
         }
+    }
+
+    /// Today's detail sheets: no navigation stack, no title, no toolbar buttons —
+    /// just the drag indicator, opening at the smaller detent.
+    @ViewBuilder
+    private func todaySheet<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder

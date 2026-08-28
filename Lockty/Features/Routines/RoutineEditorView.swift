@@ -1,4 +1,5 @@
 import FamilyControls
+import ManagedSettings
 import OSLog
 import SwiftUI
 
@@ -434,24 +435,18 @@ struct RoutineEditorView: View {
                     VStack(spacing: LocktySpacing.sm) {
                         RestrictionRow(
                             label: "Apps",
-                            summary: viewModel.selectionPreview.applicationTokens.isEmpty ? nil :
-                                (viewModel.selectionPreview.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selectionPreview.applicationTokens.count) Apps")
-                        ) {
-                            activeSheet = .apps
-                        }
-
-                        RestrictionRow(
-                            label: "Categories",
-                            summary: viewModel.selectionPreview.categoryTokens.isEmpty ? nil :
-                                (viewModel.selectionPreview.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selectionPreview.categoryTokens.count) Categories")
+                            summary: RestrictionSummary.appsAndCategories(
+                                apps: viewModel.selectionPreview.applicationTokens.count,
+                                categories: viewModel.selectionPreview.categoryTokens.count
+                            ),
+                            tokens: Array(viewModel.selectionPreview.applicationTokens.suffix(3))
                         ) {
                             activeSheet = .apps
                         }
 
                         RestrictionRow(
                             label: "Domains",
-                            summary: viewModel.blockedDomains.isEmpty ? nil :
-                                (viewModel.blockedDomains.count == 1 ? "1 Website" : "\(viewModel.blockedDomains.count) Websites")
+                            summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
                         ) {
                             activeSheet = .domains
                         }
@@ -748,9 +743,27 @@ private struct ScheduleTimeField: View {
 }
 
 /// A flat, always-visible settings-style row (label, or its live summary once set).
+enum RestrictionSummary {
+    /// e.g. "3 Apps and 1 Category." — nil when nothing is selected.
+    static func appsAndCategories(apps: Int, categories: Int) -> String? {
+        var parts: [String] = []
+        if apps > 0 { parts.append(apps == 1 ? "1 App" : "\(apps) Apps") }
+        if categories > 0 { parts.append(categories == 1 ? "1 Category" : "\(categories) Categories") }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " and ") + "."
+    }
+
+    static func domains(_ count: Int) -> String? {
+        guard count > 0 else { return nil }
+        return (count == 1 ? "1 Domain" : "\(count) Domains") + "."
+    }
+}
+
 struct RestrictionRow: View {
     let label: String
     let summary: String?
+    /// Up to 3 app tokens previewed on the trailing side, overlapping.
+    var tokens: [ApplicationToken] = []
     var isInteractive: Bool = true
     var action: (() -> Void)? = nil
 
@@ -760,10 +773,19 @@ struct RestrictionRow: View {
                 .font(LocktyTypography.callout)
                 .foregroundStyle(summary == nil ? LocktyColors.secondaryText : LocktyColors.primaryText)
             Spacer()
-            if isInteractive {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .light))
-                    .foregroundStyle(LocktyColors.tertiaryText)
+            // Label(token) renders its own icon and ignores styling applied to it directly, so
+            // the overlap is produced by sizing a transparent Color that *hosts* the label as a
+            // background — the Color's frame is what the HStack lays out.
+            HStack(spacing: 0) {
+                ForEach(Array(tokens.prefix(3).enumerated()), id: \.offset) { _, token in
+                    Color.clear
+                        .frame(width: 20, height: 32)
+                        .background {
+                            Label(token)
+                                .labelStyle(.iconOnly)
+                                .frame(width: 32, height: 32)
+                        }
+                }
             }
         }
         .padding(.horizontal, LocktySpacing.md)
@@ -775,16 +797,18 @@ struct RestrictionRow: View {
         }
     }
 
-    init(label: String, summary: String?, action: @escaping () -> Void) {
+    init(label: String, summary: String?, tokens: [ApplicationToken] = [], action: @escaping () -> Void) {
         self.label = label
         self.summary = summary
+        self.tokens = tokens
         self.isInteractive = true
         self.action = action
     }
 
-    init(label: String, summary: String?) {
+    init(label: String, summary: String?, tokens: [ApplicationToken] = []) {
         self.label = label
         self.summary = summary
+        self.tokens = tokens
         self.isInteractive = false
         self.action = nil
     }

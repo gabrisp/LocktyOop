@@ -7,6 +7,6 @@ struct LocktyToggle: View {
     var body: some View {
         Toggle(title, isOn: $isOn)
             .font(LocktyTypography.body)
-            .tint(.accentColor)
+            .tint(LocktyColors.primaryText)
     }
 }

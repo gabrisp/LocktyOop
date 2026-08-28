@@ -9,6 +9,16 @@ struct DetoxDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Best Detox")
+                        .font(LocktyTypography.largeTitle)
+                        .foregroundStyle(LocktyColors.primaryText)
+                    Spacer()
+                    Text(day.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
                 CardView {
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                         Text(state.metrics.bestDetox.durationText).font(LocktyTypography.largeTitle).monospacedDigit()
@@ -22,14 +32,5 @@ struct DetoxDetailView: View {
             .padding(LocktySpacing.md)
         }
         .task { await viewModel.load(day: day) }
-        .navigationTitle("Best Detox")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Text(day.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(LocktyColors.secondaryText)
-            }
-        }
     }
 }

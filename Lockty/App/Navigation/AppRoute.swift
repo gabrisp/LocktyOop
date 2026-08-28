@@ -5,14 +5,5 @@ enum AppRoute: Hashable {
     case routineDetail(UUID)
     case pauseDetail(UUID)
     case settings
-    case productivityDetail(Date)
-    case controlDetail(Date)
-    case detoxDetail(Date)
-    case screenTimeDetail(Date)
-    case routineDaySummary(Date)
-    case pauseDaySummary(Date)
-    case distractionsDetail(Date)
-    case intentionalTimeDetail(Date)
-    case digitalBalanceDetail(Date)
     case applicationDetails(AppIdentity.ID, day: Date?)
 }

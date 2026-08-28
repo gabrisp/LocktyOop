@@ -15,7 +15,6 @@ struct FocusView: View {
                             .padding(.bottom, LocktySpacing.xl)
                             .padding(.top, LocktySpacing.md)
                     }
-                    .adoptForIGTabBar($router.tabBarProgress)
                     .scrollIndicators(.hidden)
                     .containerRelativeFrame(.horizontal)
                     .id(FocusSection.routines)
@@ -26,7 +25,6 @@ struct FocusView: View {
                             .padding(.bottom, LocktySpacing.xl)
                             .padding(.top, LocktySpacing.md)
                     }
-                    .adoptForIGTabBar($router.tabBarProgress)
                     .scrollIndicators(.hidden)
                     .containerRelativeFrame(.horizontal)
                     .id(FocusSection.pauses)

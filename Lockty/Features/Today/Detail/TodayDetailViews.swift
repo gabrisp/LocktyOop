@@ -366,6 +366,10 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                Text(title)
+                    .font(LocktyTypography.largeTitle)
+                    .foregroundStyle(LocktyColors.primaryText)
+
                 content(state)
             }
             .padding(.horizontal, LocktySpacing.md)
@@ -374,8 +378,6 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
         .task {
             await viewModel.load(day: day)
         }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
     }
 }
 

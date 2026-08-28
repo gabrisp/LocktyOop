@@ -17,12 +17,12 @@ struct RoutineIconPickerSheet: View {
                     } label: {
                         Image(systemName: iconName)
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(isSelected ? Color.black : LocktyColors.primaryText)
+                            .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : LocktyColors.primaryText)
                             .frame(width: 46, height: 46)
                             .safeGlass(
                                 radius: 23,
                                 interactive: true,
-                                tint: isSelected ? .accentColor : nil
+                                tint: isSelected ? LocktyColors.primaryText : nil
                             )
                             .clipShape(Circle())
                     }

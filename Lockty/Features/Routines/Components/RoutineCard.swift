@@ -17,32 +17,16 @@ struct RoutineCard: View {
                                 .frame(width: 44, height: 44)
                                 .safeGlass(radius: 22)
 
-                            VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                                Text(routine.name)
-                                    .font(LocktyTypography.headline)
-                                    .foregroundStyle(LocktyColors.primaryText)
-
-                                Text("\(routine.tasks.count) routine items")
-                                    .font(LocktyTypography.caption)
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                            }
+                            Text(routine.name)
+                                .font(LocktyTypography.headline)
+                                .foregroundStyle(LocktyColors.primaryText)
 
                             Spacer()
 
                             BadgeView(
                                 title: isActive ? "Active" : routine.mode.title,
-                                color: isActive ? LocktyColors.productive : .accentColor
+                                color: isActive ? LocktyColors.productive : LocktyColors.primaryText
                             )
-                        }
-
-                        HStack(spacing: LocktySpacing.xs) {
-                            Text(routine.blockedDomains.isEmpty ? "\(routine.blockedApplications.count) apps blocked" : "\(routine.blockedApplications.count) apps · \(routine.blockedDomains.count) sites")
-                                .font(LocktyTypography.caption)
-                                .foregroundStyle(LocktyColors.secondaryText)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(LocktyColors.tertiaryText)
                         }
                     }
                 }

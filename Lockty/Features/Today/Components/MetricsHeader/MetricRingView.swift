@@ -4,6 +4,11 @@ struct MetricRingView: View {
     let metric: PrimaryMetric
     let collapseProgress: CGFloat
 
+    /// The label's natural (unconstrained) width, measured rather than hardcoded — forcing a
+    /// fixed wrapper width made short labels like "DETOX" claim far more space than their text,
+    /// which threw off the centering of the collapsed ring+label group.
+    @State private var labelWidth: CGFloat = 0
+
     private var geometry: MetricsHeaderGeometry {
         MetricsHeaderGeometry(progress: collapseProgress)
     }
@@ -19,17 +24,20 @@ struct MetricRingView: View {
         }
     }
 
+    private var label: some View {
+        Text(metric.kind.title.uppercased())
+            .font(.caption2)
+            .foregroundStyle(LocktyColors.secondaryText)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let itemWidth = proxy.size.width
             let diameter = geometry.ringDiameter
-            let labelWidth = MetricsHeaderGeometry.lerp(
-                MetricsHeaderGeometry.expandedLabelWidth,
-                MetricsHeaderGeometry.collapsedLabelWidth,
-                progress: geometry.labelProgress
-            )
             let collapsedGroupWidth = diameter + geometry.labelGap + labelWidth
-            let collapsedGroupOriginX = (itemWidth - collapsedGroupWidth) / 2
+            let collapsedGroupOriginX = max((itemWidth - collapsedGroupWidth) / 2, 0)
             let ringCenterX = MetricsHeaderGeometry.lerp(
                 itemWidth / 2,
                 collapsedGroupOriginX + (diameter / 2),
@@ -61,16 +69,10 @@ struct MetricRingView: View {
                     .opacity(geometry.valueOpacity)
                     .position(x: ringCenterX, y: ringCenterY)
 
-                Text(metric.kind.title.uppercased())
-                    .font(.caption2)
-                    .foregroundStyle(LocktyColors.secondaryText)
-                    .lineLimit(1)
-                    .frame(
-                        width: labelWidth,
-                        height: MetricsHeaderGeometry.labelHeight,
-                        alignment: .center
-                    )
-                    .multilineTextAlignment(.center)
+                label
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
+                        labelWidth = newValue
+                    }
                     .position(x: labelCenterX, y: labelCenterY)
             }
             .frame(width: itemWidth, height: geometry.height, alignment: .topLeading)

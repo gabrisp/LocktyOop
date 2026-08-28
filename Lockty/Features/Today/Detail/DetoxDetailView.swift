@@ -22,7 +22,6 @@ struct DetoxDetailView: View {
             .padding(LocktySpacing.md)
         }
         .task { await viewModel.load(day: day) }
-        .locktyScreenBackground()
         .navigationTitle("Best Detox")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

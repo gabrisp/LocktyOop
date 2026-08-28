@@ -55,7 +55,6 @@ struct SettingsView: View {
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.xl)
         }
-        .locktyScreenBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
     }

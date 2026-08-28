@@ -8,7 +8,7 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: LocktySpacing.md) {
             Image(systemName: systemImage)
-                .font(.system(size: 34, weight: .medium))
+                .font(.system(size: 34, weight: .light))
                 .foregroundStyle(LocktyColors.secondaryText)
 
             VStack(spacing: LocktySpacing.xs) {

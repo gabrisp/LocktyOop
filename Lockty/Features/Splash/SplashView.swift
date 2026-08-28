@@ -16,6 +16,5 @@ struct SplashView: View {
                 .foregroundStyle(LocktyColors.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .locktyScreenBackground()
     }
 }

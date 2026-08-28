@@ -38,6 +38,5 @@ struct OnboardingView: View {
             PrimaryButton("Continue", systemImage: "arrow.right", action: onContinue)
         }
         .padding(LocktySpacing.xl)
-        .locktyScreenBackground()
     }
 }

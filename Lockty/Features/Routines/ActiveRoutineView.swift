@@ -181,7 +181,6 @@ struct ActiveRoutineView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .locktyScreenBackground()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(role: .destructive) {
                 Task {

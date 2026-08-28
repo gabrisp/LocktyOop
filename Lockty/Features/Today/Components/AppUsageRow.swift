@@ -20,7 +20,7 @@ struct AppUsageRow: View {
                 Group {
                     if let token = state.app.applicationToken {
                         Label(token)
-                            .labelStyle(.titleOnly)
+                            .labelStyle(.socialFeedTag)
                     } else {
                         Text(state.app.displayName)
                     }
@@ -85,4 +85,23 @@ private struct ClassificationMenu: View {
         .accessibilityLabel("Classification")
         .accessibilityValue(classification.title)
     }
+}
+
+
+extension LabelStyle where Self == SocialFeedTagLabelStyle {
+ static var socialFeedTag: SocialFeedTagLabelStyle {
+     SocialFeedTagLabelStyle()
+ }
+}
+struct SocialFeedTagLabelStyle: LabelStyle {
+ @ScaledMetric(relativeTo: .footnote) private var iconWidth = 14.0
+ func makeBody(configuration: Configuration) -> some View {
+     HStack {
+         configuration.title
+             .font(.caption2)
+             .foregroundStyle(.red)
+ }
+ .compositingGroup()
+ .font(.caption)
+ }
 }

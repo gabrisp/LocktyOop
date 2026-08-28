@@ -9,9 +9,3 @@ struct ScreenBackgroundModifier: ViewModifier {
             }
     }
 }
-
-extension View {
-    func locktyScreenBackground() -> some View {
-        modifier(ScreenBackgroundModifier())
-    }
-}

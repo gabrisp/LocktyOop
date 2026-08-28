@@ -5,7 +5,8 @@ struct MyDaySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            SectionHeader(title: "My Day")
+            Text("MY DAY")
+                .locktyEyebrow()
 
             if activities.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {

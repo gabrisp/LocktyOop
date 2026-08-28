@@ -335,7 +335,6 @@ struct ApplicationDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .locktyScreenBackground()
         .navigationTitle(viewModel.appUsage?.app.displayName ?? "Application")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -375,7 +374,6 @@ private struct TodayMetricDetailScaffold<Content: View>: View {
         .task {
             await viewModel.load(day: day)
         }
-        .locktyScreenBackground()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
     }

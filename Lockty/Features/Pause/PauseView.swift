@@ -63,7 +63,6 @@ struct PauseView: View {
             }
         }
         .padding(LocktySpacing.xl)
-        .locktyScreenBackground()
         .onAppear {
             viewModel.startIfNeeded()
         }

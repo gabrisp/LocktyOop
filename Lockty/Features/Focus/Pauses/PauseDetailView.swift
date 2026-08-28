@@ -101,7 +101,6 @@ struct PauseDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .locktyScreenBackground()
         .navigationTitle(viewModel.rule?.application.displayName ?? "Pause")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

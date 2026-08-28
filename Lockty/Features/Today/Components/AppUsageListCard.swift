@@ -14,22 +14,21 @@ struct AppUsageListCard: View {
     }
 
     var body: some View {
-        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("Apps")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
+        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+            HStack {
+                Text("APPS")
+                    .locktyEyebrow()
 
-                    Spacer()
+                Spacer()
 
-                    Text("\(state.appUsages.count)")
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.tertiaryText)
-                        .locktyNumericTransition(trigger: state.appUsages.count)
-                }
-                .padding(.bottom, LocktySpacing.xs)
+                Text("\(state.appUsages.count)")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(LocktyColors.tertiaryText)
+                    .locktyNumericTransition(trigger: state.appUsages.count)
+            }
 
+            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 0) {
                 if state.appUsages.isEmpty {
                     EmptyStateView(
                         title: "No apps yet",
@@ -55,6 +54,7 @@ struct AppUsageListCard: View {
                         MoreAppsRow(appUsages: collapsedAppUsages)
                             .padding(.vertical, LocktySpacing.sm)
                     }
+                }
                 }
             }
         }

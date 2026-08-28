@@ -13,9 +13,9 @@ struct TodayView: View {
     }
 
     private var collapseProgress: CGFloat {
-        // Sticky header collapse animation paused.
-        0
-//        MetricsHeaderGeometry.collapseProgress(for: scrollOffset)
+    //     Sticky header collapse animation paused.
+
+        MetricsHeaderGeometry.collapseProgress(for: scrollOffset)
     }
 
     private var overscrollPullDistance: CGFloat {
@@ -87,7 +87,8 @@ struct TodayView: View {
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    SectionHeader(title: "Your Day")
+                    Text("BREAKDOWN")
+                        .locktyEyebrow()
                 TodayMetricGrid(state: state) { metric in
                     switch metric {
                     case .screenTime: router.push(.screenTimeDetail(day))
@@ -137,16 +138,15 @@ struct TodayView: View {
             .padding(.top, headerTopInset)
             .offset(y: overscrollPullDistance)
         }
-        .locktyScreenBackground()
         .task(id: DayKey(date: day)) {
             await viewModel.load(day: day)
         }
         // Sticky header / calendar-hide animation paused.
-//        .onChange(of: collapseProgress, initial: true) { _, newValue in
-//            router.todayChromeCollapseProgress = newValue
-//        }
-//        .onDisappear {
-//            router.todayChromeCollapseProgress = 0
-//        }
+        .onChange(of: collapseProgress, initial: true) { _, newValue in
+            router.todayChromeCollapseProgress = newValue
+        }
+        .onDisappear {
+            router.todayChromeCollapseProgress = 0
+        }
     }
 }

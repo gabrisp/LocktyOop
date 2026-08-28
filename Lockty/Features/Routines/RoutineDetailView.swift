@@ -155,7 +155,6 @@ struct RoutineDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .locktyScreenBackground()
         .navigationTitle(viewModel.routine?.name ?? "Routine")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

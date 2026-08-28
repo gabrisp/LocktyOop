@@ -6,7 +6,8 @@ struct DigitalBalanceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            SectionHeader(title: "Digital Balance")
+            Text("DIGITAL BALANCE")
+                .locktyEyebrow()
 
             Button(action: action) {
                 CardView(radius: LocktyRadius.large, padding: LocktySpacing.md, interactive: true) {

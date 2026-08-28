@@ -298,7 +298,6 @@ struct PauseEditorView: View {
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xxl)
         }
-        .locktyScreenBackground()
         .navigationTitle(viewModel.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

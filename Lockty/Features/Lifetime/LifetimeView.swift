@@ -85,7 +85,6 @@ struct LifetimeView: View {
             .padding(.vertical, LocktySpacing.lg)
         }
         .scrollIndicators(.hidden)
-        .locktyScreenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task {
             await viewModel.load()

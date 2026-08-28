@@ -28,9 +28,6 @@ struct RootView: View {
                 )
             }
         }
-        .background {
-            LocktyColors.background.ignoresSafeArea()
-        }
         .task {
             await container.startupCoordinator.startIfNeeded()
         }

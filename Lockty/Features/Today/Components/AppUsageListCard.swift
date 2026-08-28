@@ -103,35 +103,51 @@ private struct MoreAppsRow: View {
         Array(appUsages.prefix(3))
     }
 
+    private var totalDuration: TimeInterval {
+        appUsages.reduce(0) { $0 + $1.duration }
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: -6) {
+        HStack(spacing: LocktySpacing.sm) {
+            HStack(spacing: -8) {
                 ForEach(Array(previewApps.enumerated()), id: \.element.id) { index, appUsage in
                     ZStack {
                         AppIconView(
                             source: appUsage.app.iconSource,
                             applicationToken: appUsage.app.applicationToken,
                             fallbackSystemImage: appUsage.app.iconSystemName,
-                            size: 34,
+                            size: 40,
                             chrome: .plain
                         )
+                        .frame(width: 40, height: 40)
 
                         if index == previewApps.count - 1, appUsages.count > previewApps.count {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(.black.opacity(0.55))
-                                .frame(width: 34, height: 34)
+                                .frame(width: 40, height: 40)
                                 .overlay {
                                     Text("+\(appUsages.count - previewApps.count)")
-                                        .font(.system(size: 10, weight: .bold, design: .default))
+                                        .font(.system(size: 12, weight: .bold, design: .default))
                                         .foregroundStyle(.white)
                                         .monospacedDigit()
                                         .minimumScaleFactor(0.7)
                                 }
                         }
                     }
+                    .frame(width: 40, height: 40)
                 }
             }
+
+            Text("\(appUsages.count) more apps")
+                .font(LocktyTypography.caption)
+                .foregroundStyle(LocktyColors.secondaryText)
+
             Spacer()
+
+            Text(LocktyDurationFormatter.abbreviated(totalDuration))
+                .font(LocktyTypography.headline)
+                .monospacedDigit()
+                .foregroundStyle(LocktyColors.primaryText)
         }
     }
 }

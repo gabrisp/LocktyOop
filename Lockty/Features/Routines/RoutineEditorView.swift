@@ -179,18 +179,22 @@ final class RoutineEditorViewModel {
     func refreshSelectionState() {
         let selection = (try? selectionStore.load(scope: selectionScope)) ?? FamilyActivitySelection()
         selectionPreview = selection
-        selectedApplicationCount = selection.applicationTokens.count
+        selectedApplicationCount = selection.applicationTokens.count + selection.categoryTokens.count
         print("Routine editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
     }
 
     func replaceSelection(_ selection: FamilyActivitySelection) {
+        // Domains are handled separately via RoutineDomainsSheet/blockedDomains,
+        // so webDomainTokens from the picker are dropped. Category selections
+        // are kept -- restricting a whole category is a real, supported
+        // restriction, resolved into the shield at runtime via the full
+        // FamilyActivitySelection (not just applicationTokens).
         var normalized = selection
-        normalized.categoryTokens = []
         normalized.webDomainTokens = []
         selectionPreview = normalized
-        selectedApplicationCount = normalized.applicationTokens.count
+        selectedApplicationCount = normalized.applicationTokens.count + normalized.categoryTokens.count
         try? selectionStore.save(normalized, scope: selectionScope)
-        print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count)")
+        print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count) categories=\(normalized.categoryTokens.count)")
     }
 
     func addTask() {
@@ -725,44 +729,32 @@ private struct ScheduleTimeField: View {
 private struct SelectionPreviewCard: View {
     let selection: FamilyActivitySelection
 
-    private let columns = Array(repeating: GridItem(.flexible()), count: 4)
-
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text("Selected apps (\(selection.applicationTokens.count))")
+                Text("Apps (\(selection.applicationTokens.count))")
                     .font(LocktyTypography.headline)
                     .foregroundStyle(LocktyColors.primaryText)
 
-                LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
+                HStack(spacing: -10) {
                     ForEach(Array(selection.applicationTokens), id: \.self) { token in
-                        Label(token)
-                            .labelStyle(.tokenTile)
+                        AppIconView(
+                            source: .screenTimeToken,
+                            applicationToken: token,
+                            fallbackSystemImage: nil,
+                            size: 34,
+                            chrome: .plain
+                        )
+                        .frame(width: 34, height: 34)
+                        .clipShape(Circle())
+                        .overlay {
+                            Circle().stroke(LocktyColors.background, lineWidth: 2)
+                        }
                     }
                 }
             }
         }
     }
-}
-
-private struct TokenTileLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(spacing: LocktySpacing.xs) {
-            configuration.icon
-                .font(.system(size: 22, weight: .semibold))
-                .frame(width: 34, height: 34)
-            configuration.title
-                .font(LocktyTypography.caption)
-                .foregroundStyle(LocktyColors.primaryText)
-                .lineLimit(1)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private extension LabelStyle where Self == TokenTileLabelStyle {
-    static var tokenTile: TokenTileLabelStyle { TokenTileLabelStyle() }
 }
 
 struct EditorTopBar: View {

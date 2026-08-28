@@ -252,13 +252,9 @@ struct PauseEditorView: View {
 
                 section(title: "Flow") {
                     VStack(spacing: LocktySpacing.md) {
-                        ForEach(Array(viewModel.steps.enumerated()), id: \.element.id) { index, step in
+                        ForEach(Array(viewModel.steps.enumerated()), id: \.element.id) { _, step in
                             PauseStepEditorCard(
-                                index: index + 1,
-                                total: viewModel.steps.count,
                                 step: binding(for: step.id),
-                                onMoveUp: { viewModel.moveStepUp(id: step.id) },
-                                onMoveDown: { viewModel.moveStepDown(id: step.id) },
                                 onRemove: { viewModel.removeStep(id: step.id) }
                             )
                         }
@@ -270,27 +266,47 @@ struct PauseEditorView: View {
                                 }
                             }
                         } label: {
-                            Text("Add step")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(LocktyColors.primaryText)
-                                .padding(.horizontal, 14)
-                                .frame(height: 36)
-                                .safeGlass(radius: 18, interactive: true)
-                                .allowsHitTesting(false)
+                            Text("New Step")
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.secondaryText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, LocktySpacing.md)
+                                .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
 
                 section(title: "Allowance") {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Text("Duration")
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.secondaryText)
+
+                        Text(LocktyDurationFormatter.abbreviated(TimeInterval(viewModel.allowanceMinutes * 60)))
+                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .contentTransition(.numericText())
+                            .animation(.snappy(duration: 0.2), value: viewModel.allowanceMinutes)
+
+                        DurationSlider(
+                            value: Binding(
+                                get: { Double(viewModel.allowanceMinutes) },
+                                set: { viewModel.allowanceMinutes = Int($0) }
+                            ),
+                            range: 1...60
+                        )
+                    }
+                    .padding(LocktySpacing.md)
+                    .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
+
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                            EditorStepperRow(title: "Allow for", suffix: "min", value: $viewModel.allowanceMinutes, range: 1...60)
-                            ToggleRow(
-                                title: "Relock after allowance",
-                                subtitle: "Re-apply shields automatically when time expires.",
-                                isOn: $viewModel.relockAfterAllowance
-                            )
-                        }
+                        ToggleRow(
+                            title: "Relock after allowance",
+                            subtitle: "Re-apply shields automatically when time expires.",
+                            isOn: $viewModel.relockAfterAllowance
+                        )
                     }
                 }
             }
@@ -362,9 +378,11 @@ struct PauseEditorView: View {
     @ViewBuilder
     private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text(title)
-                .font(LocktyTypography.title)
-                .foregroundStyle(LocktyColors.primaryText)
+            Rectangle()
+                .fill(LocktyColors.separator)
+                .frame(height: 0.5)
+            Text(title.uppercased())
+                .locktyEyebrow()
             content()
         }
     }
@@ -372,55 +390,35 @@ struct PauseEditorView: View {
     @ViewBuilder
     private func pauseHero(viewModel: PauseEditorViewModel) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text("App")
-                    .font(LocktyTypography.headline)
-                    .foregroundStyle(LocktyColors.primaryText)
+            VStack(spacing: LocktySpacing.sm) {
+                Text(viewModel.title)
+                    .font(.footnote)
+                    .foregroundStyle(LocktyColors.tertiaryText)
 
                 Button {
                     showAppPicker = true
                 } label: {
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md, interactive: true) {
-                        HStack(spacing: LocktySpacing.md) {
-                            if let token = viewModel.selectionPreview.applicationTokens.first {
-                                Label(token)
-                                    .labelStyle(.iconOnly)
-                                    .frame(width: 42, height: 42)
-                            }
-
-                            VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                                Text(viewModel.selectedAppSummary)
-                                    .font(LocktyTypography.body)
-                                    .foregroundStyle(LocktyColors.primaryText)
-                                Text("A Pause targets exactly one application.")
-                                    .font(LocktyTypography.caption)
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(LocktyColors.tertiaryText)
+                    Group {
+                        if let token = viewModel.selectionPreview.applicationTokens.first {
+                            Label(token)
+                                .labelStyle(.iconOnly)
+                        } else {
+                            Image(systemName: "app.badge")
+                                .font(.system(size: 22, weight: .light))
+                                .foregroundStyle(LocktyColors.primaryText)
                         }
                     }
+                    .frame(width: 50, height: 50)
+                    .safeGlass(radius: 12, interactive: true)
                 }
                 .buttonStyle(.plain)
                 .tappable()
-            }
 
-            if let token = viewModel.selectionPreview.applicationTokens.first {
-                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Text("Selected App")
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-
-                        Label(token)
-                            .labelStyle(PauseSelectionTokenLabelStyle())
-                    }
-                }
+                Text(viewModel.selectedAppSummary)
+                    .font(LocktyTypography.body)
+                    .foregroundStyle(LocktyColors.primaryText)
             }
+            .frame(maxWidth: .infinity)
 
             CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
                 ToggleRow(
@@ -461,96 +459,65 @@ struct PauseAppPickerSheet: View {
     }
 }
 
-private struct PauseSelectionTokenLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: LocktySpacing.md) {
-            configuration.icon
-                .frame(width: 42, height: 42)
-
-            configuration.title
-                .font(LocktyTypography.body)
-                .foregroundStyle(LocktyColors.primaryText)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-        }
-    }
-}
 
 private struct PauseStepEditorCard: View {
-    let index: Int
-    let total: Int
     @Binding var step: PauseStep
-    let onMoveUp: () -> Void
-    let onMoveDown: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
-        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                HStack(spacing: LocktySpacing.sm) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                        Text("\(index). \(step.title)")
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                        Text(step.detail)
-                            .font(LocktyTypography.caption)
-                            .foregroundStyle(LocktyColors.secondaryText)
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: LocktySpacing.xs) {
-                        IconButton(systemImage: "chevron.up", accessibilityLabel: "Move step up", action: onMoveUp)
-                            .opacity(index == 1 ? 0.35 : 1)
-                            .disabled(index == 1)
-                        IconButton(systemImage: "chevron.down", accessibilityLabel: "Move step down", action: onMoveDown)
-                            .opacity(index == total ? 0.35 : 1)
-                            .disabled(index == total)
-                        Button(role: .destructive, action: onRemove) {
-                            Image(systemName: "trash")
-                                .font(.system(size: 16, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                                .safeGlass(radius: 22, interactive: true, tint: LocktyColors.unproductive.opacity(0.14))
-                        }
-                        .buttonStyle(.plain)
-                    }
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            HStack {
+                Text(step.title)
+                    .font(LocktyTypography.callout)
+                    .foregroundStyle(LocktyColors.secondaryText)
+                Spacer()
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundStyle(LocktyColors.tertiaryText)
                 }
+                .buttonStyle(.plain)
+            }
 
-                switch step {
-                case .countdown(let configuration):
-                    EditorStepperRow(title: "Duration", suffix: "sec", value: binding(configuration: configuration).duration.intProxy, range: 1...60)
+            switch step {
+            case .countdown(let configuration):
+                Text("\(Int(configuration.duration)) s")
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentTransition(.numericText())
 
-                case .breathing(let configuration):
-                    EditorStepperRow(title: "Breaths", value: binding(configuration: configuration).breathCount, range: 1...10)
+                DurationSlider(value: binding(configuration: configuration).duration, range: 1...60)
 
-                case .intention(let configuration):
-                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                        TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .lineLimit(2...4)
+            case .breathing(let configuration):
+                Text("\(configuration.breathCount) breaths")
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentTransition(.numericText())
 
-                        ToggleRow(title: "Required", isOn: binding(configuration: configuration).isRequired)
+                DurationSlider(value: binding(configuration: configuration).breathCount.doubleProxy, range: 1...10)
 
-                        EditorStepperRow(
-                            title: "Minimum length",
-                            value: Binding(
-                                get: { binding(configuration: configuration).minimumLength.wrappedValue ?? 0 },
-                                set: { binding(configuration: configuration).minimumLength.wrappedValue = $0 == 0 ? nil : $0 }
-                            ),
-                            range: 0...100
-                        )
-                    }
-
-                case .confirmation(let configuration):
+            case .intention(let configuration):
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
                     TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
                         .font(LocktyTypography.body)
                         .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(2...3)
+                        .lineLimit(2...4)
+
+                    ToggleRow(title: "Required", isOn: binding(configuration: configuration).isRequired)
                 }
+
+            case .confirmation(let configuration):
+                TextField("Prompt", text: binding(configuration: configuration).prompt, axis: .vertical)
+                    .font(LocktyTypography.body)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2...3)
             }
         }
+        .padding(LocktySpacing.md)
+        .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
     }
 
     private func binding(configuration: CountdownConfiguration) -> Binding<CountdownConfiguration> {
@@ -595,11 +562,33 @@ private extension Binding where Value == CountdownConfiguration {
     }
 }
 
-private extension Binding where Value == TimeInterval {
-    var intProxy: Binding<Int> {
-        Binding<Int>(
-            get: { Int(wrappedValue) },
-            set: { wrappedValue = TimeInterval($0) }
+private extension Binding where Value == Int {
+    var doubleProxy: Binding<Double> {
+        Binding<Double>(
+            get: { Double(wrappedValue) },
+            set: { wrappedValue = Int($0) }
         )
+    }
+}
+
+/// A duration slider styled after the system HIG slider pattern, with a
+/// "slow"/"fast" (tortoise/hare) glyph at each end.
+private struct DurationSlider: View {
+    let value: Binding<Double>
+    let range: ClosedRange<Double>
+
+    var body: some View {
+        Slider(value: value, in: range) {
+            EmptyView()
+        } minimumValueLabel: {
+            Image(systemName: "tortoise.fill")
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(LocktyColors.tertiaryText)
+        } maximumValueLabel: {
+            Image(systemName: "hare.fill")
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(LocktyColors.tertiaryText)
+        }
+        .tint(LocktyColors.primaryText)
     }
 }

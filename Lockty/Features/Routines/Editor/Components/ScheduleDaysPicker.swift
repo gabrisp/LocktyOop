@@ -6,7 +6,7 @@ struct ScheduleDaysPicker: View {
     private let orderedWeekdays: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday]
 
     var body: some View {
-        HStack(spacing: LocktySpacing.sm) {
+        HStack(spacing: 0) {
             ForEach(orderedWeekdays) { weekday in
                 let isSelected = selectedWeekdays.contains(weekday)
                 Button {
@@ -17,16 +17,17 @@ struct ScheduleDaysPicker: View {
                     }
                 } label: {
                     Text(weekday.shortLabel)
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(isSelected ? Color.black : LocktyColors.primaryText)
-                        .frame(width: 36, height: 36)
+                        .font(LocktyTypography.callout)
+                        .foregroundStyle(isSelected ? Color.black : LocktyColors.secondaryText)
+                        .frame(width: 50, height: 50)
                         .background(
                             isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(LocktyColors.elevatedBackground),
-                            in: Circle()
+                            in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous)
                         )
                 }
                 .buttonStyle(.plain)
                 .tappable()
+                .frame(maxWidth: .infinity)
             }
         }
     }

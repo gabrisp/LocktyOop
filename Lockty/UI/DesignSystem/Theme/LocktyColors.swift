@@ -28,6 +28,7 @@ enum LocktyColors {
         light: UIColor.black.withAlphaComponent(0.10),
         dark: UIColor.white.withAlphaComponent(0.12)
     )
+    static let separator = Color(uiColor: .separator)
     static let primaryText = adaptive(light: .black, dark: .white)
     static let secondaryText = adaptive(
         light: UIColor.black.withAlphaComponent(0.60),

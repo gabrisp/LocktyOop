@@ -425,111 +425,78 @@ struct RoutineEditorView: View {
                 RoutineEditorHero(viewModel: viewModel)
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    HStack {
-                        Text("Restrictions")
-                            .font(LocktyTypography.title)
-                            .foregroundStyle(LocktyColors.primaryText)
-                        Spacer()
-                        Menu {
-                            Button {
-                                activeSheet = .apps
-                            } label: {
-                                Text("Apps")
-                            }
-                            Button {
-                                activeSheet = .domains
-                            } label: {
-                                Text("Websites")
-                            }
-                        } label: {
-                            Text("Add")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(LocktyColors.primaryText)
-                                .padding(.horizontal, 14)
-                                .frame(height: 36)
-                                .safeGlass(radius: 18, interactive: true)
-                        }
-                    }
+                    Rectangle()
+                        .fill(LocktyColors.separator)
+                        .frame(height: 0.5)
+                    Text("RESTRICTIONS")
+                        .locktyEyebrow()
 
-                    VStack(spacing: LocktySpacing.md) {
-                        if !viewModel.selectionPreview.applicationTokens.isEmpty {
-                            SelectionPreviewCard(
-                                title: viewModel.selectionPreview.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selectionPreview.applicationTokens.count) Apps",
-                                tokens: Array(viewModel.selectionPreview.applicationTokens)
-                            ) { token in
-                                Label(token)
-                                    .labelStyle(EditorTokenLabelStyle())
-                            }
+                    VStack(spacing: LocktySpacing.sm) {
+                        RestrictionRow(
+                            label: "Apps",
+                            summary: viewModel.selectionPreview.applicationTokens.isEmpty ? nil :
+                                (viewModel.selectionPreview.applicationTokens.count == 1 ? "1 App" : "\(viewModel.selectionPreview.applicationTokens.count) Apps")
+                        ) {
+                            activeSheet = .apps
                         }
 
-                        if !viewModel.selectionPreview.categoryTokens.isEmpty {
-                            SelectionPreviewCard(
-                                title: viewModel.selectionPreview.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selectionPreview.categoryTokens.count) Categories",
-                                tokens: Array(viewModel.selectionPreview.categoryTokens)
-                            ) { token in
-                                Label(token)
-                                    .labelStyle(EditorTokenLabelStyle())
-                            }
+                        RestrictionRow(
+                            label: "Categories",
+                            summary: viewModel.selectionPreview.categoryTokens.isEmpty ? nil :
+                                (viewModel.selectionPreview.categoryTokens.count == 1 ? "1 Category" : "\(viewModel.selectionPreview.categoryTokens.count) Categories")
+                        ) {
+                            activeSheet = .apps
                         }
 
-                        if !viewModel.blockedDomains.isEmpty {
-                            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                    Text(viewModel.blockedDomains.count == 1 ? "1 Website" : "\(viewModel.blockedDomains.count) Websites")
-                                        .font(LocktyTypography.headline)
-                                        .foregroundStyle(LocktyColors.primaryText)
-
-                                    DomainChipFlow(domains: viewModel.blockedDomains) { domain in
-                                        viewModel.removeDomain(domain)
-                                    }
-                                }
-                            }
+                        RestrictionRow(
+                            label: "Domains",
+                            summary: viewModel.blockedDomains.isEmpty ? nil :
+                                (viewModel.blockedDomains.count == 1 ? "1 Website" : "\(viewModel.blockedDomains.count) Websites")
+                        ) {
+                            activeSheet = .domains
                         }
                     }
                 }
 
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Schedule")
-                        .font(LocktyTypography.title)
-                        .foregroundStyle(LocktyColors.primaryText)
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    Rectangle()
+                        .fill(LocktyColors.separator)
+                        .frame(height: 0.5)
+                    Text("SCHEDULE")
+                        .locktyEyebrow()
 
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(spacing: LocktySpacing.md) {
-                            ScheduleDaysPicker(
-                                selectedWeekdays: Binding(
-                                    get: { viewModel.scheduleTrigger.weekdays },
-                                    set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
-                                )
-                            )
-                            .frame(maxWidth: .infinity, alignment: .center)
+                    ScheduleDaysPicker(
+                        selectedWeekdays: Binding(
+                            get: { viewModel.scheduleTrigger.weekdays },
+                            set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
+                        )
+                    )
 
-                            HStack(spacing: LocktySpacing.xl) {
-                                ScheduleTimeField(
-                                    label: "Start",
-                                    hour: viewModel.scheduleTrigger.hour,
-                                    minute: viewModel.scheduleTrigger.minute,
-                                    onChange: { hour, minute in
-                                        viewModel.updateSchedule {
-                                            $0.hour = hour
-                                            $0.minute = minute
-                                        }
-                                    }
-                                )
-                                ScheduleTimeField(
-                                    label: "End",
-                                    hour: viewModel.scheduleTrigger.endHour,
-                                    minute: viewModel.scheduleTrigger.endMinute,
-                                    onChange: { hour, minute in
-                                        viewModel.updateSchedule {
-                                            $0.endHour = hour
-                                            $0.endMinute = minute
-                                        }
-                                    }
-                                )
+                    HStack(spacing: LocktySpacing.xl) {
+                        ScheduleTimeField(
+                            label: "Start",
+                            hour: viewModel.scheduleTrigger.hour,
+                            minute: viewModel.scheduleTrigger.minute,
+                            onChange: { hour, minute in
+                                viewModel.updateSchedule {
+                                    $0.hour = hour
+                                    $0.minute = minute
+                                }
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
-                        }
+                        )
+                        ScheduleTimeField(
+                            label: "End",
+                            hour: viewModel.scheduleTrigger.endHour,
+                            minute: viewModel.scheduleTrigger.endMinute,
+                            onChange: { hour, minute in
+                                viewModel.updateSchedule {
+                                    $0.endHour = hour
+                                    $0.endMinute = minute
+                                }
+                            }
+                        )
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
 
 //                editorSection(title: "Checklist") {
@@ -788,43 +755,46 @@ private struct ScheduleTimeField: View {
     }
 }
 
-private struct SelectionPreviewCard<Token: Hashable, TokenView: View>: View {
-    let title: String
-    let tokens: [Token]
-    let tokenView: (Token) -> TokenView
+/// A flat, always-visible settings-style row (label, or its live summary once set).
+struct RestrictionRow: View {
+    let label: String
+    let summary: String?
+    var isInteractive: Bool = true
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                Text(title)
-                    .font(LocktyTypography.headline)
-                    .foregroundStyle(LocktyColors.primaryText)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: LocktySpacing.sm) {
-                        ForEach(tokens, id: \.self) { token in
-                            tokenView(token)
-                        }
-                    }
-                }
+        HStack {
+            Text(summary ?? label)
+                .font(LocktyTypography.callout)
+                .foregroundStyle(summary == nil ? LocktyColors.secondaryText : LocktyColors.primaryText)
+            Spacer()
+            if isInteractive {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundStyle(LocktyColors.tertiaryText)
             }
         }
-    }
-}
-
-private struct EditorTokenLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(spacing: LocktySpacing.sm) {
-            configuration.icon
-                .frame(width: 42, height: 42)
-
-            configuration.title
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(LocktyColors.secondaryText)
-                .lineLimit(1)
-                .frame(maxWidth: 82)
+        .padding(.horizontal, LocktySpacing.md)
+        .frame(height: 50)
+        .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isInteractive { action?() }
         }
-        .frame(width: 82, alignment: .center)
+    }
+
+    init(label: String, summary: String?, action: @escaping () -> Void) {
+        self.label = label
+        self.summary = summary
+        self.isInteractive = true
+        self.action = action
+    }
+
+    init(label: String, summary: String?) {
+        self.label = label
+        self.summary = summary
+        self.isInteractive = false
+        self.action = nil
     }
 }
 

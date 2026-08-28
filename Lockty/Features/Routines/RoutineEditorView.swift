@@ -684,7 +684,10 @@ private struct RoutineEditorHero: View {
                             .padding(.vertical, 12)
                     }
                 }
-                .frame(minWidth: 180, maxWidth: 320)
+                // No minimum width: the invisible sizing text above already makes the
+                // field hug its content, so a floor only forced it wider than the
+                // placeholder it's meant to match.
+                .frame(maxWidth: 320)
             }
             .frame(maxWidth: .infinity)
 

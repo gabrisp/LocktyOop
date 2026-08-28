@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     let container: AppContainer
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -31,6 +32,10 @@ struct RootView: View {
         .locktyScreenBackground()
         .task {
             await container.startupCoordinator.startIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task { await container.startupCoordinator.handleForeground() }
         }
     }
 }

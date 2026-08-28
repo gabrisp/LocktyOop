@@ -37,8 +37,11 @@ struct TodayView: View {
         (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
     }
 
+    /// Shrinks away as the header collapses. This used to lerp and was flattened to a
+    /// constant when the date-slider spacing was removed, which left the collapsed
+    /// header sitting lower than it should.
     private var headerTopInset: CGFloat {
-        LocktySpacing.sm
+        MetricsHeaderGeometry.lerp(LocktySpacing.sm, 0, progress: dateSliderHideProgress)
     }
 
     var body: some View {

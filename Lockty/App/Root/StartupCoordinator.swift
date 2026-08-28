@@ -51,6 +51,25 @@ final class StartupCoordinator {
         }
     }
 
+    /// Re-checks for a pause requested while the app was backgrounded (the shield's
+    /// secondary button writes one, then a notification brings the user back here).
+    /// startIfNeeded() is one-shot, so it can't cover this.
+    func handleForeground() async {
+        guard hasStarted else {
+            await startIfNeeded()
+            return
+        }
+
+        guard let runtimeState = try? appGroupStore.loadRuntimeState() else { return }
+        await pauseEngine.restore(from: runtimeState)
+
+        if let pendingPause = runtimeState.pendingPause, pendingPause.isValid {
+            router.presentFullScreen(.pause(pendingPause.context))
+        }
+
+        consumePendingEvents(from: runtimeState)
+    }
+
     private func reconcileRuntimeState(_ runtimeState: RuntimeState) async throws {
         if runtimeState.shieldPolicy != .empty || runtimeState.recoveryFlags.contains(.shieldRestoreNeeded) {
             try await shieldService.restoreFromRuntimeState()

@@ -1,5 +1,6 @@
 import Foundation
 import ManagedSettings
+import UserNotifications
 
 final class ShieldActionExtension: ShieldActionDelegate {
     private let appGroupStore = AppGroupStore()
@@ -44,6 +45,12 @@ final class ShieldActionExtension: ShieldActionDelegate {
                 return
             }
             writePendingPause(snapshot: snapshot)
+            // A shield action extension can't bring the app forward itself, and a Live
+            // Activity can't be started from an extension either (ActivityKit needs the
+            // app foregrounded or a push). A local notification is the one route that
+            // works: tapping it opens Lockty, where the pending pause written above is
+            // picked up and the flow runs.
+            postPauseNotification(snapshot: snapshot)
             completionHandler(.defer)
 
         default:
@@ -57,6 +64,22 @@ final class ShieldActionExtension: ShieldActionDelegate {
         }
 
         return appGroupStore.loadPauseRuleSnapshots().first(where: { $0.id == ruleID && $0.isEnabled })
+    }
+
+    private func postPauseNotification(snapshot: PauseRuleSnapshot) {
+        let content = UNMutableNotificationContent()
+        content.title = "Open \(snapshot.application.displayName) mindfully"
+        content.body = "Tap to continue in Lockty."
+        content.sound = .default
+        content.userInfo = ["pauseRuleID": snapshot.id.uuidString]
+
+        // nil trigger delivers as soon as the system allows, rather than on a timer.
+        let request = UNNotificationRequest(
+            identifier: "pause-request-\(snapshot.id.uuidString)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func writePendingPause(snapshot: PauseRuleSnapshot) {

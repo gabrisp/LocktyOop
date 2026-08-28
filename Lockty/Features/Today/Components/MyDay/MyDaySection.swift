@@ -56,7 +56,7 @@ struct MyDaySection: View {
 
                                         Spacer(minLength: LocktySpacing.sm)
 
-                                        Text(LocktyDurationFormatter.abbreviated(activity.duration))
+                                        Text(durationText(for: activity))
                                             .font(LocktyTypography.caption)
                                             .monospacedDigit()
                                             .foregroundStyle(LocktyColors.secondaryText)
@@ -75,6 +75,12 @@ struct MyDaySection: View {
                 }
             }
         }
+    }
+
+    /// An activity still running shows NOW rather than a duration that would read 0m
+    /// for something that just started.
+    private func durationText(for activity: DigitalActivity) -> String {
+        activity.endDate > Date() ? "NOW" : LocktyDurationFormatter.abbreviated(activity.duration)
     }
 
     private func detail(for activity: DigitalActivity) -> String {

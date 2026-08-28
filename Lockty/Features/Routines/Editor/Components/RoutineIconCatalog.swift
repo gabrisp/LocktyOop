@@ -1,6 +1,6 @@
 import Foundation
 
-enum RoutineIconColorCatalog {
+enum RoutineIconCatalog {
     static let icons: [String] = [
         "house.fill",
         "bolt.fill",
@@ -52,14 +52,5 @@ enum RoutineIconColorCatalog {
         "drop.fill",
         "flag.fill",
         "gift.fill"
-    ]
-
-    // Matches LocktyAccent (ThemeManager.swift) exactly -- the app's accent is
-    // always one of white/blue/pink, so the routine color picker offers the
-    // same three instead of an unrelated palette.
-    static let colors: [String] = [
-        "#FFFFFF",
-        "#5C9EFF",
-        "#FF63AB"
     ]
 }

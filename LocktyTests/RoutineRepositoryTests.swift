@@ -18,7 +18,6 @@ struct RoutineRepositoryTests {
         let routine = Routine(
             name: "Deep Work",
             icon: "brain.head.profile",
-            colorHex: "#FF3B30",
             mode: .strict,
             triggers: [.manual, .schedule(RoutineSchedule(hour: 9, minute: 0, weekdays: [.monday, .wednesday]))],
             blockedApplications: ["instagram", "youtube"],
@@ -37,7 +36,6 @@ struct RoutineRepositoryTests {
         let saved = try #require(fetched.first)
         #expect(saved.id == routine.id)
         #expect(saved.name == "Deep Work")
-        #expect(saved.colorHex == "#FF3B30")
         #expect(saved.tasks.count == 2)
         #expect(saved.tasks.map(\.title) == ["Read", "Journal"])
         #expect(saved.triggers.count == 2)

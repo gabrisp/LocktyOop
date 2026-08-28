@@ -29,7 +29,6 @@ struct RoutineMapper {
         entity.id = routine.id
         entity.name = routine.name
         entity.icon = routine.icon
-        entity.colorHex = routine.colorHex
         entity.modeRawValue = routine.mode.rawValue
         entity.allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         entity.createdAt = routine.createdAt
@@ -111,7 +110,6 @@ struct RoutineMapper {
                 id: entity.id,
                 name: entity.name,
                 icon: entity.icon,
-                colorHex: entity.colorHex,
                 mode: mode,
                 triggers: triggers.isEmpty ? [.manual] : triggers,
                 blockedApplications: try decoder.decode(Set<AppIdentity.ID>.self, from: entity.blockedApplicationIDsData),

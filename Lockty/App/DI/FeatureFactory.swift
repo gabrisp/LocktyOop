@@ -84,13 +84,6 @@ struct FeatureFactory {
     }
 
     @ViewBuilder
-    func makeRoutineColorPickerSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
-            RoutineColorPickerSheet(selectedColorHex: Bindable(viewModel).colorHex)
-        }
-    }
-
-    @ViewBuilder
     func makeRoutineAppPickerSheet(draftID: UUID) -> some View {
         if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
             RoutineAppPickerSheet(viewModel: viewModel)

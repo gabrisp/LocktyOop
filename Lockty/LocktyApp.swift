@@ -14,7 +14,6 @@ struct LocktyApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(container: container)
-                .preferredColorScheme(.dark)
                 .tint(container.theme.accent.color)
         }
     }

@@ -6,7 +6,6 @@ final class RoutineEntity: NSManagedObject {
     @NSManaged var id: UUID
     @NSManaged var name: String
     @NSManaged var icon: String?
-    @NSManaged var colorHex: String?
     @NSManaged var modeRawValue: String
     @NSManaged var allowsPauseDuringStrictMode: Bool
     @NSManaged var createdAt: Date

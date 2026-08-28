@@ -10,7 +10,7 @@ struct RoutineIconPickerSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
-                    ForEach(RoutineIconColorCatalog.icons, id: \.self) { iconName in
+                    ForEach(RoutineIconCatalog.icons, id: \.self) { iconName in
                         let isSelected = iconName == selectedIcon
                         Button {
                             selectedIcon = iconName

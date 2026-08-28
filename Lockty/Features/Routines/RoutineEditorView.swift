@@ -24,7 +24,6 @@ final class RoutineEditorViewModel {
 
     var name = ""
     var icon = ""
-    var colorHex: String = RoutineIconColorCatalog.colors.first ?? "#0A84FF"
     var mode: RoutineMode = .normal
     var allowsPauseDuringStrictMode = true
     var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
@@ -177,7 +176,6 @@ final class RoutineEditorViewModel {
         createdAt = routine.createdAt
         name = routine.name
         icon = routine.icon ?? ""
-        colorHex = routine.colorHex ?? colorHex
         mode = routine.mode
         triggers = routine.triggers.isEmpty ? [.manual] : routine.triggers
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
@@ -271,7 +269,6 @@ final class RoutineEditorViewModel {
             id: editingID,
             name: trimmedName,
             icon: icon.isEmpty ? nil : icon,
-            colorHex: colorHex,
             mode: mode,
             triggers: triggers,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
@@ -586,7 +583,6 @@ struct RoutineEditorView: View {
                 }
             )
         }
-        .tint(Color(hex: viewModel.colorHex))
         .task {
             await viewModel.load()
             await viewModel.loadMostUsedApplications()
@@ -656,26 +652,6 @@ private struct RoutineEditorHero: View {
                                 .frame(width: 24, height: 24)
                                 .frame(width: 48, height: 48)
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .tappable()
-                }
-                .frame(width: 72, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("Color")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    Button {
-                        router.presentSheet(.routineColorPicker(viewModel.draftID))
-                    } label: {
-                        Circle()
-                            .fill(Color(hex: viewModel.colorHex))
-                            .frame(width: 48, height: 48)
-                            .overlay {
-                                Circle().stroke(LocktyColors.cardStroke, lineWidth: 0.5)
-                            }
                     }
                     .buttonStyle(.plain)
                     .tappable()

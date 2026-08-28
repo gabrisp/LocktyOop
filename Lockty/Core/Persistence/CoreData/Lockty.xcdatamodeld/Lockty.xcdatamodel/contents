@@ -5,7 +5,6 @@
         <attribute name="blockedApplicationIDsData" attributeType="Binary"/>
         <attribute name="blockedDomainsData" attributeType="Binary"/>
         <attribute name="breakPolicyData" attributeType="Binary"/>
-        <attribute name="colorHex" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="familyActivitySelectionData" optional="YES" attributeType="Binary"/>
         <attribute name="icon" optional="YES" attributeType="String"/>

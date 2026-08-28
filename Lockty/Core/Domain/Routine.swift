@@ -4,7 +4,6 @@ struct Routine: Codable, Hashable, Identifiable {
     let id: UUID
     var name: String
     var icon: String?
-    var colorHex: String?
     var mode: RoutineMode
     var triggers: [RoutineTrigger]
     var blockedApplications: Set<AppIdentity.ID>
@@ -19,7 +18,6 @@ struct Routine: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         name: String,
         icon: String? = nil,
-        colorHex: String? = nil,
         mode: RoutineMode,
         triggers: [RoutineTrigger],
         blockedApplications: Set<AppIdentity.ID>,
@@ -33,7 +31,6 @@ struct Routine: Codable, Hashable, Identifiable {
         self.id = id
         self.name = name
         self.icon = icon
-        self.colorHex = colorHex
         self.mode = mode
         self.triggers = triggers
         self.blockedApplications = blockedApplications

@@ -361,14 +361,25 @@ struct RoutineAppPickerSheet: View {
                 onConfirm: { dismiss() }
             )
 
-            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                    Text("Choose the applications this routine will restrict.")
-                        .font(LocktyTypography.callout)
-                        .foregroundStyle(LocktyColors.secondaryText)
-                    Text("Selection is saved instantly.")
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.tertiaryText)
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+                        Text("Choose the applications this routine will restrict.")
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                        Text("Selection is saved instantly.")
+                            .font(LocktyTypography.caption)
+                            .foregroundStyle(LocktyColors.tertiaryText)
+                    }
+                }
+
+                if !viewModel.mostUsedApplications.isEmpty {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Text("Recommended Restrictions")
+                            .font(LocktyTypography.headline)
+                            .foregroundStyle(LocktyColors.primaryText)
+                        RoutineAppsMostUsedSection(viewModel: viewModel)
+                    }
                 }
             }
 
@@ -383,6 +394,9 @@ struct RoutineAppPickerSheet: View {
         .padding(.horizontal, LocktySpacing.md)
         .padding(.top, LocktySpacing.sm)
         .padding(.bottom, LocktySpacing.md)
+        .task {
+            await viewModel.loadMostUsedApplications()
+        }
         .locktyScreenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
     }
@@ -420,66 +434,44 @@ struct RoutineEditorView: View {
 
                 RoutineEditorHero(viewModel: viewModel, router: router)
 
-                editorSection(title: "Triggers") {
-                    Button {
-                        router.presentSheet(.routineTriggers(viewModel.draftID))
-                    } label: {
-                        EditorActionCard(
-                            title: "Triggers",
-                            value: viewModel.triggersSummary,
-                            systemImage: "bolt.badge.clock"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .tappable()
-                }
-
-                editorSection(title: "Restrictions") {
-                    VStack(spacing: LocktySpacing.md) {
-                        RoutineAppsMostUsedSection(viewModel: viewModel)
-
-                        Button {
-                            router.presentSheet(.routineAppPicker(viewModel.draftID))
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    HStack {
+                        Text("Restrictions")
+                            .font(LocktyTypography.title)
+                            .foregroundStyle(LocktyColors.primaryText)
+                        Spacer()
+                        Menu {
+                            Button {
+                                router.presentSheet(.routineAppPicker(viewModel.draftID))
+                            } label: {
+                                Label("Apps", systemImage: "app.badge.checkmark")
+                            }
+                            Button {
+                                router.presentSheet(.routineDomains(viewModel.draftID))
+                            } label: {
+                                Label("Websites", systemImage: "globe")
+                            }
                         } label: {
-                            EditorActionCard(
-                                title: "Blocked apps",
-                                value: viewModel.appRestrictionSummary,
-                                systemImage: "app.badge.checkmark"
-                            )
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .frame(width: 32, height: 32)
+                                .safeGlass(radius: 16, interactive: true)
                         }
-                        .buttonStyle(.plain)
-                        .tappable()
+                    }
 
+                    VStack(spacing: LocktySpacing.md) {
                         if !viewModel.selectionPreview.applicationTokens.isEmpty {
                             SelectionPreviewCard(selection: viewModel.selectionPreview)
                         }
 
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                                HStack {
-                                    Text("Websites")
+                        if !viewModel.blockedDomains.isEmpty {
+                            CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                                    Text("Websites (\(viewModel.blockedDomains.count))")
                                         .font(LocktyTypography.headline)
                                         .foregroundStyle(LocktyColors.primaryText)
-                                    Spacer()
-                                    Text(viewModel.webRestrictionSummary)
-                                        .font(LocktyTypography.caption)
-                                        .foregroundStyle(LocktyColors.secondaryText)
-                                }
 
-                                HStack(spacing: LocktySpacing.sm) {
-                                    TextField("google.com", text: $viewModel.pendingDomain)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .font(LocktyTypography.body)
-                                        .foregroundStyle(LocktyColors.primaryText)
-
-                                    Button("Add") {
-                                        viewModel.addDomain()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                }
-
-                                if !viewModel.blockedDomains.isEmpty {
                                     DomainChipFlow(domains: viewModel.blockedDomains) { domain in
                                         viewModel.removeDomain(domain)
                                     }
@@ -489,33 +481,90 @@ struct RoutineEditorView: View {
                     }
                 }
 
-                editorSection(title: "Checklist") {
-                    VStack(spacing: LocktySpacing.md) {
-                        ForEach($viewModel.tasks) { $task in
-                            RoutineTaskEditorCard(
-                                task: $task,
-                                onRemove: { viewModel.removeTask(id: task.id) }
-                            )
-                        }
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    Text("Triggers")
+                        .font(LocktyTypography.title)
+                        .foregroundStyle(LocktyColors.primaryText)
 
-                        SecondaryButton("Add task", systemImage: "plus") {
-                            viewModel.addTask()
-                        }
-                    }
-                }
-
-                editorSection(title: "Breaks") {
                     CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                            EditorStepperRow(title: "Maximum breaks", value: $viewModel.maximumBreaks, range: 0...5)
-                            EditorStepperRow(title: "Break duration", suffix: "min", value: $viewModel.maximumBreakMinutes, range: 1...60, isDisabled: viewModel.maximumBreaks == 0)
-                            EditorStepperRow(title: "Minimum interval", suffix: "min", value: $viewModel.minimumBreakIntervalMinutes, range: 1...240, isDisabled: viewModel.maximumBreaks == 0)
-                            ToggleRow(title: "Manual break", isOn: $viewModel.breakTriggerManual, isDisabled: viewModel.maximumBreaks == 0)
-                            ToggleRow(title: "NFC break", isOn: $viewModel.breakTriggerNFC, isDisabled: viewModel.maximumBreaks == 0)
-                            ToggleRow(title: "Location break", isOn: $viewModel.breakTriggerLocation, isDisabled: viewModel.maximumBreaks == 0)
+                        VStack(spacing: LocktySpacing.md) {
+                            ToggleRow(
+                                title: "Schedule",
+                                subtitle: viewModel.isScheduleEnabled ? "Starts automatically on selected days." : "Manual start only.",
+                                isOn: Binding(
+                                    get: { viewModel.isScheduleEnabled },
+                                    set: { viewModel.setScheduleEnabled($0) }
+                                )
+                            )
+
+                            if let schedule = viewModel.scheduleTrigger {
+                                VStack(spacing: LocktySpacing.md) {
+                                    ScheduleDaysPicker(
+                                        selectedWeekdays: Binding(
+                                            get: { schedule.weekdays },
+                                            set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
+                                        )
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: .center)
+
+                                    HStack(spacing: LocktySpacing.md) {
+                                        Picker("Hour", selection: Binding(
+                                            get: { schedule.hour },
+                                            set: { newValue in viewModel.updateSchedule { $0.hour = newValue } }
+                                        )) {
+                                            ForEach(0..<24, id: \.self) { hour in
+                                                Text(String(format: "%02d", hour)).tag(hour)
+                                            }
+                                        }
+                                        .pickerStyle(.wheel)
+                                        .frame(maxWidth: .infinity)
+
+                                        Picker("Minute", selection: Binding(
+                                            get: { schedule.minute },
+                                            set: { newValue in viewModel.updateSchedule { $0.minute = newValue } }
+                                        )) {
+                                            ForEach([0, 15, 30, 45], id: \.self) { minute in
+                                                Text(String(format: "%02d", minute)).tag(minute)
+                                            }
+                                        }
+                                        .pickerStyle(.wheel)
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .frame(height: 120)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .center)
+                            }
                         }
                     }
                 }
+
+//                editorSection(title: "Checklist") {
+//                    VStack(spacing: LocktySpacing.md) {
+//                        ForEach($viewModel.tasks) { $task in
+//                            RoutineTaskEditorCard(
+//                                task: $task,
+//                                onRemove: { viewModel.removeTask(id: task.id) }
+//                            )
+//                        }
+//
+//                        SecondaryButton("Add task", systemImage: "plus") {
+//                            viewModel.addTask()
+//                        }
+//                    }
+//                }
+//
+//                editorSection(title: "Breaks") {
+//                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+//                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+//                            EditorStepperRow(title: "Maximum breaks", value: $viewModel.maximumBreaks, range: 0...5)
+//                            EditorStepperRow(title: "Break duration", suffix: "min", value: $viewModel.maximumBreakMinutes, range: 1...60, isDisabled: viewModel.maximumBreaks == 0)
+//                            EditorStepperRow(title: "Minimum interval", suffix: "min", value: $viewModel.minimumBreakIntervalMinutes, range: 1...240, isDisabled: viewModel.maximumBreaks == 0)
+//                            ToggleRow(title: "Manual break", isOn: $viewModel.breakTriggerManual, isDisabled: viewModel.maximumBreaks == 0)
+//                            ToggleRow(title: "NFC break", isOn: $viewModel.breakTriggerNFC, isDisabled: viewModel.maximumBreaks == 0)
+//                            ToggleRow(title: "Location break", isOn: $viewModel.breakTriggerLocation, isDisabled: viewModel.maximumBreaks == 0)
+//                        }
+//                    }
+//                }
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
@@ -645,12 +694,12 @@ private struct RoutineEditorHero: View {
                 }
                 .pickerStyle(.segmented)
 
-                ToggleRow(
-                    title: "Allow Pause during Strict Mode",
-                    subtitle: "Pause stays available only if this is enabled.",
-                    isOn: $viewModel.allowsPauseDuringStrictMode,
-                    isDisabled: viewModel.mode == .normal
-                )
+//                ToggleRow(
+//                    title: "Allow Pause during Strict Mode",
+//                    subtitle: "Pause stays available only if this is enabled.",
+//                    isOn: $viewModel.allowsPauseDuringStrictMode,
+//                    isDisabled: viewModel.mode == .normal
+//                )
 
                 HStack(spacing: LocktySpacing.sm) {
                     BadgeView(
@@ -730,18 +779,11 @@ struct EditorTopBar: View {
                 .font(LocktyTypography.headline)
                 .foregroundStyle(LocktyColors.primaryText)
             Spacer()
-            Button(confirmTitle, action: onConfirm)
-                .font(LocktyTypography.headline)
-                .foregroundStyle(.black)
-                .padding(.horizontal, LocktySpacing.md)
-                .frame(height: 44)
-                .background(.tint, in: Capsule())
-                .tappable()
+            IconButton(systemImage: "checkmark", accessibilityLabel: confirmTitle, action: onConfirm)
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.top, LocktySpacing.xs)
         .padding(.bottom, LocktySpacing.sm)
-        .background(LocktyColors.secondaryDarkModeBg.opacity(0.94))
     }
 }
 
@@ -777,7 +819,7 @@ private struct EditorActionCard: View {
     }
 }
 
-private struct DomainChipFlow: View {
+struct DomainChipFlow: View {
     let domains: [String]
     let onRemove: (String) -> Void
 

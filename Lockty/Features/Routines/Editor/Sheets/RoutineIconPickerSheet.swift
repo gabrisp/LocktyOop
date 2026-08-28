@@ -4,7 +4,7 @@ struct RoutineIconPickerSheet: View {
     @Binding var selectedIcon: String
     @Environment(\.dismiss) private var dismiss
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: LocktySpacing.md), count: 4)
+    private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
         NavigationStack {
@@ -40,6 +40,6 @@ struct RoutineIconPickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 }

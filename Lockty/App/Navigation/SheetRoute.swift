@@ -8,9 +8,9 @@ enum SheetRoute: Hashable, Identifiable {
     case systemAccess
     case routineIconPicker(UUID)
     case routineColorPicker(UUID)
-    case routineTriggers(UUID)
     case routineAppPicker(UUID)
     case pauseAppPicker(UUID)
+    case routineDomains(UUID)
 
     var id: String {
         switch self {
@@ -21,9 +21,9 @@ enum SheetRoute: Hashable, Identifiable {
         case .systemAccess: "system-access"
         case .routineIconPicker(let draftID): "routine-icon-picker-\(draftID.uuidString)"
         case .routineColorPicker(let draftID): "routine-color-picker-\(draftID.uuidString)"
-        case .routineTriggers(let draftID): "routine-triggers-\(draftID.uuidString)"
         case .routineAppPicker(let draftID): "routine-app-picker-\(draftID.uuidString)"
         case .pauseAppPicker(let draftID): "pause-app-picker-\(draftID.uuidString)"
+        case .routineDomains(let draftID): "routine-domains-\(draftID.uuidString)"
         }
     }
 }

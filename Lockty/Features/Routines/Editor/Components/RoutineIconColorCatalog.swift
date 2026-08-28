@@ -54,30 +54,12 @@ enum RoutineIconColorCatalog {
         "gift.fill"
     ]
 
+    // Matches LocktyAccent (ThemeManager.swift) exactly -- the app's accent is
+    // always one of white/blue/pink, so the routine color picker offers the
+    // same three instead of an unrelated palette.
     static let colors: [String] = [
-        // Neutrals
-        "#8E8E93",
-        "#636366",
-        "#48484A",
-        "#3A3A3C",
-        "#2C2C2E",
-        "#1C1C1E",
-        "#AEAEB2",
-        "#C7C7CC",
-        // Accents
-        "#FF3B30",
-        "#FF9500",
-        "#FFCC00",
-        "#34C759",
-        "#00C7BE",
-        "#30B0C7",
-        "#32ADE6",
-        "#007AFF",
-        "#0A84FF",
-        "#5856D6",
-        "#5E5CE6",
-        "#AF52DE",
-        "#BF5AF2",
-        "#FF2D55"
+        "#FFFFFF",
+        "#5C9EFF",
+        "#FF63AB"
     ]
 }

@@ -91,13 +91,6 @@ struct FeatureFactory {
     }
 
     @ViewBuilder
-    func makeRoutineTriggersSheet(draftID: UUID) -> some View {
-        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
-            RoutineTriggersSheet(viewModel: viewModel)
-        }
-    }
-
-    @ViewBuilder
     func makeRoutineAppPickerSheet(draftID: UUID) -> some View {
         if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
             RoutineAppPickerSheet(viewModel: viewModel)
@@ -108,6 +101,13 @@ struct FeatureFactory {
     func makePauseAppPickerSheet(draftID: UUID) -> some View {
         if let viewModel = editorStore.existingPauseEditor(draftID: draftID) {
             PauseAppPickerSheet(viewModel: viewModel)
+        }
+    }
+
+    @ViewBuilder
+    func makeRoutineDomainsSheet(draftID: UUID) -> some View {
+        if let viewModel = editorStore.existingRoutineEditor(draftID: draftID) {
+            RoutineDomainsSheet(viewModel: viewModel)
         }
     }
 

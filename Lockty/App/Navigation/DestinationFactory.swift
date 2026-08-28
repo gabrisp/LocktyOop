@@ -80,14 +80,14 @@ struct DestinationFactory {
         case .routineColorPicker(let draftID):
             featureFactory.makeRoutineColorPickerSheet(draftID: draftID)
 
-        case .routineTriggers(let draftID):
-            featureFactory.makeRoutineTriggersSheet(draftID: draftID)
-
         case .routineAppPicker(let draftID):
             featureFactory.makeRoutineAppPickerSheet(draftID: draftID)
 
         case .pauseAppPicker(let draftID):
             featureFactory.makePauseAppPickerSheet(draftID: draftID)
+
+        case .routineDomains(let draftID):
+            featureFactory.makeRoutineDomainsSheet(draftID: draftID)
         }
     }
 

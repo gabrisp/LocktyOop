@@ -32,6 +32,19 @@ private struct RuntimeRepairCoordinator {
             endScheduledRoutine(activityName: activity.rawValue)
             return
         }
+
+        // An allowance's window is scheduled to end on its expiry, so this is the moment
+        // it runs out -- not a moment to go and check whether it has. Asking isExpired
+        // here missed the ones the system delivered a second early, and then nothing
+        // relocked until something else noticed.
+        if activity.rawValue.hasPrefix("lockty.pause.") {
+            try? store.updateRuntimeState { state in
+                state.activePauseAllowance = nil
+                state.pendingPause = nil
+            }
+            PauseAllowanceLiveActivityTermination.endAllDetached()
+        }
+
         repairRuntimeState(activityName: activity.rawValue)
     }
 

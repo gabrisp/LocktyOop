@@ -48,20 +48,23 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
         )
 
         let calendar = Calendar.current
-        // A minute before the allowance began, so now is unambiguously inside the window
-        // and the system starts counting immediately. An interval starting on the current
-        // second is a coin flip: miss it and monitoring does not begin until that time
-        // comes round again, which is a day late.
+        // The window *ends* on the allowance's expiry, so intervalDidEnd fires there --
+        // on the wall clock, with the app not running. That is the only exact moment
+        // this API offers, and it is the one the countdown on screen is showing.
+        //
+        // The fifteen-minute floor is on the interval's length, not on how soon it ends,
+        // so the start is simply put far enough back to clear it. For any allowance
+        // shorter than that the start lands earlier today, which means the window is
+        // already open and monitoring begins immediately.
+        //
+        // It used to run a whole day forward from the allowance's start and lean on the
+        // usage threshold alone, which fires only once the granted minutes have actually
+        // been spent in those apps and is delivered with slack -- so the countdown hit
+        // 0:00 and everything stayed unlocked until the system got round to it.
+        let end = calendar.dateComponents([.hour, .minute, .second], from: allowance.expiresAt)
         let start = calendar.dateComponents(
             [.hour, .minute, .second],
-            from: allowance.startedAt.addingTimeInterval(-60)
-        )
-        // A whole day rather than the allowance's own length: the interval only has to
-        // be open while the threshold is being counted, and anything near the allowance
-        // itself falls under the fifteen-minute floor.
-        let end = calendar.dateComponents(
-            [.hour, .minute, .second],
-            from: allowance.startedAt.addingTimeInterval(23 * 3600)
+            from: allowance.expiresAt.addingTimeInterval(-16 * 60)
         )
 
         try center.startMonitoring(

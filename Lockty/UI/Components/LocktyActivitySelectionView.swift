@@ -127,10 +127,10 @@ struct LocktyActivitySelectionView: View {
     }
 
     var body: some View {
+        // No background of its own. It is shown inside whatever is presenting it -- a
+        // sheet with its own -- and painting black over that made it a black panel
+        // rather than a screen in that sheet.
         ZStack {
-            Color.black
-                .ignoresSafeArea()
-
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: LocktySpacing.xl) {
                     // No top bar of its own. This is pushed inside a navigation stack

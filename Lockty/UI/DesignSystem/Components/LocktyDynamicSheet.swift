@@ -182,6 +182,9 @@ extension View {
     }
 }
 
+/// The bar's height: 16 above the buttons, a 44pt button, 4 below.
+private let locktyDynamicSheetBarHeight: CGFloat = 64
+
 /// A sheet that is exactly as tall as what is in it.
 ///
 /// It measures and nothing else. Swapping between screens, and the transition that goes
@@ -213,6 +216,11 @@ struct LocktyDynamicSheet<Content: View>: View {
                 if let chrome = chromeController.configuration {
                     LocktyDynamicSheetChromeOverlay(configuration: chrome)
                         .transition(.blurReplace.combined(with: .opacity))
+                        // The inset reserves exactly what the bar draws. Without a fixed
+                        // height it reserved the buttons' 44 and the bar kept its own
+                        // padding on top, so the two disagreed by the padding and the bar
+                        // sat that much too high.
+                        .frame(height: locktyDynamicSheetBarHeight)
                 }
             }
             /// As this will fix the size of the view in the vertical direction!

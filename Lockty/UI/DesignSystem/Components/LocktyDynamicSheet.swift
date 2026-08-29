@@ -171,10 +171,17 @@ struct LocktyDynamicSheet<Content: View>: View {
     /// The height the sheet had before a screen took it to a size of its own.
     @State private var heightBeforeExplicitSize: CGFloat?
 
+    /// 16 above the buttons, a 44pt button, 4 below.
+    private static let barHeight: CGFloat = 64
+
     var body: some View {
         ZStack(alignment: .top) {
             content
-                .padding(.top, chromeController.configuration == nil ? 0 : 66)
+                // safeAreaPadding, not padding: on a scrolling screen this becomes a
+                // content inset, so the list starts below the bar but travels under it
+                // instead of being cut off at it. Plain padding shortened the view and
+                // the content stopped dead at the bar's edge.
+                .safeAreaPadding(.top, chromeController.configuration == nil ? 0 : Self.barHeight)
                 .environment(\.locktyDynamicSheetChromeController, chromeController)
                 // On the content, inside the stack: applied outside it these take in the
                 // bar overlay too, and the bar sits on top of the content rather than

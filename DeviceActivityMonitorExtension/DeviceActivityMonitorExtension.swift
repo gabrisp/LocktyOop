@@ -1,4 +1,5 @@
 import DeviceActivity
+import FamilyControls
 import Foundation
 import ManagedSettings
 
@@ -79,8 +80,18 @@ private struct RuntimeRepairCoordinator {
     }
 
     private func apply(policy: ShieldPolicy) {
-        let selection = selectionStore.mergedSelection(for: policy)
+        let selection = (try? selectionStore.selection(for: policy)) ?? FamilyActivitySelection()
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
+
+        print(
+            """
+            Monitor extension applying policy reason=\(String(describing: policy.reason)) \
+            apps=\(selection.applicationTokens.count) \
+            categories=\(selection.categoryTokens.count) \
+            domains=\(selection.webDomainTokens.count) \
+            manualDomains=\(blockedDomains.count)
+            """
+        )
 
         managedSettingsStore.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
         managedSettingsStore.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens

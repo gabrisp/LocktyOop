@@ -317,10 +317,12 @@ private struct LocktyDynamicSheetChromeOverlay: View {
 
     var body: some View {
         // 16 top and sides, the same gutter the content below it uses, so the buttons
-        // line up with what they sit above.
+        // line up with what they sit above. Only 4 underneath: the bar sits close to the
+        // content it belongs to, not spaced off it.
         chromeContent
             .padding(.top, LocktySpacing.lg)
             .padding(.horizontal, LocktySpacing.lg)
+            .padding(.bottom, LocktySpacing.xs)
     }
 
     @ViewBuilder

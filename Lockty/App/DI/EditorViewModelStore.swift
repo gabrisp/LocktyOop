@@ -10,7 +10,8 @@ final class EditorViewModelStore {
         repository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
-        usageDataService: UsageDataServicing
+        usageDataService: UsageDataServicing,
+        pauseFlowRepository: PauseFlowRepository
     ) -> RoutineEditorViewModel {
         if let existing = routineEditors[route.draftID] {
             return existing
@@ -22,7 +23,8 @@ final class EditorViewModelStore {
             repository: repository,
             selectionStore: selectionStore,
             routineEngine: routineEngine,
-            usageDataService: usageDataService
+            usageDataService: usageDataService,
+            pauseFlowRepository: pauseFlowRepository
         )
         routineEditors[route.draftID] = created
         return created

@@ -5,6 +5,9 @@ struct FocusView: View {
     let routinesViewModel: RoutinesViewModel
     let pausesViewModel: PausesViewModel
     @ObservedObject var router: AppRouter
+    let pauseFlowRepository: PauseFlowRepository
+
+    @State private var flows: [PauseFlow] = []
 
     /// The page gutter. Each horizontal row cancels it and re-applies it inside its own
     /// content, so cards scroll all the way to the screen edge instead of being clipped
@@ -21,13 +24,11 @@ struct FocusView: View {
                     routinesRow
                 }
 
-                // Pauses are moving inside each routine rather than living as their own
-                // list, so the section is out of the tab for now.
-//                section(title: "Pauses") {
-//                    router.push(.pausesList)
-//                } content: {
-//                    pausesRow
-//                }
+                section(title: "Pauses") {
+                    router.push(.pausesList)
+                } content: {
+                    flowsRow
+                }
             }
             .padding(.horizontal, gutter)
             .padding(.vertical, LocktySpacing.lg)
@@ -38,11 +39,13 @@ struct FocusView: View {
             await routinesViewModel.load()
             await pausesViewModel.load()
         }
+        .task { await loadFlows() }
         .onChange(of: router.sheet) { _, newValue in
             guard newValue == nil else { return }
             Task {
                 await routinesViewModel.load()
                 await pausesViewModel.load()
+                await loadFlows()
             }
         }
     }
@@ -79,7 +82,31 @@ struct FocusView: View {
         }
     }
 
-    @available(*, deprecated, message: "Kept while Pauses move inside the routine editor.")
+    private func loadFlows() async {
+        let loaded = await pauseFlowRepository.flows()
+        withAnimation(.smooth(duration: 0.28)) {
+            flows = loaded
+        }
+    }
+
+    /// Saved ways of pausing. No app on any of them -- a flow is picked up by a routine,
+    /// and covers whatever that routine blocks.
+    private var flowsRow: some View {
+        horizontalRow {
+            addTile(title: "New Pause") {
+                router.presentSheet(.pauseFlowEditor(PauseFlowEditorRoute(flowID: nil)))
+            }
+
+            ForEach(flows) { flow in
+                PauseFlowCard(flow: flow) {
+                    router.presentSheet(.pauseFlowEditor(PauseFlowEditorRoute(flowID: flow.id)))
+                }
+                .frame(width: tileWidth)
+            }
+        }
+    }
+
+    @available(*, deprecated, message: "The per-app pause list, kept while flows take over.")
     private var pausesRow: some View {
         horizontalRow {
             // No way in to creating one while a routine is running.
@@ -140,5 +167,43 @@ struct FocusView: View {
         .buttonStyle(.locktyInteractive)
         .tappable()
         .frame(width: tileWidth)
+    }
+}
+
+
+/// Grid tile for a pause flow: what it is called and what it puts you through.
+private struct PauseFlowCard: View {
+    let flow: PauseFlow
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            CardView(
+                radius: RoutineGridMetrics.tileRadius,
+                interactive: true,
+                height: RoutineGridMetrics.tileHeight
+            ) {
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    Image(systemName: flow.icon?.isEmpty == false ? flow.icon! : "hourglass")
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .frame(width: 24, height: 24)
+
+                    Spacer(minLength: 0)
+
+                    Text(flow.summary)
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .lineLimit(1)
+
+                    Text(flow.name)
+                        .font(.system(.subheadline, design: .default, weight: .bold))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .buttonStyle(.locktyInteractive)
+        .tappable()
     }
 }

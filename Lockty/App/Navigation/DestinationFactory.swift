@@ -41,6 +41,9 @@ struct DestinationFactory {
         case .routineEditor(let route):
             featureFactory.makeRoutineEditor(route: route)
 
+        case .pauseFlowEditor(let route):
+            featureFactory.makePauseFlowEditor(route: route)
+
         case .pauseEditor(let route):
             featureFactory.makePauseEditor(route: route)
 

@@ -17,6 +17,7 @@ struct FeatureFactory {
     let routineRepository: RoutineRepository
     let routineExecutionRepository: RoutineExecutionRepository
     let pauseRuleRepository: PauseRuleRepository
+    let pauseFlowRepository: PauseFlowRepository
     let pauseEventRepository: PauseEventRepository
     let classificationRepository: AppClassificationRepository
     let haptics: HapticsProviding
@@ -28,7 +29,13 @@ struct FeatureFactory {
     }
 
     func makeFocusView() -> FocusView {
-        FocusView(viewModel: focusViewModel, routinesViewModel: routinesViewModel, pausesViewModel: pausesViewModel, router: router)
+        FocusView(
+            viewModel: focusViewModel,
+            routinesViewModel: routinesViewModel,
+            pausesViewModel: pausesViewModel,
+            router: router,
+            pauseFlowRepository: pauseFlowRepository
+        )
     }
 
     func makeLifetimeView() -> LifetimeView {
@@ -136,6 +143,15 @@ struct FeatureFactory {
         await pauseEngine.allowTemporarily(context, intention: nil)
     }
 
+    func makePauseFlowEditor(route: PauseFlowEditorRoute) -> PauseFlowEditorSheet {
+        PauseFlowEditorSheet(
+            viewModel: PauseFlowEditorViewModel(
+                flowID: route.flowID,
+                repository: pauseFlowRepository
+            )
+        )
+    }
+
     func makeRoutineDetail(routineID: UUID) -> RoutineDetailView {
         RoutineDetailView(
             viewModel: RoutineDetailViewModel(
@@ -156,7 +172,8 @@ struct FeatureFactory {
                 repository: routineRepository,
                 selectionStore: selectionStore,
                 routineEngine: routineEngine,
-                usageDataService: usageDataService
+                usageDataService: usageDataService,
+                pauseFlowRepository: pauseFlowRepository
             ),
             router: router,
             startsEditing: route.startsEditing,

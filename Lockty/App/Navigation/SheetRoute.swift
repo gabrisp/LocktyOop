@@ -10,6 +10,7 @@ enum SheetRoute: Hashable, Identifiable {
     case liveSession
     case routineEditor(RoutineEditorRoute)
     case pauseEditor(PauseEditorRoute)
+    case pauseFlowEditor(PauseFlowEditorRoute)
     case productivityDetail(Date)
     case controlDetail(Date)
     case detoxDetail(Date)
@@ -31,6 +32,7 @@ enum SheetRoute: Hashable, Identifiable {
         case .liveSession: "live-session"
         case .routineEditor(let route): "routine-editor-\(route.draftID.uuidString)"
         case .pauseEditor(let route): "pause-editor-\(route.draftID.uuidString)"
+        case .pauseFlowEditor(let route): "pause-flow-editor-\(route.draftID.uuidString)"
         case .productivityDetail(let day): "productivity-detail-\(day.timeIntervalSince1970)"
         case .controlDetail(let day): "control-detail-\(day.timeIntervalSince1970)"
         case .detoxDetail(let day): "detox-detail-\(day.timeIntervalSince1970)"

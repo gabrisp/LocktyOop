@@ -31,6 +31,9 @@ final class RoutineEditorViewModel: ObservableObject {
     @Published var maximumBreakMinutes = 10
     @Published var minimumBreakIntervalMinutes = 30
     @Published var startAlarmEnabled = false
+    /// The saved pause flow this routine uses. Nil means the default wait-then-confirm.
+    @Published var pauseFlowID: UUID?
+    @Published private(set) var pauseFlows: [PauseFlow] = []
     @Published var breakTriggerManual = true
     @Published var breakTriggerNFC = false
     @Published var breakTriggerLocation = false
@@ -45,6 +48,7 @@ final class RoutineEditorViewModel: ObservableObject {
     private let selectionStore: ScreenTimeSelectionStore
     private let routineEngine: RoutineEngine
     private let usageDataService: UsageDataServicing
+    private let pauseFlowRepository: PauseFlowRepository
     private let strictModePolicy = StrictModePolicy()
     private let initialRoutineID: UUID?
     private var hasLoaded = false
@@ -56,7 +60,8 @@ final class RoutineEditorViewModel: ObservableObject {
         repository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
-        usageDataService: UsageDataServicing
+        usageDataService: UsageDataServicing,
+        pauseFlowRepository: PauseFlowRepository
     ) {
         initialRoutineID = routineID
         editingID = routineID ?? UUID()
@@ -65,6 +70,7 @@ final class RoutineEditorViewModel: ObservableObject {
         self.selectionStore = selectionStore
         self.routineEngine = routineEngine
         self.usageDataService = usageDataService
+        self.pauseFlowRepository = pauseFlowRepository
         createdAt = Date()
         refreshSelectionState()
     }
@@ -154,6 +160,7 @@ final class RoutineEditorViewModel: ObservableObject {
         hasLoaded = true
         print("Routine editor load started routineID=\(initialRoutineID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         await loadSuggestedApplications()
+        await loadPauseFlows()
         guard let initialRoutineID else { return }
         guard let routines = try? await repository.routines(), let routine = routines.first(where: { $0.id == initialRoutineID }) else {
             return
@@ -175,12 +182,24 @@ final class RoutineEditorViewModel: ObservableObject {
         maximumBreakMinutes = max(Int(routine.breakPolicy.maximumDuration / 60), 1)
         minimumBreakIntervalMinutes = max(Int(routine.breakPolicy.minimumInterval / 60), 1)
         startAlarmEnabled = routine.startAlarmEnabled
+        pauseFlowID = routine.pauseFlowID
         breakTriggerManual = routine.breakPolicy.allowedTriggers.contains(.manual)
         breakTriggerNFC = routine.breakPolicy.allowedTriggers.contains(.nfc)
         breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
         blockedDomains = routine.blockedDomains.sorted()
         refreshSelectionState()
         print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
+    }
+
+    func loadPauseFlows() async {
+        let loaded = await pauseFlowRepository.flows()
+        withAnimation(.smooth(duration: 0.24)) {
+            pauseFlows = loaded
+        }
+    }
+
+    var selectedPauseFlow: PauseFlow? {
+        pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } }
     }
 
     private func loadSuggestedApplications() async {
@@ -305,6 +324,10 @@ final class RoutineEditorViewModel: ObservableObject {
             tasks: tasks,
             startAlarmEnabled: startAlarmEnabled,
             breakPolicy: breakPolicy,
+            pauseFlowID: pauseFlowID,
+            // Resolved at save time: the flow can be edited or deleted afterwards and
+            // the routine keeps enforcing what it was given.
+            pausePolicy: selectedPauseFlow?.policy ?? RoutinePausePolicy(),
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
             createdAt: createdAt,
             updatedAt: Date()
@@ -567,6 +590,46 @@ struct RoutineEditorView: View {
                 }
                 // Reading mode: the whole schedule block is inert, days and times alike.
                 .disabled(!isEditing)
+
+                // Which saved flow this routine puts you through before one of its apps
+                // opens. The default is the plain wait-then-confirm.
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    Rectangle()
+                        .fill(LocktyColors.separator)
+                        .frame(height: 0.5)
+                    Text("PAUSA")
+                        .locktyEyebrow()
+
+                    Menu {
+                        Button("Por defecto") {
+                            withAnimation(.smooth(duration: 0.24)) { viewModel.pauseFlowID = nil }
+                        }
+                        ForEach(viewModel.pauseFlows) { flow in
+                            Button(flow.name) {
+                                withAnimation(.smooth(duration: 0.24)) { viewModel.pauseFlowID = flow.id }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(viewModel.selectedPauseFlow?.name ?? "Por defecto")
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(LocktyColors.primaryText)
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(LocktyColors.tertiaryText)
+                        }
+                        .padding(.horizontal, LocktySpacing.md)
+                        .padding(.vertical, LocktySpacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(LocktyColors.elevatedBackground)
+                        )
+                    }
+                    .disabled(!isEditing)
+                }
 
                 editorSection(
                     title: "Checklist",

@@ -27,3 +27,15 @@ struct PauseEditorRoute: Hashable, Identifiable {
 
     var id: UUID { draftID }
 }
+
+struct PauseFlowEditorRoute: Hashable, Identifiable {
+    let flowID: UUID?
+    let draftID: UUID
+
+    init(flowID: UUID?, draftID: UUID = UUID()) {
+        self.flowID = flowID
+        self.draftID = draftID
+    }
+
+    var id: UUID { draftID }
+}

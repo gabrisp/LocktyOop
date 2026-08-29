@@ -11,6 +11,10 @@ struct Routine: Codable, Hashable, Identifiable {
     var tasks: [RoutineTask]
     var startAlarmEnabled: Bool
     var breakPolicy: BreakPolicy
+    /// The saved flow this routine uses, if it has been given one. The policy below is
+    /// the resolved copy: the flow can be edited or deleted afterwards, and the routine
+    /// keeps working from what it was given.
+    var pauseFlowID: UUID?
     /// The pause this routine offers on whatever it blocks.
     var pausePolicy: RoutinePausePolicy
     var allowsPauseDuringStrictMode: Bool
@@ -28,6 +32,7 @@ struct Routine: Codable, Hashable, Identifiable {
         tasks: [RoutineTask],
         startAlarmEnabled: Bool = false,
         breakPolicy: BreakPolicy,
+        pauseFlowID: UUID? = nil,
         pausePolicy: RoutinePausePolicy = RoutinePausePolicy(),
         allowsPauseDuringStrictMode: Bool = true,
         createdAt: Date = Date(),
@@ -43,6 +48,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.tasks = tasks
         self.startAlarmEnabled = startAlarmEnabled
         self.breakPolicy = breakPolicy
+        self.pauseFlowID = pauseFlowID
         self.pausePolicy = pausePolicy
         self.allowsPauseDuringStrictMode = allowsPauseDuringStrictMode
         self.createdAt = createdAt

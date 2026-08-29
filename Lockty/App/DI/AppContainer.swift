@@ -168,6 +168,7 @@ final class AppContainer {
             selectionStore: selectionStore
         )
         let focusViewModel = FocusViewModel()
+        let pauseFlowRepository = AppGroupPauseFlowRepository(appGroupStore: appGroupStore)
         let pausesViewModel = PausesViewModel(
             ruleRepository: pauseRuleRepository,
             eventRepository: pauseEventRepository,
@@ -200,6 +201,7 @@ final class AppContainer {
             routineRepository: routineRepository,
             routineExecutionRepository: routineExecutionRepository,
             pauseRuleRepository: pauseRuleRepository,
+            pauseFlowRepository: pauseFlowRepository,
             pauseEventRepository: pauseEventRepository,
             classificationRepository: classificationRepository,
             haptics: haptics,

@@ -80,13 +80,20 @@ struct ActiveModeCard: View {
                             caption: released ? .remainingTime : .action("Desbloquear")
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
                     .tappable()
                 }
             }
             .padding(.horizontal, LocktySpacing.lg)
+            // Room for the badge's ring and its caption, both of which are drawn outside
+            // the icon's own frame.
+            .padding(.vertical, LocktySpacing.sm)
         }
         .scrollIndicators(.hidden)
+        // The badge scales its icon up and hangs its caption below, so it draws outside
+        // its bounds on purpose. A scroll view clips its content by default, which was
+        // shaving the top of every icon off.
+        .scrollClipDisabled()
         // Cancels the card's own padding so the row runs to the card's edges, then puts
         // it back inside the content -- otherwise the icons stop short and the row reads
         // as clipped rather than scrollable.

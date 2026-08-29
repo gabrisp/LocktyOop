@@ -667,219 +667,165 @@ struct RoutineEditorView: View {
     }
 
     private var editorContent: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                if viewModel.isEditingBlocked {
-                    EditingDisabledBanner(message: viewModel.editingBlockDecision.reason ?? "This routine cannot be edited right now.")
+        // A plain Form. The sections, the rows, the disclosure and the push all come
+        // from Apple rather than being rebuilt out of cards -- this screen is a settings
+        // screen and there is nothing here a Form does not already do.
+        Form {
+            if viewModel.isEditingBlocked {
+                Section {
+                    Text(viewModel.editingBlockDecision.reason ?? "Esta rutina no se puede editar ahora.")
+                        .font(LocktyTypography.callout)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+            }
+
+            Section {
+                LabeledContent("De") {
+                    ScheduleTimeField(
+                        label: "De",
+                        hour: viewModel.scheduleTrigger.hour,
+                        minute: viewModel.scheduleTrigger.minute
+                    ) { hour, minute in
+                        viewModel.updateSchedule {
+                            $0.hour = hour
+                            $0.minute = minute
+                        }
+                    }
                 }
 
-                RoutineEditorHero(viewModel: viewModel, isEditing: isEditing)
+                LabeledContent("A") {
+                    ScheduleTimeField(
+                        label: "A",
+                        hour: viewModel.scheduleTrigger.endHour,
+                        minute: viewModel.scheduleTrigger.endMinute
+                    ) { hour, minute in
+                        viewModel.updateSchedule {
+                            $0.endHour = hour
+                            $0.endMinute = minute
+                        }
+                    }
+                }
 
-                if !isEditing, !isCreating {
+                ScheduleDaysPicker(
+                    selectedWeekdays: Binding(
+                        get: { viewModel.scheduleTrigger.weekdays },
+                        set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
+                    )
+                )
+            } header: {
+                Label("Durante este horario", systemImage: "calendar")
+            }
+            .disabled(!isEditing)
+
+            Section {
+                // A push inside the sheet, not a screen swapped in underneath it: the
+                // sheet's own stack carries it, and the picker asks for full height on
+                // the way in and gives it back on the way out.
+                NavigationLink {
+                    LocktyActivitySelectionView(
+                        title: "Seleccionadas",
+                        addLabel: "Añadir App o categoría",
+                        selection: Binding(
+                            get: { viewModel.selectionPreview },
+                            set: { newValue in
+                                withAnimation(.smooth(duration: 0.28)) {
+                                    viewModel.replaceSelection(newValue)
+                                }
+                            }
+                        ),
+                        rules: .routine,
+                        suggestions: viewModel.suggestedApplications,
+                        onClose: {},
+                        onDone: {}
+                    )
+                    .locktySheetExpanded()
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    LabeledContent(
+                        "Apps seleccionadas",
+                        value: RestrictionSummary.appsAndCategories(
+                            apps: viewModel.selectionPreview.applicationTokens.count,
+                            categories: viewModel.selectionPreview.categoryTokens.count
+                        ) ?? "Ninguna"
+                    )
+                }
+
+                NavigationLink {
+                    RoutineDomainsSheet(viewModel: viewModel)
+                        .locktySheetExpanded()
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    LabeledContent(
+                        "Sitios web",
+                        value: RestrictionSummary.domains(viewModel.blockedDomains.count) ?? "Ninguno"
+                    )
+                }
+
+                Toggle(isOn: $viewModel.allowsPauseDuringStrictMode) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Permitir pausas")
+                        Text("Si se apaga, no se permiten desbloqueos.")
+                            .font(LocktyTypography.caption)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                    }
+                }
+            } header: {
+                Label("Apps bloqueadas", systemImage: "shield")
+            }
+            .disabled(!isEditing)
+
+            // Pause and checklist are out of creating a routine for now. Kept whole,
+            // waiting on where they should live.
+//            Section {
+//                Picker("Flujo", selection: $viewModel.pauseFlowID) {
+//                    Text("Por defecto").tag(UUID?.none)
+//                    ForEach(viewModel.pauseFlows) { flow in
+//                        Text(flow.name).tag(UUID?.some(flow.id))
+//                    }
+//                }
+//            } header: {
+//                Label("Pausa", systemImage: "hourglass")
+//            }
+//            .disabled(!isEditing)
+//
+//            Section {
+//                ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { _, $task in
+//                    if isEditing {
+//                        TextField("Tarea", text: $task.title)
+//                    } else {
+//                        Text(task.title)
+//                    }
+//                }
+//                .onDelete { offsets in
+//                    viewModel.tasks.remove(atOffsets: offsets)
+//                }
+//
+//                if isEditing {
+//                    Button {
+//                        withAnimation(.smooth(duration: 0.24)) { viewModel.addTask() }
+//                    } label: {
+//                        Label("Añadir tarea", systemImage: "plus")
+//                    }
+//                }
+//            } header: {
+//                Label("Checklist", systemImage: "checklist")
+//            }
+
+            if !isEditing, !isCreating {
+                Section {
                     HoldDownButton(
-                        text: isRoutineActive ? "" : "Hold to start",
+                        text: isRoutineActive ? "" : "Mantén para empezar",
                         sessionStartedAt: isRoutineActive ? activeRoutineStartedAt : nil
                     ) {
                         Task { await startRoutine() }
                     }
                     .frame(maxWidth: .infinity)
                 }
+                .listRowBackground(Color.clear)
+            }
 
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    sectionHeading("Apps bloqueadas", systemImage: "shield")
-
-                    VStack(spacing: LocktySpacing.sm) {
-                        if isEditing {
-                            RestrictionRow(
-                                label: "Apps",
-                                summary: RestrictionSummary.appsAndCategories(
-                                    apps: viewModel.selectionPreview.applicationTokens.count,
-                                    categories: viewModel.selectionPreview.categoryTokens.count
-                                ),
-                                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
-                            ) {
-                                withAnimation(.smooth(duration: 0.34)) { activeSheet = .apps }
-                            }
-
-                            RestrictionRow(
-                                label: "Domains",
-                                summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
-                            ) {
-                                activeSheet = .domains
-                            }
-                        } else {
-                            RestrictionRow(
-                                label: "Apps",
-                                summary: RestrictionSummary.appsAndCategories(
-                                    apps: viewModel.selectionPreview.applicationTokens.count,
-                                    categories: viewModel.selectionPreview.categoryTokens.count
-                                ),
-                                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
-                            )
-
-                            RestrictionRow(
-                                label: "Domains",
-                                summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
-                            )
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    sectionHeading("Durante este horario", systemImage: "calendar")
-
-                    ScheduleDaysPicker(
-                        selectedWeekdays: Binding(
-                            get: { viewModel.scheduleTrigger.weekdays },
-                            set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
-                        )
-                    )
-
-                    HStack(spacing: LocktySpacing.xl) {
-                        ScheduleTimeField(
-                            label: "Start",
-                            hour: viewModel.scheduleTrigger.hour,
-                            minute: viewModel.scheduleTrigger.minute,
-                            onChange: { hour, minute in
-                                viewModel.updateSchedule {
-                                    $0.hour = hour
-                                    $0.minute = minute
-                                }
-                            }
-                        )
-                        ScheduleTimeField(
-                            label: "End",
-                            hour: viewModel.scheduleTrigger.endHour,
-                            minute: viewModel.scheduleTrigger.endMinute,
-                            onChange: { hour, minute in
-                                viewModel.updateSchedule {
-                                    $0.endHour = hour
-                                    $0.endMinute = minute
-                                }
-                            }
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    
-                    if !viewModel.scheduleTrigger.weekdays.isEmpty {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            ToggleRow(
-                                title: "Sound when routine starts",
-                                subtitle: "Only when the routine actually starts.",
-                                isOn: $viewModel.startAlarmEnabled
-                            )
-                        }
-                    }
-                }
-                // Reading mode: the whole schedule block is inert, days and times alike.
-                .disabled(!isEditing)
-
-                // Which saved flow this routine puts you through before one of its apps
-                // opens. The default is the plain wait-then-confirm.
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    sectionHeading("Pausa", systemImage: "hourglass")
-
-                    Menu {
-                        Button("Por defecto") {
-                            withAnimation(.smooth(duration: 0.24)) { viewModel.pauseFlowID = nil }
-                        }
-                        ForEach(viewModel.pauseFlows) { flow in
-                            Button(flow.name) {
-                                withAnimation(.smooth(duration: 0.24)) { viewModel.pauseFlowID = flow.id }
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            Text(viewModel.selectedPauseFlow?.name ?? "Por defecto")
-                                .font(LocktyTypography.body)
-                                .foregroundStyle(LocktyColors.primaryText)
-
-                            Spacer(minLength: 0)
-
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(LocktyColors.tertiaryText)
-                        }
-                        .padding(.horizontal, LocktySpacing.md)
-                        .padding(.vertical, LocktySpacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(LocktyColors.elevatedBackground)
-                        )
-                    }
-                    .disabled(!isEditing)
-                }
-
-                editorSection(
-                    title: "Checklist",
-                    info: "Tasks from the active routine. Completing them updates this session only and resets on the next routine run."
-                ) {
-                    CardView(radius: LocktyRadius.medium, padding: 0) {
-                        VStack(spacing: 0) {
-                            ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { index, $task in
-                                RoutineTaskEditorRow(
-                                    task: $task,
-                                    isEditing: isEditing,
-                                    onRemove: {
-                                        withAnimation(.smooth(duration: 0.24)) {
-                                            viewModel.removeTask(id: task.id)
-                                        }
-                                    }
-                                )
-
-                                if index < viewModel.tasks.count - 1 {
-                                    Divider()
-                                        .padding(.leading, 20)
-                                }
-                            }
-
-                            // Reading mode has no way to add or remove a task.
-                            if isEditing {
-                                Divider()
-                                    .padding(.leading, 20)
-
-                                Button {
-                                    withAnimation(.smooth(duration: 0.24)) {
-                                        viewModel.addTask()
-                                    }
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 18, weight: .regular))
-                                        Text("Add task")
-                                            .font(LocktyTypography.callout)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 16)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .tappable()
-                            }
-                        }
-                    }
-                }
-
-//                editorSection(title: "Breaks") {
-//                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-//                        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-//                            EditorStepperRow(title: "Maximum breaks", value: $viewModel.maximumBreaks, range: 0...5)
-//                            EditorStepperRow(title: "Break duration", suffix: "min", value: $viewModel.maximumBreakMinutes, range: 1...60, isDisabled: viewModel.maximumBreaks == 0)
-//                            EditorStepperRow(title: "Minimum interval", suffix: "min", value: $viewModel.minimumBreakIntervalMinutes, range: 1...240, isDisabled: viewModel.maximumBreaks == 0)
-//                            ToggleRow(title: "Manual break", isOn: $viewModel.breakTriggerManual, isDisabled: viewModel.maximumBreaks == 0)
-//                            ToggleRow(title: "NFC break", isOn: $viewModel.breakTriggerNFC, isDisabled: viewModel.maximumBreaks == 0)
-//                            ToggleRow(title: "Location break", isOn: $viewModel.breakTriggerLocation, isDisabled: viewModel.maximumBreaks == 0)
-//                        }
-//                    }
-//                }
-
-                if isEditing {
-                    // The commit lives at the end of the sheet rather than in the
-                    // toolbar: it is the last thing you do, and it is deliberate enough
-                    // to be held rather than tapped.
+            if isEditing {
+                Section {
                     HoldDownButton(text: isCreating ? "Mantén para crear" : "Mantén para guardar") {
                         Task {
                             if await viewModel.save() {
@@ -892,19 +838,31 @@ struct RoutineEditorView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, LocktySpacing.sm)
                 }
+                .listRowBackground(Color.clear)
             }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.xxl)
-            // Inside the NavigationStack, on the content itself: the stack fills the
-            // sheet and would report the sheet's own height back to it.
-            .locktySheetContent()
         }
+        // Inside the NavigationStack, on the content itself: the stack fills the sheet
+        // and would report the sheet's own height back to it.
+        .locktySheetContent()
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
+            // The centre is what this sheet is about -- the routine -- rather than a
+            // word describing the screen.
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: LocktySpacing.sm) {
+                    Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(viewModel.name.isEmpty ? "Nueva rutina" : viewModel.name)
+                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
+                }
+            }
+
             // Hidden only while editing an existing routine, where the checkmark
             // returns to reading. Creating always keeps a way out.
             if !isEditing || isCreating {

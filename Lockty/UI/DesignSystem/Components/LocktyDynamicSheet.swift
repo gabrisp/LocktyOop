@@ -18,7 +18,44 @@ struct LocktySheetContentHeightKey: PreferenceKey {
     }
 }
 
+/// Lets a screen pushed inside a dynamic sheet ask for the whole height.
+///
+/// A pushed screen cannot be measured -- it fills what the stack gives it -- so instead
+/// of reporting a height it says it wants all of it, and gives it back when it leaves.
+struct LocktySheetExpansion {
+    let setExpanded: (Bool) -> Void
+
+    static let none = LocktySheetExpansion { _ in }
+}
+
+private struct LocktySheetExpansionKey: EnvironmentKey {
+    static let defaultValue = LocktySheetExpansion.none
+}
+
+extension EnvironmentValues {
+    var locktySheetExpansion: LocktySheetExpansion {
+        get { self[LocktySheetExpansionKey.self] }
+        set { self[LocktySheetExpansionKey.self] = newValue }
+    }
+}
+
+private struct LocktySheetExpandedModifier: ViewModifier {
+    @Environment(\.locktySheetExpansion) private var expansion
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { expansion.setExpanded(true) }
+            .onDisappear { expansion.setExpanded(false) }
+    }
+}
+
 extension View {
+    /// For a screen pushed inside a dynamic sheet that needs the full height. The sheet
+    /// goes back to measuring when it is popped.
+    func locktySheetExpanded() -> some View {
+        modifier(LocktySheetExpandedModifier())
+    }
+
     /// Marks the view whose height the enclosing `LocktyDynamicSheet` should take.
     ///
     /// Put it on the content of each screen inside the sheet -- inside any
@@ -53,6 +90,8 @@ struct LocktyDynamicSheet<Content: View>: View {
     /// swapping the set itself: replacing one .height with another gives no transition to
     /// animate, so the sheet snapped between sizes.
     @State private var selectedDetent: PresentationDetent = .medium
+    /// Raised by a pushed screen that needs the whole sheet.
+    @State private var isExpandedByChild = false
 
     init(
         animation: Animation = .easeInOut(duration: 0.28),
@@ -87,6 +126,12 @@ struct LocktyDynamicSheet<Content: View>: View {
                 reportedHeight = newValue
                 updateHeight(newValue)
             }
+            .environment(
+                \.locktySheetExpansion,
+                LocktySheetExpansion { expanded in
+                    isExpandedByChild = expanded
+                }
+            )
             .presentationDetents(detents, selection: $selectedDetent)
             .onChange(of: intendedDetent, initial: true) { _, newValue in
                 withAnimation(animation) {
@@ -105,7 +150,7 @@ struct LocktyDynamicSheet<Content: View>: View {
     }
 
     private var intendedDetent: PresentationDetent {
-        if isExpanded { return .large }
+        if isExpanded || isExpandedByChild { return .large }
         let height = fixedHeight ?? sheetHeight
         return height == .zero ? .medium : .height(height)
     }

@@ -35,6 +35,10 @@ struct TodayView: View {
 
     private var shortcutRowHeight: CGFloat { 52 }
 
+    /// An inline navigation bar's height. The chrome travels exactly this far up as it
+    /// collapses, which is what lands the ring inside the bar rather than below it.
+    private var navigationBarHeight: CGFloat { 44 }
+
     private var metricsGeometry: MetricsHeaderGeometry {
         MetricsHeaderGeometry(progress: collapseProgress)
     }
@@ -220,7 +224,11 @@ struct TodayView: View {
 //            .offset(y: shortcutRowOffsetY)
 //            .allowsHitTesting(!areShortcutsHidden)
         }
-        .offset(y: overscrollPullDistance)
+        // Rides up into the navigation bar as it collapses, so what is left at the end
+        // sits on the toolbar's own line, beside Settings, rather than parked under it.
+        // The bar has no background of its own, so there is nothing for it to hide
+        // behind on the way.
+        .offset(y: overscrollPullDistance - navigationBarHeight * collapseProgress)
     }
 
     /// Hides the shortcut row while the content is being pulled up, and reveals it on

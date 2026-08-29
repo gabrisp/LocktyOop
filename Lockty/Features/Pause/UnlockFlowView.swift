@@ -16,11 +16,15 @@ struct UnlockFlowView: View {
     let onClose: () -> Void
 
     private enum Step: Hashable {
+        /// The wait, on its own screen. It used to be a gate on the duration step's
+        /// button, which made the waiting something you sat through while already being
+        /// asked a question -- as its own step it is the only thing happening.
+        case rest
         case app
         case duration
     }
 
-    @State private var step: Step = .duration
+    @State private var step: Step = .rest
     @State private var selectedOptionID: String?
     @State private var minutes: Int?
 
@@ -65,17 +69,29 @@ struct UnlockFlowView: View {
         selectedOptionID.flatMap(token(forOptionID:))
     }
 
+    private var title: String {
+        switch step {
+        case .rest: "Respira..."
+        case .app: "Quiero usar..."
+        case .duration: "Durante..."
+        }
+    }
+
+    private var primaryTitle: String {
+        step == .duration ? "Desbloquear" : "Continuar"
+    }
+
     var body: some View {
         LocktyFlowScreen(
-            title: step == .app ? "Quiero usar..." : "Durante...",
+            title: title,
             stepID: step,
-            primaryTitle: step == .app ? "Continuar" : "Desbloquear",
+            primaryTitle: primaryTitle,
             secondaryTitle: "Déjalo",
-            // The rest belongs to the moment of unlocking, not to changing your mind
-            // about which app it is.
-            restSeconds: step == .duration ? 5 : 0,
+            // The wait is the rest step and nothing else. Every other step is answering
+            // a question, and a question does not need to be waited out.
+            restSeconds: step == .rest ? 5 : 0,
             // Only on the duration step: on the app step the chip would open the screen
-            // that is already showing.
+            // already showing, and during the rest there is nothing to change yet.
             accessoryToken: step == .duration ? selectedToken : nil,
             onAccessory: {
                 withAnimation(.smooth(duration: 0.34)) { step = .app }
@@ -83,7 +99,7 @@ struct UnlockFlowView: View {
             onClose: onClose,
             onPrimary: {
                 switch step {
-                case .app:
+                case .rest, .app:
                     withAnimation(.smooth(duration: 0.34)) { step = .duration }
                 case .duration:
                     onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound)
@@ -92,6 +108,9 @@ struct UnlockFlowView: View {
             onSecondary: onClose
         ) {
             switch step {
+            case .rest:
+                BreathingRest()
+
             case .app:
                 LocktyWheelPicker(items: optionIDs, selection: $selectedOptionID) { id in
                     appRow(id)
@@ -144,5 +163,36 @@ struct UnlockFlowView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, LocktySpacing.lg)
+    }
+}
+
+
+/// What the rest step shows: a ring that breathes in and out on its own.
+///
+/// Nothing to read and nothing to answer -- the point of the step is that there is
+/// nothing to do in it, so it holds one slow, obvious rhythm to follow instead.
+private struct BreathingRest: View {
+    @State private var isExpanded = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .stroke(
+                        LocktyColors.primaryText.opacity(0.10 - Double(index) * 0.025),
+                        lineWidth: 1
+                    )
+                    .frame(width: 150 + CGFloat(index) * 46)
+                    .scaleEffect(isExpanded ? 1.08 : 0.94)
+            }
+
+            Circle()
+                .fill(LocktyColors.primaryText.opacity(0.06))
+                .frame(width: 150)
+                .scaleEffect(isExpanded ? 1.12 : 0.9)
+        }
+        .frame(height: 260)
+        .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: isExpanded)
+        .onAppear { isExpanded = true }
     }
 }

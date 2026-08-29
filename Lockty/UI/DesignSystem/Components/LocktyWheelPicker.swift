@@ -9,8 +9,8 @@ import SwiftUI
 struct LocktyWheelPicker<Item: Hashable, Row: View>: View {
     let items: [Item]
     @Binding var selection: Item?
-    var rowHeight: CGFloat = 52
-    var visibleRows: Int = 5
+    var rowHeight: CGFloat = 58
+    var visibleRows: Int = 7
     @ViewBuilder let row: (Item) -> Row
 
     var body: some View {
@@ -48,6 +48,21 @@ struct LocktyWheelPicker<Item: Hashable, Row: View>: View {
                 .fill(.ultraThinMaterial)
                 .frame(height: rowHeight)
                 .allowsHitTesting(false)
+        }
+        // Fades out at both ends so rows arrive and leave rather than being cut off at
+        // the edge of the viewport. Applied outside the pill's background, or the pill
+        // would fade with them.
+        .mask {
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0), location: 0),
+                    .init(color: .black, location: 0.22),
+                    .init(color: .black, location: 0.78),
+                    .init(color: .black.opacity(0), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
         .sensoryFeedback(.selection, trigger: selection)
         .animation(.smooth(duration: 0.2), value: selection)

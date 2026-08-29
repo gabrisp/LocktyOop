@@ -347,6 +347,10 @@ struct TodayView: View {
         // The bar is shown, without a title: the only thing in it is Settings, and the
         // ring below it stays pinned to the safe area, which the bar now sets.
         .navigationBarTitleDisplayMode(.inline)
+        // No material behind the bar. The ring pins itself right under it and would
+        // otherwise be scrolling beneath the bar's own backdrop -- one more surface over
+        // the content, and the black one was just taken out for the same reason.
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

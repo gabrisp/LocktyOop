@@ -7,8 +7,6 @@ final class PauseFlowEditorViewModel: ObservableObject {
 
     @Published var name = ""
     @Published var steps: [PauseStep] = PauseFlow.defaultSteps
-    @Published var allowanceMinutes = 5
-    @Published var relockAfterAllowance = true
     @Published var errorMessage: String?
     /// Which step's settings are open. Only one at a time -- the sheet grows to fit it,
     /// and two open at once is most of a screen of controls.
@@ -41,8 +39,6 @@ final class PauseFlowEditorViewModel: ObservableObject {
         createdAt = flow.createdAt
         name = flow.name
         steps = flow.steps
-        allowanceMinutes = flow.allowanceMinutes
-        relockAfterAllowance = flow.relockAfterAllowance
     }
 
     func addStep(_ kind: EditablePauseStep) {
@@ -73,8 +69,6 @@ final class PauseFlowEditorViewModel: ObservableObject {
             id: editingID,
             name: trimmedName,
             steps: steps,
-            allowanceDuration: TimeInterval(allowanceMinutes * 60),
-            relockAfterAllowance: relockAfterAllowance,
             createdAt: createdAt,
             updatedAt: Date()
         )
@@ -107,8 +101,6 @@ struct PauseFlowEditorSheet: View {
                 nameField
 
                 stepsSection
-
-                allowanceSection
 
                 saveButton
             }
@@ -201,46 +193,6 @@ struct PauseFlowEditorSheet: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(LocktyColors.elevatedBackground)
                     )
-            }
-        }
-    }
-
-    private var allowanceSection: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text("PERMISO")
-                .locktyEyebrow()
-
-            CardView(radius: 18, padding: LocktySpacing.md) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    HStack {
-                        Text("Duración")
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(LocktyColors.secondaryText)
-
-                        Spacer(minLength: 0)
-
-                        Text(LocktyDurationFormatter.abbreviated(TimeInterval(viewModel.allowanceMinutes * 60)))
-                            .font(.system(.headline, design: .rounded, weight: .regular))
-                            .monospacedDigit()
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .contentTransition(.numericText())
-                            .animation(.snappy(duration: 0.2), value: viewModel.allowanceMinutes)
-                    }
-
-                    DurationSlider(
-                        value: Binding(
-                            get: { Double(viewModel.allowanceMinutes) },
-                            set: { viewModel.allowanceMinutes = Int($0) }
-                        ),
-                        range: 1...60
-                    )
-
-                    ToggleRow(
-                        title: "Volver a bloquear",
-                        subtitle: "Cuando se acabe el permiso.",
-                        isOn: $viewModel.relockAfterAllowance
-                    )
-                }
             }
         }
     }

@@ -11,9 +11,6 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
     var name: String
     var icon: String?
     var steps: [PauseStep]
-    /// How long the app stays open once the flow is completed.
-    var allowanceDuration: TimeInterval
-    var relockAfterAllowance: Bool
     var createdAt: Date
     var updatedAt: Date
 
@@ -22,8 +19,6 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         name: String,
         icon: String? = nil,
         steps: [PauseStep] = PauseFlow.defaultSteps,
-        allowanceDuration: TimeInterval = 5 * 60,
-        relockAfterAllowance: Bool = true,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -31,8 +26,6 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         self.name = name
         self.icon = icon
         self.steps = steps
-        self.allowanceDuration = allowanceDuration
-        self.relockAfterAllowance = relockAfterAllowance
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -43,22 +36,23 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         .confirmation(ConfirmationConfiguration())
     ]
 
-    var allowanceMinutes: Int {
-        max(1, Int(allowanceDuration / 60))
-    }
-
     /// What the flow does, in order, for a card that has one line to say it in.
     var summary: String {
         steps.map(\.title).joined(separator: " · ")
     }
 
     /// The policy a routine applies when it uses this flow.
+    ///
+    /// A flow says what you go through, not how long you get: the duration is chosen at
+    /// the moment of unlocking, in the flow's own "Durante..." step. The value here is
+    /// only the fallback for a request that arrives without one. Relocking afterwards is
+    /// not a question either -- an allowance that never ends is not an allowance.
     var policy: RoutinePausePolicy {
         RoutinePausePolicy(
             isEnabled: true,
             steps: steps,
-            allowanceDuration: allowanceDuration,
-            relockAfterAllowance: relockAfterAllowance
+            allowanceDuration: 5 * 60,
+            relockAfterAllowance: true
         )
     }
 }

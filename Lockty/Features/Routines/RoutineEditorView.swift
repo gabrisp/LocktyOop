@@ -406,7 +406,7 @@ struct RoutineEditorView: View {
                                 apps: viewModel.selectionPreview.applicationTokens.count,
                                 categories: viewModel.selectionPreview.categoryTokens.count
                             ),
-                            tokens: Array(viewModel.selectionPreview.applicationTokens.suffix(3))
+                            tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
                         ) {
                             activeSheet = .apps
                         }

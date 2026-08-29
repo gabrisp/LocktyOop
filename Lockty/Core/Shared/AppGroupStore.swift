@@ -233,6 +233,26 @@ final class AppGroupStore {
         )
     }
 
+    nonisolated func loadRoutineScheduleSnapshots() -> [RoutineScheduleSnapshot] {
+        guard let data = (try? readData(
+            fileName: "routine-schedule-snapshots.json",
+            legacyDefaultsKey: SharedKeys.routineScheduleSnapshotsKey
+        )) ?? nil else {
+            return []
+        }
+
+        return (try? decoder.decode([RoutineScheduleSnapshot].self, from: data)) ?? []
+    }
+
+    nonisolated func saveRoutineScheduleSnapshots(_ snapshots: [RoutineScheduleSnapshot]) throws {
+        let data = try encoder.encode(snapshots)
+        try writeData(
+            data,
+            fileName: "routine-schedule-snapshots.json",
+            legacyDefaultsKey: SharedKeys.routineScheduleSnapshotsKey
+        )
+    }
+
     nonisolated private func readData(
         fileName: String,
         legacyDefaultsKey: String

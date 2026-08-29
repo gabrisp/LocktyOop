@@ -4,6 +4,12 @@ import Foundation
 import ManagedSettings
 
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
+    override func intervalDidStart(for activity: DeviceActivityName) {
+        super.intervalDidStart(for: activity)
+        // Scheduled routines start here, with the app not running.
+        RuntimeRepairCoordinator().startScheduledRoutineIfNeeded(for: activity)
+    }
+
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         RuntimeRepairCoordinator().repair(afterEnding: activity)
@@ -22,7 +28,47 @@ private struct RuntimeRepairCoordinator {
     private let managedSettingsStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("lockty"))
 
     func repair(afterEnding activity: DeviceActivityName) {
+        if activity.rawValue.hasPrefix("lockty.routine.") {
+            endScheduledRoutine(activityName: activity.rawValue)
+            return
+        }
         repairRuntimeState(activityName: activity.rawValue)
+    }
+
+    /// The schedule is a plain daily window (DeviceActivity has no weekday filter), so
+    /// the configured weekdays are checked here before anything is applied.
+    func startScheduledRoutineIfNeeded(for activity: DeviceActivityName) {
+        guard activity.rawValue.hasPrefix("lockty.routine."),
+              let id = UUID(uuidString: String(activity.rawValue.dropFirst("lockty.routine.".count))),
+              let snapshot = store.loadRoutineScheduleSnapshots().first(where: { $0.id == id })
+        else { return }
+
+        let weekday = Weekday(rawValue: Calendar.current.component(.weekday, from: Date()))
+        guard let weekday, snapshot.schedule.weekdays.contains(weekday) else {
+            print("Scheduled routine \(snapshot.name) skipped: not scheduled for today")
+            return
+        }
+
+        guard var runtimeState = try? store.loadRuntimeState() else { return }
+        // Never displace a routine the user already has running.
+        guard runtimeState.activeRoutine == nil else { return }
+
+        runtimeState.activeRoutine = snapshot.makeActiveRoutine(startedAt: Date())
+        try? store.saveRuntimeState(runtimeState)
+        print("Started scheduled routine \(snapshot.name) from the monitor extension")
+        repairRuntimeState(activityName: activity.rawValue)
+    }
+
+    private func endScheduledRoutine(activityName: String) {
+        guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))),
+              var runtimeState = try? store.loadRuntimeState(),
+              runtimeState.activeRoutine?.routineID == id
+        else { return }
+
+        runtimeState.activeRoutine = nil
+        runtimeState.activeBreak = nil
+        try? store.saveRuntimeState(runtimeState)
+        repairRuntimeState(activityName: activityName)
     }
 
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {

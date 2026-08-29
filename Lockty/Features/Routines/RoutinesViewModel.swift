@@ -7,10 +7,17 @@ final class RoutinesViewModel {
     private let routineEngine: RoutineEngine
     private let repository: RoutineRepository
     private let shieldService: ShieldServicing
+    private let scheduleCoordinator: RoutineScheduleCoordinator
     private(set) var routines: [Routine] = []
     private(set) var errorMessage: String?
 
-    init(routineEngine: RoutineEngine, repository: RoutineRepository, shieldService: ShieldServicing) {
+    init(
+        routineEngine: RoutineEngine,
+        repository: RoutineRepository,
+        shieldService: ShieldServicing,
+        scheduleCoordinator: RoutineScheduleCoordinator
+    ) {
+        self.scheduleCoordinator = scheduleCoordinator
         self.routineEngine = routineEngine
         self.repository = repository
         self.shieldService = shieldService
@@ -22,6 +29,9 @@ final class RoutinesViewModel {
             withAnimation(.smooth(duration: 0.28)) {
                 routines = loaded
             }
+            // Keeps background scheduling in step with whatever was just created,
+            // edited or deleted.
+            await scheduleCoordinator.sync()
         }
         catch { errorMessage = error.localizedDescription }
     }

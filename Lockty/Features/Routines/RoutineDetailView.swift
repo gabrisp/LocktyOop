@@ -121,7 +121,7 @@ struct RoutineDetailView: View {
                                     apps: viewModel.selection.applicationTokens.count,
                                     categories: viewModel.selection.categoryTokens.count
                                 ),
-                                tokens: Array(viewModel.selection.applicationTokens.suffix(3))
+                                tokens: viewModel.selection.applicationTokens.stablePrefix(3)
                             )
                             RestrictionRow(
                                 label: "Domains",

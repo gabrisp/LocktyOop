@@ -150,10 +150,16 @@ final class AppContainer {
             routineExecutionRepository: routineExecutionRepository
         )
         let todayViewModel = TodayViewModel(dataProvider: todayPipeline, routineEngine: routineEngine)
+        let routineScheduleCoordinator = RoutineScheduleCoordinator(
+            repository: routineRepository,
+            appGroupStore: appGroupStore,
+            deviceActivityService: deviceActivityService
+        )
         let routinesViewModel = RoutinesViewModel(
             routineEngine: routineEngine,
             repository: routineRepository,
-            shieldService: shieldService
+            shieldService: shieldService,
+            scheduleCoordinator: routineScheduleCoordinator
         )
         let focusViewModel = FocusViewModel()
         let pausesViewModel = PausesViewModel(

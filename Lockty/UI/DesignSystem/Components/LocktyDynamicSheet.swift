@@ -110,14 +110,39 @@ private struct LocktyDynamicSheetSizesModifier: ViewModifier {
     @Environment(\.locktyDynamicSheetChromeController) private var chromeController
 
     /// Same reason as the chrome modifier: a regenerated id meant clearSizes never
-    /// matched, so the sheet stayed on the size the screen it left had asked for and
-    /// never went back to measuring the content.
+    /// matched, so what a screen registered was never taken back.
     @State private var ownerID = UUID()
     let sizes: [LocktyDynamicSheetSize]
 
+    /// A screen asking for one size gets given that height, and the sheet goes on
+    /// measuring exactly as it does for everything else.
+    ///
+    /// The sheet used to stop measuring and let this screen fill instead, and that is
+    /// what broke reading the height on the way back: the content's layout mode changed
+    /// underneath it, so the reading after returning was of something laid out to fill
+    /// rather than of the content. Handing over a height keeps every screen measurable
+    /// and every change height-to-height.
+    private var explicitHeight: CGFloat? {
+        guard sizes.count == 1, let only = sizes.first else { return nil }
+        switch only {
+        case .fit: return nil
+        case .small: return windowHeight * 0.33
+        case .medium: return windowHeight * 0.5
+        case .large: return windowHeight
+        }
+    }
+
+    private var windowHeight: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.size.height ?? 0
+    }
+
     func body(content: Content) -> some View {
         content
+            .frame(height: explicitHeight)
+            // Registered only when there is more than one size, which is the one case
+            // the sheet has to know about: several sizes means draggable.
             .onAppear {
+                guard sizes.count > 1 else { return }
                 chromeController?.setSizes(ownerID: ownerID, sizes: sizes)
             }
             .onDisappear {
@@ -171,8 +196,6 @@ struct LocktyDynamicSheet<Content: View>: View {
         return false
     }()
     @StateObject private var chromeController = LocktyDynamicSheetChromeController()
-    /// The height the sheet had before a screen took it to a size of its own.
-    @State private var heightBeforeExplicitSize: CGFloat?
 
 
     var body: some View {
@@ -180,92 +203,41 @@ struct LocktyDynamicSheet<Content: View>: View {
             content
                 // safeAreaPadding, not padding: on a scrolling screen this becomes a
                 // content inset, so the list starts below the bar but travels under it
-                // instead of being cut off at it. Plain padding shortened the view and
-                // the content stopped dead at the bar's edge.
+                // instead of being cut off at it.
                 .safeAreaPadding(.top, chromeController.configuration == nil ? 0 : locktyDynamicSheetBarHeight)
                 .environment(\.locktyDynamicSheetChromeController, chromeController)
-                // On the content, inside the stack: applied outside it these take in the
-                // bar overlay too, and the bar sits on top of the content rather than
-                // under it, so what came back was neither the content's height nor a
-                // stable one.
-                // Only while the sheet is sizing itself to the content. A screen that
-                // named its own size wants to fill the sheet it asked for, and pinning
-                // it to its ideal height leaves it sitting at the top of an empty one.
-                .fixedSize(horizontal: false, vertical: chromeController.sizes == nil)
-                .frame(maxHeight: chromeController.sizes == nil ? nil : .infinity)
+                /// As this will fix the size of the view in the vertical direction!
+                .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGSize.self) {
                     isVisible ? $0.size : .zero
                 } action: { newValue in
-                    guard newValue != .zero, chromeController.sizes == nil else { return }
-                    // Not while coming back from a screen that took its own size: the
-                    // height to return to was already measured on the way in, and
-                    // reading again mid-transition catches the content still moving.
-                    guard heightBeforeExplicitSize == nil else { return }
-                    // A reading at the ceiling is the content still laid out to fill --
-                    // the frame from the screen that just left has not been dropped yet,
-                    // and taking it would leave the sheet stuck at full height.
-                    guard newValue.height < windowSize.height - 110 else { return }
-                    setHeight(newValue.height)
+                    guard newValue != .zero else { return }
+
+                    if sheetHeight == .zero {
+                        sheetHeight = min(newValue.height, windowSize.height)
+                    } else {
+                        withAnimation(animation) {
+                            sheetHeight = min(newValue.height, windowSize.height)
+                        }
+                    }
                 }
+                .task { isVisible = true }
 
             if let chrome = chromeController.configuration {
                 LocktyDynamicSheetChromeOverlay(configuration: chrome)
                     .transition(.blurReplace.combined(with: .opacity))
             }
         }
-        .task { isVisible = true }
-        .onChange(of: chromeController.sizes == nil) { _, isMeasuring in
-            if isMeasuring {
-                // Back to sizing itself: restore what it was, rather than measuring the
-                // returning screen again.
-                if let heightBeforeExplicitSize {
-                    withAnimation(animation) { sheetHeight = heightBeforeExplicitSize }
-                }
-                // Released a beat later so the transition finishes before measurements
-                // are taken up again.
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(360))
-                    heightBeforeExplicitSize = nil
-                }
-            } else {
-                heightBeforeExplicitSize = sheetHeight
-            }
-        }
-        // Animated on the target height rather than on the sizes changing: what the
-        // modifier interpolates is the number, so the number is what has to move.
-        .animation(animation, value: targetHeight)
         .modifier(
             LocktySheetDetentModifier(
-                height: targetHeight,
+                height: sheetHeight,
                 resizableDetents: resizableDetents
             )
         )
     }
 
-    /// The one height the sheet should be right now, as a number.
-    ///
-    /// Even .large is a number here. Going from .height(x) to .large is a change of
-    /// detent kind, and there is nothing between the two for the animation to run
-    /// through -- it can only cut. Height to height is a value that can be interpolated,
-    /// and the system clamps the tall one to what the screen can actually show.
-    private var targetHeight: CGFloat {
-        guard let sizes = chromeController.sizes, sizes.count == 1, let only = sizes.first else {
-            return sheetHeight
-        }
-        return height(for: only)
-    }
-
-    private func height(for size: LocktyDynamicSheetSize) -> CGFloat {
-        switch size {
-        case .fit: sheetHeight
-        case .small: windowSize.height * 0.33
-        case .medium: windowSize.height * 0.5
-        case .large: windowSize.height
-        }
-    }
-
-    /// Only when a screen named more than one size, which is the only case where being
-    /// draggable means anything.
+    /// Only when a screen named more than one size, which is the one case where being
+    /// draggable means anything. Everything else is the measured height.
     private var resizableDetents: Set<PresentationDetent>? {
         guard let sizes = chromeController.sizes, sizes.count > 1 else { return nil }
         return Set(sizes.map(detent(for:)))
@@ -277,17 +249,6 @@ struct LocktyDynamicSheet<Content: View>: View {
         case .small: .fraction(0.33)
         case .medium: .medium
         case .large: .large
-        }
-    }
-
-    private func setHeight(_ height: CGFloat) {
-        let resolved = min(height, windowSize.height - 110)
-        guard resolved > 0 else { return }
-
-        if sheetHeight == .zero {
-            sheetHeight = resolved
-        } else {
-            withAnimation(animation) { sheetHeight = resolved }
         }
     }
 

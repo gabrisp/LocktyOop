@@ -85,7 +85,6 @@ struct LifetimeView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .adoptForIGTabBar($router.tabBarProgress)
         .scrollIndicators(.hidden)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task {

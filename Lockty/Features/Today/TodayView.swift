@@ -220,7 +220,6 @@ struct TodayView: View {
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xl)
         }
-        .adoptForIGTabBar($router.tabBarProgress)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, newValue in

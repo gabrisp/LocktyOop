@@ -78,8 +78,12 @@ struct FocusView: View {
                     }
                 )
                 .frame(width: tileWidth)
+                // A ForEach insertion has no transition of its own, so a new routine
+                // appeared fully formed and shoved the row along. It arrives instead.
+                .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))
             }
         }
+        .animation(.smooth(duration: 0.34), value: routinesViewModel.routines.map(\.id))
     }
 
     private func loadFlows() async {
@@ -102,8 +106,10 @@ struct FocusView: View {
                     router.presentSheet(.pauseFlowEditor(PauseFlowEditorRoute(flowID: flow.id)))
                 }
                 .frame(width: tileWidth)
+                .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))
             }
         }
+        .animation(.smooth(duration: 0.34), value: flows.map(\.id))
     }
 
     @available(*, deprecated, message: "The per-app pause list, kept while flows take over.")

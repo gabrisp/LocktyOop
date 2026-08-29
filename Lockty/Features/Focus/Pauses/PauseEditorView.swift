@@ -1,5 +1,6 @@
 import FamilyControls
 import OSLog
+import UserNotifications
 import SwiftUI
 
 private let pauseEditorLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "pauses")
@@ -180,6 +181,11 @@ final class PauseEditorViewModel {
         do {
             try selectionStore.save(selection, scope: selectionScope)
             try await repository.save(rule)
+            // The shield can't open the app itself; it posts a notification whose tap
+            // brings the user here to run the flow. Ask for permission now, when the
+            // Pause that depends on it is created, rather than leaving it to the
+            // System Access screen the user may never visit.
+            await requestNotificationAuthorizationIfNeeded()
             pauseEditorLogger.notice("Pause editor saved id=\(rule.id.uuidString, privacy: .public) app=\(application.displayName, privacy: .public) steps=\(sanitizedSteps.count)")
             print("Pause editor saved id=\(rule.id.uuidString) app=\(application.displayName) steps=\(sanitizedSteps.count)")
             return true
@@ -188,6 +194,13 @@ final class PauseEditorViewModel {
             print("Pause editor failed saving id=\(rule.id.uuidString): \(error.localizedDescription)")
             return false
         }
+    }
+
+    private func requestNotificationAuthorizationIfNeeded() async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 
     private func sanitizeSteps() -> [PauseStep] {

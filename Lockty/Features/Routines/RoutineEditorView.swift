@@ -257,6 +257,11 @@ final class RoutineEditorViewModel: ObservableObject {
         }
     }
 
+    /// A blank pause, written from inside this routine's own sheet.
+    func makePauseFlowEditor() -> PauseFlowEditorViewModel {
+        PauseFlowEditorViewModel(flowID: nil, repository: pauseFlowRepository)
+    }
+
     /// The flow this routine will use.
     ///
     /// Falls back to the first saved flow -- the one seeded on first run -- rather than
@@ -485,6 +490,8 @@ struct RoutineAppPickerSheet: View {
 private enum RoutineEditorLocalSheet: String, Identifiable {
     case apps
     case domains
+    /// Writing a new pause without leaving the routine that will use it.
+    case pauseFlow
 
     var id: String { rawValue }
 }
@@ -510,6 +517,9 @@ struct RoutineEditorView: View {
     /// one: same sheet, same height animation, one thing on it at a time.
     @State private var isNaming = false
     @State private var isShowingIconPicker = false
+    /// Built when the pause screen is pushed and dropped when it is popped, so each new
+    /// pause starts blank rather than carrying the last one's half-written steps.
+    @State private var pauseFlowEditor: PauseFlowEditorViewModel?
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
     @FocusState private var isNameFieldFocused: Bool
@@ -674,6 +684,12 @@ struct RoutineEditorView: View {
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
+            case .pauseFlow:
+                // Measured like the routine's own screens: a pause is a name and a few
+                // steps, and the sheet is as tall as they come out.
+                pauseFlowScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
                 case .naming:
@@ -703,6 +719,8 @@ struct RoutineEditorView: View {
             chromeTitleText("Seleccionadas")
         case .domains:
             chromeTitleText("Websites")
+        case .pauseFlow:
+            chromeTitleText(pauseFlowEditor?.title ?? "Nueva pausa")
         case nil:
             if isNaming {
                 chromeTitleText("Nombre")
@@ -752,7 +770,11 @@ struct RoutineEditorView: View {
 
     @ViewBuilder
     private var trailingChrome: some View {
-        if activeSheet != nil {
+        if activeSheet == .pauseFlow {
+            // No check here: the pause is committed by holding the button on it.
+            Color.clear
+                .frame(width: 44, height: 44)
+        } else if activeSheet != nil {
             if isCreating || isEditing {
                 LocktyDynamicSheetBarButton(action: closePicker) {
                     Image(systemName: "checkmark")
@@ -832,6 +854,10 @@ struct RoutineEditorView: View {
     }
 
     private func closePicker() {
+        if activeSheet == .pauseFlow {
+            closePauseFlowEditor()
+            return
+        }
         isGoingBack = true
         withAnimation(sheetAnimation) {
             activeSheet = nil
@@ -1166,6 +1192,113 @@ struct RoutineEditorView: View {
         }
     }
 
+    /// The pause this routine offers on the apps it blocks.
+    ///
+    /// A menu rather than a screen: picking one of the saved flows is one tap, and
+    /// writing a new one is the last item, which pushes the pause editor into this same
+    /// sheet.
+    private var pauseRow: some View {
+        Menu {
+            ForEach(viewModel.pauseFlows) { flow in
+                Button {
+                    withAnimation(.smooth(duration: 0.24)) {
+                        viewModel.pauseFlowID = flow.id
+                    }
+                } label: {
+                    if viewModel.pauseFlowID == flow.id {
+                        Label(flow.name, systemImage: "checkmark")
+                    } else {
+                        Text(flow.name)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                openPauseFlowEditor()
+            } label: {
+                Label("Nueva pausa", systemImage: "plus")
+            }
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pausa")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(pauseFlowSummary)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+    }
+
+    private var pauseFlowSummary: String {
+        guard let flow = viewModel.selectedPauseFlow else { return "Sin pausa" }
+        let stepCount = flow.steps.count
+        return "\(flow.name) · \(stepCount == 1 ? "1 paso" : "\(stepCount) pasos")"
+    }
+
+    private var readOnlyPauseRow: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pausa")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(pauseFlowSummary)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    @ViewBuilder
+    private var pauseFlowScreen: some View {
+        if let pauseFlowEditor {
+            PauseFlowEditorContent(viewModel: pauseFlowEditor) { flow in
+                Task {
+                    await viewModel.loadPauseFlows()
+                    withAnimation(sheetAnimation) {
+                        viewModel.pauseFlowID = flow.id
+                    }
+                    closePauseFlowEditor()
+                }
+            }
+        }
+    }
+
+    private func openPauseFlowEditor() {
+        pauseFlowEditor = viewModel.makePauseFlowEditor()
+        openChildSheet(.pauseFlow)
+    }
+
+    private func closePauseFlowEditor() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) {
+            activeSheet = nil
+        }
+        pauseFlowEditor = nil
+    }
+
     private var strictRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
@@ -1256,6 +1389,8 @@ struct RoutineEditorView: View {
 
                 appsRow
 
+                pauseRow
+
                 strictRow
 
                 LocktyHoldButton(
@@ -1292,6 +1427,8 @@ struct RoutineEditorView: View {
             sectionHeading("Apps bloqueadas", systemImage: "lock.shield")
 
             appsRow
+
+            readOnlyPauseRow
 
             strictReadOnlyRow
 
@@ -1591,20 +1728,40 @@ private struct ScheduleTimeField: View {
     let minute: Int
     let onChange: (Int, Int) -> Void
 
-    @State private var isPresented = false
-    @State private var draftDate = Date()
-
     private var displayText: String {
         String(format: "%02d:%02d", hour, minute)
     }
 
+    /// Every five minutes, plus whatever the routine already has if it is off that grid
+    /// (a schedule written before this control, or one the system rounded differently).
+    private var minuteOptions: [Int] {
+        let grid = Array(stride(from: 0, to: 60, by: 5))
+        return grid.contains(minute) ? grid : (grid + [minute]).sorted()
+    }
+
+    private var hourBinding: Binding<Int> {
+        Binding(get: { hour }, set: { onChange($0, minute) })
+    }
+
+    private var minuteBinding: Binding<Int> {
+        Binding(get: { minute }, set: { onChange(hour, $0) })
+    }
+
     var body: some View {
-        Button {
-            var components = DateComponents()
-            components.hour = hour
-            components.minute = minute
-            draftDate = Calendar.current.date(from: components) ?? Date()
-            isPresented = true
+        // A menu, not a popover. Hour and minute come through as their own submenus, so
+        // the time is picked in the row it belongs to instead of a wheel thrown over it.
+        Menu {
+            Picker("Hora", selection: hourBinding) {
+                ForEach(0..<24, id: \.self) { value in
+                    Text(String(format: "%02d", value)).tag(value)
+                }
+            }
+
+            Picker("Minuto", selection: minuteBinding) {
+                ForEach(minuteOptions, id: \.self) { value in
+                    Text(String(format: "%02d", value)).tag(value)
+                }
+            }
         } label: {
             HStack(spacing: LocktySpacing.sm) {
                 Text(displayText)
@@ -1622,20 +1779,7 @@ private struct ScheduleTimeField: View {
         }
         .buttonStyle(.plain)
         .tappable()
-        .popover(isPresented: $isPresented) {
-            // Apple's own wheel. The app's wheel picker is for the flows, where the rows
-            // are app names and minutes; a time is a time and the system already has the
-            // control for it.
-            DatePicker("", selection: $draftDate, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .padding()
-                .onChange(of: draftDate) { _, newValue in
-                    let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
-                    onChange(components.hour ?? hour, components.minute ?? minute)
-                }
-                .presentationCompactAdaptation(.popover)
-        }
+        .accessibilityLabel(label)
     }
 }
 

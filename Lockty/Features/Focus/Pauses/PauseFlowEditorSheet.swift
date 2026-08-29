@@ -54,15 +54,17 @@ final class PauseFlowEditorViewModel: ObservableObject {
         expandedStepID = expandedStepID == id ? nil : id
     }
 
-    func save() async -> Bool {
+    /// Returns the saved flow so whatever asked for it can use it -- the routine editor
+    /// selects the pause it just created rather than making the user find it again.
+    func save() async -> PauseFlow? {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             errorMessage = "Ponle un nombre a la pausa."
-            return false
+            return nil
         }
         guard !steps.isEmpty else {
             errorMessage = "Añade al menos un paso."
-            return false
+            return nil
         }
 
         let flow = PauseFlow(
@@ -75,16 +77,20 @@ final class PauseFlowEditorViewModel: ObservableObject {
 
         do {
             try await repository.save(flow)
-            return true
+            return flow
         } catch {
             errorMessage = error.localizedDescription
-            return false
+            return nil
         }
     }
 }
 
 /// Writing a pause flow. No app anywhere in it: a flow is a way of pausing, and which
 /// apps it covers is decided by the routine that picks it up.
+///
+/// The sheet is only the frame. Everything on it lives in PauseFlowEditorContent, which
+/// the routine editor pushes into its own sheet so a pause can be written from there
+/// without leaving the routine being written.
 struct PauseFlowEditorSheet: View {
     @StateObject private var viewModel: PauseFlowEditorViewModel
     @Environment(\.dismiss) private var dismiss
@@ -95,30 +101,46 @@ struct PauseFlowEditorSheet: View {
 
     var body: some View {
         LocktyDynamicSheet(animation: .snappy(duration: 0.3, extraBounce: 0)) {
-            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                nameField
+            PauseFlowEditorContent(viewModel: viewModel) { _ in dismiss() }
+                .locktyDynamicSheetChrome(id: viewModel.contentID) {
+                    Text(viewModel.title)
+                        .font(.system(.title3, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                } leading: {
+                    Color.clear
+                } trailing: {
+                    LocktyDynamicSheetBarButton(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                }
+        }
+        .task { await viewModel.load() }
+    }
+}
 
-                stepsSection
+/// The pause itself: its name, its steps, and the hold that commits it.
+struct PauseFlowEditorContent: View {
+    @ObservedObject var viewModel: PauseFlowEditorViewModel
+    /// Handed the flow that was written, so the host can select it or dismiss.
+    let onSaved: (PauseFlow) -> Void
 
-                saveButton
-            }
-            .padding(.horizontal, LocktySpacing.lg)
-            .padding(.top, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.xl)
-            .locktyDynamicSheetChrome(id: viewModel.contentID) {
-                Text(viewModel.title)
-                    .font(.system(.title3, design: .default, weight: .regular))
-                    .foregroundStyle(LocktyColors.primaryText)
-            } leading: {
-                Color.clear
-            } trailing: {
-                LocktyDynamicSheetBarButton(action: { dismiss() }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .medium))
+    var body: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            nameField
+
+            stepsSection
+
+            LocktyHoldButton(title: viewModel.isCreating ? "Mantén para crear" : "Mantén para guardar") {
+                Task {
+                    if let flow = await viewModel.save() { onSaved(flow) }
                 }
             }
         }
-        .task { await viewModel.load() }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.lg)
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .alert(
             "No se pudo guardar",
             isPresented: Binding(
@@ -134,7 +156,7 @@ struct PauseFlowEditorSheet: View {
 
     private var nameField: some View {
         TextField("Nombre", text: $viewModel.name)
-            .font(LocktyTypography.body)
+            .font(.system(.subheadline, design: .default, weight: .regular))
             .foregroundStyle(LocktyColors.primaryText)
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
@@ -176,7 +198,7 @@ struct PauseFlowEditorSheet: View {
                 }
             } label: {
                 Label("Añadir paso", systemImage: "plus")
-                    .font(LocktyTypography.callout)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, LocktySpacing.md)
@@ -188,23 +210,6 @@ struct PauseFlowEditorSheet: View {
         }
     }
 
-    private var saveButton: some View {
-        Button {
-            Task {
-                if await viewModel.save() { dismiss() }
-            }
-        } label: {
-            Text("Guardar")
-                .font(.system(.headline, design: .default, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(Capsule(style: .continuous).fill(.white))
-                .clipShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
-    }
-
     private func binding(at index: Int) -> Binding<PauseStep> {
         Binding(
             get: { viewModel.steps[index] },
@@ -214,7 +219,7 @@ struct PauseFlowEditorSheet: View {
 }
 
 /// A step, collapsed to its name and what it does, opening to its settings when tapped.
-private struct PauseFlowStepRow: View {
+struct PauseFlowStepRow: View {
     @Binding var step: PauseStep
     let isExpanded: Bool
     let onToggle: () -> Void

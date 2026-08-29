@@ -1,8 +1,8 @@
 import SwiftUI
 
 extension View {
-    func locktyPrimaryActionStyle() -> some View {
-        modifier(LocktyActionButtonModifier(tint: LocktyColors.primaryText, foreground: Color(uiColor: .systemBackground)))
+    func locktyPrimaryActionStyle(tint: Color = LocktyColors.primaryText) -> some View {
+        modifier(LocktyActionButtonModifier(tint: tint, foreground: Color(uiColor: .systemBackground)))
     }
 
     func locktySecondaryActionStyle() -> some View {

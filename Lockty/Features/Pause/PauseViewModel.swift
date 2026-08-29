@@ -7,11 +7,19 @@ final class PauseViewModel {
     let context: PauseContext
     private let engine: PauseEngine
     private var countdownTask: Task<Void, Never>?
+    private var hasSeededCurrentCountdown = false
 
     var currentStepIndex: Int = 0
     var remainingSeconds: Int = 0
     var completedBreaths: Int = 0
     var intentionText = ""
+    /// Total for the countdown step currently on screen, so the view can scale its
+    /// haptics by how far through the wait we are.
+    private(set) var countdownTotalSeconds: Int = 0
+    /// The moment the running countdown reaches zero. Nil whenever it is not running --
+    /// while backgrounded, for instance -- which is what keeps it from ticking away
+    /// off screen.
+    private var deadline: Date?
 
     init(context: PauseContext, engine: PauseEngine) {
         self.context = context
@@ -21,6 +29,7 @@ final class PauseViewModel {
             return configuration
         }).first {
             remainingSeconds = Int(firstCountdown.duration)
+            countdownTotalSeconds = remainingSeconds
         }
     }
 
@@ -101,22 +110,58 @@ final class PauseViewModel {
         return currentStepIndex == context.steps.count - 1
     }
 
+    var isCountingDown: Bool {
+        guard case .countdown? = currentStep else { return false }
+        return true
+    }
+
     func startIfNeeded() {
         guard case .countdown(let configuration)? = currentStep else { return }
         guard countdownTask == nil else { return }
-        remainingSeconds = Int(configuration.duration)
+        // Only seed the total on a fresh step; coming back from the background must
+        // resume where it stopped, not restart the wait.
+        if !hasSeededCurrentCountdown {
+            remainingSeconds = Int(configuration.duration)
+            countdownTotalSeconds = remainingSeconds
+            hasSeededCurrentCountdown = true
+        }
         engine.beginThinking(context)
+        resume()
+    }
+
+    /// Freezes the countdown when the app leaves the foreground. Without this the sleep
+    /// loop kept its own schedule across a suspend and the number jumped on return.
+    func pause() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        deadline = nil
+    }
+
+    /// Picks the countdown back up from the second it stopped on.
+    func resume() {
+        guard isCountingDown, remainingSeconds > 0, countdownTask == nil else { return }
+        let target = Date().addingTimeInterval(TimeInterval(remainingSeconds))
+        deadline = target
 
         countdownTask = Task { [weak self] in
-            guard let self else { return }
-            while self.remainingSeconds > 0 {
-                try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled else { return }
-                self.remainingSeconds -= 1
-                self.engine.updateCountdown(context: self.context, remainingSeconds: self.remainingSeconds)
+            while let self, !Task.isCancelled, self.deadline == target {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, self.deadline == target else { return }
+
+                // Derived from the deadline rather than decremented, so a late wake-up
+                // lands on the right second instead of drifting.
+                let next = max(0, Int(target.timeIntervalSinceNow.rounded(.up)))
+                guard next != self.remainingSeconds else { continue }
+                self.remainingSeconds = next
+                self.engine.updateCountdown(context: self.context, remainingSeconds: next)
+
+                if next == 0 {
+                    self.countdownTask = nil
+                    self.deadline = nil
+                    self.moveToNextStepIfNeeded()
+                    return
+                }
             }
-            self.countdownTask = nil
-            self.moveToNextStepIfNeeded()
         }
     }
 
@@ -139,8 +184,7 @@ final class PauseViewModel {
     }
 
     func stayLocked() async -> Bool {
-        countdownTask?.cancel()
-        countdownTask = nil
+        pause()
         await engine.cancel(context, intention: sanitizedIntention)
         return true
     }
@@ -155,8 +199,9 @@ final class PauseViewModel {
         currentStepIndex += 1
         completedBreaths = 0
         remainingSeconds = 0
-        countdownTask?.cancel()
-        countdownTask = nil
+        countdownTotalSeconds = 0
+        hasSeededCurrentCountdown = false
+        pause()
         startIfNeeded()
     }
 }

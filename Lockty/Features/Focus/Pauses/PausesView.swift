@@ -13,6 +13,10 @@ struct PausesView: View {
         // Same shape as Routines: a two-column grid whose last tile is "Add", with no
         // separate create button underneath and no summary card above.
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            if viewModel.isLockedByActiveRoutine {
+                EditingDisabledBanner(message: viewModel.activeRoutineLockMessage)
+            }
+
 //            CardView {
 //                HStack(spacing: LocktySpacing.lg) {
 //                    MetricRingView(metric: PrimaryMetric(kind: .control, value: Double(viewModel.state.summary.successRateValue ?? 0)), collapseProgress: 0)
@@ -38,7 +42,10 @@ struct PausesView: View {
                     }
                 }
 
-                addPauseTile
+                // No way in to creating one while a routine is running.
+                if !viewModel.isLockedByActiveRoutine {
+                    addPauseTile
+                }
             }
         }
         .onAppear {

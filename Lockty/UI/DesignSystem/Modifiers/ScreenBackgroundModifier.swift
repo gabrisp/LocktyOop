@@ -31,7 +31,7 @@ struct LocktyScreenBackground: View {
             let maxDimension = max(size.width, size.height)
 
             ZStack {
-                LocktyColors.secondaryDarkModeBg
+                LocktyColors.background
 
                 circle(size: maxDimension * 0.92)
                     .offset(x: -maxDimension * 0.42, y: -maxDimension * 0.30)

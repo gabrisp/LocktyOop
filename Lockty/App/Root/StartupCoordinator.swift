@@ -65,7 +65,9 @@ final class StartupCoordinator {
         await pauseEngine.restore(from: runtimeState)
 
         let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
-        if let presentedPause {
+        // pendingPause survives until the flow is answered, so without this check every
+        // return to the foreground re-presented the cover over the one already up.
+        if let presentedPause, router.fullScreen == nil {
             router.presentFullScreen(.pause(presentedPause.context))
         }
 

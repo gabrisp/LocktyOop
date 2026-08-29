@@ -30,6 +30,7 @@ struct RootView: View {
             }
         }
         .locktyScreenBackground()
+        .preferredColorScheme(.dark)
         .task {
             await container.startupCoordinator.startIfNeeded()
         }

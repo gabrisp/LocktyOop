@@ -111,11 +111,19 @@ final class RoutineEditorViewModel {
         sanitizedTasks().count
     }
 
+    /// A routine can't be edited while it is the one running -- in any mode, not only
+    /// Strict. Its restrictions are already applied, so a mid-run edit would leave the
+    /// live shield and the stored routine describing different things.
     var editingBlockDecision: StrictModeDecision {
-        guard let initialRoutineID, routineEngine.activeRoutine()?.routineID == initialRoutineID else {
+        guard let initialRoutineID, let active = routineEngine.activeRoutine(),
+              active.routineID == initialRoutineID
+        else {
             return .allowed
         }
-        return strictModePolicy.decision(for: .editRoutine, activeRoutine: routineEngine.activeRoutine())
+
+        let strictDecision = strictModePolicy.decision(for: .editRoutine, activeRoutine: active)
+        guard strictDecision.isAllowed else { return strictDecision }
+        return .denied("\(active.nameSnapshot) is running. It can't be edited until it ends.")
     }
 
     var isEditingBlocked: Bool {

@@ -51,6 +51,7 @@ final class PauseEditorViewModel {
     private let initialPauseID: UUID?
     private let repository: PauseRuleRepository
     private let selectionStore: ScreenTimeSelectionStore
+    private let routineEngine: RoutineEngine
     private var hasLoaded = false
     private var createdAt: Date
 
@@ -58,15 +59,28 @@ final class PauseEditorViewModel {
         pauseID: UUID?,
         draftID: UUID,
         repository: PauseRuleRepository,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        routineEngine: RoutineEngine
     ) {
         initialPauseID = pauseID
         editingID = pauseID ?? UUID()
         self.draftID = draftID
         self.repository = repository
         self.selectionStore = selectionStore
+        self.routineEngine = routineEngine
         createdAt = Date()
         refreshSelectionState()
+    }
+
+    /// Pauses are part of what a running routine enforces, so they are frozen for as
+    /// long as one is active -- creating a new one included.
+    var isEditingBlocked: Bool {
+        routineEngine.activeRoutine() != nil
+    }
+
+    var editingBlockedMessage: String {
+        let name = routineEngine.activeRoutine()?.nameSnapshot ?? "A routine"
+        return "\(name) is running. Pauses can't be changed until it ends."
     }
 
     var title: String {
@@ -154,6 +168,11 @@ final class PauseEditorViewModel {
     }
 
     func save() async -> Bool {
+        guard !isEditingBlocked else {
+            errorMessage = editingBlockedMessage
+            return false
+        }
+
         let selection = selectionPreview
 
         let selectedApps = selection.applicationTokens.map(AppIdentity.init(token:))
@@ -247,7 +266,7 @@ struct PauseEditorView: View {
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
-        _isEditing = State(initialValue: viewModel.isCreating)
+        _isEditing = State(initialValue: viewModel.isCreating && !viewModel.isEditingBlocked)
         self.router = router
         self.onCloseEditor = onCloseEditor
     }
@@ -271,6 +290,10 @@ struct PauseEditorView: View {
 
         return ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                if viewModel.isEditingBlocked {
+                    EditingDisabledBanner(message: viewModel.editingBlockedMessage)
+                }
+
                 pauseHero(viewModel: viewModel)
 
                 section(title: "Flow") {
@@ -364,6 +387,9 @@ struct PauseEditorView: View {
                 }
             }
 
+            // No pencil at all while a routine is running: there is nothing to switch
+            // into, so the editor stays a reader.
+            if !viewModel.isEditingBlocked {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     guard isEditing else {
@@ -384,6 +410,7 @@ struct PauseEditorView: View {
                     Image(systemName: isEditing ? "checkmark" : "pencil")
                         .fontWeight(.ultraLight)
                 }
+            }
             }
         }
         .interactiveDismissDisabled(isEditing && !isCreating)

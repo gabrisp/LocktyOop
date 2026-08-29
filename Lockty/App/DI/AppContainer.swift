@@ -165,7 +165,8 @@ final class AppContainer {
         let pausesViewModel = PausesViewModel(
             ruleRepository: pauseRuleRepository,
             eventRepository: pauseEventRepository,
-            calculator: PauseSuccessCalculator()
+            calculator: PauseSuccessCalculator(),
+            routineEngine: routineEngine
         )
         let lifetimeViewModel = LifetimeViewModel(
             usageDataService: usageDataService,

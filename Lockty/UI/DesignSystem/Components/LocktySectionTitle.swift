@@ -101,15 +101,18 @@ struct LocktySectionTitle: View {
                     .frame(height: 0.5)
             }
 
-            HStack(spacing: LocktySpacing.xs) {
+            HStack(spacing: LocktySpacing.sm) {
                 if onOpen != nil || showsChevron {
+                    // The usage card's heading, verbatim -- it is the one every other
+                    // card matches, not the other way round.
                     Text(title)
-                        .font(.system(.headline, design: .default, weight: .bold))
-                        .foregroundStyle(LocktyColors.primaryText)
+                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .lineLimit(1)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundStyle(LocktyColors.tertiaryText)
+                        .font(.system(.subheadline, design: .default, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.58))
 
                     inlineAccessory
                         .padding(.leading, LocktySpacing.xs)

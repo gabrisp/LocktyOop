@@ -284,12 +284,6 @@ private struct LocktyDynamicSheetChromeOverlay: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.md)
             .padding(.bottom, LocktySpacing.sm)
-            // Clear and blurred, never a material: a material paints its own tinted
-            // surface over what is behind it, which made the bar read as a panel sitting
-            // on the content rather than as part of the sheet.
-            .background(alignment: .top) {
-                Color.clear.blur(radius: 18)
-            }
     }
 
     @ViewBuilder

@@ -8,6 +8,10 @@ struct LocktyDynamicSheet<Content: View>: View {
     /// blur while the sheet resizes, so growing to fit a newly opened section reads as
     /// one movement rather than a jump followed by a redraw.
     let contentID: AnyHashable?
+    /// Takes the whole screen instead of measuring. For content that is a screen in its
+    /// own right -- a picker with its own list -- where sizing to it would just mean
+    /// full height with an extra layout pass first.
+    let isExpanded: Bool
     let content: Content
 
     @State private var sheetHeight: CGFloat = 0
@@ -16,11 +20,13 @@ struct LocktyDynamicSheet<Content: View>: View {
         animation: Animation = .easeInOut(duration: 0.28),
         fixedHeight: CGFloat? = nil,
         contentID: AnyHashable? = nil,
+        isExpanded: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.animation = animation
         self.fixedHeight = fixedHeight
         self.contentID = contentID
+        self.isExpanded = isExpanded
         self.content = content()
     }
 
@@ -39,6 +45,7 @@ struct LocktyDynamicSheet<Content: View>: View {
     }
 
     private var detents: Set<PresentationDetent> {
+        if isExpanded { return [.large] }
         let height = fixedHeight ?? sheetHeight
         return height == .zero ? [.medium] : [.height(height)]
     }

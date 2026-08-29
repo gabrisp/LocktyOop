@@ -436,6 +436,10 @@ struct RoutineEditorView: View {
     @State private var isEditing: Bool
     /// Which section's (i) popover is showing, keyed by its info text.
     @State private var infoSectionText: String?
+    /// The pencil swaps the sheet's content for the naming screen rather than pushing
+    /// one: same sheet, same height animation, one thing on it at a time.
+    @State private var isNaming = false
+    @State private var isShowingIconPicker = false
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -468,11 +472,136 @@ struct RoutineEditorView: View {
         dismiss()
     }
 
+    /// The app and category picker is shown inside this sheet rather than on top of it,
+    /// so choosing apps is the sheet growing to full height, not a second sheet stacking
+    /// over the first.
+    private var isPickingApps: Bool { activeSheet == .apps }
+
+    private var contentID: String {
+        if isPickingApps { return "apps" }
+        return isNaming ? "naming" : "editor"
+    }
+
     var body: some View {
-        NavigationStack {
-            editorContent
+        LocktyDynamicSheet(
+            animation: .smooth(duration: 0.34),
+            contentID: contentID,
+            isExpanded: isPickingApps
+        ) {
+            if isNaming {
+                namingContent
+            } else if isPickingApps {
+                LocktyActivitySelectionView(
+                    title: "Seleccionadas",
+                    addLabel: "Añadir App o categoría",
+                    selection: Binding(
+                        get: { viewModel.selectionPreview },
+                        set: { newValue in
+                            withAnimation(.smooth(duration: 0.28)) {
+                                viewModel.replaceSelection(newValue)
+                            }
+                        }
+                    ),
+                    rules: .routine,
+                    suggestions: viewModel.suggestedApplications,
+                    onClose: { closePicker() },
+                    onDone: { closePicker() }
+                )
+            } else {
+                NavigationStack {
+                    editorContent
+                }
+            }
         }
-        .presentationDetents([.large])
+    }
+
+    /// Naming the routine: its name and its icon, and nothing else. Reached from the
+    /// pencil, and the only way back is answering it.
+    private var namingContent: some View {
+        VStack(spacing: LocktySpacing.lg) {
+            HStack {
+                Button {
+                    withAnimation(.smooth(duration: 0.34)) { isNaming = false }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(LocktyColors.elevatedBackground))
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+
+                Spacer(minLength: 0)
+
+                Text("Pon nombre a tu regla")
+                    .font(.system(.headline, design: .default, weight: .semibold))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    withAnimation(.smooth(duration: 0.34)) { isNaming = false }
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(LocktyColors.productive))
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            HStack(spacing: LocktySpacing.sm) {
+                TextField("Nombre", text: $viewModel.name)
+                    .font(LocktyTypography.body)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .padding(.horizontal, LocktySpacing.lg)
+                    .padding(.vertical, LocktySpacing.md)
+                    .background(Capsule(style: .continuous).fill(LocktyColors.elevatedBackground))
+
+                // The icon lives beside the name, not inside the field: it is the other
+                // half of what identifies the routine, and it opens its own popover.
+                Button {
+                    isShowingIconPicker = true
+                } label: {
+                    Image(systemName: viewModel.icon.isEmpty ? "square.grid.2x2" : viewModel.icon)
+                        .font(.system(size: 18, weight: .light))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(LocktyColors.elevatedBackground))
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .popover(isPresented: $isShowingIconPicker) {
+                    RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
+                        .presentationCompactAdaptation(.popover)
+                }
+            }
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.vertical, LocktySpacing.lg)
+    }
+
+    /// Section heading: a glyph and a label, both in full colour. The eyebrow form is
+    /// for sections inside a card; these are the sheet's own divisions.
+    @ViewBuilder
+    private func sectionHeading(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: LocktySpacing.sm) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+            Text(title)
+                .font(.system(.headline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.primaryText)
+        }
+    }
+
+    private func closePicker() {
+        withAnimation(.smooth(duration: 0.34)) {
+            activeSheet = nil
+        }
+        viewModel.refreshSelectionState()
     }
 
     private var editorContent: some View {
@@ -495,11 +624,7 @@ struct RoutineEditorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Rectangle()
-                        .fill(LocktyColors.separator)
-                        .frame(height: 0.5)
-                    Text("RESTRICTIONS")
-                        .locktyEyebrow()
+                    sectionHeading("Apps bloqueadas", systemImage: "shield")
 
                     VStack(spacing: LocktySpacing.sm) {
                         if isEditing {
@@ -511,7 +636,7 @@ struct RoutineEditorView: View {
                                 ),
                                 tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
                             ) {
-                                activeSheet = .apps
+                                withAnimation(.smooth(duration: 0.34)) { activeSheet = .apps }
                             }
 
                             RestrictionRow(
@@ -539,11 +664,7 @@ struct RoutineEditorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Rectangle()
-                        .fill(LocktyColors.separator)
-                        .frame(height: 0.5)
-                    Text("SCHEDULE")
-                        .locktyEyebrow()
+                    sectionHeading("Durante este horario", systemImage: "calendar")
 
                     ScheduleDaysPicker(
                         selectedWeekdays: Binding(
@@ -594,11 +715,7 @@ struct RoutineEditorView: View {
                 // Which saved flow this routine puts you through before one of its apps
                 // opens. The default is the plain wait-then-confirm.
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Rectangle()
-                        .fill(LocktyColors.separator)
-                        .frame(height: 0.5)
-                    Text("PAUSA")
-                        .locktyEyebrow()
+                    sectionHeading("Pausa", systemImage: "hourglass")
 
                     Menu {
                         Button("Por defecto") {
@@ -696,6 +813,25 @@ struct RoutineEditorView: View {
 //                        }
 //                    }
 //                }
+
+                if isEditing {
+                    // The commit lives at the end of the sheet rather than in the
+                    // toolbar: it is the last thing you do, and it is deliberate enough
+                    // to be held rather than tapped.
+                    HoldDownButton(text: isCreating ? "Mantén para crear" : "Mantén para guardar") {
+                        Task {
+                            if await viewModel.save() {
+                                if isCreating {
+                                    close()
+                                } else {
+                                    withAnimation(.smooth(duration: 0.28)) { isEditing = false }
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, LocktySpacing.sm)
+                }
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
@@ -721,25 +857,15 @@ struct RoutineEditorView: View {
             // offering the control at all just makes it look broken.
             if !viewModel.isEditingBlocked {
             ToolbarItem(placement: .topBarTrailing) {
+                // The pencil opens the naming screen, in this same sheet. Saving is the
+                // hold button at the end of the editor, not this.
                 Button {
-                    guard isEditing else {
-                        withAnimation(.smooth(duration: 0.28)) { isEditing = true }
-                        return
-                    }
-
-                    Task {
-                        if await viewModel.save() {
-                            if isCreating {
-                                close()
-                            } else {
-                                // Editing an existing routine returns to reading it,
-                                // rather than dismissing the sheet outright.
-                                withAnimation(.smooth(duration: 0.28)) { isEditing = false }
-                            }
-                        }
+                    withAnimation(.smooth(duration: 0.34)) {
+                        isEditing = true
+                        isNaming = true
                     }
                 } label: {
-                    Image(systemName: isEditing ? "checkmark" : "pencil")
+                    Image(systemName: "pencil")
                         .fontWeight(.ultraLight)
                 }
             }
@@ -756,13 +882,13 @@ struct RoutineEditorView: View {
                 viewModel.refreshSelectionState()
             }
         }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .apps:
-                RoutineAppPickerSheet(viewModel: viewModel)
-            case .domains:
-                RoutineDomainsSheet(viewModel: viewModel)
-            }
+        .sheet(
+            isPresented: Binding(
+                get: { activeSheet == .domains },
+                set: { if !$0 { activeSheet = nil } }
+            )
+        ) {
+            RoutineDomainsSheet(viewModel: viewModel)
         }
         .alert(
             "Could not save routine",
@@ -995,15 +1121,42 @@ private struct ScheduleTimeField: View {
         .buttonStyle(.plain)
         .tappable()
         .popover(isPresented: $isPresented) {
-            DatePicker("", selection: $draftDate, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .padding()
-                .onChange(of: draftDate) { _, newValue in
-                    let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
-                    onChange(components.hour ?? hour, components.minute ?? minute)
+            // Two wheels of our own rather than a DatePicker: hours and minutes each get
+            // the same wheel the rest of the app uses, with the selection pill fixed in
+            // the middle, instead of a system control that looks like nothing else here.
+            HStack(spacing: 0) {
+                LocktyWheelPicker(
+                    items: Array(0..<24),
+                    selection: Binding(
+                        get: { hour },
+                        set: { onChange($0 ?? hour, minute) }
+                    ),
+                    rowHeight: 44
+                ) { value in
+                    Text(String(format: "%02d", value))
+                        .font(.system(.title3, design: .default, weight: value == hour ? .semibold : .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
                 }
-                .presentationCompactAdaptation(.popover)
+
+                LocktyWheelPicker(
+                    items: Array(0..<60),
+                    selection: Binding(
+                        get: { minute },
+                        set: { onChange(hour, $0 ?? minute) }
+                    ),
+                    rowHeight: 44
+                ) { value in
+                    Text(String(format: "%02d", value))
+                        .font(.system(.title3, design: .default, weight: value == minute ? .semibold : .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(width: 220, height: 308)
+            .presentationCompactAdaptation(.popover)
         }
     }
 }

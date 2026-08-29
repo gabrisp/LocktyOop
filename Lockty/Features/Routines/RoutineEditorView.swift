@@ -495,6 +495,7 @@ struct RoutineEditorView: View {
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
     @FocusState private var isNameFieldFocused: Bool
+    @State private var isGoingBack = false
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -608,6 +609,20 @@ struct RoutineEditorView: View {
 
     private var sheetAnimation: Animation { .snappy(duration: 0.3, extraBounce: 0) }
 
+    /// Which way the screens travel. Going deeper the new screen comes in from the right
+    /// and the old one leaves to the left; coming back, both reverse. Without this every
+    /// change ran the same way and going back looked like going forward again.
+    private var screenTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: isGoingBack ? .leading : .trailing)
+                .combined(with: AnyTransition(.blurReplace))
+                .combined(with: .opacity),
+            removal: .move(edge: isGoingBack ? .trailing : .leading)
+                .combined(with: AnyTransition(.blurReplace))
+                .combined(with: .opacity)
+        )
+    }
+
     /// The screens, swapped in place. There is no navigation stack: one ZStack holds
     /// whichever screen is current and each branch is its own geometryGroup, so the
     /// sheet resizing and the content changing move together instead of the transition
@@ -622,27 +637,27 @@ struct RoutineEditorView: View {
                     .frame(maxHeight: .infinity)
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
-                    .transition(.blurReplace(.upUp))
+                    .transition(screenTransition)
             case .domains:
                 domainsScreen
                     .frame(maxHeight: .infinity)
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
-                    .transition(.blurReplace(.upUp))
+                    .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
                 case .naming:
                     namingContent
                         .geometryGroup()
-                        .transition(.blurReplace(.upUp))
+                        .transition(screenTransition)
                 case .editing:
                     editorContent
                         .geometryGroup()
-                        .transition(.blurReplace(.downUp))
+                        .transition(screenTransition)
                 case .reading:
                     readOnlyContent
                         .geometryGroup()
-                        .transition(.blurReplace(.downUp))
+                        .transition(screenTransition)
                 }
             }
         }
@@ -787,6 +802,7 @@ struct RoutineEditorView: View {
     }
 
     private func closePicker() {
+        isGoingBack = true
         withAnimation(sheetAnimation) {
             activeSheet = nil
         }
@@ -794,12 +810,14 @@ struct RoutineEditorView: View {
     }
 
     private func openChildSheet(_ sheet: RoutineEditorLocalSheet) {
+        isGoingBack = false
         withAnimation(sheetAnimation) {
             activeSheet = sheet
         }
     }
 
     private func enterEditingFlow() {
+        isGoingBack = false
         withAnimation(sheetAnimation) {
             isEditing = true
             isNaming = true
@@ -807,6 +825,7 @@ struct RoutineEditorView: View {
     }
 
     private func exitNaming() {
+        isGoingBack = true
         withAnimation(sheetAnimation) {
             isNaming = false
         }

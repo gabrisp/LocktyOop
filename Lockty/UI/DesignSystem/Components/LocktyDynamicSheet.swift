@@ -162,6 +162,8 @@ struct LocktyDynamicSheet<Content: View>: View {
         return false
     }()
     @StateObject private var chromeController = LocktyDynamicSheetChromeController()
+    /// The height the sheet had before a screen took it to a size of its own.
+    @State private var heightBeforeExplicitSize: CGFloat?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -181,6 +183,10 @@ struct LocktyDynamicSheet<Content: View>: View {
                     isVisible ? $0.size : .zero
                 } action: { newValue in
                     guard newValue != .zero, chromeController.sizes == nil else { return }
+                    // Not while coming back from a screen that took its own size: the
+                    // height to return to was already measured on the way in, and
+                    // reading again mid-transition catches the content still moving.
+                    guard heightBeforeExplicitSize == nil else { return }
                     setHeight(newValue.height)
                 }
 
@@ -190,6 +196,23 @@ struct LocktyDynamicSheet<Content: View>: View {
             }
         }
         .task { isVisible = true }
+        .onChange(of: chromeController.sizes == nil) { _, isMeasuring in
+            if isMeasuring {
+                // Back to sizing itself: restore what it was, rather than measuring the
+                // returning screen again.
+                if let heightBeforeExplicitSize {
+                    withAnimation(animation) { sheetHeight = heightBeforeExplicitSize }
+                }
+                // Released a beat later so the transition finishes before measurements
+                // are taken up again.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(360))
+                    heightBeforeExplicitSize = nil
+                }
+            } else {
+                heightBeforeExplicitSize = sheetHeight
+            }
+        }
         .modifier(LocktySheetDetentModifier(height: sheetHeight, sizes: chromeController.sizes))
     }
 
@@ -261,9 +284,9 @@ private struct LocktyDynamicSheetChromeOverlay: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.md)
             .padding(.bottom, LocktySpacing.sm)
-            // No background. A material paints its own tinted surface over whatever is
-            // behind it, which made the bar read as a panel sitting on the content
-            // rather than as part of the sheet.
+            // Clear and blurred, never a material: a material paints its own tinted
+            // surface over what is behind it, which made the bar read as a panel sitting
+            // on the content rather than as part of the sheet.
             .background(alignment: .top) {
                 Color.clear.blur(radius: 18)
             }

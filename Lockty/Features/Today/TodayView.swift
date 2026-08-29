@@ -96,7 +96,9 @@ struct TodayView: View {
                 .ignoresSafeArea()
 
             scrollContent
-            topChromeBackdrop
+            // No backdrop behind the collapsed chrome: the ring sits on the screen's own
+            // background now rather than on a black gradient masked in behind it.
+//            topChromeBackdrop
             topChrome
         }
         .task(id: DayKey(date: day)) {

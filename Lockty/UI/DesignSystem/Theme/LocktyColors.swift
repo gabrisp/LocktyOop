@@ -8,9 +8,8 @@ private func adaptive(light: UIColor, dark: UIColor) -> Color {
 }
 
 enum LocktyColors {
-    /// Global app background: Apple's secondary system background, not the primary one,
-    /// so the screen sits a step above pure black/white and the cards read against it.
-    static let background = Color(uiColor: .secondarySystemBackground)
+    /// Global app background. Lockty currently runs in dark appearance only.
+    static let background = Color.black
     static let elevatedBackground = adaptive(
         light: UIColor.black.withAlphaComponent(0.06),
         dark: UIColor.white.withAlphaComponent(0.08)

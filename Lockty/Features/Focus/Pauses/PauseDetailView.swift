@@ -1,14 +1,14 @@
 import SwiftUI
+import Combine
 
 @MainActor
-@Observable
-final class PauseDetailViewModel {
+final class PauseDetailViewModel: ObservableObject {
     private let pauseID: UUID
     private let repository: PauseRuleRepository
     private let eventRepository: PauseEventRepository
 
-    private(set) var rule: PauseRule?
-    private(set) var events: [PauseEvent] = []
+    @Published private(set) var rule: PauseRule?
+    @Published private(set) var events: [PauseEvent] = []
 
     init(
         pauseID: UUID,
@@ -37,7 +37,7 @@ final class PauseDetailViewModel {
 }
 
 struct PauseDetailView: View {
-    @Bindable var viewModel: PauseDetailViewModel
+    @ObservedObject var viewModel: PauseDetailViewModel
     let router: AppRouter
     @Environment(\.dismiss) private var dismiss
 

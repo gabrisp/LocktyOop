@@ -29,58 +29,33 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         )
     }
 
-    /// True only when an enabled Pause rule exists for this specific app — the
-    /// secondary button offers the Pause flow, so it must not appear otherwise.
-    private func pauseRule(for application: Application?) -> PauseRuleSnapshot? {
-        guard let application else { return nil }
-
-        let snapshots = AppGroupStore().loadPauseRuleSnapshots().filter(\.isEnabled)
-        guard !snapshots.isEmpty else { return nil }
-
-        if let token = application.token,
-           let match = snapshots.first(where: { $0.application.applicationToken == token }) {
-            return match
-        }
-
-        if let bundleIdentifier = application.bundleIdentifier,
-           let match = snapshots.first(where: {
-               $0.application.bundleIdentifier == bundleIdentifier
-                   || $0.application.id.rawValue == bundleIdentifier
-           }) {
-            return match
-        }
-
-        return nil
-    }
-
+    /// The same two buttons on every shielded app: primary asks Lockty to unlock,
+    /// secondary closes. Neither depends on a per-app rule any more -- the pause belongs
+    /// to the running routine, so it covers everything that routine blocks.
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
-        let rule = pauseRule(for: application)
-        let allowsPause = runtime?.pendingPause == nil && rule != nil
-        let activeRoutineName = runtime?.activeRoutine?.nameSnapshot
-        // Prefer the user's own label: the system only gives us an opaque token, so
-        // localizedDisplayName is frequently unavailable here.
-        let title = rule?.displayName ?? resourceName
+        let activeRoutine = runtime?.activeRoutine
+        let offersUnlock = runtime?.pendingPause == nil
+            && activeRoutine?.pausePolicySnapshot.offersPause == true
 
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1),
             icon: UIImage(systemName: "lock.shield"),
             title: ShieldConfiguration.Label(
-                text: title,
+                text: resourceName,
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(
-                text: activeRoutineName.map { "Blocked by \($0)" } ?? "Locked by Lockty",
+                text: activeRoutine.map { "Bloqueado por \($0.nameSnapshot)" } ?? "Bloqueado por Lockty",
                 color: UIColor.white.withAlphaComponent(0.72)
             ),
-            primaryButtonLabel: ShieldConfiguration.Label(
-                text: "Stay Locked",
-                color: .white
-            ),
-            primaryButtonBackgroundColor: UIColor.systemBlue,
-            secondaryButtonLabel: allowsPause
-                ? ShieldConfiguration.Label(text: "Open Mindfully", color: UIColor.white.withAlphaComponent(0.85))
+            primaryButtonLabel: offersUnlock
+                ? ShieldConfiguration.Label(text: "Desbloquear", color: .black)
+                : ShieldConfiguration.Label(text: "Cerrar", color: .black),
+            primaryButtonBackgroundColor: .white,
+            secondaryButtonLabel: offersUnlock
+                ? ShieldConfiguration.Label(text: "Cerrar", color: UIColor.white.withAlphaComponent(0.85))
                 : nil
         )
     }

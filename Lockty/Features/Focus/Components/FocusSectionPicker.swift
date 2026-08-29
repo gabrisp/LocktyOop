@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FocusSectionPicker: View {
-    @Bindable var viewModel: FocusViewModel
+    @ObservedObject var viewModel: FocusViewModel
 
     var body: some View {
         Picker("", selection: Binding(

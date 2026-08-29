@@ -1,19 +1,19 @@
 import FamilyControls
+import Combine
 import SwiftUI
 
 @MainActor
-@Observable
-final class RoutineDetailViewModel {
+final class RoutineDetailViewModel: ObservableObject {
     private let routineID: UUID
     private let repository: RoutineRepository
     private let executionRepository: RoutineExecutionRepository
     private let routineEngine: RoutineEngine
     private let selectionStore: ScreenTimeSelectionStore
 
-    private(set) var routine: Routine?
-    private(set) var recentExecutions: [RoutineExecution] = []
-    private(set) var selection = FamilyActivitySelection()
-    var errorMessage: String?
+    @Published private(set) var routine: Routine?
+    @Published private(set) var recentExecutions: [RoutineExecution] = []
+    @Published private(set) var selection = FamilyActivitySelection()
+    @Published var errorMessage: String?
 
     init(
         routineID: UUID,
@@ -77,7 +77,7 @@ private func timeText(hour: Int, minute: Int) -> String {
 }
 
 struct RoutineDetailView: View {
-    @Bindable var viewModel: RoutineDetailViewModel
+    @ObservedObject var viewModel: RoutineDetailViewModel
     let router: AppRouter
     @Environment(\.dismiss) private var dismiss
 

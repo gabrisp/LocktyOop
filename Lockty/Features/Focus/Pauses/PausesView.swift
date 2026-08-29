@@ -65,7 +65,7 @@ struct PausesView: View {
         Button {
             router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
         } label: {
-            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
+            CardView(radius: RoutineGridMetrics.tileRadius, interactive: true, height: RoutineGridMetrics.tileHeight) {
                 VStack(alignment: .leading, spacing: LocktySpacing.md) {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .light))
@@ -86,37 +86,34 @@ struct PausesView: View {
     }
 }
 
-/// Grid tile for a Pause, matching RoutineCard.
-private struct PauseCard: View {
+/// Grid tile for a Pause. Same shape as RoutineCard, but the app itself is the subject:
+/// its own icon and its token-derived name, both bottom-aligned and leading.
+struct PauseCard: View {
     let rule: PauseRuleSummaryState
     let onOpen: () -> Void
 
     var body: some View {
         Button(action: onOpen) {
-            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Image(systemName: "pause")
-                        .font(.system(size: 16, weight: .light))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 24, height: 24)
-
+            CardView(radius: RoutineGridMetrics.tileRadius, interactive: true, height: RoutineGridMetrics.tileHeight) {
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     Spacer(minLength: 0)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(rule.name)
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .lineLimit(1)
+                    AppIconView(
+                        source: rule.app.iconSource,
+                        applicationToken: rule.app.applicationToken,
+                        fallbackSystemImage: rule.app.iconSystemName,
+                        size: 34,
+                        chrome: .plain
+                    )
 
-                        Text(rule.flow)
-                            .font(LocktyTypography.caption)
-                            .foregroundStyle(LocktyColors.secondaryText)
-                            .lineLimit(1)
-                    }
+                    LocktyAppNameText(app: rule.app, scale: 0.82)
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.primaryText)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

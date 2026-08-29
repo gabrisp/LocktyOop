@@ -14,7 +14,7 @@ struct ScreenTimeCard: View {
                 )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

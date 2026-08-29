@@ -10,7 +10,7 @@ struct IntentionalTimeCard: View {
                 TodayMetricCardLayoutView(title: "Intentional Time", value: state.valueText, detail: state.detailText)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

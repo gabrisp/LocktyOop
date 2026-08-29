@@ -4,7 +4,6 @@ import UserNotifications
 
 final class ShieldActionExtension: ShieldActionDelegate {
     private let appGroupStore = AppGroupStore()
-    private let selectionStore = ScreenTimeSelectionStore()
 
     override func handle(
         action: ShieldAction,
@@ -30,6 +29,10 @@ final class ShieldActionExtension: ShieldActionDelegate {
         completionHandler(.close)
     }
 
+    /// Primary asks Lockty to unlock, secondary closes the app.
+    ///
+    /// Neither one depends on a per-app rule any more: the pause belongs to whichever
+    /// routine is running, so the same two buttons work for every app it blocks.
     private func handle(
         action: ShieldAction,
         applicationToken: ApplicationToken,
@@ -37,60 +40,66 @@ final class ShieldActionExtension: ShieldActionDelegate {
     ) {
         switch action {
         case .primaryButtonPressed:
-            completionHandler(.close)
-
-        case .secondaryButtonPressed:
-            guard let snapshot = resolvePauseRule(for: applicationToken) else {
+            guard let context = makeUnlockRequest(for: applicationToken) else {
                 completionHandler(.close)
                 return
             }
-            writePendingPause(snapshot: snapshot)
-            // A shield action extension can't bring the app forward itself, and a Live
-            // Activity can't be started from an extension either (ActivityKit needs the
-            // app foregrounded or a push). A local notification is the one route that
-            // works: tapping it opens Lockty, where the pending pause written above is
-            // picked up and the flow runs.
-            postPauseNotification(snapshot: snapshot)
+
+            writePendingPause(context)
+            // A shield action extension can't bring the app forward itself, and
+            // ActivityKit can't be started from an extension either. A local
+            // notification is the one route that works: tapping it opens Lockty, where
+            // the request written above is surfaced as a card.
+            postUnlockNotification(context)
             completionHandler(.defer)
+
+        case .secondaryButtonPressed:
+            completionHandler(.close)
 
         default:
             completionHandler(.close)
         }
     }
 
-    private func resolvePauseRule(for token: ApplicationToken) -> PauseRuleSnapshot? {
-        guard let ruleID = selectionStore.pauseRuleID(matching: token) else {
-            return nil
-        }
+    /// Builds the request from the running routine's own pause policy.
+    private func makeUnlockRequest(for token: ApplicationToken) -> PauseContext? {
+        guard let runtime = try? appGroupStore.loadRuntimeState(),
+              let activeRoutine = runtime.activeRoutine,
+              activeRoutine.pausePolicySnapshot.offersPause
+        else { return nil }
 
-        return appGroupStore.loadPauseRuleSnapshots().first(where: { $0.id == ruleID && $0.isEnabled })
+        let policy = activeRoutine.pausePolicySnapshot
+        let application = Application(token: token)
+        let identity = AppIdentity(token: token)
+
+        return PauseContext(
+            pauseRuleID: activeRoutine.routineID,
+            appID: identity.id,
+            displayName: application.localizedDisplayName ?? identity.displayName,
+            allowanceDuration: policy.allowanceDuration,
+            steps: policy.steps,
+            activeRoutineID: activeRoutine.routineID,
+            source: .shieldAction
+        )
     }
 
-    private func postPauseNotification(snapshot: PauseRuleSnapshot) {
+    private func postUnlockNotification(_ context: PauseContext) {
         let content = UNMutableNotificationContent()
-        content.title = "Open \(snapshot.displayName) mindfully"
-        content.body = "Tap to continue in Lockty."
+        content.title = "Solicitud de desbloqueo"
+        content.body = "Toca para decidir sobre \(context.displayName) en Lockty."
         content.sound = .default
-        content.userInfo = ["pauseRuleID": snapshot.id.uuidString]
+        content.userInfo = ["pauseRuleID": context.pauseRuleID.uuidString]
 
         // nil trigger delivers as soon as the system allows, rather than on a timer.
         let request = UNNotificationRequest(
-            identifier: "pause-request-\(snapshot.id.uuidString)",
+            identifier: "pause-request-\(context.pauseRuleID.uuidString)",
             content: content,
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
     }
 
-    private func writePendingPause(snapshot: PauseRuleSnapshot) {
-        let context = PauseContext(
-            pauseRuleID: snapshot.id,
-            appID: snapshot.application.id,
-            displayName: snapshot.displayName,
-            allowanceDuration: snapshot.allowanceDuration,
-            steps: snapshot.steps,
-            source: .shieldAction
-        )
+    private func writePendingPause(_ context: PauseContext) {
         let pendingContext = PendingPauseContext(
             context: context,
             expiresAt: Date().addingTimeInterval(10 * 60),
@@ -103,7 +112,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
             idempotencyKey: pendingContext.idempotencyKey
         )
 
-        try? AppGroupStore().updateRuntimeState { state in
+        try? appGroupStore.updateRuntimeState { state in
             state.pendingPause = pendingContext
             state.pendingEvents.append(event)
         }

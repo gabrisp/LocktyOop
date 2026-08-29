@@ -1,33 +1,50 @@
+import Combine
+import FamilyControls
 import Foundation
-import Observation
+import ManagedSettings
 import SwiftUI
 
-@Observable
-final class RoutinesViewModel {
+final class RoutinesViewModel: ObservableObject {
     private let routineEngine: RoutineEngine
     private let repository: RoutineRepository
     private let shieldService: ShieldServicing
     private let scheduleCoordinator: RoutineScheduleCoordinator
-    private(set) var routines: [Routine] = []
-    private(set) var errorMessage: String?
+    private let selectionStore: ScreenTimeSelectionStore
+    @Published private(set) var routines: [Routine] = []
+    /// Resolved once per load rather than read from the card's body: the tokens live in
+    /// the selection store, and hitting it on every redraw would re-read the App Group
+    /// for every tile on screen.
+    @Published private(set) var applicationTokens: [UUID: [ApplicationToken]] = [:]
+    @Published private(set) var errorMessage: String?
 
     init(
         routineEngine: RoutineEngine,
         repository: RoutineRepository,
         shieldService: ShieldServicing,
-        scheduleCoordinator: RoutineScheduleCoordinator
+        scheduleCoordinator: RoutineScheduleCoordinator,
+        selectionStore: ScreenTimeSelectionStore
     ) {
         self.scheduleCoordinator = scheduleCoordinator
         self.routineEngine = routineEngine
         self.repository = repository
         self.shieldService = shieldService
+        self.selectionStore = selectionStore
+    }
+
+    func tokens(for routineID: UUID) -> [ApplicationToken] {
+        applicationTokens[routineID] ?? []
     }
 
     func load() async {
         do {
             let loaded = try await repository.routines()
+            let tokens = loaded.reduce(into: [UUID: [ApplicationToken]]()) { result, routine in
+                let selection = (try? selectionStore.load(scope: .routine(routine.id)))?.applicationTokens ?? []
+                result[routine.id] = selection.stablePrefix(selection.count)
+            }
             withAnimation(.smooth(duration: 0.28)) {
                 routines = loaded
+                applicationTokens = tokens
             }
             // Keeps background scheduling in step with whatever was just created,
             // edited or deleted.

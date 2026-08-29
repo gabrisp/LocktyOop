@@ -12,6 +12,9 @@ struct LocktySectionTitle: View {
     var showsSeparator = true
     /// Optional trailing content, e.g. a count.
     var accessory: AnyView?
+    /// Set when the section has a screen of its own. The title then reads as the way in:
+    /// it grows to a real heading, carries a chevron, and the whole row is tappable.
+    var onOpen: (() -> Void)?
 
     @State private var isShowingInfo = false
 
@@ -24,6 +27,18 @@ struct LocktySectionTitle: View {
         self.info = info
         self.showsSeparator = showsSeparator
         self.accessory = nil
+    }
+
+    init(
+        _ title: String,
+        info: String? = nil,
+        onOpen: @escaping () -> Void
+    ) {
+        self.title = title
+        self.info = info
+        self.showsSeparator = false
+        self.accessory = nil
+        self.onOpen = onOpen
     }
 
     init<Accessory: View>(
@@ -47,8 +62,18 @@ struct LocktySectionTitle: View {
             }
 
             HStack(spacing: LocktySpacing.xs) {
-                Text(title.uppercased())
-                    .locktyEyebrow()
+                if onOpen != nil {
+                    Text(title)
+                        .font(.system(.headline, design: .default, weight: .bold))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                } else {
+                    Text(title.uppercased())
+                        .locktyEyebrow()
+                }
 
                 if let info {
                     Button {
@@ -73,6 +98,10 @@ struct LocktySectionTitle: View {
                 Spacer(minLength: 0)
 
                 accessory
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onOpen?()
             }
         }
     }

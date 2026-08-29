@@ -1,21 +1,20 @@
 import Foundation
-import Observation
+import Combine
 
 @MainActor
-@Observable
-final class PauseViewModel {
+final class PauseViewModel: ObservableObject {
     let context: PauseContext
     private let engine: PauseEngine
     private var countdownTask: Task<Void, Never>?
     private var hasSeededCurrentCountdown = false
 
-    var currentStepIndex: Int = 0
-    var remainingSeconds: Int = 0
-    var completedBreaths: Int = 0
-    var intentionText = ""
+    @Published var currentStepIndex: Int = 0
+    @Published var remainingSeconds: Int = 0
+    @Published var completedBreaths: Int = 0
+    @Published var intentionText = ""
     /// Total for the countdown step currently on screen, so the view can scale its
     /// haptics by how far through the wait we are.
-    private(set) var countdownTotalSeconds: Int = 0
+    @Published private(set) var countdownTotalSeconds: Int = 0
     /// The moment the running countdown reaches zero. Nil whenever it is not running --
     /// while backgrounded, for instance -- which is what keeps it from ticking away
     /// off screen.

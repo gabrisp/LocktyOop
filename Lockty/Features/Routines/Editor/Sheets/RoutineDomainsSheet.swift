@@ -1,16 +1,10 @@
 import SwiftUI
 
 struct RoutineDomainsSheet: View {
-    @State private var viewModel: RoutineEditorViewModel
+    @ObservedObject var viewModel: RoutineEditorViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(viewModel: RoutineEditorViewModel) {
-        _viewModel = State(initialValue: viewModel)
-    }
-
     var body: some View {
-        @Bindable var viewModel = viewModel
-
         LocktyDynamicSheet {
             VStack(alignment: .leading, spacing: 0) {
                 EditorTopBar(title: "Websites", onClose: { dismiss() })

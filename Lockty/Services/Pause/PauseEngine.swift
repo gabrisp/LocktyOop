@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 import UserNotifications
 
 enum PauseEngineState: Equatable {
@@ -14,8 +14,7 @@ enum PauseEngineState: Equatable {
     case failed(String)
 }
 
-@Observable
-final class PauseEngine {
+final class PauseEngine: ObservableObject {
     private let shieldService: ShieldServicing
     private let deviceActivityService: DeviceActivityServicing
     private let appGroupStore: AppGroupStore
@@ -24,7 +23,7 @@ final class PauseEngine {
     private let shieldPolicyResolver: ShieldPolicyResolver
     private let liveActivityController: PauseAllowanceLiveActivityControlling
 
-    private(set) var state: PauseEngineState = .idle
+    @Published private(set) var state: PauseEngineState = .idle
 
     init(
         shieldService: ShieldServicing,

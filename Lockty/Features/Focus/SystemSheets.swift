@@ -1,12 +1,12 @@
+import Combine
 import SwiftUI
 
 @MainActor
-@Observable
-final class AppClassificationSheetViewModel {
+final class AppClassificationSheetViewModel: ObservableObject {
     let appID: AppIdentity.ID
     private let repository: AppClassificationRepository
 
-    private(set) var selection: AppClassification = .neutral
+    @Published private(set) var selection: AppClassification = .neutral
 
     init(
         appID: AppIdentity.ID,
@@ -27,7 +27,7 @@ final class AppClassificationSheetViewModel {
 }
 
 struct AppClassificationSheet: View {
-    @Bindable var viewModel: AppClassificationSheetViewModel
+    @ObservedObject var viewModel: AppClassificationSheetViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -87,7 +87,7 @@ struct AppClassificationSheet: View {
 }
 
 struct RoutineBreakSheet: View {
-    @Bindable var viewModel: RoutineBreakSheetViewModel
+    @ObservedObject var viewModel: RoutineBreakSheetViewModel
     let router: AppRouter
     @Environment(\.dismiss) private var dismiss
 
@@ -141,13 +141,12 @@ struct RoutineBreakSheet: View {
 }
 
 @MainActor
-@Observable
-final class RoutineBreakSheetViewModel {
+final class RoutineBreakSheetViewModel: ObservableObject {
     let routineID: UUID
     private let routineEngine: RoutineEngine
 
-    private(set) var activeRoutine: ActiveRoutine?
-    private(set) var errorMessage: String?
+    @Published private(set) var activeRoutine: ActiveRoutine?
+    @Published private(set) var errorMessage: String?
 
     init(
         routineID: UUID,

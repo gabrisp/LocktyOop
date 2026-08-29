@@ -14,7 +14,7 @@ struct LocktySectionScreen<Content: View>: View {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 content
             }
-            .padding(.horizontal, LocktySpacing.md)
+            .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.lg)
         }
         .locktyScreenBackground()

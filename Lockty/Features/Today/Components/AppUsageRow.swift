@@ -22,7 +22,7 @@ struct AppUsageRow: View {
                         Label(token)
                             .labelStyle(.socialFeedTag)
                     } else {
-                        Text(state.app.displayName)
+                        LocktyAppNameText(app: state.app)
                     }
                 }
                 .font(LocktyTypography.headline)

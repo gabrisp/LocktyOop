@@ -159,7 +159,8 @@ final class AppContainer {
             routineEngine: routineEngine,
             repository: routineRepository,
             shieldService: shieldService,
-            scheduleCoordinator: routineScheduleCoordinator
+            scheduleCoordinator: routineScheduleCoordinator,
+            selectionStore: selectionStore
         )
         let focusViewModel = FocusViewModel()
         let pausesViewModel = PausesViewModel(

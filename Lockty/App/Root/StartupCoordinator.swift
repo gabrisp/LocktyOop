@@ -1,15 +1,14 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class StartupCoordinator {
+final class StartupCoordinator: ObservableObject {
     private let session: AppSession
     private let router: AppRouter
     private let appGroupStore: AppGroupStore
     private let pauseEngine: PauseEngine
     private let routineEngine: RoutineEngine
     private let shieldService: ShieldServicing
-    private var hasStarted = false
+    @Published private var hasStarted = false
 
     init(
         session: AppSession,
@@ -43,9 +42,7 @@ final class StartupCoordinator {
             session.finishStartup(requiresOnboarding: !session.hasCompletedOnboarding)
 
             let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
-            if let presentedPause {
-                router.presentFullScreen(.pause(presentedPause.context))
-            }
+            router.pendingUnlock = presentedPause?.context
 
             consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
         } catch {
@@ -67,12 +64,11 @@ final class StartupCoordinator {
         guard let runtimeState = try? appGroupStore.loadRuntimeState() else { return }
         await pauseEngine.restore(from: runtimeState)
 
+        // Surfaced as a card on Today rather than presented: a cover thrown up over
+        // whatever the user was doing is also what made it loop, since pendingPause
+        // survives until the flow is actually answered.
         let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
-        // pendingPause survives until the flow is answered, so without this check every
-        // return to the foreground re-presented the cover over the one already up.
-        if let presentedPause, router.fullScreen == nil {
-            router.presentFullScreen(.pause(presentedPause.context))
-        }
+        router.pendingUnlock = presentedPause?.context
 
         consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
     }
@@ -118,7 +114,7 @@ final class StartupCoordinator {
         switch event.payload {
         case .pauseRequested(let context):
             guard !pauseAlreadyPresented else { return }
-            router.presentFullScreen(.pause(context))
+            router.pendingUnlock = context
         case .routineStartRequested:
             break
         case .settingsRequested:

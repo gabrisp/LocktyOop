@@ -14,7 +14,7 @@ struct BestDetoxCard: View {
                 )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

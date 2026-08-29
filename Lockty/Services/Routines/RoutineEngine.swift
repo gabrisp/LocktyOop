@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 enum RoutineEngineState: Equatable {
     case inactive
@@ -11,8 +11,7 @@ enum RoutineEngineState: Equatable {
     case failed(String)
 }
 
-@Observable
-final class RoutineEngine {
+final class RoutineEngine: ObservableObject {
     private let shieldService: ShieldServicing
     private let deviceActivityService: DeviceActivityServicing
     private let alarmService: AlarmServicing
@@ -22,7 +21,7 @@ final class RoutineEngine {
     private let shieldPolicyResolver: ShieldPolicyResolver
     private let strictModePolicy = StrictModePolicy()
 
-    private(set) var state: RoutineEngineState = .inactive
+    @Published private(set) var state: RoutineEngineState = .inactive
 
     init(
         shieldService: ShieldServicing,
@@ -86,6 +85,7 @@ final class RoutineEngine {
             trigger: trigger,
             shieldPolicy: .routine(routine),
             breakPolicySnapshot: routine.breakPolicy,
+            pausePolicySnapshot: routine.pausePolicy,
             taskCompletions: taskCompletions,
             allowsPauseDuringStrictMode: routine.allowsPauseDuringStrictMode
         )

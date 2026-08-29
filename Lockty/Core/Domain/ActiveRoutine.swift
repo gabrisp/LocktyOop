@@ -13,6 +13,9 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
     var trigger: RoutineTrigger
     var shieldPolicy: ShieldPolicy
     var breakPolicySnapshot: BreakPolicy
+    /// The pause this routine offers, carried here so the shield extension can build the
+    /// flow without reaching into Core Data.
+    var pausePolicySnapshot: RoutinePausePolicy
     var taskCompletions: [RoutineTaskCompletion]
     var allowsPauseDuringStrictMode: Bool
 
@@ -27,6 +30,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         trigger: RoutineTrigger,
         shieldPolicy: ShieldPolicy,
         breakPolicySnapshot: BreakPolicy,
+        pausePolicySnapshot: RoutinePausePolicy = .off,
         taskCompletions: [RoutineTaskCompletion],
         allowsPauseDuringStrictMode: Bool
     ) {
@@ -40,7 +44,28 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         self.trigger = trigger
         self.shieldPolicy = shieldPolicy
         self.breakPolicySnapshot = breakPolicySnapshot
+        self.pausePolicySnapshot = pausePolicySnapshot
         self.taskCompletions = taskCompletions
         self.allowsPauseDuringStrictMode = allowsPauseDuringStrictMode
+    }
+
+    // Written by hand so a runtime state persisted before pausePolicySnapshot existed
+    // still decodes. Without it the whole RuntimeState fails to load and the running
+    // routine is silently dropped on the next launch.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        routineID = try container.decode(UUID.self, forKey: .routineID)
+        nameSnapshot = try container.decode(String.self, forKey: .nameSnapshot)
+        iconSnapshot = try container.decodeIfPresent(String.self, forKey: .iconSnapshot)
+        modeSnapshot = try container.decode(RoutineMode.self, forKey: .modeSnapshot)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        expectedEndAt = try container.decodeIfPresent(Date.self, forKey: .expectedEndAt)
+        trigger = try container.decode(RoutineTrigger.self, forKey: .trigger)
+        shieldPolicy = try container.decode(ShieldPolicy.self, forKey: .shieldPolicy)
+        breakPolicySnapshot = try container.decode(BreakPolicy.self, forKey: .breakPolicySnapshot)
+        pausePolicySnapshot = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicySnapshot) ?? .off
+        taskCompletions = try container.decode([RoutineTaskCompletion].self, forKey: .taskCompletions)
+        allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
     }
 }

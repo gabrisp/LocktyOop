@@ -1,13 +1,13 @@
 import FamilyControls
+import Combine
 import OSLog
 import SwiftUI
 
 private let appPickerLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "selection")
 
 @MainActor
-@Observable
-final class AppPickerViewModel {
-    var selection: FamilyActivitySelection
+final class AppPickerViewModel: ObservableObject {
+    @Published var selection: FamilyActivitySelection
     private let selectionStore: ScreenTimeSelectionStore
     let scope: ScreenTimeSelectionScope
 
@@ -67,6 +67,28 @@ final class AppPickerViewModel {
 
     func persistCurrentSelection() throws {
         try save()
+    }
+
+    var selectionRules: LocktyActivitySelectionRules {
+        switch scope {
+        case .library:
+            .library
+        case .routine:
+            .routine
+        case .pause:
+            .pause
+        }
+    }
+
+    var addLabel: String {
+        switch scope {
+        case .library:
+            "Añadir App o sitio web"
+        case .routine:
+            "Añadir App o categoría"
+        case .pause:
+            "Añadir App"
+        }
     }
 
     func shouldAutoCommitSelection(after previousSelection: FamilyActivitySelection) -> Bool {
@@ -132,59 +154,35 @@ final class AppPickerViewModel {
 }
 
 struct AppPickerSheet: View {
-    @Bindable var viewModel: AppPickerViewModel
+    @ObservedObject var viewModel: AppPickerViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var errorMessage: String?
+    @State private var errorOverlay: LocktyFeedbackOverlayState?
 
     var body: some View {
-        LocktyDynamicSheet(fixedHeight: nil) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(title: viewModel.navigationTitle, onClose: { dismiss() })
-
-                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                        Text(viewModel.descriptionText)
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(LocktyColors.secondaryText)
-
-                        if let helperText = viewModel.helperText {
-                            Text(helperText)
-                                .font(LocktyTypography.caption)
-                                .foregroundStyle(LocktyColors.tertiaryText)
-                        }
-                    }
-                }
-
-                FamilyActivityPicker(selection: $viewModel.selection)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.md)
-            .alert("Could not save selection", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                Button("OK", role: .cancel) { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
-            .onChange(of: viewModel.selection) { oldValue, newValue in
-                guard oldValue != newValue else { return }
-                viewModel.selectionDidChange(from: oldValue)
-
-                // Skip persisting a spurious reset-to-empty event (see
-                // isSpuriousEmptyReset); every other real selection change still
-                // auto-saves immediately, matching the original auto-save-as-you-go
-                // behavior. "Done" always persists the final state regardless.
-                guard !viewModel.isSpuriousEmptyReset(from: oldValue) else { return }
-
+        LocktyActivitySelectionView(
+            title: "Seleccionadas",
+            addLabel: viewModel.addLabel,
+            selection: $viewModel.selection,
+            rules: viewModel.selectionRules,
+            suggestions: [],
+            externalOverlay: $errorOverlay,
+            onClose: { dismiss() },
+            onDone: {
                 do {
                     try viewModel.persistCurrentSelection()
+                    dismiss()
                 } catch {
-                    errorMessage = error.localizedDescription
-                    return
+                    withAnimation(.smooth(duration: 0.22)) {
+                        errorOverlay = LocktyFeedbackOverlayState(
+                            systemImage: "exclamationmark.triangle.fill",
+                            title: "No se pudo guardar",
+                            subtitle: error.localizedDescription,
+                            tint: Color.red.opacity(0.5)
+                        )
+                    }
                 }
-                guard viewModel.shouldAutoCommitSelection(after: oldValue) else { return }
-                dismiss()
             }
-        }
+        )
+        .presentationDetents([.large])
     }
 }

@@ -31,9 +31,32 @@ struct TodayDayState: Equatable {
             activities: [],
             metrics: .loading,
             timeline: .empty,
-            appUsages: []
+            appUsages: placeholderAppUsages
         )
     }
+
+    /// Shape for the app list to hold while the real data is on its way.
+    ///
+    /// The screen stays mounted and gets redacted rather than swapped for a spinner, so
+    /// nothing jumps into place when the load lands -- the values just fill in.
+    static let placeholderAppUsages: [AppUsageState] = {
+        let durations: [TimeInterval] = [68 * 60, 40 * 60, 23 * 60, 21 * 60, 16 * 60]
+
+        return durations.enumerated().map { index, duration -> AppUsageState in
+            let identity = AppIdentity(
+                id: AppIdentity.ID(rawValue: "placeholder.\(index)"),
+                displayName: "Placeholder App"
+            )
+
+            return AppUsageState(
+                app: identity,
+                durationText: LocktyDurationFormatter.abbreviated(duration),
+                duration: duration,
+                classification: .neutral,
+                comparisonText: nil
+            )
+        }
+    }()
 }
 
 struct TodayMetricsState: Codable, Hashable {

@@ -39,7 +39,7 @@ struct DailyPerspectiveStackSection: View {
         // Clipping to a rect inset outwards by the scroll content's horizontal padding
         // puts the cut at the screen edge instead, and being a clip shape rather than a
         // frame change it leaves the layout width alone.
-        .clipShape(Rectangle().inset(by: -LocktySpacing.md))
+        .clipShape(Rectangle().inset(by: -LocktySpacing.lg))
         .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
     }
 

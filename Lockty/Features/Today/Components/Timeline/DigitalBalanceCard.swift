@@ -32,7 +32,7 @@ struct DigitalBalanceCard: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.locktyInteractive)
             .tappable()
         }
     }

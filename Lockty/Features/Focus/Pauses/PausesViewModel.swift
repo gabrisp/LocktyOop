@@ -1,9 +1,11 @@
 import Foundation
-import Observation
+import Combine
 import SwiftUI
 
 struct PauseRuleSummaryState: Identifiable, Equatable {
     let id: UUID
+    /// Carried so the card can draw the app's own icon and token-derived name.
+    let app: AppIdentity
     let name: String
     let flow: String
     let successRate: String
@@ -18,14 +20,13 @@ struct PausesOverviewState: Equatable {
 }
 
 @MainActor
-@Observable
-final class PausesViewModel {
+final class PausesViewModel: ObservableObject {
     private let ruleRepository: PauseRuleRepository
     private let eventRepository: PauseEventRepository
     private let calculator: PauseSuccessCalculating
     private let routineEngine: RoutineEngine
-    private(set) var state = PausesOverviewState()
-    private(set) var recentEvents: [PauseEvent] = []
+    @Published private(set) var state = PausesOverviewState()
+    @Published private(set) var recentEvents: [PauseEvent] = []
 
     init(
         ruleRepository: PauseRuleRepository,
@@ -67,6 +68,7 @@ final class PausesViewModel {
                 let summary = calculator.summary(from: ruleEvents)
                 return PauseRuleSummaryState(
                     id: rule.id,
+                    app: rule.application,
                     name: rule.displayName,
                     flow: rule.steps.map(\.title).joined(separator: " -> "),
                     successRate: summary.successRateValue.map { "\($0)% success" } ?? "No decisions",

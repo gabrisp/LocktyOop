@@ -3,8 +3,8 @@ import UIKit
 
 struct TodayView: View {
     let day: Date
-    let viewModel: TodayViewModel
-    @Bindable var router: AppRouter
+    @ObservedObject var viewModel: TodayViewModel
+    @ObservedObject var router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
     /// Routines/Pauses hide on a downward scroll and come back the moment the finger
@@ -45,12 +45,18 @@ struct TodayView: View {
 
     /// The vertical space the shortcut row occupies, which collapses to nothing as it
     /// hides so everything below it rides up.
+    ///
+    /// Zero while the row itself is commented out above, so it doesn't hold a gap the
+    /// rings would sit below.
     private var shortcutBlockHeight: CGFloat {
-        (shortcutRowHeight + topChromeSpacing) * (1 - shortcutHideProgress)
+        0
+//        (shortcutRowHeight + topChromeSpacing) * (1 - shortcutHideProgress)
     }
 
+    /// Zero while the date slider is commented out above, same reason.
     private var dateSliderBlockHeight: CGFloat {
-        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
+        0
+//        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
     }
 
     /// Routines/Pauses sit above the rings now, pinned between the date slider and them.
@@ -58,9 +64,13 @@ struct TodayView: View {
         dateSliderBlockHeight + headerTopInset
     }
 
+    /// Zero while the whole top chrome is commented out: nothing is pinned over the
+    /// scroll view any more, so the content must not be pushed down to clear it.
     private var topChromeExpandedHeight: CGFloat {
-        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
-            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
+        0
+//        headerTopInset + MetricsHeaderGeometry.expandedHeight
+//        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
+//            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
     }
 
     private var metricsHeaderOffsetY: CGFloat {
@@ -86,12 +96,13 @@ struct TodayView: View {
                 .ignoresSafeArea()
 
             scrollContent
-            topChromeBackdrop
+//            topChromeBackdrop
             topChrome
         }
         .task(id: DayKey(date: day)) {
             await viewModel.load(day: day)
         }
+        .animation(.smooth(duration: 0.32), value: router.pendingUnlock?.id)
         .onChange(of: collapseProgress, initial: true) { _, newValue in
             router.todayChromeCollapseProgress = newValue
         }
@@ -158,54 +169,55 @@ struct TodayView: View {
 
     private var topChrome: some View {
         ZStack(alignment: .top) {
-            DateSliderView(
-                dates: router.dayNavigationDays,
-                selectedDate: Binding(
-                    get: { router.selectedDay },
-                    set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
-                ),
-                scrollOffset: Binding(
-                    get: { router.daySliderOffset },
-                    set: { router.daySliderOffset = $0 }
-                ),
-                onDateChanged: { newDate in
-                    router.selectedDay = Calendar.current.startOfDay(for: newDate)
-                },
-                onSelectionChanged: {}
-            )
-            .opacity(1 - dateSliderHideProgress)
-            .offset(y: -dateSliderHideProgress * 12)
+//            DateSliderView(
+//                dates: router.dayNavigationDays,
+//                selectedDate: Binding(
+//                    get: { router.selectedDay },
+//                    set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
+//                ),
+//                scrollOffset: Binding(
+//                    get: { router.daySliderOffset },
+//                    set: { router.daySliderOffset = $0 }
+//                ),
+//                onDateChanged: { newDate in
+//                    router.selectedDay = Calendar.current.startOfDay(for: newDate)
+//                },
+//                onSelectionChanged: {}
+//            )
+//            .opacity(1 - dateSliderHideProgress)
+//            .offset(y: -dateSliderHideProgress * 12)
 
-            TodayMetricsHeader(
-                metrics: state.primaryMetrics.metrics,
-                collapseProgress: collapseProgress,
-                topInset: headerTopInset,
-                onMetricSelected: { metric in
-                    switch metric.kind {
-                    case .productivity: router.presentSheet(.productivityDetail(day))
-                    case .control: router.presentSheet(.controlDetail(day))
-                    case .detox: router.presentSheet(.detoxDetail(day))
-                    }
-                }
-            )
-            .offset(y: metricsHeaderOffsetY)
+//            TodayMetricsHeader(
+//                metrics: state.primaryMetrics.metrics,
+//                collapseProgress: collapseProgress,
+//                topInset: headerTopInset,
+//                onMetricSelected: { metric in
+//                    switch metric.kind {
+//                    case .productivity: router.presentSheet(.productivityDetail(day))
+//                    case .control: router.presentSheet(.controlDetail(day))
+//                    case .detox: router.presentSheet(.detoxDetail(day))
+//                    }
+//                }
+//            )
+//            .offset(y: metricsHeaderOffsetY)
+            EmptyView()
 
             // Above the rings and pinned with them. They fade out on a downward scroll
             // and the rings ride up into the space; a scroll up brings them straight
             // back, even while the rings stay collapsed.
-            HStack(spacing: LocktySpacing.sm) {
-                TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
-                    router.push(.routinesList)
-                }
-                TodaySectionShortcut(title: "Pauses", systemImage: "pause.circle") {
-                    router.push(.pausesList)
-                }
-            }
-            .padding(.horizontal, LocktySpacing.md)
-            .frame(height: shortcutRowHeight)
-            .opacity(1 - shortcutHideProgress)
-            .offset(y: shortcutRowOffsetY)
-            .allowsHitTesting(!areShortcutsHidden)
+//            HStack(spacing: LocktySpacing.sm) {
+//                TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
+//                    router.push(.routinesList)
+//                }
+//                TodaySectionShortcut(title: "Pauses", systemImage: "pause.circle") {
+//                    router.push(.pausesList)
+//                }
+//            }
+//            .padding(.horizontal, LocktySpacing.md)
+//            .frame(height: shortcutRowHeight)
+//            .opacity(1 - shortcutHideProgress)
+//            .offset(y: shortcutRowOffsetY)
+//            .allowsHitTesting(!areShortcutsHidden)
         }
         .offset(y: overscrollPullDistance)
     }
@@ -225,90 +237,83 @@ struct TodayView: View {
         }
     }
 
+    /// Whether the day's numbers are still standing in for real ones.
+    private var isAwaitingData: Bool {
+        state.loadingState != .loaded
+    }
+
     private var scrollContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Color.clear
                     .frame(height: topChromeExpandedHeight + LocktySpacing.sm)
 
-                if let checklist = state.activeRoutineChecklist {
-                    // Just the card on Today — the label and its explanation live in the
-                    // routine editor's Checklist section instead.
-                    ActiveRoutineChecklistCard(
-                        state: checklist,
-                        onToggle: { item in
-                            Task {
-                                await viewModel.toggleActiveRoutineTask(item.id, day: day)
-                            }
+                // Above everything else: an unlock the shield asked for is the one thing
+                // on this screen that is waiting on an answer.
+                if let pendingUnlock = router.pendingUnlock {
+                    UnlockRequestCard(context: pendingUnlock) {
+                        withAnimation(.smooth(duration: 0.28)) {
+                            router.pendingUnlock = nil
                         }
-                    )
-                }
-
-                if case .loading = state.loadingState {
-                    VStack(spacing: LocktySpacing.md) {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                Text("Loading Screen Time data")
-                                    .font(LocktyTypography.title)
-                                    .foregroundStyle(LocktyColors.primaryText)
-                                Text("Lockty is requesting the Device Activity report for this day.")
-                                    .font(LocktyTypography.callout)
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                                LoadingView()
-                                    .frame(height: 88)
-                            }
-                        }
-                        LiveScreenTimeReportCard(day: day)
+                        router.presentFullScreen(.pause(pendingUnlock))
                     }
-                } else if case .unavailable(let message) = state.loadingState {
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Screen Time data not ready")
-                                .font(LocktyTypography.title)
-                                .foregroundStyle(LocktyColors.primaryText)
-                            Text(message)
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.secondaryText)
-                            Text("Lockty is retrying direct usage access and any cached Screen Time report available for this day.")
-                                .font(LocktyTypography.caption)
-                                .foregroundStyle(LocktyColors.tertiaryText)
-                        }
-                    }
-
-                    LiveScreenTimeReportCard(day: day)
+                    .transition(.blurReplace.combined(with: .opacity))
                 }
 
-                DailyPerspectiveStackSection(
-                    perspectives: viewModel.visiblePerspectives(for: day),
-                    onDismiss: { perspective in
-                        viewModel.dismissPerspective(perspective.id, day: day)
-                    }
-                )
+//                if let checklist = state.activeRoutineChecklist {
+//                    ActiveRoutineChecklistCard(
+//                        state: checklist,
+//                        onToggle: { item in
+//                            Task {
+//                                await viewModel.toggleActiveRoutineTask(item.id, day: day)
+//                            }
+//                        }
+//                    )
+//                }
 
-                MyDaySection(activities: state.activities)
-
-                DigitalBalanceCard(state: state.timeline) {
-                    router.presentSheet(.digitalBalanceDetail(day))
+                // The whole loading branch is gone. It used to swap the screen for a
+                // spinner card, so everything mounted and jumped into place once the
+                // report landed. The real layout is always on screen now, holding
+                // placeholder values, redacted and blurred until the data arrives --
+                // then the values fill in and the blur lifts.
+                if case .unavailable(let message) = state.loadingState {
+                    Text(message)
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    LocktySectionTitle(
-                        "Breakdown",
-                        info: "Headline numbers for the day. Tap any card to see what went into it.",
-                        showsSeparator: false
-                    )
-                    .padding(.top, 16)
-                TodayMetricGrid(state: state) { metric in
-                    switch metric {
-                    case .screenTime: router.presentSheet(.screenTimeDetail(day))
-                    case .bestDetox: router.presentSheet(.detoxDetail(day))
-                    case .routines: router.presentSheet(.routineDaySummary(day))
-                    case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
-                    case .distractions: router.presentSheet(.distractionsDetail(day))
-                    case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
-                    }
-                }
-                }
+//                DailyPerspectiveStackSection(
+//                    perspectives: viewModel.visiblePerspectives(for: day),
+//                    onDismiss: { perspective in
+//                        viewModel.dismissPerspective(perspective.id, day: day)
+//                    }
+//                )
+//
+//                MyDaySection(activities: state.activities)
+//
+//                DigitalBalanceCard(state: state.timeline) {
+//                    router.presentSheet(.digitalBalanceDetail(day))
+//                }
+//
+//                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+//                    LocktySectionTitle(
+//                        "Breakdown",
+//                        info: "Headline numbers for the day. Tap any card to see what went into it.",
+//                        showsSeparator: false
+//                    )
+//                    .padding(.top, 16)
+//                    TodayMetricGrid(state: state) { metric in
+//                        switch metric {
+//                        case .screenTime: router.presentSheet(.screenTimeDetail(day))
+//                        case .bestDetox: router.presentSheet(.detoxDetail(day))
+//                        case .routines: router.presentSheet(.routineDaySummary(day))
+//                        case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
+//                        case .distractions: router.presentSheet(.distractionsDetail(day))
+//                        case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
+//                        }
+//                    }
+//                }
 
                 AppUsageListCard(state: state) { appUsage, classification in
                     viewModel.updateClassification(
@@ -317,6 +322,10 @@ struct TodayView: View {
                         day: day
                     )
                 }
+                .redacted(reason: isAwaitingData ? .placeholder : [])
+                .blur(radius: isAwaitingData ? 5 : 0)
+                .disabled(isAwaitingData)
+                .animation(.smooth(duration: 0.35), value: isAwaitingData)
 
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)
@@ -324,7 +333,7 @@ struct TodayView: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, LocktySpacing.md)
+            .padding(.horizontal, LocktySpacing.lg)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xl)
         }

@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 import FamilyControls
 
 enum ScreenTimeAuthorizationState: String, Codable, Hashable {
@@ -35,9 +35,8 @@ protocol ScreenTimeAuthorizationServicing {
 }
 
 @MainActor
-@Observable
-final class LiveScreenTimeAuthorizationService: ScreenTimeAuthorizationServicing {
-    private(set) var currentState: ScreenTimeAuthorizationState
+final class LiveScreenTimeAuthorizationService: ScreenTimeAuthorizationServicing, ObservableObject {
+    @Published private(set) var currentState: ScreenTimeAuthorizationState
 
     init() {
         currentState = Self.map(AuthorizationCenter.shared.authorizationStatus)

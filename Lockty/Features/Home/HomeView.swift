@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @Bindable var router: AppRouter
+    @ObservedObject var router: AppRouter
     let featureFactory: FeatureFactory
     let destinationFactory: DestinationFactory
 
@@ -13,29 +13,56 @@ struct HomeView: View {
     }
 
     var body: some View {
-        // No TabView: Today is the whole screen, Routines and Pauses are opened from
-        // cards inside it, and the bottom bar is reserved for the running session.
-        NavigationStack(path: $router.todayPath) {
-            featureFactory.makeTodayView(day: router.selectedDay)
-                .locktyScreenBackground()
-                .navigationDestination(for: AppRoute.self) { route in
-                    destinationFactory.destination(for: route)
-                }
+        // Two tabs, the plain system TabView: Today, and Routines/Pauses -- which is one
+        // tab holding both behind a segmented control, not two. Each keeps its own
+        // NavigationStack path so a push in one doesn't surface in the other.
+        TabView(selection: $router.selectedTab) {
+            NavigationStack(path: $router.todayPath) {
+                featureFactory.makeTodayView(day: router.selectedDay)
+                    .locktyScreenBackground()
+                    .navigationDestination(for: AppRoute.self) { route in
+                        destinationFactory.destination(for: route)
+                    }
+            }
+            .tabItem {
+                Label(AppTab.today.title, systemImage: AppTab.today.systemImage)
+            }
+            .tag(AppTab.today)
+
+            NavigationStack(path: $router.focusPath) {
+                featureFactory.makeFocusView()
+                    .locktyScreenBackground()
+                    .navigationDestination(for: AppRoute.self) { route in
+                        destinationFactory.destination(for: route)
+                    }
+            }
+            .tabItem {
+                Label(AppTab.focus.title, systemImage: AppTab.focus.systemImage)
+            }
+            .tag(AppTab.focus)
         }
         .safeAreaInset(edge: .bottom) {
-            if let activeRoutine {
-                ActiveSessionBar(
-                    routine: activeRoutine,
-                    pauseCount: featureFactory.pausesViewModel.eventsSince(activeRoutine.startedAt).count
-                ) {
-                    router.presentSheet(.liveSession)
+            Group {
+                if let activeRoutine {
+                    ActiveSessionBar(
+                        routine: activeRoutine,
+                        pauseCount: featureFactory.pausesViewModel.eventsSince(activeRoutine.startedAt).count
+                    ) {
+                        router.presentSheet(.liveSession)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .matchedTransitionSource(id: SheetRoute.liveSession.id, in: liveSessionZoom)
-                .padding(.bottom, LocktySpacing.sm)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+            // The zoom source is on this container, not on the bar itself. The bar
+            // redraws every second from its own TimelineView clock, and a source that
+            // gets re-created while the transition is running is dropped -- which is why
+            // dismissing sometimes just snapped back with no animation at all.
+            .matchedTransitionSource(id: SheetRoute.liveSession.id, in: liveSessionZoom)
+            .padding(.bottom, LocktySpacing.sm)
+            // Scoped to the bar. On the whole TabView this implicit animation was picked
+            // up by the presentation itself and fought the zoom.
+            .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: activeRoutine?.id)
         }
-        .animation(.smooth(duration: 0.3), value: activeRoutine?.id)
         .sheet(item: $router.sheet) { route in
             // Only the live session zooms, and only from the bottom bar that opened it —
             // every other sheet has no matching source and must present normally.

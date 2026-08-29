@@ -10,7 +10,7 @@ struct PauseSuccessDayCard: View {
                 TodayMetricCardLayoutView(title: "Pause Success", value: state.valueText, detail: state.detailText)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

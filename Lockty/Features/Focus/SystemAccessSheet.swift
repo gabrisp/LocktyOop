@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SystemAccessSheet: View {
-    @Bindable var viewModel: SystemAccessViewModel
+    @ObservedObject var viewModel: SystemAccessViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

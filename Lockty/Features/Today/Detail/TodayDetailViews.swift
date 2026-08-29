@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct ProductivityDetailView: View {
     let day: Date
@@ -198,8 +199,7 @@ struct DigitalBalanceDetailView: View {
 }
 
 @MainActor
-@Observable
-final class ApplicationDetailViewModel {
+final class ApplicationDetailViewModel: ObservableObject {
     let appID: AppIdentity.ID
     let day: Date
 
@@ -207,9 +207,9 @@ final class ApplicationDetailViewModel {
     private let routineRepository: RoutineRepository
     private let pauseRuleRepository: PauseRuleRepository
 
-    private(set) var appUsage: AppUsageState?
-    private(set) var relatedRoutines: [Routine] = []
-    private(set) var pauseRule: PauseRule?
+    @Published private(set) var appUsage: AppUsageState?
+    @Published private(set) var relatedRoutines: [Routine] = []
+    @Published private(set) var pauseRule: PauseRule?
 
     init(
         appID: AppIdentity.ID,
@@ -241,7 +241,7 @@ final class ApplicationDetailViewModel {
 }
 
 struct ApplicationDetailView: View {
-    @Bindable var viewModel: ApplicationDetailViewModel
+    @ObservedObject var viewModel: ApplicationDetailViewModel
     let router: AppRouter
 
     var body: some View {
@@ -257,7 +257,7 @@ struct ApplicationDetailView: View {
                                     fallbackSystemImage: appUsage.app.iconSystemName
                                 )
                                 VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                                    Text(appUsage.app.displayName)
+                                    LocktyAppNameText(app: appUsage.app)
                                         .font(LocktyTypography.title)
                                     Text(appUsage.durationText)
                                         .font(LocktyTypography.callout)
@@ -506,7 +506,7 @@ private struct DetailAppsCard: View {
                                 fallbackSystemImage: app.app.iconSystemName
                             )
                             VStack(alignment: .leading, spacing: LocktySpacing.xs) {
-                                Text(app.app.displayName)
+                                LocktyAppNameText(app: app.app)
                                     .font(LocktyTypography.callout)
                                 Text(app.classification.title)
                                     .font(LocktyTypography.caption)

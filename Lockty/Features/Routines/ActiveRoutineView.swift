@@ -1,10 +1,11 @@
 import SwiftUI
+import Combine
 
 @MainActor
-@Observable
-final class ActiveRoutineViewModel {
+final class ActiveRoutineViewModel: ObservableObject {
     let routineID: UUID
     private let routineEngine: RoutineEngine
+    private var cancellables: Set<AnyCancellable> = []
 
     init(
         routineID: UUID,
@@ -12,6 +13,11 @@ final class ActiveRoutineViewModel {
     ) {
         self.routineID = routineID
         self.routineEngine = routineEngine
+        routineEngine.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     var activeRoutine: ActiveRoutine? {
@@ -58,7 +64,7 @@ final class ActiveRoutineViewModel {
 }
 
 struct ActiveRoutineView: View {
-    @Bindable var viewModel: ActiveRoutineViewModel
+    @ObservedObject var viewModel: ActiveRoutineViewModel
     let router: AppRouter
     @Environment(\.dismiss) private var dismiss
 

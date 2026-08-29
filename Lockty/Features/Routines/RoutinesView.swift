@@ -18,6 +18,7 @@ struct RoutinesView: View {
                     RoutineCard(
                         routine: routine,
                         isActive: viewModel.activeRoutineID() == routine.id,
+                        applicationTokens: viewModel.tokens(for: routine.id),
                         onOpen: {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
                         }

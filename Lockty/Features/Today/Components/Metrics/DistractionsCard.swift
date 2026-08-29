@@ -14,7 +14,7 @@ struct DistractionsCard: View {
                 )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

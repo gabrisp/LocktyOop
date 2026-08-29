@@ -1,4 +1,5 @@
 import FamilyControls
+import Combine
 import OSLog
 import UserNotifications
 import SwiftUI
@@ -34,25 +35,26 @@ enum EditablePauseStep: String, CaseIterable, Identifiable {
 }
 
 @MainActor
-@Observable
-final class PauseEditorViewModel {
+final class PauseEditorViewModel: ObservableObject {
     let editingID: UUID
     let draftID: UUID
 
-    var isEnabled = true
-    var customName = ""
-    var allowanceMinutes = 5
-    var relockAfterAllowance = true
-    var steps: [PauseStep] = [.countdown(CountdownConfiguration(duration: 10)), .confirmation(ConfirmationConfiguration())]
-    var errorMessage: String?
-    private(set) var selectedApplication: AppIdentity?
-    private(set) var selectionPreview = FamilyActivitySelection()
+    @Published var isEnabled = true
+    @Published var customName = ""
+    @Published var allowanceMinutes = 5
+    @Published var relockAfterAllowance = true
+    @Published var steps: [PauseStep] = [.countdown(CountdownConfiguration(duration: 10)), .confirmation(ConfirmationConfiguration())]
+    @Published var errorMessage: String?
+    @Published private(set) var selectedApplication: AppIdentity?
+    @Published private(set) var selectionPreview = FamilyActivitySelection()
+    @Published private(set) var suggestedApplications: [AppIdentity] = []
 
     private let initialPauseID: UUID?
     private let repository: PauseRuleRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let routineEngine: RoutineEngine
     private let pauseEngine: PauseEngine
+    private let usageDataService: UsageDataServicing
     private var hasLoaded = false
     private var createdAt: Date
 
@@ -62,7 +64,8 @@ final class PauseEditorViewModel {
         repository: PauseRuleRepository,
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
-        pauseEngine: PauseEngine
+        pauseEngine: PauseEngine,
+        usageDataService: UsageDataServicing
     ) {
         initialPauseID = pauseID
         editingID = pauseID ?? UUID()
@@ -71,6 +74,7 @@ final class PauseEditorViewModel {
         self.selectionStore = selectionStore
         self.routineEngine = routineEngine
         self.pauseEngine = pauseEngine
+        self.usageDataService = usageDataService
         createdAt = Date()
         refreshSelectionState()
     }
@@ -107,6 +111,7 @@ final class PauseEditorViewModel {
         guard !hasLoaded else { return }
         hasLoaded = true
         print("Pause editor load started pauseID=\(initialPauseID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
+        await loadSuggestedApplications()
         guard let initialPauseID, let rule = await repository.rule(id: initialPauseID) else { return }
         createdAt = rule.createdAt
         customName = rule.customName ?? ""
@@ -116,6 +121,32 @@ final class PauseEditorViewModel {
         steps = rule.steps
         refreshSelectionState()
         print("Pause editor loaded pauseID=\(initialPauseID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) steps=\(steps.count)")
+    }
+
+    private func loadSuggestedApplications() async {
+        do {
+            let usage = try await usageDataService.mostUsedApplications(for: Date())
+            // Suggestions are the most-used unproductive apps -- those are the ones worth
+            // restricting. Everything else only stands in when nothing is classified
+            // that way yet, so the section is never empty for no reason.
+            let usable = usage.filter { $0.duration > 0 && $0.app.applicationToken != nil }
+            let unproductive = usable.filter { $0.classification == .unproductive }
+            let ranked = (unproductive.isEmpty ? usable : unproductive)
+                .sorted { $0.duration > $1.duration }
+
+            var seen = Set<AppIdentity.ID>()
+            let suggestions = ranked.compactMap { item -> AppIdentity? in
+                guard seen.insert(item.app.id).inserted else { return nil }
+                return item.app
+            }
+
+            withAnimation(.smooth(duration: 0.28)) {
+                suggestedApplications = Array(suggestions.prefix(8))
+            }
+            print("Pause editor loaded suggested applications count=\(suggestedApplications.count)")
+        } catch {
+            print("Pause editor failed loading suggested applications: \(error.localizedDescription)")
+        }
     }
 
     func refreshSelectionState() {
@@ -256,7 +287,7 @@ final class PauseEditorViewModel {
 }
 
 struct PauseEditorView: View {
-    @State private var viewModel: PauseEditorViewModel
+    @StateObject private var viewModel: PauseEditorViewModel
     let router: AppRouter
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -271,7 +302,7 @@ struct PauseEditorView: View {
         router: AppRouter,
         onCloseEditor: @escaping () -> Void
     ) {
-        _viewModel = State(initialValue: viewModel)
+        _viewModel = StateObject(wrappedValue: viewModel)
         _isEditing = State(initialValue: viewModel.isCreating && !viewModel.isEditingBlocked)
         self.router = router
         self.onCloseEditor = onCloseEditor
@@ -292,9 +323,7 @@ struct PauseEditorView: View {
     }
 
     private var editorContent: some View {
-        @Bindable var viewModel = viewModel
-
-        return ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if viewModel.isEditingBlocked {
                     EditingDisabledBanner(message: viewModel.editingBlockedMessage)
@@ -571,60 +600,27 @@ struct PauseEditorView: View {
 }
 
 struct PauseAppPickerSheet: View {
-    @State private var viewModel: PauseEditorViewModel
+    @ObservedObject var viewModel: PauseEditorViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var pickerSelection = FamilyActivitySelection()
-
-    init(viewModel: PauseEditorViewModel) {
-        _viewModel = State(initialValue: viewModel)
-    }
 
     var body: some View {
-        @Bindable var viewModel = viewModel
-
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            EditorTopBar(title: "Choose App", onClose: { dismiss() })
-
-            FamilyActivityPicker(selection: Binding(
-                get: { pickerSelection },
+        LocktyActivitySelectionView(
+            title: "Seleccionadas",
+            addLabel: "Añadir App",
+            selection: Binding(
+                get: { viewModel.selectionPreview },
                 set: { newValue in
-                    let previousSelection = pickerSelection
-                    var normalized = newValue
-                    normalized.categoryTokens = []
-                    normalized.webDomainTokens = []
-
-                    let addedApplication = normalized.applicationTokens
-                        .subtracting(previousSelection.applicationTokens)
-                        .first
-
-                    if let addedApplication {
-                        normalized.applicationTokens = [addedApplication]
-                    } else if let keptApplication = normalized.applicationTokens.first {
-                        normalized.applicationTokens = [keptApplication]
-                    } else {
-                        normalized.applicationTokens = []
+                    withAnimation(.smooth(duration: 0.28)) {
+                        viewModel.replaceSelection(newValue)
                     }
-
-                    pickerSelection = normalized
-
-                    // Commit/close only when an application was actually just picked.
-                    // Categories are invalid for a Pause (it targets exactly one app), so
-                    // tapping one strips it and leaves the sheet open rather than
-                    // committing whatever app happened to already be selected.
-                    guard addedApplication != nil else { return }
-                    viewModel.replaceSelection(normalized)
-                    dismiss()
                 }
-            ))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.top, LocktySpacing.sm)
-        .padding(.bottom, LocktySpacing.md)
-        .onAppear {
-            pickerSelection = FamilyActivitySelection()
-            print("Pause app picker opened with empty picker selection; current saved app remains outside the sheet.")
-        }
+            ),
+            rules: .pause,
+            suggestions: viewModel.suggestedApplications,
+            onClose: { dismiss() },
+            onDone: { dismiss() }
+        )
+        .presentationDetents([.large])
     }
 }
 

@@ -33,7 +33,7 @@ struct LiveSessionSheet: View {
 
                         ForEach(pauseEvents.prefix(5)) { event in
                             HStack {
-                                Text(event.application.displayName)
+                                LocktyAppNameText(app: event.application)
                                     .font(LocktyTypography.callout)
                                     .foregroundStyle(LocktyColors.primaryText)
                                     .lineLimit(1)

@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 struct LifetimeTrend: Identifiable, Equatable {
     let id: String
@@ -38,8 +38,7 @@ private struct LifetimeDaySnapshot {
 }
 
 @MainActor
-@Observable
-final class LifetimeViewModel {
+final class LifetimeViewModel: ObservableObject {
     private let usageDataService: UsageDataServicing
     private let pauseEventRepository: PauseEventRepository
     private let routineExecutionRepository: RoutineExecutionRepository
@@ -53,7 +52,7 @@ final class LifetimeViewModel {
     private let reclaimedTimeCalculator = ReclaimedTimeCalculator()
     private let routineAdherenceCalculator = RoutineAdherenceCalculator()
 
-    private(set) var state = LifetimeState()
+    @Published private(set) var state = LifetimeState()
 
     init(
         usageDataService: UsageDataServicing,

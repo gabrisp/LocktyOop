@@ -1,4 +1,5 @@
 import FamilyControls
+import Combine
 import ManagedSettings
 import OSLog
 import SwiftUI
@@ -16,29 +17,29 @@ struct EditableRoutineTask: Identifiable, Hashable {
 }
 
 @MainActor
-@Observable
-final class RoutineEditorViewModel {
+final class RoutineEditorViewModel: ObservableObject {
     let editingID: UUID
     let draftID: UUID
 
-    var name = ""
-    var icon = ""
-    var mode: RoutineMode = .normal
-    var allowsPauseDuringStrictMode = true
-    var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
-    var triggers: [RoutineTrigger] = [.manual]
-    var maximumBreaks = 0
-    var maximumBreakMinutes = 10
-    var minimumBreakIntervalMinutes = 30
-    var startAlarmEnabled = false
-    var breakTriggerManual = true
-    var breakTriggerNFC = false
-    var breakTriggerLocation = false
-    var blockedDomains: [String] = []
-    var pendingDomain = ""
-    var errorMessage: String?
-    private(set) var selectedApplicationCount = 0
-    private(set) var selectionPreview = FamilyActivitySelection()
+    @Published var name = ""
+    @Published var icon = ""
+    @Published var mode: RoutineMode = .normal
+    @Published var allowsPauseDuringStrictMode = true
+    @Published var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
+    @Published var triggers: [RoutineTrigger] = [.manual]
+    @Published var maximumBreaks = 0
+    @Published var maximumBreakMinutes = 10
+    @Published var minimumBreakIntervalMinutes = 30
+    @Published var startAlarmEnabled = false
+    @Published var breakTriggerManual = true
+    @Published var breakTriggerNFC = false
+    @Published var breakTriggerLocation = false
+    @Published var blockedDomains: [String] = []
+    @Published var pendingDomain = ""
+    @Published var errorMessage: String?
+    @Published private(set) var selectedApplicationCount = 0
+    @Published private(set) var selectionPreview = FamilyActivitySelection()
+    @Published private(set) var suggestedApplications: [AppIdentity] = []
 
     private let repository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
@@ -152,6 +153,7 @@ final class RoutineEditorViewModel {
         guard !hasLoaded else { return }
         hasLoaded = true
         print("Routine editor load started routineID=\(initialRoutineID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
+        await loadSuggestedApplications()
         guard let initialRoutineID else { return }
         guard let routines = try? await repository.routines(), let routine = routines.first(where: { $0.id == initialRoutineID }) else {
             return
@@ -179,6 +181,32 @@ final class RoutineEditorViewModel {
         blockedDomains = routine.blockedDomains.sorted()
         refreshSelectionState()
         print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
+    }
+
+    private func loadSuggestedApplications() async {
+        do {
+            let usage = try await usageDataService.mostUsedApplications(for: Date())
+            // Suggestions are the most-used unproductive apps -- those are the ones worth
+            // restricting. Everything else only stands in when nothing is classified
+            // that way yet, so the section is never empty for no reason.
+            let usable = usage.filter { $0.duration > 0 && $0.app.applicationToken != nil }
+            let unproductive = usable.filter { $0.classification == .unproductive }
+            let ranked = (unproductive.isEmpty ? usable : unproductive)
+                .sorted { $0.duration > $1.duration }
+
+            var seen = Set<AppIdentity.ID>()
+            let suggestions = ranked.compactMap { item -> AppIdentity? in
+                guard seen.insert(item.app.id).inserted else { return nil }
+                return item.app
+            }
+
+            withAnimation(.smooth(duration: 0.28)) {
+                suggestedApplications = Array(suggestions.prefix(8))
+            }
+            print("Routine editor loaded suggested applications count=\(suggestedApplications.count)")
+        } catch {
+            print("Routine editor failed loading suggested applications: \(error.localizedDescription)")
+        }
     }
 
     func refreshSelectionState() {
@@ -343,30 +371,27 @@ final class RoutineEditorViewModel {
 }
 
 struct RoutineAppPickerSheet: View {
-    @State private var viewModel: RoutineEditorViewModel
+    @ObservedObject var viewModel: RoutineEditorViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(viewModel: RoutineEditorViewModel) {
-        _viewModel = State(initialValue: viewModel)
-    }
-
     var body: some View {
-        @Bindable var viewModel = viewModel
-
-        return VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            EditorTopBar(title: "Choose Apps", onClose: { dismiss() })
-
-            FamilyActivityPicker(selection: Binding(
+        LocktyActivitySelectionView(
+            title: "Seleccionadas",
+            addLabel: "Añadir App o categoría",
+            selection: Binding(
                 get: { viewModel.selectionPreview },
                 set: { newValue in
-                    viewModel.replaceSelection(newValue)
+                    withAnimation(.smooth(duration: 0.28)) {
+                        viewModel.replaceSelection(newValue)
+                    }
                 }
-            ))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.top, LocktySpacing.sm)
-        .padding(.bottom, LocktySpacing.md)
+            ),
+            rules: .routine,
+            suggestions: viewModel.suggestedApplications,
+            onClose: { dismiss() },
+            onDone: { dismiss() }
+        )
+        .presentationDetents([.large])
     }
 }
 
@@ -378,7 +403,7 @@ private enum RoutineEditorLocalSheet: String, Identifiable {
 }
 
 struct RoutineEditorView: View {
-    @State private var viewModel: RoutineEditorViewModel
+    @StateObject private var viewModel: RoutineEditorViewModel
     let router: AppRouter
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -395,7 +420,7 @@ struct RoutineEditorView: View {
         startsEditing: Bool = true,
         onCloseEditor: @escaping () -> Void
     ) {
-        _viewModel = State(initialValue: viewModel)
+        _viewModel = StateObject(wrappedValue: viewModel)
         _isEditing = State(initialValue: startsEditing && !viewModel.isEditingBlocked)
         self.router = router
         self.onCloseEditor = onCloseEditor
@@ -428,9 +453,7 @@ struct RoutineEditorView: View {
     }
 
     private var editorContent: some View {
-        @Bindable var viewModel = viewModel
-
-        return ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 if viewModel.isEditingBlocked {
                     EditingDisabledBanner(message: viewModel.editingBlockDecision.reason ?? "This routine cannot be edited right now.")
@@ -744,7 +767,7 @@ struct RoutineEditorView: View {
 }
 
 private struct RoutineEditorHero: View {
-    @Bindable var viewModel: RoutineEditorViewModel
+    @ObservedObject var viewModel: RoutineEditorViewModel
     var isEditing: Bool = true
     @State private var showIconPicker = false
 

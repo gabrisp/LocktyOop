@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct LifetimeView: View {
-    @Bindable var viewModel: LifetimeViewModel
-    @Bindable var router: AppRouter
+    @ObservedObject var viewModel: LifetimeViewModel
+    @ObservedObject var router: AppRouter
 
     var body: some View {
         ScrollView(showsIndicators: false) {

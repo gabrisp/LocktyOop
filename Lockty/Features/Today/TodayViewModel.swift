@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 import OSLog
 import SwiftUI
 
@@ -8,12 +8,11 @@ private func todayLogger() -> Logger {
 }
 
 @MainActor
-@Observable
-final class TodayViewModel {
+final class TodayViewModel: ObservableObject {
     private let dataProvider: TodayDataProviding
     private let routineEngine: RoutineEngine
-    private(set) var days: [DayKey: TodayDayState] = [:]
-    private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
+    @Published private(set) var days: [DayKey: TodayDayState] = [:]
+    @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
 
     init(dataProvider: TodayDataProviding, routineEngine: RoutineEngine) {
         self.dataProvider = dataProvider
@@ -78,7 +77,7 @@ final class TodayViewModel {
 
     func dismissPerspective(_ perspectiveID: String, day: Date) {
         let key = DayKey(date: day)
-        withAnimation(.smooth(duration: 0.3)) {
+        _ = withAnimation(.smooth(duration: 0.3)) {
             dismissedPerspectiveIDsByDay[key, default: []].insert(perspectiveID)
         }
     }

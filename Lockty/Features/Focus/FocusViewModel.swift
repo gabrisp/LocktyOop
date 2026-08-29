@@ -1,8 +1,7 @@
 import Foundation
-import Observation
+import Combine
 
 @MainActor
-@Observable
-final class FocusViewModel {
-    var selectedSection: FocusSection = .routines
+final class FocusViewModel: ObservableObject {
+    @Published var selectedSection: FocusSection = .routines
 }

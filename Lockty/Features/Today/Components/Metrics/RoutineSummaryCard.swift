@@ -14,7 +14,7 @@ struct RoutineSummaryCard: View {
                 )
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive)
         .tappable()
     }
 }

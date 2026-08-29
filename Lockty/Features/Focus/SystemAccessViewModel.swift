@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 struct SystemAccessItemState: Equatable {
     var title: String
@@ -9,17 +9,16 @@ struct SystemAccessItemState: Equatable {
 }
 
 @MainActor
-@Observable
-final class SystemAccessViewModel {
+final class SystemAccessViewModel: ObservableObject {
     private let screenTime: ScreenTimeAuthorizationServicing
     private let notifications: NotificationServicing
     private let location: LocationTriggerServicing
     private let alarms: AlarmServicing
 
-    private(set) var screenTimeState = SystemAccessItemState(title: "Screen Time", detail: "Checking", actionTitle: nil)
-    private(set) var notificationState = SystemAccessItemState(title: "Notifications", detail: "Checking", actionTitle: nil)
-    private(set) var locationState = SystemAccessItemState(title: "Location", detail: "Checking", actionTitle: nil)
-    private(set) var alarmState = SystemAccessItemState(title: "Alarms", detail: "Checking", actionTitle: nil)
+    @Published private(set) var screenTimeState = SystemAccessItemState(title: "Screen Time", detail: "Checking", actionTitle: nil)
+    @Published private(set) var notificationState = SystemAccessItemState(title: "Notifications", detail: "Checking", actionTitle: nil)
+    @Published private(set) var locationState = SystemAccessItemState(title: "Location", detail: "Checking", actionTitle: nil)
+    @Published private(set) var alarmState = SystemAccessItemState(title: "Alarms", detail: "Checking", actionTitle: nil)
 
     init(screenTime: ScreenTimeAuthorizationServicing, notifications: NotificationServicing, location: LocationTriggerServicing, alarms: AlarmServicing) {
         self.screenTime = screenTime

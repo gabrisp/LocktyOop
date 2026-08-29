@@ -1,15 +1,14 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class AppSession {
+final class AppSession: ObservableObject {
     private enum Keys {
         static let onboardingCompleted = "lockty.onboarding.completed"
     }
 
-    private(set) var phase: AppPhase = .splash
-    private(set) var hasCompletedOnboarding: Bool
-    private(set) var startupError: String?
+    @Published private(set) var phase: AppPhase = .splash
+    @Published private(set) var hasCompletedOnboarding: Bool
+    @Published private(set) var startupError: String?
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

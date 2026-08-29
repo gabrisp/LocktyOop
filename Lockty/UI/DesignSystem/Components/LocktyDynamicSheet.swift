@@ -49,6 +49,10 @@ struct LocktyDynamicSheet<Content: View>: View {
     @State private var sheetHeight: CGFloat = 0
     /// Height a screen inside reported for itself, zero when none did.
     @State private var reportedHeight: CGFloat = 0
+    /// Which detent is showing. Declared as a selection over a stable set rather than by
+    /// swapping the set itself: replacing one .height with another gives no transition to
+    /// animate, so the sheet snapped between sizes.
+    @State private var selectedDetent: PresentationDetent = .medium
 
     init(
         animation: Animation = .easeInOut(duration: 0.28),
@@ -83,13 +87,27 @@ struct LocktyDynamicSheet<Content: View>: View {
                 reportedHeight = newValue
                 updateHeight(newValue)
             }
-            .presentationDetents(detents)
+            .presentationDetents(detents, selection: $selectedDetent)
+            .onChange(of: intendedDetent, initial: true) { _, newValue in
+                withAnimation(animation) {
+                    selectedDetent = newValue
+                }
+            }
     }
 
+    /// Everything the sheet can be, at once: the height it measured for itself, and
+    /// full. Both stay in the set so moving between them is a change of selection.
     private var detents: Set<PresentationDetent> {
-        if isExpanded { return [.large] }
+        var set: Set<PresentationDetent> = [.large]
         let height = fixedHeight ?? sheetHeight
-        return height == .zero ? [.medium] : [.height(height)]
+        set.insert(height == .zero ? .medium : .height(height))
+        return set
+    }
+
+    private var intendedDetent: PresentationDetent {
+        if isExpanded { return .large }
+        let height = fixedHeight ?? sheetHeight
+        return height == .zero ? .medium : .height(height)
     }
 
     private func updateHeight(_ measuredHeight: CGFloat) {

@@ -215,6 +215,7 @@ final class AppContainer {
             appGroupStore: appGroupStore,
             pauseEngine: pauseEngine,
             pauseFlowRepository: pauseFlowRepository,
+            notificationService: notificationService,
             routineEngine: routineEngine,
             shieldService: shieldService
         )

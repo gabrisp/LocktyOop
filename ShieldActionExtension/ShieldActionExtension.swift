@@ -50,11 +50,18 @@ final class ShieldActionExtension: ShieldActionDelegate {
             // is the guaranteed way back. Lockty pulls the notification the moment it
             // picks the request up, so a successful open leaves nothing stale behind.
             openLockty(for: context)
-            postUnlockNotification(context)
 
             // .defer, never .close. Closing is what the secondary button is for; the
             // primary must never be the thing that shuts the app the user just opened.
-            completionHandler(.defer)
+            //
+            // Held until the notification is registered. Answering straight away let the
+            // system tear this process down while the request was still being added, and
+            // nothing was ever delivered.
+            let responder = SingleResponse(completionHandler)
+            postUnlockNotification(context) { responder.send(.defer) }
+            // Nothing guarantees that callback arrives, and a shield left waiting on it
+            // is worse than one that answers without its notification.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { responder.send(.defer) }
 
         case .secondaryButtonPressed:
             completionHandler(.close)
@@ -108,12 +115,21 @@ final class ShieldActionExtension: ShieldActionDelegate {
         guard let applicationClass = NSClassFromString("UIApplication") as? NSObject.Type,
               applicationClass.responds(to: sharedSelector),
               let application = applicationClass.perform(sharedSelector)?.takeUnretainedValue() as? NSObject
-        else { return }
+        else {
+            print("Shield action could not reach UIApplication to open Lockty")
+            return
+        }
 
+        // Both are attempted, and neither is trusted. The old single-argument openURL:
+        // is the one that has historically gone through from an extension, but it
+        // returns nothing either way, so there is no way to tell whether it landed --
+        // which is why the notification always goes out alongside this. It used to stop
+        // after the legacy attempt, so on a system where that one is inert the modern
+        // selector was never even tried.
         let legacySelector = NSSelectorFromString("openURL:")
         if application.responds(to: legacySelector) {
             application.perform(legacySelector, with: url)
-            return
+            print("Shield action asked to open Lockty through openURL:")
         }
 
         let modernSelector = NSSelectorFromString("openURL:options:completionHandler:")
@@ -123,9 +139,10 @@ final class ShieldActionExtension: ShieldActionDelegate {
         let implementation = application.method(for: modernSelector)
         let open = unsafeBitCast(implementation, to: OpenURL.self)
         open(application, modernSelector, url as NSURL, NSDictionary(), nil)
+        print("Shield action asked to open Lockty through openURL:options:completionHandler:")
     }
 
-    private func postUnlockNotification(_ context: PauseContext) {
+    private func postUnlockNotification(_ context: PauseContext, completion: @escaping () -> Void) {
         let content = UNMutableNotificationContent()
         content.title = "Unlock \(context.displayName)?"
         content.body = "Tap to decide in Lockty."
@@ -144,7 +161,12 @@ final class ShieldActionExtension: ShieldActionDelegate {
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("Unlock notification could not be scheduled: \(error.localizedDescription)")
+            }
+            completion()
+        }
     }
 
     private func writePendingPause(_ context: PauseContext) {
@@ -164,5 +186,26 @@ final class ShieldActionExtension: ShieldActionDelegate {
             state.pendingPause = pendingContext
             state.pendingEvents.append(event)
         }
+    }
+}
+
+
+/// Answers the shield exactly once, from whichever of the two paths gets there first.
+private final class SingleResponse {
+    private let completionHandler: (ShieldActionResponse) -> Void
+    private let lock = NSLock()
+    private var hasResponded = false
+
+    init(_ completionHandler: @escaping (ShieldActionResponse) -> Void) {
+        self.completionHandler = completionHandler
+    }
+
+    func send(_ response: ShieldActionResponse) {
+        lock.lock()
+        let shouldSend = !hasResponded
+        hasResponded = true
+        lock.unlock()
+        guard shouldSend else { return }
+        completionHandler(response)
     }
 }

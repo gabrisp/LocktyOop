@@ -8,6 +8,7 @@ final class StartupCoordinator: ObservableObject {
     private let appGroupStore: AppGroupStore
     private let pauseEngine: PauseEngine
     private let pauseFlowRepository: PauseFlowRepository
+    private let notificationService: NotificationServicing
     private let routineEngine: RoutineEngine
     private let shieldService: ShieldServicing
     @Published private var hasStarted = false
@@ -18,6 +19,7 @@ final class StartupCoordinator: ObservableObject {
         appGroupStore: AppGroupStore,
         pauseEngine: PauseEngine,
         pauseFlowRepository: PauseFlowRepository,
+        notificationService: NotificationServicing,
         routineEngine: RoutineEngine,
         shieldService: ShieldServicing
     ) {
@@ -26,6 +28,7 @@ final class StartupCoordinator: ObservableObject {
         self.appGroupStore = appGroupStore
         self.pauseEngine = pauseEngine
         self.pauseFlowRepository = pauseFlowRepository
+        self.notificationService = notificationService
         self.routineEngine = routineEngine
         self.shieldService = shieldService
     }
@@ -45,6 +48,7 @@ final class StartupCoordinator: ObservableObject {
             await pauseEngine.refreshShields()
 
             session.finishStartup(requiresOnboarding: !session.hasCompletedOnboarding)
+            await requestNotificationsIfNeeded()
 
             let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
             router.pendingUnlock = presentedPause?.context
@@ -82,6 +86,17 @@ final class StartupCoordinator: ObservableObject {
         }
 
         consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
+    }
+
+    /// Asks for notifications on the first launch that gets this far.
+    ///
+    /// It was only ever asked for from the system-access screen, which nothing sends the
+    /// user to -- so the permission was usually never granted and the shield's unlock
+    /// notification, the only way back into Lockty from a blocked app, was dropped by the
+    /// system without a word.
+    private func requestNotificationsIfNeeded() async {
+        guard await notificationService.refreshAuthorization() == .notDetermined else { return }
+        _ = await notificationService.requestAuthorization()
     }
 
     /// The shield posts a notification alongside opening the app, because it cannot tell

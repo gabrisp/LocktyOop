@@ -126,10 +126,17 @@ private struct LocktyDynamicSheetSizesModifier: ViewModifier {
         guard sizes.count == 1, let only = sizes.first else { return nil }
         switch only {
         case .fit: return nil
-        case .small: return windowHeight * 0.33
-        case .medium: return windowHeight * 0.5
-        case .large: return windowHeight
+        case .small: return availableHeight * 0.33
+        case .medium: return availableHeight * 0.5
+        case .large: return availableHeight
         }
+    }
+
+    /// What a sheet can actually be, not what the window is. Asking for the window's
+    /// full height made the content taller than the sheet it produced, so it was pushed
+    /// up and the bar went off the top with it.
+    private var availableHeight: CGFloat {
+        max(0, windowHeight - 110)
     }
 
     private var windowHeight: CGFloat {

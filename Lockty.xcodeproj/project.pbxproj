@@ -1062,6 +1062,7 @@
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Lockty uses NFC tags to start configured focus actions.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Lockty uses your location for configured routine triggers.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lockty uses your location for configured routine triggers.";
+				INFOPLIST_FILE = LocktyInfo.plist;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1099,6 +1100,7 @@
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Lockty uses NFC tags to start configured focus actions.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Lockty uses your location for configured routine triggers.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lockty uses your location for configured routine triggers.";
+				INFOPLIST_FILE = LocktyInfo.plist;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

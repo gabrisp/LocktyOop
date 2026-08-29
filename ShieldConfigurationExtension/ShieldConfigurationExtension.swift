@@ -37,24 +37,30 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let activeRoutine = runtime?.activeRoutine
         let offersUnlock = activeRoutine?.pausePolicySnapshot.offersPause == true
 
+        let subtitle = activeRoutine.map { routine in
+            offersUnlock
+                ? "\(routine.nameSnapshot) is running. Ask Lockty to unlock it, or close the app."
+                : "\(routine.nameSnapshot) is running."
+        } ?? "This app is locked."
+
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1),
-            icon: UIImage(systemName: "lock.shield"),
+            icon: UIImage(systemName: "lock.fill"),
             title: ShieldConfiguration.Label(
-                text: resourceName,
+                text: "\(resourceName) was blocked by Lockty",
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(
-                text: activeRoutine.map { "Bloqueado por \($0.nameSnapshot)" } ?? "Bloqueado por Lockty",
-                color: UIColor.white.withAlphaComponent(0.72)
+                text: subtitle,
+                color: UIColor.white.withAlphaComponent(0.68)
             ),
             primaryButtonLabel: offersUnlock
-                ? ShieldConfiguration.Label(text: "Desbloquear", color: .black)
-                : ShieldConfiguration.Label(text: "Cerrar", color: .black),
+                ? ShieldConfiguration.Label(text: "Unlock with Lockty", color: .black)
+                : ShieldConfiguration.Label(text: "Close", color: .black),
             primaryButtonBackgroundColor: .white,
             secondaryButtonLabel: offersUnlock
-                ? ShieldConfiguration.Label(text: "Cerrar", color: UIColor.white.withAlphaComponent(0.85))
+                ? ShieldConfiguration.Label(text: "Close", color: UIColor.white.withAlphaComponent(0.85))
                 : nil
         )
     }

@@ -41,28 +41,28 @@ struct HomeView: View {
             }
             .tag(AppTab.focus)
         }
-        .safeAreaInset(edge: .bottom) {
-            Group {
-                if let activeRoutine {
-                    ActiveSessionBar(
-                        routine: activeRoutine,
-                        pauseCount: featureFactory.pausesViewModel.eventsSince(activeRoutine.startedAt).count
-                    ) {
-                        router.presentSheet(.liveSession)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            // The zoom source is on this container, not on the bar itself. The bar
-            // redraws every second from its own TimelineView clock, and a source that
-            // gets re-created while the transition is running is dropped -- which is why
-            // dismissing sometimes just snapped back with no animation at all.
-            .matchedTransitionSource(id: SheetRoute.liveSession.id, in: liveSessionZoom)
-            .padding(.bottom, LocktySpacing.sm)
-            // Scoped to the bar. On the whole TabView this implicit animation was picked
-            // up by the presentation itself and fought the zoom.
-            .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: activeRoutine?.id)
-        }
+//        .safeAreaInset(edge: .bottom) {
+//            Group {
+//                if let activeRoutine {
+//                    ActiveSessionBar(
+//                        routine: activeRoutine,
+//                        pauseCount: featureFactory.pausesViewModel.eventsSince(activeRoutine.startedAt).count
+//                    ) {
+//                        router.presentSheet(.liveSession)
+//                    }
+//                    .transition(.move(edge: .bottom).combined(with: .opacity))
+//                }
+//            }
+//            // The zoom source is on this container, not on the bar itself. The bar
+//            // redraws every second from its own TimelineView clock, and a source that
+//            // gets re-created while the transition is running is dropped -- which is why
+//            // dismissing sometimes just snapped back with no animation at all.
+//            .matchedTransitionSource(id: SheetRoute.liveSession.id, in: liveSessionZoom)
+//            .padding(.bottom, LocktySpacing.sm)
+//            // Scoped to the bar. On the whole TabView this implicit animation was picked
+//            // up by the presentation itself and fought the zoom.
+//            .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: activeRoutine?.id)
+//        }
         .sheet(item: $router.sheet) { route in
             // Only the live session zooms, and only from the bottom bar that opened it —
             // every other sheet has no matching source and must present normally.

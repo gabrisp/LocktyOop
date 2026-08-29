@@ -1,5 +1,6 @@
 import Foundation
 import ManagedSettings
+import UIKit
 import UserNotifications
 
 final class ShieldActionExtension: ShieldActionDelegate {
@@ -46,11 +47,15 @@ final class ShieldActionExtension: ShieldActionDelegate {
             }
 
             writePendingPause(context)
-            // A shield action extension can't bring the app forward itself, and
-            // ActivityKit can't be started from an extension either. A local
-            // notification is the one route that works: tapping it opens Lockty, where
-            // the request written above is surfaced as a card.
-            postUnlockNotification(context)
+
+            // Try to bring Lockty forward directly. UIApplication is not visible to an
+            // app extension at compile time, so it is reached through the runtime -- the
+            // only way this button can open the app rather than just leave a breadcrumb.
+            // A notification is still posted whenever that doesn't take, so the request
+            // is never left with no way back to the app.
+            if !openLockty(for: context) {
+                postUnlockNotification(context)
+            }
             completionHandler(.defer)
 
         case .secondaryButtonPressed:
@@ -84,12 +89,41 @@ final class ShieldActionExtension: ShieldActionDelegate {
         )
     }
 
+    /// Opens `lockty://unlock?...`, returning whether the open was actually dispatched.
+    @discardableResult
+    private func openLockty(for context: PauseContext) -> Bool {
+        guard let url = URL(string: "lockty://unlock?request=\(context.id.uuidString)") else {
+            return false
+        }
+
+        let sharedSelector = NSSelectorFromString("sharedApplication")
+        guard let applicationClass = NSClassFromString("UIApplication") as? NSObject.Type,
+              applicationClass.responds(to: sharedSelector),
+              let application = applicationClass.perform(sharedSelector)?.takeUnretainedValue() as? NSObject
+        else { return false }
+
+        let openSelector = NSSelectorFromString("openURL:options:completionHandler:")
+        guard application.responds(to: openSelector) else { return false }
+
+        typealias OpenURL = @convention(c) (NSObject, Selector, NSURL, NSDictionary, Any?) -> Void
+        let implementation = application.method(for: openSelector)
+        let open = unsafeBitCast(implementation, to: OpenURL.self)
+        open(application, openSelector, url as NSURL, NSDictionary(), nil)
+        return true
+    }
+
     private func postUnlockNotification(_ context: PauseContext) {
         let content = UNMutableNotificationContent()
-        content.title = "Solicitud de desbloqueo"
-        content.body = "Toca para decidir sobre \(context.displayName) en Lockty."
+        content.title = "Unlock \(context.displayName)?"
+        content.body = "Tap to decide in Lockty."
         content.sound = .default
         content.userInfo = ["pauseRuleID": context.pauseRuleID.uuidString]
+        // Time sensitive so it comes through immediately and survives a Focus mode --
+        // this notification is the only way an extension can get the user back into
+        // Lockty, so it must not be held back or batched. iOS ignores this until the
+        // Time Sensitive Notifications capability is enabled on the target; the
+        // provisioning profile does not carry it yet.
+        content.interruptionLevel = .timeSensitive
 
         // nil trigger delivers as soon as the system allows, rather than on a timer.
         let request = UNNotificationRequest(

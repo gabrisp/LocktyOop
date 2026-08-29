@@ -38,5 +38,12 @@ struct RootView: View {
             guard newPhase == .active else { return }
             Task { await container.startupCoordinator.handleForeground() }
         }
+        // lockty://unlock — the shield's primary button opens this directly, and the
+        // notification it falls back to carries it too. Either way it lands on the same
+        // pending request the coordinator reads out of the App Group.
+        .onOpenURL { url in
+            guard url.scheme == "lockty", url.host == "unlock" else { return }
+            Task { await container.startupCoordinator.handleForeground() }
+        }
     }
 }

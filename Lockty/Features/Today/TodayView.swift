@@ -64,11 +64,11 @@ struct TodayView: View {
         dateSliderBlockHeight + headerTopInset
     }
 
-    /// Zero while the whole top chrome is commented out: nothing is pinned over the
-    /// scroll view any more, so the content must not be pushed down to clear it.
+    /// What the pinned chrome takes at the top of the scroll content: the ring, and the
+    /// inset above it. The date slider and the shortcut row are still commented out, so
+    /// they claim nothing.
     private var topChromeExpandedHeight: CGFloat {
-        0
-//        headerTopInset + MetricsHeaderGeometry.expandedHeight
+        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
     }
@@ -96,7 +96,7 @@ struct TodayView: View {
                 .ignoresSafeArea()
 
             scrollContent
-//            topChromeBackdrop
+            topChromeBackdrop
             topChrome
         }
         .task(id: DayKey(date: day)) {
@@ -187,20 +187,19 @@ struct TodayView: View {
 //            .opacity(1 - dateSliderHideProgress)
 //            .offset(y: -dateSliderHideProgress * 12)
 
-//            TodayMetricsHeader(
-//                metrics: state.primaryMetrics.metrics,
-//                collapseProgress: collapseProgress,
-//                topInset: headerTopInset,
-//                onMetricSelected: { metric in
-//                    switch metric.kind {
-//                    case .productivity: router.presentSheet(.productivityDetail(day))
-//                    case .control: router.presentSheet(.controlDetail(day))
-//                    case .detox: router.presentSheet(.detoxDetail(day))
-//                    }
-//                }
-//            )
-//            .offset(y: metricsHeaderOffsetY)
-            EmptyView()
+            TodayMetricsHeader(
+                metrics: state.primaryMetrics.metrics,
+                collapseProgress: collapseProgress,
+                topInset: headerTopInset,
+                onMetricSelected: { metric in
+                    switch metric.kind {
+                    case .productivity: router.presentSheet(.productivityDetail(day))
+                    case .control: router.presentSheet(.controlDetail(day))
+                    case .detox: router.presentSheet(.detoxDetail(day))
+                    }
+                }
+            )
+            .offset(y: metricsHeaderOffsetY)
 
             // Above the rings and pinned with them. They fade out on a downward scroll
             // and the rings ride up into the space; a scroll up brings them straight

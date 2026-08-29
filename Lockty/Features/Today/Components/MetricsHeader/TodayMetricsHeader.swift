@@ -10,11 +10,18 @@ struct TodayMetricsHeader: View {
         MetricsHeaderGeometry(progress: collapseProgress)
     }
 
+    /// Only productivity. The other two rings are still computed and still have their
+    /// own detail sheets; the header just stopped being a row of three, so the one that
+    /// matters can sit in the middle and shrink there.
+    private var headlineMetric: PrimaryMetric? {
+        metrics.first { $0.kind == .productivity } ?? metrics.first
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            ForEach(metrics) { metric in
-                Button { onMetricSelected?(metric) } label: {
-                    MetricRingView(metric: metric, collapseProgress: collapseProgress)
+            if let headlineMetric {
+                Button { onMetricSelected?(headlineMetric) } label: {
+                    MetricRingView(metric: headlineMetric, collapseProgress: collapseProgress)
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity)

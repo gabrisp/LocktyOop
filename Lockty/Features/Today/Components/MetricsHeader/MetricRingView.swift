@@ -39,11 +39,10 @@ struct MetricRingView: View {
             let collapsedGroupWidth = diameter + geometry.labelGap + labelWidth
             let collapsedGroupOriginX = max((itemWidth - collapsedGroupWidth) / 2, 0)
             let horizontalProgress = geometry.labelProgress
-            let ringCenterX = MetricsHeaderGeometry.lerp(
-                itemWidth / 2,
-                collapsedGroupOriginX + (diameter / 2),
-                progress: horizontalProgress
-            )
+            // Dead centre at every stage. It used to slide left to make room for the
+            // label beside it, but the label now fades out instead of moving next to the
+            // ring, so there is nothing to make room for.
+            let ringCenterX = itemWidth / 2
             let ringCenterY = geometry.contentTopOffset + (diameter / 2)
             let labelCenterX = MetricsHeaderGeometry.lerp(
                 itemWidth / 2,
@@ -67,13 +66,15 @@ struct MetricRingView: View {
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                     .frame(width: diameter, height: diameter, alignment: .center)
-                    .opacity(geometry.valueOpacity)
                     .position(x: ringCenterX, y: ringCenterY)
 
                 label
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
                         labelWidth = newValue
                     }
+                    // Gone by the time the header is collapsed: what is left is the
+                    // ring, smaller, with its number still in it.
+                    .opacity(1 - horizontalProgress)
                     .position(x: labelCenterX, y: labelCenterY)
             }
             .frame(width: itemWidth, height: geometry.height, alignment: .topLeading)

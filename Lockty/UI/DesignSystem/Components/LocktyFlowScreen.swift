@@ -50,12 +50,22 @@ struct LocktyFlowScreen<Content: View>: View {
                 Text(title)
                     .font(.system(.title2, design: .default, weight: .bold))
                     .foregroundStyle(LocktyColors.primaryText)
+                    // Same transition as the content, keyed on the title itself: the
+                    // whole step should change together rather than the copy snapping
+                    // while the thing it describes fades.
+                    .transition(.blurReplace.combined(with: .opacity))
+                    .id(title)
 
                 content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.blurReplace.combined(with: .opacity))
                     .id(stepID)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Clear of the chrome laid over it, so the wheel can run as tall as it likes
+            // without its ends sitting under the buttons.
+            .padding(.top, 60)
+            .padding(.bottom, 110)
             .overlay(alignment: .top) { header }
             .overlay(alignment: .bottom) { footer }
             .padding(.horizontal, LocktySpacing.lg)
@@ -114,15 +124,22 @@ struct LocktyFlowScreen<Content: View>: View {
                 Text(isResting ? "\(remainingRest)" : primaryTitle)
                     .font(.system(.headline, design: .default, weight: .semibold))
                     .monospacedDigit()
-                    .contentTransition(.numericText(countsDown: true))
+                    // Counting stays a numeric transition; changing what the button is
+                    // for is a blur replace, like everything else in the step.
+                    .contentTransition(isResting ? .numericText(countsDown: true) : .identity)
+                    .transition(.blurReplace.combined(with: .opacity))
+                    .id(isResting ? "rest" : primaryTitle)
                     .animation(.snappy(duration: 0.25), value: remainingRest)
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
                     .background(Capsule(style: .continuous).fill(isResting ? .white.opacity(0.55) : .white))
             }
+            // locktyInteractive feeds the press state; the surface is what draws the
+            // shrink and the highlight, and it needs the same capsule the button is.
             .buttonStyle(.locktyInteractive)
-            .locktyInteractiveSurface(enabled: true, shape: Capsule(style: .continuous))
+            .clipShape(Capsule(style: .continuous))
+            .locktyInteractiveSurface(shape: Capsule(style: .continuous))
             .tappable()
             .disabled(!canPressPrimary)
             .opacity(isPrimaryEnabled ? 1 : 0.4)
@@ -141,9 +158,13 @@ struct LocktyFlowScreen<Content: View>: View {
                         .font(.system(.headline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 30)
+                        .frame(height: 52)
+                        .contentShape(Capsule(style: .continuous))
                 }
-                .buttonStyle(.plain)
+                // No background of its own: the capsule only shows up as the press
+                // highlight, so the button is invisible until it is touched.
+                .buttonStyle(.locktyInteractive)
+                .locktyInteractiveSurface(shape: Capsule(style: .continuous))
                 .tappable()
             }
         }

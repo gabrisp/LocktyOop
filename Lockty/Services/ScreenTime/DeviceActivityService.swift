@@ -1,5 +1,7 @@
-import Foundation
 import DeviceActivity
+import FamilyControls
+import Foundation
+import ManagedSettings
 
 protocol DeviceActivityServicing {
     func schedulePauseRelock(_ allowance: ActivePauseAllowance) async throws
@@ -9,13 +11,55 @@ protocol DeviceActivityServicing {
 
 struct LiveDeviceActivityService: DeviceActivityServicing {
     private let center = DeviceActivityCenter()
+    private let selectionStore: ScreenTimeSelectionStore
 
+    init(selectionStore: ScreenTimeSelectionStore = ScreenTimeSelectionStore()) {
+        self.selectionStore = selectionStore
+    }
+
+    /// Name of the usage event that ends an allowance.
+    static let pauseAllowanceEvent = DeviceActivityEvent.Name("lockty.pause.allowance")
+
+    /// Ends the allowance in the background, once the released apps have been used for
+    /// as long as it granted.
+    ///
+    /// This used to be a schedule running from the allowance's start to its end, which
+    /// never worked: DeviceActivitySchedule will not take an interval under fifteen
+    /// minutes, so every allowance shorter than that -- which is all of them -- threw
+    /// and nothing was monitored at all. The app only ever re-locked because opening it
+    /// noticed the expiry.
+    ///
+    /// A usage threshold is monitored instead. The window is long enough for the API to
+    /// accept it, and the event fires after the granted minutes have actually been spent
+    /// in those apps, which is the case that matters: the phone is in your hand and the
+    /// time runs out. Put the phone down and the wall clock expiry still catches it on
+    /// the next foreground.
     func schedulePauseRelock(_ allowance: ActivePauseAllowance) async throws {
         let name = DeviceActivityName("lockty.pause.\(allowance.id.uuidString)")
+        let tokens = selectionStore.applicationTokens(for: allowance.releasedApplications)
+        guard !tokens.isEmpty else { return }
+
+        let minutes = max(1, Int(allowance.expiresAt.timeIntervalSince(allowance.startedAt) / 60))
+        let event = DeviceActivityEvent(
+            applications: tokens,
+            threshold: DateComponents(minute: minutes)
+        )
+
         let calendar = Calendar.current
-        let start = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: allowance.startedAt)
-        let end = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: allowance.expiresAt)
-        try center.startMonitoring(name, during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false))
+        let start = calendar.dateComponents([.hour, .minute, .second], from: allowance.startedAt)
+        // A whole day rather than the allowance's own length: the interval only has to
+        // be open while the threshold is being counted, and anything near the allowance
+        // itself falls under the fifteen-minute floor.
+        let end = calendar.dateComponents(
+            [.hour, .minute, .second],
+            from: allowance.startedAt.addingTimeInterval(23 * 3600)
+        )
+
+        try center.startMonitoring(
+            name,
+            during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false),
+            events: [Self.pauseAllowanceEvent: event]
+        )
     }
 
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws {

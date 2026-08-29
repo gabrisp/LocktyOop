@@ -71,8 +71,16 @@ private struct RuntimeRepairCoordinator {
         repairRuntimeState(activityName: activityName)
     }
 
+    /// The allowance's usage threshold has been reached: the granted minutes have been
+    /// spent, so it ends now whether or not its wall clock has run out.
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {
         _ = event
+        if activity.rawValue.hasPrefix("lockty.pause.") {
+            try? store.updateRuntimeState { state in
+                state.activePauseAllowance = nil
+                state.pendingPause = nil
+            }
+        }
         repairRuntimeState(activityName: activity.rawValue)
     }
 

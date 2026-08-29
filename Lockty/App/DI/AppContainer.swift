@@ -110,7 +110,7 @@ final class AppContainer {
             classificationRepository: classificationRepository
         )
         let shieldService = LiveShieldService(appGroupStore: appGroupStore, selectionStore: selectionStore)
-        let deviceActivityService = LiveDeviceActivityService()
+        let deviceActivityService = LiveDeviceActivityService(selectionStore: selectionStore)
         let pauseRuleRepository = CoreDataPauseRuleRepository(
             controller: persistenceController,
             appGroupStore: appGroupStore,

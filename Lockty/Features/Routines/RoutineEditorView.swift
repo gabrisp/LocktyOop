@@ -1228,21 +1228,20 @@ struct RoutineEditorView: View {
 
                 strictRow
 
-                HoldDownButton(
-                    text: isCreating ? "Mantén para confirmar" : "Mantén para guardar",
-                    isProminent: true
+                LocktyHoldButton(
+                    title: isCreating ? "Mantén para confirmar" : "Mantén para guardar"
                 ) {
                     Task {
                         if await viewModel.save() {
+                            // Confirming closes the sheet and leaves the routine made.
                             if isCreating {
                                 close()
                             } else {
-                                withAnimation(.smooth(duration: 0.28)) { isEditing = false }
+                                withAnimation(sheetAnimation) { isEditing = false }
                             }
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
                 .padding(.top, LocktySpacing.sm)
             }
         .padding(.horizontal, LocktySpacing.lg)

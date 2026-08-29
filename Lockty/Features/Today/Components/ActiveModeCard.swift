@@ -61,10 +61,12 @@ struct ActiveModeCard: View {
 
                 // Held, not tapped: ending a routine early is the one thing on this card
                 // that undoes what the routine is for.
-                HoldDownButton(text: "Mantén para finalizar", isProminent: true) {
-                    onStop()
-                }
-                .frame(maxWidth: .infinity)
+                LocktyHoldButton(
+                    title: "Mantén para finalizar",
+                    systemImage: "stop.circle",
+                    tint: LocktyColors.unproductive,
+                    action: onStop
+                )
                 .padding(.top, LocktySpacing.xs)
             }
         }

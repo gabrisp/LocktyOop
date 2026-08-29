@@ -257,8 +257,13 @@ final class RoutineEditorViewModel: ObservableObject {
         }
     }
 
+    /// The flow this routine will use.
+    ///
+    /// Falls back to the first saved flow -- the one seeded on first run -- rather than
+    /// to nothing: a routine with no flow chosen offered no pause at all, so its apps
+    /// could not be unlocked by any means.
     var selectedPauseFlow: PauseFlow? {
-        pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } }
+        pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } } ?? pauseFlows.first
     }
 
     private func loadSuggestedApplications() async {

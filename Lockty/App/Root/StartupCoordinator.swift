@@ -7,6 +7,7 @@ final class StartupCoordinator: ObservableObject {
     private let router: AppRouter
     private let appGroupStore: AppGroupStore
     private let pauseEngine: PauseEngine
+    private let pauseFlowRepository: PauseFlowRepository
     private let routineEngine: RoutineEngine
     private let shieldService: ShieldServicing
     @Published private var hasStarted = false
@@ -16,6 +17,7 @@ final class StartupCoordinator: ObservableObject {
         router: AppRouter,
         appGroupStore: AppGroupStore,
         pauseEngine: PauseEngine,
+        pauseFlowRepository: PauseFlowRepository,
         routineEngine: RoutineEngine,
         shieldService: ShieldServicing
     ) {
@@ -23,6 +25,7 @@ final class StartupCoordinator: ObservableObject {
         self.router = router
         self.appGroupStore = appGroupStore
         self.pauseEngine = pauseEngine
+        self.pauseFlowRepository = pauseFlowRepository
         self.routineEngine = routineEngine
         self.shieldService = shieldService
     }
@@ -38,6 +41,7 @@ final class StartupCoordinator: ObservableObject {
             try await reconcileRuntimeState(runtimeState)
             // The stored policy can be out of date with the stored rules -- a Pause
             // created while nothing else recomputed the shield left no policy at all.
+            await pauseFlowRepository.seedDefaultFlowIfNeeded()
             await pauseEngine.refreshShields()
 
             session.finishStartup(requiresOnboarding: !session.hasCompletedOnboarding)

@@ -2,6 +2,8 @@ import Foundation
 
 protocol PauseFlowRepository {
     func flows() async -> [PauseFlow]
+    /// Writes the flow every routine falls back to, once, on first run.
+    func seedDefaultFlowIfNeeded() async
     func flow(id: UUID) async -> PauseFlow?
     func save(_ flow: PauseFlow) async throws
     func delete(id: UUID) async throws
@@ -17,6 +19,22 @@ struct AppGroupPauseFlowRepository: PauseFlowRepository {
 
     init(appGroupStore: AppGroupStore) {
         self.appGroupStore = appGroupStore
+    }
+
+    private enum Keys {
+        static let didSeedDefault = "lockty.pauseFlows.didSeedDefault"
+    }
+
+    /// Seeded once and never again, tracked by a flag rather than by the store being
+    /// empty: deleting every flow is a choice, and an empty list should not quietly grow
+    /// one back.
+    func seedDefaultFlowIfNeeded() async {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Keys.didSeedDefault) else { return }
+        defaults.set(true, forKey: Keys.didSeedDefault)
+
+        guard appGroupStore.loadPauseFlows().isEmpty else { return }
+        try? await save(PauseFlow(name: "Espera y confirma", icon: "hourglass"))
     }
 
     func flows() async -> [PauseFlow] {

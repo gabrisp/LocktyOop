@@ -73,6 +73,8 @@ final class PauseEditorViewModel {
         initialPauseID == nil ? "New Pause" : "Edit Pause"
     }
 
+    var isCreating: Bool { initialPauseID == nil }
+
     var selectionScope: ScreenTimeSelectionScope {
         .pause(editingID)
     }
@@ -235,6 +237,9 @@ struct PauseEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showAppPicker = false
     @State private var showNameInfo = false
+    /// Opening an existing Pause reads it; the pencil turns it into an editor. Creating
+    /// one starts in editing, the same way the routine editor behaves.
+    @State private var isEditing: Bool
 
     init(
         viewModel: PauseEditorViewModel,
@@ -242,9 +247,12 @@ struct PauseEditorView: View {
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
+        _isEditing = State(initialValue: viewModel.isCreating)
         self.router = router
         self.onCloseEditor = onCloseEditor
     }
+
+    private var isCreating: Bool { viewModel.isCreating }
 
     private func close() {
         onCloseEditor()
@@ -270,6 +278,7 @@ struct PauseEditorView: View {
                         ForEach(Array(viewModel.steps.enumerated()), id: \.element.id) { _, step in
                             PauseStepEditorCard(
                                 step: binding(for: step.id),
+                                isEditing: isEditing,
                                 onRemove: {
                                     withAnimation(.smooth(duration: 0.24)) {
                                         viewModel.removeStep(id: step.id)
@@ -278,6 +287,7 @@ struct PauseEditorView: View {
                             )
                         }
 
+                        if isEditing {
                         Menu {
                             ForEach(EditablePauseStep.allCases) { type in
                                 Button(type.rawValue.capitalized) {
@@ -295,6 +305,7 @@ struct PauseEditorView: View {
                                 .safeGlass(radius: LocktyRadius.medium, interactive: true)
                         }
                         .buttonStyle(.plain)
+                        }
                     }
                 }
 
@@ -330,6 +341,8 @@ struct PauseEditorView: View {
                         )
                     }
                 }
+                // Reading mode: the allowance slider and relock switch are inert.
+                .disabled(!isEditing)
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
@@ -338,27 +351,42 @@ struct PauseEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    close()
-                } label: {
-                    Image(systemName: "xmark")
-                        .fontWeight(.ultraLight)
+            // Hidden only while editing an existing Pause, where the checkmark returns
+            // to reading. Creating always keeps a way out.
+            if !isEditing || isCreating {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        close()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .fontWeight(.ultraLight)
+                    }
                 }
             }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    guard isEditing else {
+                        withAnimation(.smooth(duration: 0.28)) { isEditing = true }
+                        return
+                    }
+
                     Task {
                         if await viewModel.save() {
-                            close()
+                            if isCreating {
+                                close()
+                            } else {
+                                withAnimation(.smooth(duration: 0.28)) { isEditing = false }
+                            }
                         }
                     }
                 } label: {
-                    Image(systemName: "checkmark")
+                    Image(systemName: isEditing ? "checkmark" : "pencil")
                         .fontWeight(.ultraLight)
                 }
             }
         }
+        .interactiveDismissDisabled(isEditing && !isCreating)
         .task {
             await viewModel.load()
         }
@@ -410,6 +438,21 @@ struct PauseEditorView: View {
     }
 
     @ViewBuilder
+    private func appIcon(viewModel: PauseEditorViewModel) -> some View {
+        if let token = viewModel.selectionPreview.applicationTokens.first {
+            // .id(token): SwiftUI reuses the existing Label in place when the token
+            // changes, so without this it keeps drawing the previously selected icon.
+            Label(token)
+                .labelStyle(.iconOnly)
+                .id(token)
+        } else {
+            Image(systemName: "app.badge")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(LocktyColors.primaryText)
+        }
+    }
+
+    @ViewBuilder
     private func pauseHero(viewModel: PauseEditorViewModel) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
             VStack(spacing: LocktySpacing.sm) {
@@ -417,30 +460,25 @@ struct PauseEditorView: View {
                     .font(.footnote)
                     .foregroundStyle(LocktyColors.tertiaryText)
 
-                Button {
-                    showAppPicker = true
-                } label: {
-                    Group {
-                        if let token = viewModel.selectionPreview.applicationTokens.first {
-                            // .id(token): SwiftUI reuses the existing Label in place when
-                            // the token changes, so without this it keeps drawing the
-                            // previously selected app's icon.
-                            Label(token)
-                                .labelStyle(.iconOnly)
-                                .id(token)
-                        } else {
-                            Image(systemName: "app.badge")
-                                .font(.system(size: 22, weight: .medium))
-                                .foregroundStyle(LocktyColors.primaryText)
-                        }
+                // Reading mode is inert: the app tile loses its tappable glass and the
+                // name loses its field background, so nothing invites an edit.
+                if isEditing {
+                    Button {
+                        showAppPicker = true
+                    } label: {
+                        appIcon(viewModel: viewModel)
+                            .frame(width: 50, height: 50)
+                            .safeGlass(radius: 12, interactive: true)
                     }
-                    .frame(width: 50, height: 50)
-                    .safeGlass(radius: 12, interactive: true)
+                    .buttonStyle(.plain)
+                    .tappable()
+                } else {
+                    appIcon(viewModel: viewModel)
+                        .frame(width: 50, height: 50)
                 }
-                .buttonStyle(.plain)
-                .tappable()
 
                 HStack(spacing: LocktySpacing.xs) {
+                    if isEditing {
                     CardView(
                         radius: 14,
                         padding: 0,
@@ -464,6 +502,15 @@ struct PauseEditorView: View {
                         }
                     }
                     .frame(maxWidth: 320)
+                    } else {
+                        Text(viewModel.customName)
+                            .font(LocktyTypography.body)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: 320)
+                    }
 
                     Button {
                         showNameInfo = true
@@ -551,6 +598,7 @@ struct PauseAppPickerSheet: View {
 
 private struct PauseStepEditorCard: View {
     @Binding var step: PauseStep
+    var isEditing: Bool = true
     let onRemove: () -> Void
 
     var body: some View {
@@ -560,12 +608,14 @@ private struct PauseStepEditorCard: View {
                     .font(LocktyTypography.callout)
                     .foregroundStyle(LocktyColors.secondaryText)
                 Spacer()
-                Button(role: .destructive, action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(LocktyColors.tertiaryText)
+                if isEditing {
+                    Button(role: .destructive, action: onRemove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundStyle(LocktyColors.tertiaryText)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
             switch step {
@@ -603,6 +653,8 @@ private struct PauseStepEditorCard: View {
                     .lineLimit(2...3)
             }
         }
+        // Reading mode: sliders and prompt fields are inert, the step still reads.
+        .disabled(!isEditing)
         .padding(LocktySpacing.md)
         .background(LocktyColors.elevatedBackground, in: RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous))
     }

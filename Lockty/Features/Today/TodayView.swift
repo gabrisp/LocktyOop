@@ -107,10 +107,31 @@ struct TodayView: View {
         return scene?.keyWindow?.safeAreaInsets.top ?? 0
     }
 
-    /// From the top of the screen down to just below the rings, whatever is currently
-    /// pinned in between.
+    /// From the top of the screen down to just below the rings, counting only what is
+    /// actually pinned in between: it grows when the shortcut row drops in and shrinks
+    /// back to the rings alone when the row hides.
     private var topChromeBackdropHeight: CGFloat {
-        safeAreaTop + metricsHeaderOffsetY + headerTopInset + metricsGeometry.height + 6
+        safeAreaTop
+            + dateSliderBlockHeight
+            + headerTopInset
+            + shortcutBlockHeight
+            + metricsGeometry.height
+            + 6
+    }
+
+    /// The bottom fade is a fixed distance rather than a share of the height, so the
+    /// short version (rings only) ends tight under them instead of fading over a
+    /// proportionally long stretch the way the tall version does.
+    private var topChromeBackdropFadeStart: CGFloat {
+        let height = topChromeBackdropHeight
+        guard height > 0 else { return 1 }
+        return max(0, 1 - (18 / height))
+    }
+
+    /// Fades in across the collapse rather than tracking it from the first pixel, so a
+    /// small scroll doesn't already paint a bar over the content.
+    private var topChromeBackdropOpacity: CGFloat {
+        MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0.12, to: 0.72)
     }
 
     /// A separate top-anchored layer rather than a background on the metrics header:
@@ -121,7 +142,7 @@ struct TodayView: View {
         LinearGradient(
             stops: [
                 .init(color: LocktyColors.background, location: 0),
-                .init(color: LocktyColors.background, location: 0.82),
+                .init(color: LocktyColors.background, location: topChromeBackdropFadeStart),
                 .init(color: LocktyColors.background.opacity(0), location: 1)
             ],
             startPoint: .top,
@@ -130,7 +151,7 @@ struct TodayView: View {
         .frame(maxWidth: .infinity)
         .frame(height: topChromeBackdropHeight)
         // Invisible while expanded, fading in as the header collapses.
-        .opacity(collapseProgress)
+        .opacity(topChromeBackdropOpacity)
         .allowsHitTesting(false)
         .ignoresSafeArea(edges: .top)
     }

@@ -281,23 +281,33 @@ private struct LocktyDynamicSheetChromeOverlay: View {
         }
     }
 
+    /// Each slot is keyed to the screen, so a screen change replaces the button and the
+    /// title rather than mutating them in place. Without the id they keep their identity
+    /// across the change and a transition has nothing to run on -- the label just swaps.
     private var baseChromeContent: some View {
         HStack(spacing: LocktySpacing.md) {
             configuration.leading
                 .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                 .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-leading", namespace: glassNamespace))
+                .id(configuration.transitionID)
+                .transition(.blurReplace.combined(with: .opacity))
 
             Spacer(minLength: 0)
 
             configuration.center
                 .lineLimit(1)
+                .id(configuration.transitionID)
+                .transition(.blurReplace.combined(with: .opacity))
 
             Spacer(minLength: 0)
 
             configuration.trailing
                 .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                 .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-trailing", namespace: glassNamespace))
+                .id(configuration.transitionID)
+                .transition(.blurReplace.combined(with: .opacity))
         }
+        .animation(.snappy(duration: 0.3, extraBounce: 0), value: configuration.transitionID)
     }
 }
 

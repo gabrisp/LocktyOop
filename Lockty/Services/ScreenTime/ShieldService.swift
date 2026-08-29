@@ -37,24 +37,35 @@ final class LiveShieldService: ShieldServicing {
     }
 
     func apply(_ policy: ShieldPolicy) async throws {
-        let selection = try selectionStore.selection(for: policy)
+        var selection = try selectionStore.selection(for: policy)
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
         guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty else {
             print("Shield apply failed because no selection matched policy reason=\(String(describing: policy.reason)) blockedApps=\(policy.blockedApplications.count) blockedDomains=\(policy.blockedDomains.count)")
             throw ShieldServiceError.selectionNotConfigured
         }
+
+        // A pause allowance releases an app that the selection behind this policy still
+        // lists -- and may only block through a category, where dropping the token does
+        // nothing. Subtract it from the tokens and hand it to the category shield as an
+        // exception, or "Continue" leaves the app shielded.
+        let exemptTokens = selectionStore.applicationTokens(for: policy.exemptApplications)
+        selection.applicationTokens.subtract(exemptTokens)
+
         print(
             """
             Applying shield policy reason=\(String(describing: policy.reason)) \
             apps=\(selection.applicationTokens.count) \
             categories=\(selection.categoryTokens.count) \
             selectionDomains=\(selection.webDomainTokens.count) \
-            manualDomains=\(blockedDomains.count)
+            manualDomains=\(blockedDomains.count) \
+            exempt=\(exemptTokens.count)
             """
         )
         managedSettingsStore.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
         managedSettingsStore.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
-        managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+        managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty
+            ? nil
+            : .specific(selection.categoryTokens, except: exemptTokens)
         managedSettingsStore.webContent.blockedByFilter = blockedDomains.isEmpty ? nil : .specific(blockedDomains)
         try appGroupStore.updateRuntimeState { state in state.shieldPolicy = policy }
     }
@@ -72,7 +83,7 @@ final class LiveShieldService: ShieldServicing {
 
     func restoreFromRuntimeState() async throws {
         let state = try appGroupStore.loadRuntimeState()
-        if state.shieldPolicy != .empty { try await apply(state.shieldPolicy) }
+        if !state.shieldPolicy.blocksNothing { try await apply(state.shieldPolicy) }
     }
 
     func clearAllRestrictions() async throws {

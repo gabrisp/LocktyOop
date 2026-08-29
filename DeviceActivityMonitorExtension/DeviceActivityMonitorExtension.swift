@@ -126,8 +126,13 @@ private struct RuntimeRepairCoordinator {
     }
 
     private func apply(policy: ShieldPolicy) {
-        let selection = (try? selectionStore.selection(for: policy)) ?? FamilyActivitySelection()
+        var selection = (try? selectionStore.selection(for: policy)) ?? FamilyActivitySelection()
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
+
+        // Same exemption the app applies: an app released by a live pause allowance must
+        // not be re-shielded here, whether it is blocked by token or by category.
+        let exemptTokens = selectionStore.applicationTokens(for: policy.exemptApplications)
+        selection.applicationTokens.subtract(exemptTokens)
 
         print(
             """
@@ -135,13 +140,16 @@ private struct RuntimeRepairCoordinator {
             apps=\(selection.applicationTokens.count) \
             categories=\(selection.categoryTokens.count) \
             domains=\(selection.webDomainTokens.count) \
-            manualDomains=\(blockedDomains.count)
+            manualDomains=\(blockedDomains.count) \
+            exempt=\(exemptTokens.count)
             """
         )
 
         managedSettingsStore.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
         managedSettingsStore.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
-        managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+        managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty
+            ? nil
+            : .specific(selection.categoryTokens, except: exemptTokens)
         managedSettingsStore.webContent.blockedByFilter = blockedDomains.isEmpty ? nil : .specific(blockedDomains)
     }
 

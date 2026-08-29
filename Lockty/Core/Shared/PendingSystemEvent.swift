@@ -28,6 +28,13 @@ nonisolated struct PendingSystemEvent: Codable, Hashable, Identifiable {
         guard let expiresAt else { return false }
         return Date() >= expiresAt
     }
+
+    /// Whether this is a queued pause request for the given rule, so the engine can drop
+    /// it once the pause has actually been answered.
+    func matchesPauseRequest(for pauseRuleID: UUID) -> Bool {
+        guard case .pauseRequested(let context) = payload else { return false }
+        return context.pauseRuleID == pauseRuleID
+    }
 }
 
 nonisolated enum SystemEventSource: String, Codable, Hashable {

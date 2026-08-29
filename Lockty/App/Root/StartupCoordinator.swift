@@ -39,11 +39,12 @@ final class StartupCoordinator {
 
             session.finishStartup(requiresOnboarding: !session.hasCompletedOnboarding)
 
-            if let pendingPause = runtimeState.pendingPause, pendingPause.isValid {
-                router.presentFullScreen(.pause(pendingPause.context))
+            let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
+            if let presentedPause {
+                router.presentFullScreen(.pause(presentedPause.context))
             }
 
-            consumePendingEvents(from: runtimeState)
+            consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
         } catch {
             session.recordStartupError(error.localizedDescription)
             appGroupStore.resetRuntimeStateToSafeDefault()
@@ -63,15 +64,16 @@ final class StartupCoordinator {
         guard let runtimeState = try? appGroupStore.loadRuntimeState() else { return }
         await pauseEngine.restore(from: runtimeState)
 
-        if let pendingPause = runtimeState.pendingPause, pendingPause.isValid {
-            router.presentFullScreen(.pause(pendingPause.context))
+        let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
+        if let presentedPause {
+            router.presentFullScreen(.pause(presentedPause.context))
         }
 
-        consumePendingEvents(from: runtimeState)
+        consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
     }
 
     private func reconcileRuntimeState(_ runtimeState: RuntimeState) async throws {
-        if runtimeState.shieldPolicy != .empty || runtimeState.recoveryFlags.contains(.shieldRestoreNeeded) {
+        if !runtimeState.shieldPolicy.blocksNothing || runtimeState.recoveryFlags.contains(.shieldRestoreNeeded) {
             try await shieldService.restoreFromRuntimeState()
         }
 
@@ -92,12 +94,25 @@ final class StartupCoordinator {
         }
     }
 
-    private func consumePendingEvents(from runtimeState: RuntimeState) {
+    /// Handles the first pending event and clears the queue.
+    ///
+    /// It used to only read the queue: nothing ever removed an event, so the pause the
+    /// shield wrote came back on every single foreground for the full ten minutes it
+    /// stayed valid -- and it was presented twice per foreground, once from pendingPause
+    /// and again from here, which left the flow half-presented and unable to finish.
+    private func consumePendingEvents(from runtimeState: RuntimeState, pauseAlreadyPresented: Bool) {
         let pendingEvents = runtimeState.pendingEvents.filter { !$0.isExpired }
+        defer {
+            try? appGroupStore.updateRuntimeState { state in
+                state.pendingEvents = []
+            }
+        }
+
         guard let event = pendingEvents.first else { return }
 
         switch event.payload {
         case .pauseRequested(let context):
+            guard !pauseAlreadyPresented else { return }
             router.presentFullScreen(.pause(context))
         case .routineStartRequested:
             break

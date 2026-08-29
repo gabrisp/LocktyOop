@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 enum PauseEngineState: Equatable {
     case idle
@@ -102,6 +103,9 @@ final class PauseEngine {
             )
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.pendingPause = nil
+                // The shield action queues an event alongside the pending pause; leaving
+                // it behind re-presented this same flow on the next foreground.
+                runtime.pendingEvents.removeAll { $0.matchesPauseRequest(for: context.pauseRuleID) }
                 runtime.activePauseAllowance = allowance
                 runtime.shieldPolicy = effectivePolicy
             }
@@ -110,7 +114,7 @@ final class PauseEngine {
             // a 15 minute interval, so any shorter allowance (the default is 5) threw and
             // the app stayed locked. The allowance expiry is also enforced on foreground,
             // so a missing schedule degrades rather than breaks.
-            if effectivePolicy == .empty {
+            if effectivePolicy.blocksNothing {
                 try await shieldService.remove(runtime.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
@@ -136,6 +140,7 @@ final class PauseEngine {
                     actualUsageDuration: nil
                 )
             )
+            clearPauseNotification(for: context.pauseRuleID)
             await liveActivityController.start(for: allowance)
             state = .temporarilyAllowed(allowance)
         } catch {
@@ -147,6 +152,7 @@ final class PauseEngine {
         do {
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.pendingPause = nil
+                runtime.pendingEvents.removeAll { $0.matchesPauseRequest(for: context.pauseRuleID) }
             }
             await pauseEventRepository.save(
                 PauseEvent(
@@ -163,11 +169,23 @@ final class PauseEngine {
                     actualUsageDuration: nil
                 )
             )
+            clearPauseNotification(for: context.pauseRuleID)
             state = .cancelled(context)
             state = .locked(context)
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    /// Pulls the "Open ... mindfully" notification the shield action posted.
+    ///
+    /// It stays in Notification Centre otherwise, and tapping it later re-opens a pause
+    /// that has already been answered.
+    private func clearPauseNotification(for pauseRuleID: UUID) {
+        let identifier = "pause-request-\(pauseRuleID.uuidString)"
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
     func relock(_ context: PauseContext) async {
@@ -182,7 +200,7 @@ final class PauseEngine {
                 activePauseAllowance: nil,
                 pauseRules: pauseRules
             )
-            if effectivePolicy == .empty {
+            if effectivePolicy.blocksNothing {
                 try await shieldService.remove(runtime.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
@@ -190,8 +208,10 @@ final class PauseEngine {
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.activePauseAllowance = nil
                 runtime.pendingPause = nil
+                runtime.pendingEvents.removeAll { $0.matchesPauseRequest(for: context.pauseRuleID) }
                 runtime.shieldPolicy = effectivePolicy
             }
+            clearPauseNotification(for: context.pauseRuleID)
             await liveActivityController.end()
             state = .locked(context)
         } catch {

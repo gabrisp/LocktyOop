@@ -29,8 +29,10 @@ struct ShieldPolicyResolver {
         // A granted allowance releases that app whatever put it behind the shield. The
         // loop above only skips it when it came from a pause rule, so an app blocked by
         // an active routine stayed shielded and "Continue" appeared to do nothing.
+        var exemptApplications = Set<AppIdentity.ID>()
         if let allowedAppID = activePauseAllowance?.context.appID {
             blockedApplications.remove(allowedAppID)
+            exemptApplications.insert(allowedAppID)
         }
 
         let reason: ShieldReason
@@ -46,7 +48,8 @@ struct ShieldPolicyResolver {
         return ShieldPolicy(
             blockedApplications: blockedApplications,
             blockedDomains: blockedDomains,
-            reason: reason
+            reason: reason,
+            exemptApplications: exemptApplications
         )
     }
 }

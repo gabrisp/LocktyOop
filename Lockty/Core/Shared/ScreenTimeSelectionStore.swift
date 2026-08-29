@@ -61,6 +61,21 @@ struct ScreenTimeSelectionStore {
         }
     }
 
+    /// The tokens, across every stored selection, for the given app identities.
+    ///
+    /// An AppIdentity.ID is derived from its token, so this walks the records rather
+    /// than trying to reconstruct a token from the identity -- which is not possible.
+    func applicationTokens(for appIDs: Set<AppIdentity.ID>) -> Set<ApplicationToken> {
+        guard !appIDs.isEmpty else { return [] }
+        var tokens = Set<ApplicationToken>()
+        for record in records() {
+            for token in record.selection.applicationTokens where appIDs.contains(AppIdentity.ID(token: token)) {
+                tokens.insert(token)
+            }
+        }
+        return tokens
+    }
+
     func selection(for policy: ShieldPolicy) throws -> FamilyActivitySelection {
         switch policy.reason {
         case .routine(let routineID):

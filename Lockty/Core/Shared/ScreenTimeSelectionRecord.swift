@@ -62,7 +62,11 @@ extension ScreenTimeSelectionRecord {
             || !selection.webDomainTokens.isEmpty
         guard hasAnySelection else { return false }
 
-        return blockedApplications.isSubset(of: policy.blockedApplications)
+        // Exempt apps count as covered: a pause allowance removes the released app from
+        // blockedApplications, and without this the routine record that also contains
+        // that app stopped being a subset, so the merge dropped the record whole and
+        // unshielded every other app the routine blocks.
+        return blockedApplications.isSubset(of: policy.blockedApplications.union(policy.exemptApplications))
             && blockedDomains.isSubset(of: policy.blockedDomains)
     }
 }

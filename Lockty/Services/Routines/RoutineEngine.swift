@@ -162,7 +162,7 @@ final class RoutineEngine {
                 runtime.activeBreak = nil
                 runtime.shieldPolicy = effectivePolicy
             }
-            if effectivePolicy == .empty {
+            if effectivePolicy.blocksNothing {
                 try await shieldService.remove(activeRoutine.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
@@ -260,7 +260,7 @@ final class RoutineEngine {
             }
             try await deviceActivityService.scheduleBreakEnd(activeBreak)
 
-            if effectivePolicy == .empty {
+            if effectivePolicy.blocksNothing {
                 try await shieldService.remove(activeRoutine.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)

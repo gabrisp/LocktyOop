@@ -77,6 +77,10 @@ struct ScreenTimeSelectionStore {
     }
 
     func selection(for policy: ShieldPolicy) throws -> FamilyActivitySelection {
+        if !policy.selectionScopes.isEmpty {
+            return mergedSelection(scopes: policy.selectionScopes)
+        }
+
         switch policy.reason {
         case .routine(let routineID):
             return try load(scope: .routine(routineID))
@@ -114,6 +118,16 @@ struct ScreenTimeSelectionStore {
             """
         )
 
+        return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
+            partialResult.applicationTokens.formUnion(record.selection.applicationTokens)
+            partialResult.categoryTokens.formUnion(record.selection.categoryTokens)
+            partialResult.webDomainTokens.formUnion(record.selection.webDomainTokens)
+        }
+    }
+
+    func mergedSelection(scopes: Set<ScreenTimeSelectionScope>) -> FamilyActivitySelection {
+        let matchingRecords = records().filter { scopes.contains($0.scope) }
+        print("Merging selection for explicit scopes=\(matchingRecords.map { $0.scope.id })")
         return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
             partialResult.applicationTokens.formUnion(record.selection.applicationTokens)
             partialResult.categoryTokens.formUnion(record.selection.categoryTokens)

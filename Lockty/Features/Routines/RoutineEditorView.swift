@@ -373,7 +373,7 @@ final class RoutineEditorViewModel: ObservableObject {
             pauseFlowID: pauseFlowID,
             // Resolved at save time: the flow can be edited or deleted afterwards and
             // the routine keeps enforcing what it was given.
-            pausePolicy: selectedPauseFlow?.policy ?? RoutinePausePolicy(),
+            pausePolicy: selectedPauseFlow?.policy ?? .off,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
             createdAt: createdAt,
             updatedAt: Date()
@@ -471,6 +471,12 @@ private enum RoutineEditorLocalSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
+private enum RoutineEditorCompactScreen: Hashable {
+    case reading
+    case editing
+    case naming
+}
+
 struct RoutineEditorView: View {
     @StateObject private var viewModel: RoutineEditorViewModel
     let router: AppRouter
@@ -488,17 +494,8 @@ struct RoutineEditorView: View {
     @State private var isShowingIconPicker = false
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
-    @State private var selectedDetent: PresentationDetent = .medium
-    /// The pushed picker's real height, handed back to it so it fills the sheet it just
-    /// asked to grow rather than the height the stack proposed on the way in.
-    @State private var pickerHeight: CGFloat?
-    @State private var editorHeight: CGFloat = 420
-    @State private var namingHeight: CGFloat = 140
-    /// Raised by a pushed screen that needs the whole sheet, and lowered when it leaves.
-    ///
-    /// Opening one goes straight to full height without measuring anything, and coming
-    /// back returns to the height that was already measured rather than taking it again.
-    @State private var isChildFullHeight = false
+    @FocusState private var isNameFieldFocused: Bool
+    @State private var sheetNavigationDirection: LocktyDynamicSheetNavigationDirection = .none
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -542,69 +539,178 @@ struct RoutineEditorView: View {
         isConfirmingDiscard = true
     }
 
-    /// The app and category picker is shown inside this sheet rather than on top of it,
-    /// so choosing apps is the sheet growing to full height, not a second sheet stacking
-    /// over the first.
-    private var isPickingApps: Bool { activeSheet == .apps }
-
     private var contentID: String {
-        if isPickingApps { return "apps" }
-        return isNaming ? "naming" : "editor"
+        if let activeSheet {
+            return activeSheet.id
+        }
+        switch currentCompactScreen {
+        case .reading: return "reading"
+        case .editing: return "editor"
+        case .naming: return "naming"
+        }
     }
 
-    /// Exactly one size at a time, unless the screen showing says otherwise.
-    ///
-    /// A set with one detent in it is a sheet that cannot be dragged to another size,
-    /// which is the point: these screens are as tall as what they contain, and there is
-    /// no second size for the user to want. The value itself still moves -- it is
-    /// whatever the content just measured.
-    private var detents: Set<PresentationDetent> {
-        guard isChildFullHeight else { return [currentDetent] }
-        // The pushed picker is a screen of its own and can be pulled back down to the
-        // height it came from.
-        return [editorDetent, .large]
+    private var currentCompactScreen: RoutineEditorCompactScreen {
+        if isNaming { return .naming }
+        return (isCreating || isEditing) ? .editing : .reading
     }
 
-    /// The size the sheet should be right now.
-    private var currentDetent: PresentationDetent {
-        if isChildFullHeight { return .large }
-        return isNaming ? namingDetent : editorDetent
-    }
-
-    private var editorDetent: PresentationDetent {
-        .height(clampedSheetHeight(editorHeight))
-    }
-
-    private var namingDetent: PresentationDetent {
-        .height(clampedSheetHeight(namingHeight))
-    }
-
-    /// Room for the navigation bar and the home indicator around whatever was measured,
-    /// and never taller than the screen can show.
-    private func clampedSheetHeight(_ height: CGFloat) -> CGFloat {
-        let chrome: CGFloat = 92
-        let maximum = UIScreen.main.bounds.height * 0.92
-        return min(max(height + chrome, 200), maximum)
+    private func timeValue(hour: Int, minute: Int) -> String {
+        String(format: "%02d:%02d", hour, minute)
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isNaming {
-                    namingContent
-                } else {
-                    editorContent
+        LocktyDynamicSheet(
+            animation: .smooth(duration: 0.32),
+            contentID: contentID,
+            navigationDirection: sheetNavigationDirection
+        ) {
+            sheetContent
+                .id(contentID)
+                .locktyDynamicSheetChrome(id: contentID) {
+                    centerChrome
+                } leading: {
+                    leadingChrome
+                } trailing: {
+                    trailingChrome
+                }
+        }
+        .interactiveDismissDisabled(viewModel.hasChanges && activeSheet == nil)
+        .confirmationDialog(
+            "¿Descartar los cambios?",
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button("Descartar", role: .destructive) { close() }
+            Button("Seguir editando", role: .cancel) {}
+        }
+        .task {
+            await viewModel.load()
+        }
+        .onChange(of: isNaming, initial: false) { _, newValue in
+            guard newValue else { return }
+            DispatchQueue.main.async {
+                isNameFieldFocused = true
+            }
+        }
+        .alert(
+            "Could not save routine",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        switch activeSheet {
+        case .apps:
+            selectionScreen
+                .locktyDynamicSheetSizes([.large])
+        case .domains:
+            domainsScreen
+                .locktyDynamicSheetSizes([.large])
+        case nil:
+            switch currentCompactScreen {
+            case .naming:
+                namingContent
+            case .editing:
+                editorContent
+            case .reading:
+                readOnlyContent
+            }
+        }
+    }
+
+    /// The middle of the bar. On the routine itself that is its icon beside its name,
+    /// which is why the bar takes a view rather than a string.
+    @ViewBuilder
+    private var centerChrome: some View {
+        switch activeSheet {
+        case .apps:
+            chromeTitleText("Seleccionadas")
+        case .domains:
+            chromeTitleText("Websites")
+        case nil:
+            if isNaming {
+                chromeTitleText("Nombre")
+            } else {
+                HStack(spacing: LocktySpacing.sm) {
+                    Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    chromeTitleText(routineChromeName)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .presentationDetents(detents, selection: $selectedDetent)
-            // The selection follows whatever the current screen says it should be, so
-            // it is always a detent the set still contains.
-            .onChange(of: currentDetent, initial: true) { _, newValue in
-                withAnimation(.smooth(duration: 0.3)) {
-                    selectedDetent = newValue
-                }
+        }
+    }
+
+    private var routineChromeName: String {
+        let trimmed = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty else { return trimmed }
+        return isCreating ? "Nueva rutina" : "Rutina"
+    }
+
+    private func chromeTitleText(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.title3, design: .default, weight: .regular))
+            .foregroundStyle(LocktyColors.primaryText)
+    }
+
+    @ViewBuilder
+    private var leadingChrome: some View {
+        if activeSheet != nil {
+            LocktyDynamicSheetBarButton(action: closePicker) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
             }
+        } else if isNaming {
+            LocktyDynamicSheetBarButton(action: exitNaming) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
+        } else {
+            LocktyDynamicSheetBarButton(action: requestClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var trailingChrome: some View {
+        if activeSheet != nil {
+            if isCreating || isEditing {
+                LocktyDynamicSheetBarButton(action: closePicker) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 18, weight: .medium))
+                }
+            } else {
+                Color.clear
+                    .frame(width: 44, height: 44)
+            }
+        } else if isNaming {
+            LocktyDynamicSheetBarButton(action: exitNaming) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 18, weight: .medium))
+            }
+            .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } else if !isEditing && !isCreating && !viewModel.isEditingBlocked {
+            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        } else {
+            Color.clear
+                .frame(width: 44, height: 44)
         }
     }
 
@@ -612,43 +718,9 @@ struct RoutineEditorView: View {
     /// pencil, and the only way back is answering it.
     private var namingContent: some View {
         VStack(spacing: LocktySpacing.lg) {
-            HStack {
-                Button {
-                    // Back out of naming, not out of the sheet: the editor behind it is
-                    // still holding the same unsaved edits either way.
-                    withAnimation(.smooth(duration: 0.34)) { isNaming = false }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(LocktyColors.elevatedBackground))
-                }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-
-                Spacer(minLength: 0)
-
-                Text("Pon nombre a tu regla")
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
-
-                Spacer(minLength: 0)
-
-                Button {
-                    withAnimation(.smooth(duration: 0.34)) { isNaming = false }
-                } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(LocktyColors.productive))
-                }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-                .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-
             HStack(spacing: LocktySpacing.sm) {
                 TextField("Nombre", text: $viewModel.name)
+                    .focused($isNameFieldFocused)
                     .font(LocktyTypography.body)
                     .foregroundStyle(LocktyColors.primaryText)
                     .padding(.horizontal, LocktySpacing.lg)
@@ -675,14 +747,6 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onChange(of: proxy.size.height, initial: true) { _, newValue in
-                        namingHeight = newValue
-                    }
-            }
-        }
     }
 
     /// Section heading: a glyph and a label, both in full colour. The eyebrow form is
@@ -702,9 +766,33 @@ struct RoutineEditorView: View {
 
     private func closePicker() {
         withAnimation(.smooth(duration: 0.34)) {
+            sheetNavigationDirection = .backward
             activeSheet = nil
         }
         viewModel.refreshSelectionState()
+    }
+
+    private func openChildSheet(_ sheet: RoutineEditorLocalSheet) {
+        withAnimation(.smooth(duration: 0.34)) {
+            sheetNavigationDirection = .forward
+            activeSheet = sheet
+        }
+    }
+
+    private func enterEditingFlow() {
+        withAnimation(.smooth(duration: 0.34)) {
+            sheetNavigationDirection = .forward
+            isEditing = true
+            isNaming = true
+        }
+    }
+
+    private func exitNaming() {
+        withAnimation(.smooth(duration: 0.34)) {
+            sheetNavigationDirection = .backward
+            isNaming = false
+        }
+        isNameFieldFocused = false
     }
 
     private var cardFill: Color { Color.white.opacity(0.055) }
@@ -754,6 +842,41 @@ struct RoutineEditorView: View {
         }
     }
 
+    private var readOnlyScheduleCard: some View {
+        VStack(spacing: 0) {
+            readOnlyTimeRow(
+                label: "De",
+                value: timeValue(
+                    hour: viewModel.scheduleTrigger.hour,
+                    minute: viewModel.scheduleTrigger.minute
+                ),
+                isStart: true
+            )
+
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+                .padding(.leading, 44)
+
+            readOnlyTimeRow(
+                label: "A",
+                value: timeValue(
+                    hour: viewModel.scheduleTrigger.endHour,
+                    minute: viewModel.scheduleTrigger.endMinute
+                ),
+                isStart: false
+            )
+        }
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .overlay(alignment: .topLeading) {
+            Rectangle()
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 1)
+                .padding(.leading, 21)
+                .padding(.top, 26)
+                .padding(.bottom, 26)
+        }
+    }
+
     private func timeRow(
         label: String,
         hour: Int,
@@ -779,6 +902,38 @@ struct RoutineEditorView: View {
             Spacer(minLength: 0)
 
             ScheduleTimeField(label: label, hour: hour, minute: minute, onChange: onChange)
+        }
+        .padding(.trailing, LocktySpacing.md)
+        .frame(height: 52)
+    }
+
+    private func readOnlyTimeRow(
+        label: String,
+        value: String,
+        isStart: Bool
+    ) -> some View {
+        HStack(spacing: 0) {
+            Circle()
+                .fill(isStart ? Color.white.opacity(0.75) : .clear)
+                .overlay {
+                    if !isStart {
+                        Circle().stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                    }
+                }
+                .frame(width: 9, height: 9)
+                .frame(width: 44, alignment: .center)
+
+            Text(label)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            Spacer(minLength: 0)
+
+            Text(value)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
         }
         .padding(.trailing, LocktySpacing.md)
         .frame(height: 52)
@@ -849,33 +1004,8 @@ struct RoutineEditorView: View {
     }
 
     private var appsRow: some View {
-        NavigationLink {
-            GeometryReader { proxy in
-                LocktyActivitySelectionView(
-                    title: "Seleccionadas",
-                    addLabel: "Añadir App o categoría",
-                    selection: Binding(
-                        get: { viewModel.selectionPreview },
-                        set: { newValue in
-                            withAnimation(.smooth(duration: 0.28)) {
-                                viewModel.replaceSelection(newValue)
-                            }
-                        }
-                    ),
-                    rules: .routine,
-                    suggestions: viewModel.suggestedApplications,
-                    onClose: {},
-                    onDone: {}
-                )
-                .navigationBarTitleDisplayMode(.inline)
-                .frame(maxHeight: pickerHeight)
-                .animation(.default, value: pickerHeight)
-                .onChange(of: proxy.size.height) { _, newValue in
-                    pickerHeight = newValue
-                }
-            }
-            .onAppear { isChildFullHeight = true }
-            .onDisappear { isChildFullHeight = false }
+        Button {
+            openChildSheet(.apps)
         } label: {
             HStack {
                 Text("Apps seleccionadas")
@@ -902,6 +1032,71 @@ struct RoutineEditorView: View {
             .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
+    }
+
+    @ViewBuilder
+    private var selectionScreen: some View {
+        Group {
+            if isCreating || isEditing {
+                LocktyActivitySelectionView(
+                    title: "Seleccionadas",
+                    addLabel: "Añadir App o categoría",
+                    selection: Binding(
+                        get: { viewModel.selectionPreview },
+                        set: { newValue in
+                            withAnimation(.smooth(duration: 0.28)) {
+                                viewModel.replaceSelection(newValue)
+                            }
+                        }
+                    ),
+                    rules: .routine,
+                    suggestions: viewModel.suggestedApplications,
+                    onClose: {},
+                    onDone: {}
+                )
+            } else {
+                LocktyReadOnlyActivitySelectionView(
+                    title: "Seleccionadas",
+                    selection: viewModel.selectionPreview
+                )
+            }
+        }
+    }
+
+    private var domainsScreen: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                HStack(spacing: LocktySpacing.sm) {
+                    TextField("google.com", text: $viewModel.pendingDomain)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .locktyGlassInputStyle()
+
+                    Button("Add") {
+                        withAnimation(.smooth(duration: 0.24)) {
+                            viewModel.addDomain()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, LocktySpacing.md)
+                    .frame(height: 52)
+                    .safeGlass(radius: LocktyRadius.medium, interactive: true, tint: LocktyColors.primaryText)
+                }
+
+                if !viewModel.blockedDomains.isEmpty {
+                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                        DomainChipFlow(domains: viewModel.blockedDomains) { domain in
+                            withAnimation(.smooth(duration: 0.24)) {
+                                viewModel.removeDomain(domain)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.md)
+        }
     }
 
     private var strictRow: some View {
@@ -949,6 +1144,33 @@ struct RoutineEditorView: View {
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
+    private var strictReadOnlyRow: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Modo estricto")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(viewModel.mode == .strict ? "Activado" : "Desactivado")
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: viewModel.mode == .strict ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(
+                    viewModel.mode == .strict
+                    ? LocktyColors.productive
+                    : LocktyColors.secondaryText
+                )
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
     private var editorContent: some View {
         // Built to the design, not assembled from the app's other pieces. A List would
         // impose its own row insets, separators and background, and the design has none
@@ -988,114 +1210,105 @@ struct RoutineEditorView: View {
             }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.xl)
+        .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onChange(of: proxy.size.height, initial: true) { _, newValue in
-                        // Frozen while a screen is pushed over it. The editor is still
-                        // in the stack and gets laid out at the full height the child
-                        // asked for, so reading it then would overwrite the height to
-                        // come back to with the height being left.
-                        guard !isChildFullHeight else { return }
-                        editorHeight = newValue
-                    }
-            }
-        }
         .frame(maxHeight: .infinity, alignment: .top)
+    }
 
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            // The centre is what this sheet is about -- the routine -- rather than a
-            // word describing the screen.
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: LocktySpacing.sm) {
-                    Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
-                        .font(.system(size: 15, weight: .regular))
+    private var readOnlyContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sectionHeading("Durante este horario", systemImage: "calendar")
+
+            readOnlyScheduleCard
+
+            readOnlyDaysCard
+
+            sectionHeading("Apps bloqueadas", systemImage: "lock.shield")
+
+            appsRow
+
+            strictReadOnlyRow
+
+            if !trimmedReadOnlyTasks.isEmpty {
+                sectionHeading("To Do", systemImage: "checklist")
+                readOnlyTasksCard
+            }
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var readOnlyDaysCard: some View {
+        let selected = viewModel.scheduleTrigger.weekdays
+
+        return VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            HStack {
+                Text("Estos días:")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                Text(RoutineEditorView.presetName(for: selected))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            HStack(spacing: 10) {
+                ForEach(Weekday.orderedWeek, id: \.self) { weekday in
+                    let isOn = selected.contains(weekday)
+
+                    Text(weekday.shortLabel)
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(isOn ? .black : LocktyColors.primaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background {
+                            if isOn {
+                                Circle().fill(.white)
+                            } else {
+                                Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            }
+                        }
+                }
+            }
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var trimmedReadOnlyTasks: [EditableRoutineTask] {
+        viewModel.tasks.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private var readOnlyTasksCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(trimmedReadOnlyTasks.enumerated()), id: \.element.id) { index, task in
+                HStack(spacing: 12) {
+                    Image(systemName: "circle")
+                        .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    Text(viewModel.name.isEmpty ? "Nueva rutina" : viewModel.name)
-                        .font(.system(.headline, design: .default, weight: .semibold))
+                    Text(task.title)
+                        .font(LocktyTypography.headline)
                         .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-                }
-            }
 
-            // Hidden only while editing an existing routine, where the checkmark
-            // returns to reading. Creating always keeps a way out.
-            if !isEditing || isCreating {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        requestClose()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .fontWeight(.ultraLight)
-                    }
+                    Spacer(minLength: 0)
                 }
-            }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
 
-            // No pencil while editing is blocked: there is nothing to switch into, so
-            // offering the control at all just makes it look broken.
-            if !viewModel.isEditingBlocked {
-            ToolbarItem(placement: .topBarTrailing) {
-                // The pencil opens the naming screen, in this same sheet. Saving is the
-                // hold button at the end of the editor, not this.
-                Button {
-                    withAnimation(.smooth(duration: 0.34)) {
-                        isEditing = true
-                        isNaming = true
-                    }
-                } label: {
-                    Image(systemName: "pencil")
-                        .fontWeight(.ultraLight)
+                if index < trimmedReadOnlyTasks.count - 1 {
+                    Divider()
+                        .overlay(LocktyColors.separator.opacity(0.55))
                 }
             }
-            }
         }
-        // Only while editing an existing routine: creating one has an xmark and must
-        // stay dismissable, otherwise opening it by mistake leaves no way out.
-        // Dragging the sheet away is fine until there are edits to lose; from then on
-        // every way out goes through the confirmation instead of discarding silently.
-        .interactiveDismissDisabled(viewModel.hasChanges)
-        .confirmationDialog(
-            "¿Descartar los cambios?",
-            isPresented: $isConfirmingDiscard,
-            titleVisibility: .visible
-        ) {
-            Button("Descartar", role: .destructive) { close() }
-            Button("Seguir editando", role: .cancel) {}
-        }
-        .task {
-            await viewModel.load()
-        }
-        .onChange(of: activeSheet) { _, newValue in
-            if newValue == nil {
-                viewModel.refreshSelectionState()
-            }
-        }
-        .sheet(
-            isPresented: Binding(
-                get: { activeSheet == .domains },
-                set: { if !$0 { activeSheet = nil } }
-            )
-        ) {
-            RoutineDomainsSheet(viewModel: viewModel)
-        }
-        .alert(
-            "Could not save routine",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
-        }
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
     @ViewBuilder

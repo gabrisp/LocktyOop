@@ -315,11 +315,8 @@ final class RoutineEngine: ObservableObject {
                 runtime.shieldPolicy = effectivePolicy
             }
             try await shieldService.apply(effectivePolicy)
+            print("Routine break ended routineID=\(activeRoutine.routineID.uuidString) restoring routine shields")
             state = .active(activeRoutine)
-
-            if reason == .breakExpired, activeRoutine.modeSnapshot == .strict {
-                await stop()
-            }
         } catch {
             state = .failed(error.localizedDescription)
         }

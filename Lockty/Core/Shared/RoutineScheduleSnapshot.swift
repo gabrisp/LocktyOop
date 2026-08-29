@@ -39,7 +39,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
-        pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? RoutinePausePolicy()
+        pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off
         allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
         schedule = try container.decode(RoutineSchedule.self, forKey: .schedule)
     }
@@ -56,7 +56,8 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
             shieldPolicy: ShieldPolicy(
                 blockedApplications: blockedApplications,
                 blockedDomains: blockedDomains,
-                reason: .routine(id)
+                reason: .routine(id),
+                selectionScopes: [.routine(id)]
             ),
             breakPolicySnapshot: breakPolicy,
             pausePolicySnapshot: pausePolicy,

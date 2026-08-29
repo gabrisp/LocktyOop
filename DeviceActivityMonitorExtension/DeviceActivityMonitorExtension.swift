@@ -97,10 +97,7 @@ private struct RuntimeRepairCoordinator {
            let activeBreak = runtimeState.activeBreak,
            activeBreak.endsAt <= Date() {
             runtimeState.activeBreak = nil
-
-            if runtimeState.activeRoutine?.modeSnapshot == .strict {
-                runtimeState.activeRoutine = nil
-            }
+            print("Break monitor expired breakID=\(activeBreak.id.uuidString) restoring active routine shields")
         }
 
         let pauseRules = store.loadPauseRuleSnapshots()

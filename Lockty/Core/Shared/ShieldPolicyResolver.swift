@@ -10,11 +10,13 @@ struct ShieldPolicyResolver {
         var blockedApplications = Set<AppIdentity.ID>()
         var blockedDomains = Set<String>()
         var reasons: [ShieldReason] = []
+        var selectionScopes = Set<ScreenTimeSelectionScope>()
 
         if let activeRoutine, activeBreak == nil {
             blockedApplications.formUnion(activeRoutine.shieldPolicy.blockedApplications)
             blockedDomains.formUnion(activeRoutine.shieldPolicy.blockedDomains)
             reasons.append(activeRoutine.shieldPolicy.reason)
+            selectionScopes.formUnion(activeRoutine.shieldPolicy.selectionScopes)
         }
 
         let releasedApplications = activePauseAllowance?.releasedApplications ?? []
@@ -25,6 +27,7 @@ struct ShieldPolicyResolver {
             if !isTemporarilyAllowed {
                 blockedApplications.insert(rule.application.id)
                 reasons.append(.pause(rule.application.id))
+                selectionScopes.insert(.pause(rule.id))
             }
         }
 
@@ -51,6 +54,7 @@ struct ShieldPolicyResolver {
             blockedApplications: blockedApplications,
             blockedDomains: blockedDomains,
             reason: reason,
+            selectionScopes: selectionScopes,
             exemptApplications: exemptApplications
         )
     }

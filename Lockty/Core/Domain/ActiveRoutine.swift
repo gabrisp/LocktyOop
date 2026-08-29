@@ -30,7 +30,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         trigger: RoutineTrigger,
         shieldPolicy: ShieldPolicy,
         breakPolicySnapshot: BreakPolicy,
-        pausePolicySnapshot: RoutinePausePolicy = RoutinePausePolicy(),
+        pausePolicySnapshot: RoutinePausePolicy = .off,
         taskCompletions: [RoutineTaskCompletion],
         allowsPauseDuringStrictMode: Bool
     ) {
@@ -66,7 +66,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         breakPolicySnapshot = try container.decode(BreakPolicy.self, forKey: .breakPolicySnapshot)
         // Defaults to the standard flow, not off: there is no UI to configure a pause
         // yet, so a routine that predates the field must still be unlockable.
-        pausePolicySnapshot = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicySnapshot) ?? RoutinePausePolicy()
+        pausePolicySnapshot = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicySnapshot) ?? .off
         taskCompletions = try container.decode([RoutineTaskCompletion].self, forKey: .taskCompletions)
         allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
     }

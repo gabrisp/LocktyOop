@@ -33,7 +33,7 @@ struct Routine: Codable, Hashable, Identifiable {
         startAlarmEnabled: Bool = false,
         breakPolicy: BreakPolicy,
         pauseFlowID: UUID? = nil,
-        pausePolicy: RoutinePausePolicy = RoutinePausePolicy(),
+        pausePolicy: RoutinePausePolicy = .off,
         allowsPauseDuringStrictMode: Bool = true,
         createdAt: Date = Date(),
         updatedAt: Date = Date()

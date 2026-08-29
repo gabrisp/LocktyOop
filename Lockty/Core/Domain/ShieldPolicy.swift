@@ -4,6 +4,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
     var reason: ShieldReason
+    var selectionScopes: Set<ScreenTimeSelectionScope>
     /// Apps a granted pause allowance has released.
     ///
     /// Dropping them from `blockedApplications` is not enough: the shield is driven by
@@ -17,11 +18,13 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
         reason: ShieldReason,
+        selectionScopes: Set<ScreenTimeSelectionScope> = [],
         exemptApplications: Set<AppIdentity.ID> = []
     ) {
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
         self.reason = reason
+        self.selectionScopes = selectionScopes
         self.exemptApplications = exemptApplications
     }
 
@@ -32,6 +35,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
         reason = try container.decode(ShieldReason.self, forKey: .reason)
+        selectionScopes = try container.decodeIfPresent(Set<ScreenTimeSelectionScope>.self, forKey: .selectionScopes) ?? []
         exemptApplications = try container.decodeIfPresent(Set<AppIdentity.ID>.self, forKey: .exemptApplications) ?? []
     }
 
@@ -55,7 +59,8 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         ShieldPolicy(
             blockedApplications: routine.blockedApplications,
             blockedDomains: routine.blockedDomains,
-            reason: .routine(routine.id)
+            reason: .routine(routine.id),
+            selectionScopes: [.routine(routine.id)]
         )
     }
 }

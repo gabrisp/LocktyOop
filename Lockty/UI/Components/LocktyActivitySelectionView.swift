@@ -402,6 +402,103 @@ struct LocktyActivitySelectionView: View {
     }
 }
 
+struct LocktyReadOnlyActivitySelectionView: View {
+    let title: String
+    let selection: FamilyActivitySelection
+
+    init(
+        title: String = "Seleccionadas",
+        selection: FamilyActivitySelection
+    ) {
+        self.title = title
+        self.selection = selection
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+                    if selectedItems.isEmpty {
+                        Text("Nada configurado")
+                            .font(.system(.body, design: .default, weight: .medium))
+                            .foregroundStyle(LocktyColors.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 80)
+                    } else {
+                        selectedItemsSection
+                            .padding(.top, LocktySpacing.sm)
+                    }
+                }
+                .padding(.horizontal, LocktySpacing.lg)
+                .padding(.bottom, LocktySpacing.xxl)
+            }
+        }
+    }
+
+    private var selectedItemsSection: some View {
+        VStack(spacing: 0) {
+            ForEach(selectedItems) { item in
+                HStack(spacing: LocktySpacing.lg) {
+                    selectedRowLabel(item)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 8)
+
+                if item.id != selectedItems.last?.id {
+                    Divider()
+                        .overlay(LocktyColors.separator.opacity(0.55))
+                }
+            }
+        }
+        .animation(.smooth(duration: 0.28), value: selectedItems.map(\.id))
+    }
+
+    @ViewBuilder
+    private func selectedRowLabel(_ item: LocktySelectedActivityItem) -> some View {
+        switch item.kind {
+        case .app(let token):
+            let app = AppIdentity(token: token)
+            HStack(spacing: LocktySpacing.md) {
+                AppIconView(
+                    source: app.iconSource,
+                    applicationToken: token,
+                    fallbackSystemImage: app.iconSystemName,
+                    size: 38,
+                    chrome: .plain
+                )
+
+                Label(token)
+                    .labelStyle(.titleOnly)
+                    .font(.system(.body, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .lineLimit(1)
+            }
+
+        case .category(let token):
+            Label(token)
+                .labelStyle(.titleAndIcon)
+                .font(.system(.body, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+        case .webDomain(let token):
+            Label(token)
+                .labelStyle(.titleAndIcon)
+                .font(.system(.body, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+        }
+    }
+
+    private var selectedItems: [LocktySelectedActivityItem] {
+        let apps = stableApplications(selection.applicationTokens).map { LocktySelectedActivityItem(kind: .app($0)) }
+        let categories = stableCategories(selection.categoryTokens).map { LocktySelectedActivityItem(kind: .category($0)) }
+        let domains = stableWebDomains(selection.webDomainTokens).map { LocktySelectedActivityItem(kind: .webDomain($0)) }
+        return apps + categories + domains
+    }
+}
+
 private struct LocktyOfficialActivityPickerSheet: View {
     let selection: FamilyActivitySelection
     let rules: LocktyActivitySelectionRules

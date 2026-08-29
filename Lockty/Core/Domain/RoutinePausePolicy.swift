@@ -14,8 +14,8 @@ nonisolated struct RoutinePausePolicy: Codable, Hashable {
     var relockAfterAllowance: Bool
 
     init(
-        isEnabled: Bool = true,
-        steps: [PauseStep] = RoutinePausePolicy.defaultSteps,
+        isEnabled: Bool = false,
+        steps: [PauseStep] = [],
         allowanceDuration: TimeInterval = 5 * 60,
         relockAfterAllowance: Bool = true
     ) {

@@ -96,8 +96,6 @@ struct PauseFlowEditorSheet: View {
     var body: some View {
         LocktyDynamicSheet(animation: .smooth(duration: 0.32), contentID: viewModel.contentID) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                header
-
                 nameField
 
                 stepsSection
@@ -107,7 +105,18 @@ struct PauseFlowEditorSheet: View {
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.top, LocktySpacing.lg)
             .padding(.bottom, LocktySpacing.xl)
-            .locktySheetContent()
+            .locktyDynamicSheetChrome(id: viewModel.contentID) {
+                Text(viewModel.title)
+                    .font(.system(.title3, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+            } leading: {
+                Color.clear
+            } trailing: {
+                LocktyDynamicSheetBarButton(action: { dismiss() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .medium))
+                }
+            }
         }
         .task { await viewModel.load() }
         .alert(
@@ -120,25 +129,6 @@ struct PauseFlowEditorSheet: View {
             Button("OK", role: .cancel) { viewModel.errorMessage = nil }
         } message: {
             Text(viewModel.errorMessage ?? "")
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            Text(viewModel.title)
-                .font(.system(.title3, design: .default, weight: .bold))
-                .foregroundStyle(LocktyColors.primaryText)
-
-            Spacer(minLength: 0)
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(LocktyColors.elevatedBackground))
-            }
-            .buttonStyle(.locktyInteractive(shape: Circle()))
         }
     }
 

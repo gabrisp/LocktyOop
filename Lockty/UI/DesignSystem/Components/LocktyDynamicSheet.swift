@@ -1,172 +1,397 @@
+import Combine
 import SwiftUI
 import UIKit
 
-/// Height reported from inside a dynamic sheet.
-///
-/// A NavigationStack fills whatever it is offered and never reports what is in it, so
-/// measuring the sheet's own content view gives back the sheet's height and the detent
-/// can never settle. The screen inside marks itself instead and the height travels up as
-/// a preference, which crosses the stack that geometry cannot.
-struct LocktySheetContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
+enum LocktyDynamicSheetNavigationDirection {
+    case none
+    case forward
+    case backward
+}
 
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        // Last non-zero wins rather than the tallest: with a stack, a screen that was
-        // pushed and popped would otherwise hold the sheet open at its height forever.
-        let next = nextValue()
-        if next > 0 { value = next }
+enum LocktyDynamicSheetSize: Hashable {
+    case fit
+    case small
+    case medium
+    case large
+}
+
+@MainActor
+final class LocktyDynamicSheetChromeController: ObservableObject {
+    struct Configuration {
+        var ownerID: UUID
+        var transitionID: AnyHashable
+        /// Whatever the screen wants in the middle -- a title, or an icon and a name.
+        /// It is a view, not a string, because it is the screen's to decide.
+        var center: AnyView
+        var leading: AnyView
+        var trailing: AnyView
+    }
+
+    @Published private(set) var configuration: Configuration?
+    @Published private(set) var sizes: [LocktyDynamicSheetSize]?
+    private var sizesOwnerID: UUID?
+
+    func set(
+        ownerID: UUID,
+        transitionID: AnyHashable,
+        center: AnyView,
+        leading: AnyView,
+        trailing: AnyView
+    ) {
+        configuration = Configuration(
+            ownerID: ownerID,
+            transitionID: transitionID,
+            center: center,
+            leading: leading,
+            trailing: trailing
+        )
+    }
+
+    func clear(ownerID: UUID) {
+        guard configuration?.ownerID == ownerID else { return }
+        configuration = nil
+    }
+
+    func setSizes(
+        ownerID: UUID,
+        sizes: [LocktyDynamicSheetSize]
+    ) {
+        sizesOwnerID = ownerID
+        self.sizes = sizes
+    }
+
+    func clearSizes(ownerID: UUID) {
+        guard sizesOwnerID == ownerID else { return }
+        sizes = nil
+        sizesOwnerID = nil
     }
 }
 
-/// Lets a screen pushed inside a dynamic sheet ask for the whole height.
-///
-/// A pushed screen cannot be measured -- it fills what the stack gives it -- so instead
-/// of reporting a height it says it wants all of it, and gives it back when it leaves.
-struct LocktySheetExpansion {
-    let setExpanded: (Bool) -> Void
-
-    static let none = LocktySheetExpansion { _ in }
-}
-
-private struct LocktySheetExpansionKey: EnvironmentKey {
-    static let defaultValue = LocktySheetExpansion.none
+private struct LocktyDynamicSheetChromeControllerKey: EnvironmentKey {
+    static let defaultValue: LocktyDynamicSheetChromeController? = nil
 }
 
 extension EnvironmentValues {
-    var locktySheetExpansion: LocktySheetExpansion {
-        get { self[LocktySheetExpansionKey.self] }
-        set { self[LocktySheetExpansionKey.self] = newValue }
+    var locktyDynamicSheetChromeController: LocktyDynamicSheetChromeController? {
+        get { self[LocktyDynamicSheetChromeControllerKey.self] }
+        set { self[LocktyDynamicSheetChromeControllerKey.self] = newValue }
     }
 }
 
-private struct LocktySheetExpandedModifier: ViewModifier {
-    @Environment(\.locktySheetExpansion) private var expansion
+private struct LocktyDynamicSheetChromeModifier<Center: View, Leading: View, Trailing: View>: ViewModifier {
+    @Environment(\.locktyDynamicSheetChromeController) private var chromeController
+
+    let ownerID = UUID()
+    let updateID: AnyHashable
+    let center: Center
+    let leading: Leading
+    let trailing: Trailing
 
     func body(content: Content) -> some View {
         content
-            .onAppear { expansion.setExpanded(true) }
-            .onDisappear { expansion.setExpanded(false) }
+            .onAppear(perform: apply)
+            .onChange(of: updateID, initial: true) { _, _ in
+                apply()
+            }
+            .onDisappear {
+                chromeController?.clear(ownerID: ownerID)
+            }
+    }
+
+    private func apply() {
+        chromeController?.set(
+            ownerID: ownerID,
+            transitionID: updateID,
+            center: AnyView(center),
+            leading: AnyView(leading),
+            trailing: AnyView(trailing)
+        )
+    }
+}
+
+private struct LocktyDynamicSheetSizesModifier: ViewModifier {
+    @Environment(\.locktyDynamicSheetChromeController) private var chromeController
+
+    let ownerID = UUID()
+    let sizes: [LocktyDynamicSheetSize]
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                chromeController?.setSizes(ownerID: ownerID, sizes: sizes)
+            }
+            .onDisappear {
+                chromeController?.clearSizes(ownerID: ownerID)
+            }
     }
 }
 
 extension View {
-    /// For a screen pushed inside a dynamic sheet that needs the full height. The sheet
-    /// goes back to measuring when it is popped.
-    func locktySheetExpanded() -> some View {
-        modifier(LocktySheetExpandedModifier())
+    /// The sheet's bar for this screen: a button, whatever the screen puts in the
+    /// middle, and a button.
+    func locktyDynamicSheetChrome<Center: View, Leading: View, Trailing: View>(
+        id: AnyHashable,
+        @ViewBuilder center: () -> Center,
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        modifier(
+            LocktyDynamicSheetChromeModifier(
+                updateID: id,
+                center: center(),
+                leading: leading(),
+                trailing: trailing()
+            )
+        )
     }
 
-    /// Marks the view whose height the enclosing `LocktyDynamicSheet` should take.
-    ///
-    /// Put it on the content of each screen inside the sheet -- inside any
-    /// NavigationStack, not around it.
-    func locktySheetContent() -> some View {
-        background {
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: LocktySheetContentHeightKey.self, value: proxy.size.height)
-            }
-        }
+    func locktyDynamicSheetSizes(_ sizes: [LocktyDynamicSheetSize]) -> some View {
+        modifier(LocktyDynamicSheetSizesModifier(sizes: sizes))
     }
 }
 
 struct LocktyDynamicSheet<Content: View>: View {
     let animation: Animation
-    let fixedHeight: CGFloat?
-    /// Identity of what is on screen. When it changes the content crossfades through a
-    /// blur while the sheet resizes, so growing to fit a newly opened section reads as
-    /// one movement rather than a jump followed by a redraw.
+    /// Identity of the screen on show. Changing it crossfades the content and re-measures
+    /// -- the sheet has no navigation stack, it swaps what is in it, so this is what
+    /// stands in for a push.
     let contentID: AnyHashable?
-    /// Takes the whole screen instead of measuring. For content that is a screen in its
-    /// own right -- a picker with its own list -- where sizing to it would just mean
-    /// full height with an extra layout pass first.
-    let isExpanded: Bool
+    let navigationDirection: LocktyDynamicSheetNavigationDirection
     let content: Content
 
     @State private var sheetHeight: CGFloat = 0
-    /// Height a screen inside reported for itself, zero when none did.
-    @State private var reportedHeight: CGFloat = 0
-    /// Which detent is showing. Declared as a selection over a stable set rather than by
-    /// swapping the set itself: replacing one .height with another gives no transition to
-    /// animate, so the sheet snapped between sizes.
-    @State private var selectedDetent: PresentationDetent = .medium
-    /// Raised by a pushed screen that needs the whole sheet.
-    @State private var isExpandedByChild = false
+    /// iOS 17 lays a sheet out before it is on screen and the first measurement comes
+    /// back as nothing, which would open the sheet at zero.
+    @State private var isVisible: Bool = {
+        if #available(iOS 18, *) { return true }
+        return false
+    }()
+    @StateObject private var chromeController = LocktyDynamicSheetChromeController()
 
     init(
         animation: Animation = .easeInOut(duration: 0.28),
-        fixedHeight: CGFloat? = nil,
         contentID: AnyHashable? = nil,
-        isExpanded: Bool = false,
+        navigationDirection: LocktyDynamicSheetNavigationDirection = .none,
         @ViewBuilder content: () -> Content
     ) {
         self.animation = animation
-        self.fixedHeight = fixedHeight
         self.contentID = contentID
-        self.isExpanded = isExpanded
+        self.navigationDirection = navigationDirection
         self.content = content()
     }
 
     var body: some View {
-        // No fixedSize anywhere. Forcing the ideal vertical size collapses a
-        // NavigationStack to nothing -- it has no ideal height, it takes what it is
-        // given -- which is why a sheet built around one came up empty. Height comes
-        // only from what the screen inside reports through locktySheetContent().
-        content
-            .transition(.blurReplace.combined(with: .opacity))
-            .id(contentID)
-            .animation(animation, value: contentID)
-            .onPreferenceChange(LocktySheetContentHeightKey.self) { newValue in
-                guard newValue > 0 else { return }
-                reportedHeight = newValue
-                updateHeight(newValue)
+        ZStack(alignment: .top) {
+            transitionedContent
+                .padding(.top, chromeController.configuration == nil ? 0 : 66)
+                .id(contentID)
+                .animation(animation, value: contentID)
+                .environment(\.locktyDynamicSheetChromeController, chromeController)
+
+            if let chrome = chromeController.configuration {
+                LocktyDynamicSheetChromeOverlay(configuration: chrome)
+                    .transition(.blurReplace.combined(with: .opacity))
             }
-            .environment(
-                \.locktySheetExpansion,
-                LocktySheetExpansion { expanded in
-                    isExpandedByChild = expanded
-                }
-            )
-            .presentationDetents(detents, selection: $selectedDetent)
-            .onChange(of: intendedDetent, initial: true) { _, newValue in
-                withAnimation(animation) {
-                    selectedDetent = newValue
-                }
-            }
+        }
+        // Pins the content to its ideal height so it can be measured. There is no
+        // navigation stack in the way to collapse -- the stack is faked by swapping
+        // content -- which is what makes measuring directly possible at all.
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGSize.self) {
+            isVisible ? $0.size : .zero
+        } action: { newValue in
+            guard newValue != .zero else { return }
+            setHeight(newValue.height)
+        }
+        .task { isVisible = true }
+        .modifier(LocktySheetDetentModifier(height: sheetHeight, sizes: chromeController.sizes))
     }
 
-    /// Everything the sheet can be, at once: the height it measured for itself, and
-    /// full. Both stay in the set so moving between them is a change of selection.
-    private var detents: Set<PresentationDetent> {
-        var set: Set<PresentationDetent> = [.large]
-        let height = fixedHeight ?? sheetHeight
-        set.insert(height == .zero ? .medium : .height(height))
-        return set
-    }
+    private func setHeight(_ height: CGFloat) {
+        let resolved = min(height, windowSize.height - 110)
+        guard resolved > 0 else { return }
 
-    private var intendedDetent: PresentationDetent {
-        if isExpanded || isExpandedByChild { return .large }
-        let height = fixedHeight ?? sheetHeight
-        return height == .zero ? .medium : .height(height)
-    }
-
-    private func updateHeight(_ measuredHeight: CGFloat) {
-        let resolvedHeight = min(fixedHeight ?? measuredHeight, windowSize.height - 96)
-        guard resolvedHeight > 0 else { return }
-
-        if sheetHeight == .zero || fixedHeight != nil {
-            sheetHeight = resolvedHeight
+        if sheetHeight == .zero {
+            sheetHeight = resolved
         } else {
-            withAnimation(animation) {
-                sheetHeight = resolvedHeight
-            }
+            withAnimation(animation) { sheetHeight = resolved }
         }
     }
 
     private var windowSize: CGSize {
-        if let size = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.size {
-            return size
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.size ?? .zero
+    }
+
+    @ViewBuilder
+    private var transitionedContent: some View {
+        switch navigationDirection {
+        case .none:
+            content
+                .transition(.blurReplace.combined(with: .opacity))
+        case .forward:
+            content
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .trailing)
+                            .combined(with: AnyTransition(.blurReplace))
+                            .combined(with: .opacity),
+                        removal: .move(edge: .leading)
+                            .combined(with: AnyTransition(.blurReplace))
+                            .combined(with: .opacity)
+                    )
+                )
+        case .backward:
+            content
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .leading)
+                            .combined(with: AnyTransition(.blurReplace))
+                            .combined(with: .opacity),
+                        removal: .move(edge: .trailing)
+                            .combined(with: AnyTransition(.blurReplace))
+                            .combined(with: .opacity)
+                    )
+                )
         }
-        return .zero
+    }
+}
+
+/// Animatable so the height is interpolated frame by frame.
+///
+/// Swapping one `.height` detent for another hands the system two unrelated values with
+/// nothing in between, which is why resizing used to snap and needed a second detent kept
+/// around to animate towards. Interpolating the number and giving a new detent each frame
+/// is what actually moves it.
+private struct LocktySheetDetentModifier: ViewModifier, Animatable {
+    var height: CGFloat
+    var sizes: [LocktyDynamicSheetSize]?
+
+    var animatableData: CGFloat {
+        get { height }
+        set { height = newValue }
+    }
+
+    /// What the screen asked for, or the height it measured.
+    ///
+    /// One detent is a sheet that cannot be dragged anywhere, which is the point when the
+    /// sheet is the size of its content. Several is the only case where dragging means
+    /// something, and then it is resizable.
+    private var detents: Set<PresentationDetent> {
+        guard let sizes, !sizes.isEmpty else {
+            return height == .zero ? [.medium] : [.height(height)]
+        }
+        return Set(sizes.map(detent(for:)))
+    }
+
+    private func detent(for size: LocktyDynamicSheetSize) -> PresentationDetent {
+        switch size {
+        case .fit: height == .zero ? .medium : .height(height)
+        case .small: .fraction(0.33)
+        case .medium: .medium
+        case .large: .large
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content.presentationDetents(detents)
+    }
+}
+
+private struct LocktyDynamicSheetChromeOverlay: View {
+    let configuration: LocktyDynamicSheetChromeController.Configuration
+    @Namespace private var glassNamespace
+
+    var body: some View {
+        chromeContent
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.xs)
+            .padding(.bottom, LocktySpacing.sm)
+            .background(alignment: .top) {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+                    .mask {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0),
+                                .init(color: .black, location: 0.72),
+                                .init(color: .black.opacity(0.55), location: 0.9),
+                                .init(color: .clear, location: 1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+            }
+    }
+
+    @ViewBuilder
+    private var chromeContent: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: LocktySpacing.md) {
+                baseChromeContent
+                    .glassEffectTransition(.matchedGeometry)
+            }
+        } else {
+            baseChromeContent
+        }
+    }
+
+    private var baseChromeContent: some View {
+        HStack(spacing: LocktySpacing.md) {
+            configuration.leading
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-leading", namespace: glassNamespace))
+
+            Spacer(minLength: 0)
+
+            configuration.center
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            configuration.trailing
+                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-trailing", namespace: glassNamespace))
+        }
+    }
+}
+
+private struct LocktyGlassTransitionSlotModifier: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffectID(id, in: namespace)
+        } else {
+            content
+        }
+    }
+}
+
+struct LocktyDynamicSheetBarButton<Label: View>: View {
+    let action: () -> Void
+    let label: Label
+
+    init(
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Label
+    ) {
+        self.action = action
+        self.label = label()
+    }
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .foregroundStyle(LocktyColors.primaryText)
+                .frame(minWidth: 44, minHeight: 44)
+                .safeGlass(radius: 22, interactive: true)
+        }
+        .buttonStyle(.plain)
+        .tappable()
     }
 }

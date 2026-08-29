@@ -49,6 +49,47 @@ final class RoutineEditorViewModel: ObservableObject {
     private let routineEngine: RoutineEngine
     private let usageDataService: UsageDataServicing
     private let pauseFlowRepository: PauseFlowRepository
+    /// What the routine looked like when the editor opened. Everything that decides
+    /// whether there is anything to discard is compared against this rather than tracked
+    /// by a flag, so undoing an edit by hand counts as no change again.
+    private var baseline: Snapshot?
+
+    private struct Snapshot: Equatable {
+        var name: String
+        var icon: String
+        var mode: RoutineMode
+        var triggers: [RoutineTrigger]
+        var tasks: [EditableRoutineTask]
+        var blockedDomains: [String]
+        var startAlarmEnabled: Bool
+        var pauseFlowID: UUID?
+        var allowsPauseDuringStrictMode: Bool
+        var selectedApplicationCount: Int
+    }
+
+    private var snapshot: Snapshot {
+        Snapshot(
+            name: name,
+            icon: icon,
+            mode: mode,
+            triggers: triggers,
+            tasks: tasks,
+            blockedDomains: blockedDomains,
+            startAlarmEnabled: startAlarmEnabled,
+            pauseFlowID: pauseFlowID,
+            allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
+            selectedApplicationCount: selectedApplicationCount
+        )
+    }
+
+    var hasChanges: Bool {
+        guard let baseline else { return false }
+        return snapshot != baseline
+    }
+
+    func captureBaseline() {
+        baseline = snapshot
+    }
     private let strictModePolicy = StrictModePolicy()
     private let initialRoutineID: UUID?
     private var hasLoaded = false
@@ -161,7 +202,11 @@ final class RoutineEditorViewModel: ObservableObject {
         print("Routine editor load started routineID=\(initialRoutineID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         await loadSuggestedApplications()
         await loadPauseFlows()
-        guard let initialRoutineID else { return }
+        // A new routine's baseline is its empty form, so typing a name already counts.
+        guard let initialRoutineID else {
+            captureBaseline()
+            return
+        }
         guard let routines = try? await repository.routines(), let routine = routines.first(where: { $0.id == initialRoutineID }) else {
             return
         }
@@ -188,6 +233,7 @@ final class RoutineEditorViewModel: ObservableObject {
         breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
         blockedDomains = routine.blockedDomains.sorted()
         refreshSelectionState()
+        captureBaseline()
         print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
     }
 
@@ -440,6 +486,8 @@ struct RoutineEditorView: View {
     /// one: same sheet, same height animation, one thing on it at a time.
     @State private var isNaming = false
     @State private var isShowingIconPicker = false
+    /// Raised by any attempt to leave with unsaved edits.
+    @State private var isConfirmingDiscard = false
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -470,6 +518,17 @@ struct RoutineEditorView: View {
     private func close() {
         onCloseEditor()
         dismiss()
+    }
+
+    /// Leaving is free until something has been edited, and then it asks. Applies to the
+    /// X and to the naming screen's back chevron alike -- both are ways out of the same
+    /// unsaved state.
+    private func requestClose() {
+        guard viewModel.hasChanges else {
+            close()
+            return
+        }
+        isConfirmingDiscard = true
     }
 
     /// The app and category picker is shown inside this sheet rather than on top of it,
@@ -521,6 +580,8 @@ struct RoutineEditorView: View {
         VStack(spacing: LocktySpacing.lg) {
             HStack {
                 Button {
+                    // Back out of naming, not out of the sheet: the editor behind it is
+                    // still holding the same unsaved edits either way.
                     withAnimation(.smooth(duration: 0.34)) { isNaming = false }
                 } label: {
                     Image(systemName: "chevron.left")
@@ -845,7 +906,7 @@ struct RoutineEditorView: View {
             if !isEditing || isCreating {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        close()
+                        requestClose()
                     } label: {
                         Image(systemName: "xmark")
                             .fontWeight(.ultraLight)
@@ -873,7 +934,17 @@ struct RoutineEditorView: View {
         }
         // Only while editing an existing routine: creating one has an xmark and must
         // stay dismissable, otherwise opening it by mistake leaves no way out.
-        .interactiveDismissDisabled(isEditing && !isCreating)
+        // Dragging the sheet away is fine until there are edits to lose; from then on
+        // every way out goes through the confirmation instead of discarding silently.
+        .interactiveDismissDisabled(viewModel.hasChanges)
+        .confirmationDialog(
+            "¿Descartar los cambios?",
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button("Descartar", role: .destructive) { close() }
+            Button("Seguir editando", role: .cancel) {}
+        }
         .task {
             await viewModel.load()
         }

@@ -233,6 +233,22 @@ final class AppGroupStore {
         )
     }
 
+    // Pause flows live here rather than in Core Data. They are small, they are read by
+    // the extensions as often as by the app, and adding an entity means a model version
+    // -- the same reasoning that already puts routine schedules and pause snapshots in
+    // this store. Worth moving when the model is next revised.
+    nonisolated func loadPauseFlows() -> [PauseFlow] {
+        guard let data = (try? readData(fileName: "pause-flows.json", legacyDefaultsKey: nil)) ?? nil else {
+            return []
+        }
+        return (try? decoder.decode([PauseFlow].self, from: data)) ?? []
+    }
+
+    nonisolated func savePauseFlows(_ flows: [PauseFlow]) throws {
+        let data = try encoder.encode(flows)
+        try writeData(data, fileName: "pause-flows.json", legacyDefaultsKey: nil)
+    }
+
     nonisolated func loadRoutineScheduleSnapshots() -> [RoutineScheduleSnapshot] {
         guard let data = (try? readData(
             fileName: "routine-schedule-snapshots.json",
@@ -255,7 +271,7 @@ final class AppGroupStore {
 
     nonisolated private func readData(
         fileName: String,
-        legacyDefaultsKey: String
+        legacyDefaultsKey: String?
     ) throws -> Data? {
         if let fileURL = fileURL(named: fileName), fileManager.fileExists(atPath: fileURL.path) {
             Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Reading shared file \(fileName, privacy: .public) at \(fileURL.path(percentEncoded: false), privacy: .public)")
@@ -263,7 +279,7 @@ final class AppGroupStore {
             return try Data(contentsOf: fileURL)
         }
 
-        if let defaults, let data = defaults.data(forKey: legacyDefaultsKey) {
+        if let defaults, let legacyDefaultsKey, let data = defaults.data(forKey: legacyDefaultsKey) {
             Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Reading shared defaults key \(legacyDefaultsKey, privacy: .public)")
             try? writeData(data, fileName: fileName, legacyDefaultsKey: legacyDefaultsKey)
             return data
@@ -276,13 +292,15 @@ final class AppGroupStore {
     nonisolated private func writeData(
         _ data: Data,
         fileName: String,
-        legacyDefaultsKey: String
+        legacyDefaultsKey: String?
     ) throws {
         guard let fileURL = fileURL(named: fileName) else { throw AppGroupStoreError.unavailable }
 
         try ensureDirectoryExists(at: fileURL.deletingLastPathComponent())
         try data.write(to: fileURL, options: .atomic)
-        defaults?.set(data, forKey: legacyDefaultsKey)
+        if let legacyDefaultsKey {
+            defaults?.set(data, forKey: legacyDefaultsKey)
+        }
         Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").notice("Wrote shared file \(fileName, privacy: .public) to \(fileURL.path(percentEncoded: false), privacy: .public)")
         print("Wrote shared file \(fileName) to \(fileURL.path(percentEncoded: false))")
     }

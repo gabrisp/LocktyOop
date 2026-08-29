@@ -717,7 +717,7 @@ private struct PauseStepEditorCard: View {
     }
 }
 
-private extension Binding where Value == CountdownConfiguration {
+extension Binding where Value == CountdownConfiguration {
     var duration: Binding<TimeInterval> {
         Binding<TimeInterval>(
             get: { wrappedValue.duration },
@@ -730,7 +730,7 @@ private extension Binding where Value == CountdownConfiguration {
     }
 }
 
-private extension Binding where Value == Int {
+extension Binding where Value == Int {
     var doubleProxy: Binding<Double> {
         Binding<Double>(
             get: { Double(wrappedValue) },
@@ -739,7 +739,7 @@ private extension Binding where Value == Int {
     }
 }
 
-private struct DurationSlider: View {
+struct DurationSlider: View {
     let value: Binding<Double>
     let range: ClosedRange<Double>
 

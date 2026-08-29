@@ -30,6 +30,11 @@ final class TodayViewModel: ObservableObject {
         self.selectionStore = selectionStore
     }
 
+    /// Ends the running routine. Strict mode can refuse, which the engine decides.
+    func stopActiveRoutine() async {
+        await routineEngine.stop()
+    }
+
     /// The allowance currently running, if any, so a released app can show its timer.
     var activePauseAllowance: ActivePauseAllowance? {
         guard case .temporarilyAllowed(let allowance) = pauseEngine.state,

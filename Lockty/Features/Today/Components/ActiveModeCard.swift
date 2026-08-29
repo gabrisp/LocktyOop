@@ -12,6 +12,7 @@ struct ActiveModeCard: View {
     var allowance: ActivePauseAllowance?
     let onOpenApps: () -> Void
     let onUnlock: (ApplicationToken) -> Void
+    let onStop: () -> Void
 
     private var radius: CGFloat { LocktyRadius.medium }
 
@@ -57,6 +58,14 @@ struct ActiveModeCard: View {
                     .overlay(LocktyColors.cardStroke)
 
                 blockedApps
+
+                // Held, not tapped: ending a routine early is the one thing on this card
+                // that undoes what the routine is for.
+                HoldDownButton(text: "Mantén para finalizar", isProminent: true) {
+                    onStop()
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, LocktySpacing.xs)
             }
         }
     }

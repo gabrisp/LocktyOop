@@ -326,6 +326,9 @@ struct TodayView: View {
                         },
                         onUnlock: { token in
                             router.presentFullScreen(.unlockFlow(token))
+                        },
+                        onStop: {
+                            Task { await viewModel.stopActiveRoutine() }
                         }
                     )
                 }

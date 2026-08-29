@@ -256,8 +256,10 @@ private struct LocktyDynamicSheetChromeOverlay: View {
 
     var body: some View {
         chromeContent
+            // Same inset top and sides, so the buttons sit the same distance from the
+            // sheet's corner in both directions.
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.xs)
+            .padding(.top, LocktySpacing.md)
             .padding(.bottom, LocktySpacing.sm)
             // No background. A material paints its own tinted surface over whatever is
             // behind it, which made the bar read as a panel sitting on the content

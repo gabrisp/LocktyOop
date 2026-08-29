@@ -105,13 +105,16 @@ struct LocktySectionTitle: View {
                 if onOpen != nil || showsChevron {
                     // The usage card's heading, verbatim -- it is the one every other
                     // card matches, not the other way round.
+                    // subheadline over headline, and footnote over subheadline for the
+                    // chevron: exactly one step down each, which keeps Dynamic Type
+                    // rather than pinning a point size to take 2pt off.
                     Text(title)
-                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.72))
                         .lineLimit(1)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(.subheadline, design: .default, weight: .medium))
+                        .font(.system(.footnote, design: .default, weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.58))
 
                     inlineAccessory

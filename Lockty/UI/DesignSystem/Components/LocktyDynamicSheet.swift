@@ -284,12 +284,10 @@ private struct LocktyDynamicSheetChromeOverlay: View {
     @Namespace private var glassNamespace
 
     var body: some View {
+        // No padding of its own. It is an overlay, and whatever it is laid over already
+        // has the insets the screen wants -- adding more here only pushed the buttons
+        // out of line with the content underneath them.
         chromeContent
-            // Same inset top and sides, so the buttons sit the same distance from the
-            // sheet's corner in both directions.
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.md)
-            .padding(.bottom, LocktySpacing.sm)
     }
 
     @ViewBuilder

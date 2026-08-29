@@ -344,6 +344,18 @@ struct TodayView: View {
             scrollOffset = newValue
             updateShortcutVisibility(from: oldValue, to: newValue)
         }
-        .toolbarVisibility(.hidden, for: .navigationBar)
+        // The bar is shown, without a title: the only thing in it is Settings, and the
+        // ring below it stays pinned to the safe area, which the bar now sets.
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    // Not wired up yet.
+                } label: {
+                    Image(systemName: "gearshape")
+                        .fontWeight(.light)
+                }
+            }
+        }
     }
 }

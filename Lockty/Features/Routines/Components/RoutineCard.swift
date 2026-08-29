@@ -1,44 +1,60 @@
 import SwiftUI
 
+/// Grid tile for a routine: icon, name, and a short restriction summary.
 struct RoutineCard: View {
     let routine: Routine
     let isActive: Bool
-    let onStart: () -> Void
     let onOpen: () -> Void
 
+    private var subtitle: String {
+        let apps = routine.blockedApplications.count
+        let domains = routine.blockedDomains.count
+        let appsText = apps == 1 ? "1 app" : "\(apps) apps"
+        guard domains > 0 else { return appsText }
+        return "\(appsText) · \(domains == 1 ? "1 site" : "\(domains) sites")"
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Button(action: onOpen) {
-                CardView(interactive: true) {
-                    VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                        HStack(spacing: LocktySpacing.md) {
-                            Image(systemName: routine.icon ?? "repeat")
-                                .font(.system(size: 22, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                                .safeGlass(radius: 22)
+        Button(action: onOpen) {
+            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    HStack {
+                        Image(systemName: routine.icon?.isEmpty == false ? routine.icon! : "repeat")
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(width: 24, height: 24)
 
-                            Text(routine.name)
-                                .font(LocktyTypography.headline)
-                                .foregroundStyle(LocktyColors.primaryText)
+                        Spacer(minLength: 0)
 
-                            Spacer()
-
-                            BadgeView(
-                                title: isActive ? "Active" : routine.mode.title,
-                                color: isActive ? LocktyColors.productive : LocktyColors.primaryText
-                            )
+                        if isActive {
+                            Text("ACTIVE")
+                                .locktyEyebrow()
+                                .foregroundStyle(LocktyColors.productive)
                         }
+                    }
+
+                    Spacer(minLength: 0)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(routine.name)
+                            .font(LocktyTypography.headline)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .lineLimit(1)
+
+                        Text(subtitle)
+                            .font(LocktyTypography.caption)
+                            .foregroundStyle(LocktyColors.secondaryText)
+                            .lineLimit(1)
                     }
                 }
             }
-            .buttonStyle(.plain)
-            .tappable()
-
-            PrimaryButton(isActive ? "Running" : "Start", systemImage: "play.fill", action: onStart)
-                .padding(.trailing, LocktySpacing.md)
-                .padding(.bottom, LocktySpacing.md)
-                .disabled(isActive)
-                .opacity(isActive ? 0.6 : 1)
         }
+        .buttonStyle(.plain)
+        .tappable()
     }
+}
+
+enum RoutineGridMetrics {
+    static let tileHeight: CGFloat = 108
+    static let spacing = LocktySpacing.sm
 }

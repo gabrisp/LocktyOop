@@ -68,6 +68,25 @@ final class RoutineEditorViewModel {
         refreshSelectionState()
     }
 
+    var isCreating: Bool { initialRoutineID == nil }
+
+    func activeRoutine() -> ActiveRoutine? {
+        routineEngine.activeRoutine()
+    }
+
+    /// Manual start from the routine's own sheet (hold-to-start).
+    func startRoutine() async {
+        guard let initialRoutineID,
+              let routines = try? await repository.routines(),
+              let routine = routines.first(where: { $0.id == initialRoutineID })
+        else { return }
+
+        await routineEngine.start(routine)
+        if case .failed(let message) = routineEngine.state {
+            errorMessage = message
+        }
+    }
+
     var title: String {
         initialRoutineID == nil ? "New Routine" : "Edit Routine"
     }
@@ -356,17 +375,36 @@ struct RoutineEditorView: View {
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RoutineEditorLocalSheet?
+    /// The same view serves reading and editing; the pencil flips this rather than
+    /// pushing a different screen.
+    @State private var isEditing: Bool
     /// Which section's (i) popover is showing, keyed by its info text.
     @State private var infoSectionText: String?
 
     init(
         viewModel: RoutineEditorViewModel,
         router: AppRouter,
+        startsEditing: Bool = true,
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
+        _isEditing = State(initialValue: startsEditing)
         self.router = router
         self.onCloseEditor = onCloseEditor
+    }
+
+    private var isCreating: Bool { viewModel.isCreating }
+
+    private var isRoutineActive: Bool {
+        viewModel.activeRoutine()?.routineID == viewModel.editingID
+    }
+
+    private var activeRoutineStartedAt: Date? {
+        isRoutineActive ? viewModel.activeRoutine()?.startedAt : nil
+    }
+
+    private func startRoutine() async {
+        await viewModel.startRoutine()
     }
 
     private func close() {
@@ -390,7 +428,17 @@ struct RoutineEditorView: View {
                     EditingDisabledBanner(message: viewModel.editingBlockDecision.reason ?? "This routine cannot be edited right now.")
                 }
 
-                RoutineEditorHero(viewModel: viewModel)
+                RoutineEditorHero(viewModel: viewModel, isEditing: isEditing)
+
+                if !isEditing, !isCreating {
+                    HoldDownButton(
+                        text: isRoutineActive ? "" : "Hold to start",
+                        sessionStartedAt: isRoutineActive ? activeRoutineStartedAt : nil
+                    ) {
+                        Task { await startRoutine() }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     Rectangle()
@@ -400,22 +448,38 @@ struct RoutineEditorView: View {
                         .locktyEyebrow()
 
                     VStack(spacing: LocktySpacing.sm) {
-                        RestrictionRow(
-                            label: "Apps",
-                            summary: RestrictionSummary.appsAndCategories(
-                                apps: viewModel.selectionPreview.applicationTokens.count,
-                                categories: viewModel.selectionPreview.categoryTokens.count
-                            ),
-                            tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
-                        ) {
-                            activeSheet = .apps
-                        }
+                        if isEditing {
+                            RestrictionRow(
+                                label: "Apps",
+                                summary: RestrictionSummary.appsAndCategories(
+                                    apps: viewModel.selectionPreview.applicationTokens.count,
+                                    categories: viewModel.selectionPreview.categoryTokens.count
+                                ),
+                                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
+                            ) {
+                                activeSheet = .apps
+                            }
 
-                        RestrictionRow(
-                            label: "Domains",
-                            summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
-                        ) {
-                            activeSheet = .domains
+                            RestrictionRow(
+                                label: "Domains",
+                                summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
+                            ) {
+                                activeSheet = .domains
+                            }
+                        } else {
+                            RestrictionRow(
+                                label: "Apps",
+                                summary: RestrictionSummary.appsAndCategories(
+                                    apps: viewModel.selectionPreview.applicationTokens.count,
+                                    categories: viewModel.selectionPreview.categoryTokens.count
+                                ),
+                                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(3)
+                            )
+
+                            RestrictionRow(
+                                label: "Domains",
+                                summary: RestrictionSummary.domains(viewModel.blockedDomains.count)
+                            )
                         }
                     }
                 }
@@ -433,6 +497,7 @@ struct RoutineEditorView: View {
                             set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
                         )
                     )
+                    .disabled(!isEditing)
 
                     HStack(spacing: LocktySpacing.xl) {
                         ScheduleTimeField(
@@ -540,27 +605,43 @@ struct RoutineEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    close()
-                } label: {
-                    Image(systemName: "xmark")
-                        .fontWeight(.ultraLight)
+            if !isEditing {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        close()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .fontWeight(.ultraLight)
+                    }
                 }
             }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    guard isEditing else {
+                        withAnimation(.smooth(duration: 0.28)) { isEditing = true }
+                        return
+                    }
+
                     Task {
                         if await viewModel.save() {
-                            close()
+                            if isCreating {
+                                close()
+                            } else {
+                                // Editing an existing routine returns to reading it,
+                                // rather than dismissing the sheet outright.
+                                withAnimation(.smooth(duration: 0.28)) { isEditing = false }
+                            }
                         }
                     }
                 } label: {
-                    Image(systemName: "checkmark")
+                    Image(systemName: isEditing ? "checkmark" : "pencil")
                         .fontWeight(.ultraLight)
                 }
             }
         }
+        // Dismissing mid-edit would silently drop the changes.
+        .interactiveDismissDisabled(isEditing)
         .task {
             await viewModel.load()
         }
@@ -644,6 +725,7 @@ struct RoutineEditorView: View {
 
 private struct RoutineEditorHero: View {
     @Bindable var viewModel: RoutineEditorViewModel
+    var isEditing: Bool = true
     @State private var showIconPicker = false
 
     var body: some View {
@@ -654,6 +736,7 @@ private struct RoutineEditorHero: View {
                     .foregroundStyle(LocktyColors.tertiaryText)
 
                 Button {
+                    guard isEditing else { return }
                     showIconPicker = true
                 } label: {
                     Image(systemName: viewModel.icon.isEmpty ? "square.and.arrow.up.fill" : viewModel.icon)

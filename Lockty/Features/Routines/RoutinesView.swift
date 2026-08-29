@@ -4,54 +4,44 @@ struct RoutinesView: View {
     let viewModel: RoutinesViewModel
     let router: AppRouter
 
+    private let columns = [
+        GridItem(.flexible(), spacing: RoutineGridMetrics.spacing),
+        GridItem(.flexible(), spacing: RoutineGridMetrics.spacing)
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            VStack(spacing: LocktySpacing.md) {
-                if viewModel.routines.isEmpty {
-                    CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                        EmptyStateView(
-                            title: "No Routines Yet",
-                            message: "Create your first routine and attach app or website restrictions.",
-                            systemImage: "repeat"
-                        )
-                    }
-                } else {
-                    ForEach(viewModel.routines) { routine in
-                        RoutineCard(
-                            routine: routine,
-                            isActive: viewModel.activeRoutineID() == routine.id,
-                            onStart: {
-                                Task {
-                                    await viewModel.start(routine)
-                                    await viewModel.load()
-                                }
-                            },
-                            onOpen: {
-                                router.push(.routineDetail(routine.id))
-                            }
-                        )
-                    }
+            // "Add" sits in the grid as another tile rather than as a separate button
+            // below it, so the whole section reads as one block.
+            LazyVGrid(columns: columns, spacing: RoutineGridMetrics.spacing) {
+                ForEach(viewModel.routines) { routine in
+                    RoutineCard(
+                        routine: routine,
+                        isActive: viewModel.activeRoutineID() == routine.id,
+                        onOpen: {
+                            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+                        }
+                    )
                 }
 
-                PrimaryButton("Create Routine", systemImage: "plus") {
-                    router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
-                }
-
-                #if DEBUG
-                SecondaryButton("Unblock Everything", systemImage: "lock.open") {
-                    Task {
-                        await viewModel.debugUnblockEverything()
-                    }
-                }
-                #endif
+                addRoutineTile
             }
+
+            #if DEBUG
+            SecondaryButton("Unblock Everything", systemImage: "lock.open") {
+                Task {
+                    await viewModel.debugUnblockEverything()
+                }
+            }
+            #endif
         }
         .onAppear {
             Task {
                 await viewModel.load()
             }
         }
-        .onChange(of: router.path) { _, _ in
+        .onChange(of: router.sheet) { _, newValue in
+            guard newValue == nil else { return }
             Task {
                 await viewModel.load()
             }
@@ -69,5 +59,29 @@ struct RoutinesView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+    }
+
+    private var addRoutineTile: some View {
+        Button {
+            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
+        } label: {
+            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .frame(width: 24, height: 24)
+
+                    Spacer(minLength: 0)
+
+                    Text("Add Routine")
+                        .font(LocktyTypography.headline)
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .tappable()
     }
 }

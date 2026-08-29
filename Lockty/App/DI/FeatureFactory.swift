@@ -71,6 +71,7 @@ struct FeatureFactory {
                 usageDataService: usageDataService
             ),
             router: router,
+            startsEditing: route.startsEditing,
             onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.draftID) }
         )
     }

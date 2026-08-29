@@ -266,7 +266,9 @@ struct TodayView: View {
                         withAnimation(.smooth(duration: 0.28)) {
                             router.pendingUnlock = nil
                         }
-                        router.presentFullScreen(.pause(pendingUnlock))
+                        // The unlock flow, the same one everything else opens. The old
+                        // per-step pause screen is gone.
+                        router.presentFullScreen(.unlockFlow(pendingUnlock.applicationToken))
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }

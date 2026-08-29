@@ -88,9 +88,6 @@ struct DestinationFactory {
     @ViewBuilder
     func fullScreen(for route: FullScreenRoute) -> some View {
         switch route {
-        case .pause(let context):
-            featureFactory.makePauseView(context: context)
-
         case .activeRoutine(let id):
             featureFactory.makeActiveRoutine(routineID: id)
 

@@ -78,13 +78,6 @@ struct FeatureFactory {
         }
     }
 
-    func makePauseView(context: PauseContext) -> PauseView {
-        PauseView(
-            viewModel: PauseViewModel(context: context, engine: pauseEngine),
-            router: router
-        )
-    }
-
     func makeUnlockFlow(token: ApplicationToken?) -> UnlockFlowView {
         let activeRoutine = routineEngine.activeRoutine()
         let blockedTokens: [ApplicationToken] = activeRoutine.map { routine in

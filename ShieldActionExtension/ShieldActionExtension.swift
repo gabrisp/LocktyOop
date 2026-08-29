@@ -75,6 +75,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
         return PauseContext(
             pauseRuleID: activeRoutine.routineID,
             appID: identity.id,
+            applicationToken: token,
             displayName: application.localizedDisplayName ?? identity.displayName,
             allowanceDuration: policy.allowanceDuration,
             steps: policy.steps,

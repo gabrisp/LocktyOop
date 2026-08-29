@@ -1,9 +1,14 @@
 import Foundation
+import ManagedSettings
 
 nonisolated struct PauseContext: Codable, Hashable, Identifiable {
     let id: UUID
     var pauseRuleID: UUID
     var appID: AppIdentity.ID
+    /// The app's own token, so anything showing this request can draw its real icon.
+    /// An AppIdentity rebuilt from appID alone has no token and falls back to a
+    /// placeholder square.
+    var applicationToken: ApplicationToken?
     var displayName: String
     var allowanceDuration: TimeInterval
     var steps: [PauseStep]
@@ -15,6 +20,7 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         pauseRuleID: UUID,
         appID: AppIdentity.ID,
+        applicationToken: ApplicationToken? = nil,
         displayName: String,
         allowanceDuration: TimeInterval,
         steps: [PauseStep],
@@ -25,6 +31,7 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         self.id = id
         self.pauseRuleID = pauseRuleID
         self.appID = appID
+        self.applicationToken = applicationToken
         self.displayName = displayName
         self.allowanceDuration = allowanceDuration
         self.steps = steps

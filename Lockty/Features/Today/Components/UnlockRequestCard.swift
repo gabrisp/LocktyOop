@@ -19,7 +19,7 @@ struct UnlockRequestCard: View {
     private var radius: CGFloat { LocktyRadius.medium }
 
     private var token: ApplicationToken? {
-        AppIdentity(id: context.appID, displayName: context.displayName).applicationToken
+        context.applicationToken
     }
 
     var body: some View {

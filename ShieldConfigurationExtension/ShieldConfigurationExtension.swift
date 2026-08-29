@@ -35,8 +35,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
         let activeRoutine = runtime?.activeRoutine
-        let offersUnlock = runtime?.pendingPause == nil
-            && activeRoutine?.pausePolicySnapshot.offersPause == true
+        let offersUnlock = activeRoutine?.pausePolicySnapshot.offersPause == true
 
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,

@@ -90,9 +90,9 @@ struct UnlockFlowView: View {
             // The wait is the rest step and nothing else. Every other step is answering
             // a question, and a question does not need to be waited out.
             restSeconds: step == .rest ? 5 : 0,
-            // Only on the duration step: on the app step the chip would open the screen
-            // already showing, and during the rest there is nothing to change yet.
-            accessoryToken: step == .duration ? selectedToken : nil,
+            // On every step but the app one, where it would open the screen already
+            // showing. During the rest it is the only thing there is to do.
+            accessoryToken: step == .app ? nil : selectedToken,
             onAccessory: {
                 withAnimation(.smooth(duration: 0.34)) { step = .app }
             },

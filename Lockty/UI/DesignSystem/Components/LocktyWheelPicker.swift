@@ -17,12 +17,44 @@ struct LocktyWheelPicker<Item: Hashable, Row: View>: View {
     /// number of rows, and the content margins are derived from it so the pill stays
     /// exactly in the middle whatever that height turns out to be.
     @State private var measuredHeight: CGFloat = 0
+    /// Whether the wheel has been scrolled to the selection it was given.
+    ///
+    /// Until it has, the scroll position is whatever the layout happened to start at --
+    /// the first row -- and letting that write back would overwrite the caller's choice
+    /// with it. The binding is one-way until the initial scroll lands.
+    @State private var hasSettled = false
 
     private var verticalMargin: CGFloat {
         max(0, (measuredHeight - rowHeight) / 2)
     }
 
+    private var scrollBinding: Binding<Item?> {
+        Binding(
+            get: { selection },
+            set: { newValue in
+                guard hasSettled, let newValue else { return }
+                selection = newValue
+            }
+        )
+    }
+
     var body: some View {
+        ScrollViewReader { proxy in
+            wheel
+                .task(id: items) {
+                    // One runloop turn so the rows exist to be scrolled to; a LazyVStack
+                    // has not built them yet when the view first appears.
+                    hasSettled = false
+                    try? await Task.sleep(for: .milliseconds(60))
+                    if let selection {
+                        proxy.scrollTo(selection, anchor: .center)
+                    }
+                    hasSettled = true
+                }
+        }
+    }
+
+    private var wheel: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
                 ForEach(items, id: \.self) { item in
@@ -54,7 +86,7 @@ struct LocktyWheelPicker<Item: Hashable, Row: View>: View {
         .contentMargins(.vertical, verticalMargin, for: .scrollContent)
         .scrollIndicators(.hidden)
         .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $selection, anchor: .center)
+        .scrollPosition(id: scrollBinding, anchor: .center)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { newValue in
             measuredHeight = newValue

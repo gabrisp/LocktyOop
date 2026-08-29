@@ -24,6 +24,12 @@ struct MetricRingView: View {
         }
     }
 
+    /// Tracks the ring: large enough to read expanded, small enough to sit inside the
+    /// collapsed ring rather than swallow it.
+    private var valueFontSize: CGFloat {
+        MetricsHeaderGeometry.lerp(22, 11, progress: collapseProgress)
+    }
+
     private var label: some View {
         Text(metric.kind.title.uppercased())
             .font(.caption2)
@@ -59,11 +65,15 @@ struct MetricRingView: View {
                 ring(diameter: diameter)
                     .position(x: ringCenterX, y: ringCenterY)
 
+                // The number shrinks with the ring. At a fixed title2 it stayed 22pt
+                // inside a 26pt collapsed ring, so it covered the ring completely and
+                // the ring looked like it had disappeared rather than got smaller.
                 Text(metric.displayValue)
-                    .font(.title2.weight(.bold))
+                    .font(.system(size: valueFontSize, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(LocktyColors.primaryText)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .contentTransition(.numericText())
                     .frame(width: diameter, height: diameter, alignment: .center)
                     .position(x: ringCenterX, y: ringCenterY)

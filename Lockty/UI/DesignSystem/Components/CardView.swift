@@ -40,6 +40,15 @@ struct CardView<Content: View>: View {
     ///
     /// Measuring cannot feed back into layout here: the radius only drives the fill, the
     /// clip and the border, never the frame.
+    /// Two points more than asked for, on every edge.
+    ///
+    /// Left alone at zero: a card is passed 0 when its content lays itself out edge to
+    /// edge -- a list whose rows carry their own insets, say -- and quietly adding a
+    /// gutter there would break the alignment that was the point of asking for none.
+    private var resolvedPadding: CGFloat {
+        padding > 0 ? padding + 2 : 0
+    }
+
     private var resolvedRadius: CGFloat {
         measuredSize == .zero ? radius : LocktyRadius.card(for: measuredSize)
     }
@@ -49,7 +58,7 @@ struct CardView<Content: View>: View {
         let resolvedTint = tint ?? .white
 
         content
-            .padding(padding)
+            .padding(resolvedPadding)
             .frame(
                 maxWidth: expandsHorizontally ? .infinity : nil,
                 minHeight: height,

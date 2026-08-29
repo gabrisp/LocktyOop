@@ -8,7 +8,10 @@ struct RootView: View {
         Group {
             switch container.session.phase {
             case .splash:
-                SplashView()
+                // Unreachable: AppSession starts on .onboarding or .home. Kept so the
+                // phase stays in the model, but it must never put a screen in the way.
+//                SplashView()
+                EmptyView()
 
             case .onboarding:
                 OnboardingView(

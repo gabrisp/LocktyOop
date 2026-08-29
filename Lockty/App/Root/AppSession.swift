@@ -13,7 +13,13 @@ final class AppSession: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.hasCompletedOnboarding = defaults.bool(forKey: Keys.onboardingCompleted)
+        let completed = defaults.bool(forKey: Keys.onboardingCompleted)
+        hasCompletedOnboarding = completed
+        // Never .splash. Whether onboarding is needed is already known here -- it is one
+        // UserDefaults read -- so waiting on startup to decide only bought a shield
+        // screen in front of the app for no reason. The real screen is the first thing
+        // drawn, and it fills its own values in as they arrive.
+        phase = completed ? .home : .onboarding
     }
 
     func finishStartup(requiresOnboarding: Bool) {

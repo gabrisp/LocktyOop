@@ -48,17 +48,17 @@ final class ShieldActionExtension: ShieldActionDelegate {
 
             writePendingPause(context)
 
-            // Both, deliberately. The direct open is what actually brings Lockty
-            // forward, but there is no way to observe whether it landed, so the
-            // notification always goes out as the guaranteed way back. Lockty pulls it
-            // from Notification Centre the moment it picks the request up, so a
-            // successful open doesn't leave a stale one behind.
-            postUnlockNotification(context)
+            // The open is attempted first so it has the foreground request in flight
+            // before the response is given, and the notification always goes out
+            // alongside it -- there is no way to observe whether the open landed, so it
+            // is the guaranteed way back. Lockty pulls the notification the moment it
+            // picks the request up, so a successful open leaves nothing stale behind.
             openLockty(for: context)
+            postUnlockNotification(context)
 
-            // .close rather than .defer: deferring keeps the blocked app in front, and
-            // the open cannot bring Lockty over an app that is still holding the screen.
-            completionHandler(.close)
+            // .defer, never .close. Closing is what the secondary button is for; the
+            // primary must never be the thing that shuts the app the user just opened.
+            completionHandler(.defer)
 
         case .secondaryButtonPressed:
             completionHandler(.close)

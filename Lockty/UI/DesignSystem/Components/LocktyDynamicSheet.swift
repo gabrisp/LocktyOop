@@ -136,7 +136,7 @@ private struct LocktyDynamicSheetSizesModifier: ViewModifier {
     /// full height made the content taller than the sheet it produced, so it was pushed
     /// up and the bar went off the top with it.
     private var availableHeight: CGFloat {
-        max(0, windowHeight - 110)
+         windowHeight - 110
     }
 
     private var windowHeight: CGFloat {
@@ -187,7 +187,7 @@ extension View {
 /// Derived, not written down twice: the height the inset reserves and the padding the
 /// bar draws were two separate numbers, and every time one moved the other did not, so
 /// the bar sat above the space kept for it.
-private let locktyDynamicSheetBarTopPadding: CGFloat = 24
+private let locktyDynamicSheetBarTopPadding: CGFloat = 0
 private let locktyDynamicSheetBarBottomPadding: CGFloat = 4
 private let locktyDynamicSheetBarButtonSize: CGFloat = 44
 private let locktyDynamicSheetBarHeight: CGFloat =
@@ -214,45 +214,87 @@ struct LocktyDynamicSheet<Content: View>: View {
 
 
     var body: some View {
-        content
-            .environment(\.locktyDynamicSheetChromeController, chromeController)
+        if #available(iOS 26.0, *) {
+            content
+                .environment(\.locktyDynamicSheetChromeController, chromeController)
             // safeAreaInset, not a ZStack overlay: an overlay aligned to the top of a
             // stack is placed against that stack's bounds, which are not the sheet's --
             // so the bar drifted above the sheet's own edge. An inset is laid out by the
             // sheet, reserves its own room, and still lets scrolling content pass under.
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if let chrome = chromeController.configuration {
-                    LocktyDynamicSheetChromeOverlay(configuration: chrome)
-                        .transition(.blurReplace.combined(with: .opacity))
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    if let chrome = chromeController.configuration {
+                        LocktyDynamicSheetChromeOverlay(configuration: chrome)
+                            .transition(.blurReplace.combined(with: .opacity))
                         // The inset reserves exactly what the bar draws. Without a fixed
                         // height it reserved the buttons' 44 and the bar kept its own
                         // padding on top, so the two disagreed by the padding and the bar
                         // sat that much too high.
-                        .frame(height: locktyDynamicSheetBarHeight)
-                }
-            }
-            /// As this will fix the size of the view in the vertical direction!
-            .fixedSize(horizontal: false, vertical: true)
-            .onGeometryChange(for: CGSize.self) {
-                isVisible ? $0.size : .zero
-            } action: { newValue in
-                guard newValue != .zero else { return }
-
-                if sheetHeight == .zero {
-                    sheetHeight = min(newValue.height, windowSize.height)
-                } else {
-                    withAnimation(animation) {
-                        sheetHeight = min(newValue.height, windowSize.height)
+                            .frame(height: locktyDynamicSheetBarHeight)
                     }
                 }
-            }
-            .task { isVisible = true }
-        .modifier(
-            LocktySheetDetentModifier(
-                height: sheetHeight,
-                resizableDetents: resizableDetents
-            )
-        )
+            /// As this will fix the size of the view in the vertical direction!
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGSize.self) {
+                    isVisible ? $0.size : .zero
+                } action: { newValue in
+                    guard newValue != .zero else { return }
+                    
+                    if sheetHeight == .zero {
+                        sheetHeight = min(newValue.height, windowSize.height)
+                    } else {
+                        withAnimation(animation) {
+                            sheetHeight = min(newValue.height, windowSize.height)
+                        }
+                    }
+                }
+                .task { isVisible = true }
+                .modifier(
+                    LocktySheetDetentModifier(
+                        height: sheetHeight,
+                        resizableDetents: resizableDetents
+                    )
+                )
+        } else {
+            content
+                .environment(\.locktyDynamicSheetChromeController, chromeController)
+            // safeAreaInset, not a ZStack overlay: an overlay aligned to the top of a
+            // stack is placed against that stack's bounds, which are not the sheet's --
+            // so the bar drifted above the sheet's own edge. An inset is laid out by the
+            // sheet, reserves its own room, and still lets scrolling content pass under.
+                .customSafeAreaBar(edge: .top, spacing: 0) {
+                    if let chrome = chromeController.configuration {
+                        LocktyDynamicSheetChromeOverlay(configuration: chrome)
+                            .transition(.blurReplace.combined(with: .opacity))
+                        // The inset reserves exactly what the bar draws. Without a fixed
+                        // height it reserved the buttons' 44 and the bar kept its own
+                        // padding on top, so the two disagreed by the padding and the bar
+                        // sat that much too high.
+                            .frame(height: locktyDynamicSheetBarHeight)
+                    }
+                }
+            /// As this will fix the size of the view in the vertical direction!
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGSize.self) {
+                    isVisible ? $0.size : .zero
+                } action: { newValue in
+                    guard newValue != .zero else { return }
+                    
+                    if sheetHeight == .zero {
+                        sheetHeight = min(newValue.height, windowSize.height)
+                    } else {
+                        withAnimation(animation) {
+                            sheetHeight = min(newValue.height, windowSize.height)
+                        }
+                    }
+                }
+                .task { isVisible = true }
+                .modifier(
+                    LocktySheetDetentModifier(
+                        height: sheetHeight,
+                        resizableDetents: resizableDetents
+                    )
+                )
+        }
     }
 
     /// Only when a screen named more than one size, which is the one case where being

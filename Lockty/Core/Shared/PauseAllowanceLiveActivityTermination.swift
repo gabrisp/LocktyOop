@@ -21,10 +21,16 @@ nonisolated enum PauseAllowanceLiveActivityTermination {
 
     /// For the extension callbacks, which are synchronous and cannot await.
     ///
-    /// Best effort: the process is short-lived and may be gone before this lands. The
-    /// app's own foreground path ends the activity too, so a missed one is stale until
-    /// the next launch rather than permanent.
-    static func endAllDetached() {
-        Task { await endAll() }
+    /// Waits for the end to land rather than firing it off. A monitor extension's
+    /// callback returns and the process goes away with it, so the detached task this
+    /// used to start was collected before ActivityKit had done anything -- the shields
+    /// went back on at the right second and the countdown stayed on the Lock Screen.
+    static func endAllBlocking(timeout: TimeInterval = 5) {
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
+            await endAll()
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + timeout)
     }
 }

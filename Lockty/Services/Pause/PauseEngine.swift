@@ -58,6 +58,12 @@ final class PauseEngine: ObservableObject {
             state = .relocking(allowance.context)
             await relock(allowance.context)
         } else {
+            // Nothing is running, so nothing should still be counting down on the Lock
+            // Screen. The monitor extension clears the allowance when it relocks in the
+            // background, and this branch is where the app arrives afterwards -- it used
+            // to fall straight to idle and leave a Live Activity nobody could end, since
+            // relock() is the only thing that ends one and it is never reached from here.
+            Task { await liveActivityController.end() }
             state = .idle
         }
     }

@@ -647,7 +647,7 @@ struct RoutineEditorView: View {
         }
     }
 
-    private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.1) }
+    private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
 
     /// Which way the screens travel. Going deeper the new screen comes in from the right
     /// and the old one leaves to the left; coming back, both reverse. Without this every
@@ -674,7 +674,6 @@ struct RoutineEditorView: View {
                 // A screen of its own: it asked for the whole sheet, so it has to fill
                 // it rather than sit at the top of it at its own ideal height.
                 selectionScreen
-                    .frame(maxHeight: .infinity)
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
@@ -1129,7 +1128,7 @@ struct RoutineEditorView: View {
 
     @ViewBuilder
     private var selectionScreen: some View {
-        Group {
+        VStack {
             if isCreating || isEditing {
                 LocktyActivitySelectionView(
                     title: "Seleccionadas",

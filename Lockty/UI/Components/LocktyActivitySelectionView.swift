@@ -130,35 +130,35 @@ struct LocktyActivitySelectionView: View {
         // No background of its own. It is shown inside whatever is presenting it -- a
         // sheet with its own -- and painting black over that made it a black panel
         // rather than a screen in that sheet.
-        ZStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                    // No top bar of its own. This is pushed inside a navigation stack
-                    // now, which already carries the way back, and the selection is
-                    // written straight through the binding -- there is nothing for a
-                    // confirm button to confirm.
-                    addButton
-                        .padding(.top, LocktySpacing.sm)
+            ZStack {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+                        // No top bar of its own. This is pushed inside a navigation stack
+                        // now, which already carries the way back, and the selection is
+                        // written straight through the binding -- there is nothing for a
+                        // confirm button to confirm.
+                        addButton
+                            .padding(.top, LocktySpacing.sm)
 
-                    selectedItemsSection
+                        selectedItemsSection
 
-                    if !visibleSuggestions.isEmpty {
-                        suggestionsSection
-                            .transition(.blurReplace.combined(with: .opacity))
+                        if !visibleSuggestions.isEmpty {
+                            suggestionsSection
+                                .transition(.blurReplace.combined(with: .opacity))
+                        }
                     }
+                    .padding(.horizontal, LocktySpacing.lg)
+                    .padding(.bottom, LocktySpacing.xxl)
                 }
-                .padding(.horizontal, LocktySpacing.lg)
-                .padding(.bottom, LocktySpacing.xxl)
+                if let activeOverlay {
+                    LocktyCenteredFeedbackOverlay(
+                        state: activeOverlay
+                    )
+                    .transition(.blurReplace.combined(with: .scale(0.96)).combined(with: .opacity))
+                    .zIndex(5)
+                }
+            
             }
-
-            if let activeOverlay {
-                LocktyCenteredFeedbackOverlay(
-                    state: activeOverlay
-                )
-                .transition(.blurReplace.combined(with: .scale(0.96)).combined(with: .opacity))
-                .zIndex(5)
-            }
-        }
         .sheet(isPresented: $isShowingOfficialPicker) {
             LocktyOfficialActivityPickerSheet(
                 selection: selection,

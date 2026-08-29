@@ -488,10 +488,12 @@ struct RoutineEditorView: View {
     @State private var isShowingIconPicker = false
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
-    @State private var selectedDetent: PresentationDetent = .height(560)
+    @State private var selectedDetent: PresentationDetent = .medium
     /// The pushed picker's real height, handed back to it so it fills the sheet it just
     /// asked to grow rather than the height the stack proposed on the way in.
     @State private var pickerHeight: CGFloat?
+    @State private var editorHeight: CGFloat = 420
+    @State private var namingHeight: CGFloat = 140
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -545,13 +547,31 @@ struct RoutineEditorView: View {
         return isNaming ? "naming" : "editor"
     }
 
-    /// Every size the sheet can be. Declared up front and never rebuilt: the sheet moves
-    /// by changing which one is selected, and swapping the set out instead gives the
-    /// system nothing to animate between.
-    private let detents: Set<PresentationDetent> = [.height(220), .height(560), .large]
+    /// Every size the sheet can be: what the editor actually measures, what the naming
+    /// screen measures, and full for the pushed picker.
+    ///
+    /// The two heights were guessed constants and were simply wrong -- the sheet stood
+    /// taller or shorter than what was in it. They come from the content now, the same
+    /// way the pushed screen reads its own height.
+    private var detents: Set<PresentationDetent> {
+        [editorDetent, namingDetent, .large]
+    }
 
-    private var editorDetent: PresentationDetent { .height(560) }
-    private var namingDetent: PresentationDetent { .height(220) }
+    private var editorDetent: PresentationDetent {
+        .height(clampedSheetHeight(editorHeight))
+    }
+
+    private var namingDetent: PresentationDetent {
+        .height(clampedSheetHeight(namingHeight))
+    }
+
+    /// Room for the navigation bar and the home indicator around whatever was measured,
+    /// and never taller than the screen can show.
+    private func clampedSheetHeight(_ height: CGFloat) -> CGFloat {
+        let chrome: CGFloat = 92
+        let maximum = UIScreen.main.bounds.height * 0.92
+        return min(max(height + chrome, 200), maximum)
+    }
 
     var body: some View {
         NavigationStack {
@@ -566,7 +586,19 @@ struct RoutineEditorView: View {
             .presentationDetents(detents, selection: $selectedDetent)
             .onAppear { selectedDetent = editorDetent }
             .onChange(of: isNaming) { _, naming in
-                selectedDetent = naming ? namingDetent : editorDetent
+                withAnimation(.smooth(duration: 0.3)) {
+                    selectedDetent = naming ? namingDetent : editorDetent
+                }
+            }
+            // Keeps the selection on the measured height as the content settles, or the
+            // sheet stays at whatever it was when it first appeared.
+            .onChange(of: editorHeight) { _, _ in
+                guard !isNaming else { return }
+                selectedDetent = editorDetent
+            }
+            .onChange(of: namingHeight) { _, _ in
+                guard isNaming else { return }
+                selectedDetent = namingDetent
             }
         }
     }
@@ -638,6 +670,14 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: proxy.size.height, initial: true) { _, newValue in
+                        namingHeight = newValue
+                    }
+            }
+        }
     }
 
     /// Section heading: a glyph and a label, both in full colour. The eyebrow form is
@@ -646,11 +686,11 @@ struct RoutineEditorView: View {
     private func sectionHeading(_ title: String, systemImage: String) -> some View {
         HStack(spacing: LocktySpacing.sm) {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
 
             Text(title)
-                .font(.system(.headline, design: .default, weight: .semibold))
+                .font(.system(.subheadline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
         }
     }
@@ -663,7 +703,7 @@ struct RoutineEditorView: View {
     }
 
     private var cardFill: Color { Color.white.opacity(0.055) }
-    private var cardRadius: CGFloat { 30 }
+    private var cardRadius: CGFloat { 22 }
 
     /// The two times in one card, joined down the left by the dotted run between them.
     private var scheduleCard: some View {
@@ -682,7 +722,7 @@ struct RoutineEditorView: View {
 
             Divider()
                 .overlay(Color.white.opacity(0.10))
-                .padding(.leading, 52)
+                .padding(.leading, 44)
 
             timeRow(
                 label: "A",
@@ -703,9 +743,9 @@ struct RoutineEditorView: View {
             Rectangle()
                 .fill(Color.white.opacity(0.35))
                 .frame(width: 1)
-                .padding(.leading, 27)
-                .padding(.top, 34)
-                .padding(.bottom, 34)
+                .padding(.leading, 21)
+                .padding(.top, 26)
+                .padding(.bottom, 26)
         }
     }
 
@@ -725,34 +765,34 @@ struct RoutineEditorView: View {
                     }
                 }
                 .frame(width: 9, height: 9)
-                .frame(width: 56, alignment: .center)
+                .frame(width: 44, alignment: .center)
 
             Text(label)
-                .font(.system(.title3, design: .default, weight: .regular))
+                .font(.system(.subheadline, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.primaryText)
 
             Spacer(minLength: 0)
 
             ScheduleTimeField(label: label, hour: hour, minute: minute, onChange: onChange)
         }
-        .padding(.trailing, LocktySpacing.lg)
-        .frame(height: 68)
+        .padding(.trailing, LocktySpacing.md)
+        .frame(height: 52)
     }
 
     /// The weekday circles, with the name of whatever preset they add up to.
     private var daysCard: some View {
         let selected = viewModel.scheduleTrigger.weekdays
 
-        return VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+        return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
                 Text("Estos días:")
-                    .font(.system(.title3, design: .default, weight: .regular))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
                 Spacer(minLength: 0)
 
                 Text(RoutineEditorView.presetName(for: selected))
-                    .font(.system(.title3, design: .default, weight: .regular))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
 
@@ -768,10 +808,10 @@ struct RoutineEditorView: View {
                         }
                     } label: {
                         Text(weekday.shortLabel)
-                            .font(.system(.title3, design: .default, weight: .regular))
+                            .font(.system(.subheadline, design: .default, weight: .regular))
                             .foregroundStyle(isOn ? .black : LocktyColors.primaryText)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 44)
+                            .frame(height: 38)
                             .background {
                                 if isOn {
                                     Circle().fill(.white)
@@ -784,8 +824,8 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
-        .padding(.vertical, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
@@ -834,7 +874,7 @@ struct RoutineEditorView: View {
         } label: {
             HStack {
                 Text("Apps seleccionadas")
-                    .font(.system(.title3, design: .default, weight: .regular))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
                 Spacer(minLength: 0)
@@ -845,18 +885,18 @@ struct RoutineEditorView: View {
                         categories: viewModel.selectionPreview.categoryTokens.count
                     ) ?? "Ninguna"
                 )
-                .font(.system(.title3, design: .default, weight: .regular))
+                .font(.system(.subheadline, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
-            .padding(.horizontal, LocktySpacing.lg)
-            .frame(height: 68)
+            .padding(.horizontal, LocktySpacing.md)
+            .frame(height: 52)
             .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
         }
-        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 30, style: .continuous)))
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
     }
 
     private var strictRow: some View {
@@ -864,7 +904,7 @@ struct RoutineEditorView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: LocktySpacing.sm) {
                     Text("Modo estricto")
-                        .font(.system(.title3, design: .default, weight: .regular))
+                        .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
                     HStack(spacing: 3) {
@@ -882,7 +922,7 @@ struct RoutineEditorView: View {
                 }
 
                 Text("No se permiten desbloqueos")
-                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
 
@@ -899,8 +939,8 @@ struct RoutineEditorView: View {
             )
             .labelsHidden()
         }
-        .padding(.horizontal, LocktySpacing.lg)
-        .padding(.vertical, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
@@ -909,7 +949,7 @@ struct RoutineEditorView: View {
         // impose its own row insets, separators and background, and the design has none
         // of those -- what it has is two cards under each heading.
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 18) {
                 sectionHeading("Durante este horario", systemImage: "calendar")
 
                 scheduleCard
@@ -942,6 +982,16 @@ struct RoutineEditorView: View {
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.top, LocktySpacing.md)
             .padding(.bottom, LocktySpacing.xl)
+            // Measured on the stack inside the scroll view, not on the scroll view: a
+            // scroll view reports the space it was given, which is the sheet's height.
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onChange(of: proxy.size.height, initial: true) { _, newValue in
+                            editorHeight = newValue
+                        }
+                }
+            }
         }
         .scrollIndicators(.hidden)
 
@@ -1239,14 +1289,14 @@ private struct ScheduleTimeField: View {
         } label: {
             HStack(spacing: LocktySpacing.sm) {
                 Text(displayText)
-                    .font(.system(.title3, design: .default, weight: .regular))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: displayText)
 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
             .contentShape(Rectangle())

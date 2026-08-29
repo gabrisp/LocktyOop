@@ -107,6 +107,7 @@ struct PauseFlowEditorSheet: View {
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.top, LocktySpacing.lg)
             .padding(.bottom, LocktySpacing.xl)
+            .locktySheetContent()
         }
         .task { await viewModel.load() }
         .alert(

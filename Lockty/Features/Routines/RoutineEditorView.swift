@@ -641,6 +641,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
+        .locktySheetContent()
     }
 
     /// Section heading: a glyph and a label, both in full colour. The eyebrow form is
@@ -897,6 +898,9 @@ struct RoutineEditorView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xxl)
+            // Inside the NavigationStack, on the content itself: the stack fills the
+            // sheet and would report the sheet's own height back to it.
+            .locktySheetContent()
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

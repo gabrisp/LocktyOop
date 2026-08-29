@@ -21,6 +21,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
     var activeBreak: ActiveBreak?
     var pendingPause: PendingPauseContext?
     var activePauseAllowance: ActivePauseAllowance?
+
     var shieldPolicy: ShieldPolicy
     var pendingEvents: [PendingSystemEvent]
     var recoveryFlags: Set<RuntimeRecoveryFlag>
@@ -36,6 +37,15 @@ nonisolated struct RuntimeState: Codable, Hashable {
         recoveryFlags: [],
         lastUpdatedAt: Date()
     )
+
+    /// The allowance only if it is still running.
+    ///
+    /// Everything that resolves a shield policy has to use this rather than the stored
+    /// property: an expired allowance kept exempting its app, so once one had been used
+    /// the Pause never re-shielded that app again -- stopping a routine included.
+    var livePauseAllowance: ActivePauseAllowance? {
+        activePauseAllowance.flatMap { $0.isExpired ? nil : $0 }
+    }
 }
 
 nonisolated enum RuntimeRecoveryFlag: String, Codable, Hashable {

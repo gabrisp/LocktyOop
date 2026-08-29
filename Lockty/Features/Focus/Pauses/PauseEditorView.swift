@@ -52,6 +52,7 @@ final class PauseEditorViewModel {
     private let repository: PauseRuleRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let routineEngine: RoutineEngine
+    private let pauseEngine: PauseEngine
     private var hasLoaded = false
     private var createdAt: Date
 
@@ -60,7 +61,8 @@ final class PauseEditorViewModel {
         draftID: UUID,
         repository: PauseRuleRepository,
         selectionStore: ScreenTimeSelectionStore,
-        routineEngine: RoutineEngine
+        routineEngine: RoutineEngine,
+        pauseEngine: PauseEngine
     ) {
         initialPauseID = pauseID
         editingID = pauseID ?? UUID()
@@ -68,6 +70,7 @@ final class PauseEditorViewModel {
         self.repository = repository
         self.selectionStore = selectionStore
         self.routineEngine = routineEngine
+        self.pauseEngine = pauseEngine
         createdAt = Date()
         refreshSelectionState()
     }
@@ -202,6 +205,9 @@ final class PauseEditorViewModel {
         do {
             try selectionStore.save(selection, scope: selectionScope)
             try await repository.save(rule)
+            // Saving the rule is not enough on its own -- the shield has to be rebuilt
+            // and applied, or the Pause exists but its app is never actually blocked.
+            await pauseEngine.refreshShields()
             // The shield can't open the app itself; it posts a notification whose tap
             // brings the user here to run the flow. Ask for permission now, when the
             // Pause that depends on it is created, rather than leaving it to the

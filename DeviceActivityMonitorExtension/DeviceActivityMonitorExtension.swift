@@ -113,7 +113,7 @@ private struct RuntimeRepairCoordinator {
         let effectivePolicy = resolver.resolve(
             activeRoutine: runtimeState.activeRoutine,
             activeBreak: runtimeState.activeBreak,
-            activePauseAllowance: runtimeState.activePauseAllowance,
+            activePauseAllowance: runtimeState.livePauseAllowance,
             pauseRules: pauseRules
         )
 

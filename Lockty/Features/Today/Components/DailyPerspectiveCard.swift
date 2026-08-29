@@ -13,15 +13,37 @@ struct DailyPerspectiveStackSection: View {
         CGFloat(max(visiblePerspectives.count - 1, 0)) * 12
     }
 
+    @State private var stackHeight: CGFloat = 0
+
     var body: some View {
+        // GeometryReader purely to get a hard width clamp. maxWidth: .infinity only ever
+        // expands — it cannot stop a card whose content wants more room than the column
+        // has, and the section then reported that larger width to the scroll view, which
+        // is where the horizontal overscroll came from (it appeared at three cards
+        // because that is when copy long enough to do it showed up). A reader proposes
+        // its own size to its children, so the frame below is the real column width and
+        // nothing inside can exceed it. Height can't come from the reader for the same
+        // reason, so it is measured off the content and fed back.
+        GeometryReader { proxy in
+            cards
+                .frame(width: proxy.size.width, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { newValue in
+                    stackHeight = newValue
+                }
+        }
         // Height comes from the tallest card (it used to be hardcoded to 152, so longer
         // copy overflowed) and the section collapses on its own once all are dismissed.
+        .frame(height: stackHeight + peekInset)
         // The card slides up to 420pt sideways on dismissal, so it has to be clipped —
         // but clipping at the card's own width crops the swipe right at the card edge.
         // Clipping to a rect inset outwards by the scroll content's horizontal padding
-        // puts the cut at the screen edge instead, and because it's a clip shape rather
-        // than a real frame change the layout width is untouched, so no horizontal
-        // overscroll appears.
+        // puts the cut at the screen edge instead, and being a clip shape rather than a
+        // frame change it leaves the layout width alone.
+        .clipShape(Rectangle().inset(by: -LocktySpacing.md))
+        .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
+    }
+
+    private var cards: some View {
         ZStack(alignment: .top) {
             ForEach(Array(visiblePerspectives.enumerated().reversed()), id: \.element.id) { index, perspective in
                 DismissibleDailyPerspectiveCard(
@@ -36,10 +58,6 @@ struct DailyPerspectiveStackSection: View {
                 .zIndex(Double(visiblePerspectives.count - index))
             }
         }
-        .padding(.bottom, peekInset)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipShape(Rectangle().inset(by: -LocktySpacing.md))
-        .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
     }
 }
 
@@ -81,6 +99,8 @@ private struct DismissibleDailyPerspectiveCard: View {
                 Text(perspective.title)
                     .font(.system(.title3, design: .default, weight: .semibold))
                     .foregroundStyle(LocktyColors.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(perspective.body)
                     .font(LocktyTypography.body)

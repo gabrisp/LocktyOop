@@ -32,7 +32,8 @@ final class EditorViewModelStore {
         route: PauseEditorRoute,
         repository: PauseRuleRepository,
         selectionStore: ScreenTimeSelectionStore,
-        routineEngine: RoutineEngine
+        routineEngine: RoutineEngine,
+        pauseEngine: PauseEngine
     ) -> PauseEditorViewModel {
         if let existing = pauseEditors[route.draftID] {
             return existing
@@ -43,7 +44,8 @@ final class EditorViewModelStore {
             draftID: route.draftID,
             repository: repository,
             selectionStore: selectionStore,
-            routineEngine: routineEngine
+            routineEngine: routineEngine,
+            pauseEngine: pauseEngine
         )
         pauseEditors[route.draftID] = created
         return created

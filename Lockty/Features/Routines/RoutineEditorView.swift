@@ -396,7 +396,7 @@ struct RoutineEditorView: View {
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
-        _isEditing = State(initialValue: startsEditing)
+        _isEditing = State(initialValue: startsEditing && !viewModel.isEditingBlocked)
         self.router = router
         self.onCloseEditor = onCloseEditor
     }
@@ -631,6 +631,9 @@ struct RoutineEditorView: View {
                 }
             }
 
+            // No pencil while editing is blocked: there is nothing to switch into, so
+            // offering the control at all just makes it look broken.
+            if !viewModel.isEditingBlocked {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     guard isEditing else {
@@ -653,6 +656,7 @@ struct RoutineEditorView: View {
                     Image(systemName: isEditing ? "checkmark" : "pencil")
                         .fontWeight(.ultraLight)
                 }
+            }
             }
         }
         // Only while editing an existing routine: creating one has an xmark and must

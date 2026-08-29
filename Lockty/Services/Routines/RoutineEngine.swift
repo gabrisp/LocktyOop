@@ -95,7 +95,7 @@ final class RoutineEngine {
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: nil,
-                activePauseAllowance: try appGroupStore.loadRuntimeState().activePauseAllowance,
+                activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
                 pauseRules: pauseRules
             )
             try appGroupStore.updateRuntimeState { runtime in
@@ -154,7 +154,7 @@ final class RoutineEngine {
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: nil,
                 activeBreak: nil,
-                activePauseAllowance: try appGroupStore.loadRuntimeState().activePauseAllowance,
+                activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
                 pauseRules: pauseRules
             )
             try appGroupStore.updateRuntimeState { runtime in
@@ -250,7 +250,7 @@ final class RoutineEngine {
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: activeBreak,
-                activePauseAllowance: try appGroupStore.loadRuntimeState().activePauseAllowance,
+                activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
                 pauseRules: pauseRules
             )
 
@@ -307,7 +307,7 @@ final class RoutineEngine {
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: nil,
-                activePauseAllowance: try appGroupStore.loadRuntimeState().activePauseAllowance,
+                activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
                 pauseRules: pauseRules
             )
             try appGroupStore.updateRuntimeState { runtime in

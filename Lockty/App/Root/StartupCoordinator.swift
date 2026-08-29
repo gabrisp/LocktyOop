@@ -36,6 +36,9 @@ final class StartupCoordinator {
             await routineEngine.restore(from: runtimeState)
             await pauseEngine.restore(from: runtimeState)
             try await reconcileRuntimeState(runtimeState)
+            // The stored policy can be out of date with the stored rules -- a Pause
+            // created while nothing else recomputed the shield left no policy at all.
+            await pauseEngine.refreshShields()
 
             session.finishStartup(requiresOnboarding: !session.hasCompletedOnboarding)
 

@@ -134,7 +134,8 @@ struct FeatureFactory {
                 route: route,
                 repository: pauseRuleRepository,
                 selectionStore: selectionStore,
-                routineEngine: routineEngine
+                routineEngine: routineEngine,
+                pauseEngine: pauseEngine
             ),
             router: router,
             onCloseEditor: { editorStore.releasePauseEditor(draftID: route.draftID) }

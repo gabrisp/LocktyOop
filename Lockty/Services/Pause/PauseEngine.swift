@@ -55,6 +55,37 @@ final class PauseEngine {
         }
     }
 
+    /// Recomputes the shield from whatever is stored right now and applies it.
+    ///
+    /// Nothing did this for pause rules: the shield was only ever recomputed when a
+    /// routine started or stopped, or when an allowance was granted or relocked. So a
+    /// newly created Pause never actually shielded its app, and the flow it describes
+    /// could never be triggered. Call after any change to the rules, and on launch.
+    func refreshShields() async {
+        do {
+            let runtime = try appGroupStore.loadRuntimeState()
+            let pauseRules = await pauseRuleRepository.rules()
+            let effectivePolicy = shieldPolicyResolver.resolve(
+                activeRoutine: runtime.activeRoutine,
+                activeBreak: runtime.activeBreak,
+                activePauseAllowance: runtime.livePauseAllowance,
+                pauseRules: pauseRules
+            )
+
+            if effectivePolicy.blocksNothing {
+                try await shieldService.remove(runtime.shieldPolicy)
+            } else {
+                try await shieldService.apply(effectivePolicy)
+            }
+            try appGroupStore.updateRuntimeState { state in
+                state.shieldPolicy = effectivePolicy
+            }
+            print("Refreshed shields rules=\(pauseRules.count) blockedApps=\(effectivePolicy.blockedApplications.count)")
+        } catch {
+            print("Refreshing shields failed: \(error.localizedDescription)")
+        }
+    }
+
     func request(_ context: PauseContext) async {
         state = .requested(context)
         do {

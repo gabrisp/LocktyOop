@@ -1,9 +1,17 @@
 import SwiftUI
 
 struct PauseView: View {
-    @Bindable var viewModel: PauseViewModel
+    // @State, not @Bindable: the factory builds a fresh PauseViewModel every time the
+    // presenting body re-evaluates, so a non-owning reference meant the countdown was
+    // replaced by a brand-new one on each render and never left its starting second.
+    @State private var viewModel: PauseViewModel
     let router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
+
+    init(viewModel: PauseViewModel, router: AppRouter) {
+        _viewModel = State(initialValue: viewModel)
+        self.router = router
+    }
 
     var body: some View {
         VStack(spacing: LocktySpacing.xl) {

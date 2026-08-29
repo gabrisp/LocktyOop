@@ -29,15 +29,7 @@ struct ActiveModeCard: View {
     var body: some View {
         CardView(radius: radius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                LocktySectionTitle(
-                    "Rutina activa",
-                    onOpen: onOpenApps,
-                    inlineAccessory: {
-                        // A recording dot: something is running right now, and it keeps
-                        // running whether or not this screen is being looked at.
-                        RecordingDot()
-                    }
-                )
+                LocktySectionTitle("Rutina activa", onOpen: onOpenApps)
 
                 HStack(spacing: LocktySpacing.md) {
                     // The routine's own icon, not a generic shield: this card is about
@@ -103,22 +95,3 @@ struct ActiveModeCard: View {
 }
 
 
-/// The steady pulse next to "Rutina activa".
-private struct RecordingDot: View {
-    @State private var isPulsing = false
-
-    var body: some View {
-        Circle()
-            .fill(LocktyColors.productive)
-            .frame(width: 9, height: 9)
-            .overlay {
-                Circle()
-                    .stroke(LocktyColors.productive, lineWidth: 1)
-                    .scaleEffect(isPulsing ? 2.2 : 1)
-                    .opacity(isPulsing ? 0 : 0.8)
-            }
-            .animation(.easeOut(duration: 1.6).repeatForever(autoreverses: false), value: isPulsing)
-            .onAppear { isPulsing = true }
-            .accessibilityHidden(true)
-    }
-}

@@ -124,11 +124,17 @@ struct LocktyAppLockBadge: View {
             .padding(.bottom, caption == .none ? 0 : 20)
     }
 
+    /// FamilyControls draws `Label(token)` at its own size and ignores the frame it is
+    /// given, so the icon sat small in the middle of the badge no matter how large the
+    /// badge was. Scaling it is the only thing that actually grows it; the font is set
+    /// too, for the versions that do honour it.
     @ViewBuilder
     private var icon: some View {
         if let token {
             Label(token)
                 .labelStyle(.iconOnly)
+                .font(.system(size: size))
+                .scaleEffect(size / 34)
                 .id(token)
         } else {
             RoundedRectangle(cornerRadius: iconRadius, style: .continuous)

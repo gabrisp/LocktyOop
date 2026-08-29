@@ -90,7 +90,7 @@ struct LocktyFlowScreen<Content: View>: View {
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(LocktyColors.elevatedBackground))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.locktyInteractive(shape: Circle()))
             .tappable()
 
             Spacer(minLength: 0)
@@ -111,7 +111,7 @@ struct LocktyFlowScreen<Content: View>: View {
                     .padding(.vertical, 7)
                     .background(Capsule(style: .continuous).fill(LocktyColors.elevatedBackground))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
                 .tappable()
                 .transition(.blurReplace.combined(with: .opacity))
             }

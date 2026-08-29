@@ -49,6 +49,12 @@ struct TodayView: View {
         // (and clipped) to the scroll view's frame, which starts below the safe area, so
         // the header's backdrop could never reach up into the status bar.
         ZStack(alignment: .top) {
+            // An explicit bottom layer rather than .background: applied as a background
+            // it sat behind the TabView/NavigationStack chrome, which paints over it, so
+            // neither the base colour nor the aura ever showed.
+            LocktyScreenBackground()
+                .ignoresSafeArea()
+
             scrollContent
             topChrome
         }

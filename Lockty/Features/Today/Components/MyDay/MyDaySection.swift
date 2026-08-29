@@ -3,6 +3,8 @@ import SwiftUI
 struct MyDaySection: View {
     let activities: [DigitalActivity]
 
+    @State private var inspectedActivity: DigitalActivity?
+
     private let rowHeight: CGFloat = 44
 
     private var orderedActivities: [DigitalActivity] {
@@ -69,11 +71,26 @@ struct MyDaySection: View {
                                         .lineLimit(1)
                                 }
                                 .frame(height: rowHeight, alignment: .top)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    inspectedActivity = activity
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+        .sheet(item: $inspectedActivity) { activity in
+            LocktyDynamicSheet {
+                MyDayActivityDetail(
+                    activity: activity,
+                    detail: detail(for: activity),
+                    durationText: durationText(for: activity),
+                    color: color(for: activity.type)
+                )
+            }
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -103,5 +120,58 @@ struct MyDaySection: View {
         case .distraction:
             LocktyColors.unproductive
         }
+    }
+}
+
+private struct MyDayActivityDetail: View {
+    let activity: DigitalActivity
+    let detail: String
+    let durationText: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            HStack(spacing: LocktySpacing.md) {
+                Capsule()
+                    .fill(color)
+                    .frame(width: 4, height: 38)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(activity.title)
+                        .font(.title3.weight(.regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(2)
+
+                    Text(activity.type.title)
+                        .font(LocktyTypography.caption)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: LocktySpacing.sm) {
+                detailRow(
+                    "Started",
+                    activity.startDate.formatted(date: .omitted, time: .shortened)
+                )
+                detailRow("Duration", durationText)
+                detailRow("Detail", detail)
+            }
+        }
+        .padding(LocktySpacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(LocktyColors.secondaryText)
+            Spacer(minLength: LocktySpacing.md)
+            Text(value)
+                .foregroundStyle(LocktyColors.primaryText)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(LocktyTypography.callout)
     }
 }

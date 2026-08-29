@@ -16,7 +16,7 @@ extension View {
     }
 }
 
-private struct LocktyScreenBackground: View {
+struct LocktyScreenBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var auraColor: Color {

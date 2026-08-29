@@ -1,5 +1,6 @@
-import Foundation
 import Combine
+import Foundation
+import UserNotifications
 
 final class StartupCoordinator: ObservableObject {
     private let session: AppSession
@@ -43,6 +44,9 @@ final class StartupCoordinator: ObservableObject {
 
             let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
             router.pendingUnlock = presentedPause?.context
+            if let presentedPause {
+                clearUnlockNotification(for: presentedPause.context.pauseRuleID)
+            }
 
             consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
         } catch {
@@ -69,8 +73,21 @@ final class StartupCoordinator: ObservableObject {
         // survives until the flow is actually answered.
         let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
         router.pendingUnlock = presentedPause?.context
+        if let presentedPause {
+            clearUnlockNotification(for: presentedPause.context.pauseRuleID)
+        }
 
         consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
+    }
+
+    /// The shield posts a notification alongside opening the app, because it cannot tell
+    /// whether the open landed. Once the request is on screen the notification has done
+    /// its job either way.
+    private func clearUnlockNotification(for pauseRuleID: UUID) {
+        let identifier = "pause-request-\(pauseRuleID.uuidString)"
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
     private func reconcileRuntimeState(_ runtimeState: RuntimeState) async throws {

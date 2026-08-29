@@ -48,15 +48,17 @@ final class ShieldActionExtension: ShieldActionDelegate {
 
             writePendingPause(context)
 
-            // Try to bring Lockty forward directly. UIApplication is not visible to an
-            // app extension at compile time, so it is reached through the runtime -- the
-            // only way this button can open the app rather than just leave a breadcrumb.
-            // A notification is still posted whenever that doesn't take, so the request
-            // is never left with no way back to the app.
-            if !openLockty(for: context) {
-                postUnlockNotification(context)
-            }
-            completionHandler(.defer)
+            // Both, deliberately. The direct open is what actually brings Lockty
+            // forward, but there is no way to observe whether it landed, so the
+            // notification always goes out as the guaranteed way back. Lockty pulls it
+            // from Notification Centre the moment it picks the request up, so a
+            // successful open doesn't leave a stale one behind.
+            postUnlockNotification(context)
+            openLockty(for: context)
+
+            // .close rather than .defer: deferring keeps the blocked app in front, and
+            // the open cannot bring Lockty over an app that is still holding the screen.
+            completionHandler(.close)
 
         case .secondaryButtonPressed:
             completionHandler(.close)
@@ -89,27 +91,36 @@ final class ShieldActionExtension: ShieldActionDelegate {
         )
     }
 
-    /// Opens `lockty://unlock?...`, returning whether the open was actually dispatched.
-    @discardableResult
-    private func openLockty(for context: PauseContext) -> Bool {
+    /// Opens `lockty://unlock?...`.
+    ///
+    /// UIApplication is not visible to an app extension at compile time, so it is reached
+    /// through the runtime. Both selectors are tried: the modern one is the API, but the
+    /// old single-argument `openURL:` is the one that still goes through from an
+    /// extension, so it gets the first attempt.
+    private func openLockty(for context: PauseContext) {
         guard let url = URL(string: "lockty://unlock?request=\(context.id.uuidString)") else {
-            return false
+            return
         }
 
         let sharedSelector = NSSelectorFromString("sharedApplication")
         guard let applicationClass = NSClassFromString("UIApplication") as? NSObject.Type,
               applicationClass.responds(to: sharedSelector),
               let application = applicationClass.perform(sharedSelector)?.takeUnretainedValue() as? NSObject
-        else { return false }
+        else { return }
 
-        let openSelector = NSSelectorFromString("openURL:options:completionHandler:")
-        guard application.responds(to: openSelector) else { return false }
+        let legacySelector = NSSelectorFromString("openURL:")
+        if application.responds(to: legacySelector) {
+            application.perform(legacySelector, with: url)
+            return
+        }
+
+        let modernSelector = NSSelectorFromString("openURL:options:completionHandler:")
+        guard application.responds(to: modernSelector) else { return }
 
         typealias OpenURL = @convention(c) (NSObject, Selector, NSURL, NSDictionary, Any?) -> Void
-        let implementation = application.method(for: openSelector)
+        let implementation = application.method(for: modernSelector)
         let open = unsafeBitCast(implementation, to: OpenURL.self)
-        open(application, openSelector, url as NSURL, NSDictionary(), nil)
-        return true
+        open(application, modernSelector, url as NSURL, NSDictionary(), nil)
     }
 
     private func postUnlockNotification(_ context: PauseContext) {

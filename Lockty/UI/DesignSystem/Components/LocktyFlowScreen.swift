@@ -134,12 +134,9 @@ struct LocktyFlowScreen<Content: View>: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
                     .background(Capsule(style: .continuous).fill(isResting ? .white.opacity(0.55) : .white))
+                    .clipShape(Capsule(style: .continuous))
             }
-            // locktyInteractive feeds the press state; the surface is what draws the
-            // shrink and the highlight, and it needs the same capsule the button is.
-            .buttonStyle(.locktyInteractive)
-            .clipShape(Capsule(style: .continuous))
-            .locktyInteractiveSurface(shape: Capsule(style: .continuous))
+            .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
             .tappable()
             .disabled(!canPressPrimary)
             .opacity(isPrimaryEnabled ? 1 : 0.4)
@@ -163,8 +160,7 @@ struct LocktyFlowScreen<Content: View>: View {
                 }
                 // No background of its own: the capsule only shows up as the press
                 // highlight, so the button is invisible until it is touched.
-                .buttonStyle(.locktyInteractive)
-                .locktyInteractiveSurface(shape: Capsule(style: .continuous))
+                .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
                 .tappable()
             }
         }

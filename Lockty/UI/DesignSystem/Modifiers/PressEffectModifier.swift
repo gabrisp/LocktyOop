@@ -68,13 +68,31 @@ private struct LocktyInteractiveSurfaceModifier<S: Shape>: ViewModifier {
 }
 
 struct LocktyInteractiveButtonStyle: ButtonStyle {
+    /// When set, the style draws the press surface itself.
+    ///
+    /// Applying `locktyInteractiveSurface` next to `buttonStyle` looks right and does
+    /// nothing: the style publishes the pressed state into the *label's* environment, so
+    /// a surface chained onto the Button from outside never sees it and the button just
+    /// sits there. Handing the shape to the style puts the surface where it can read it.
+    var shape: AnyShape?
+    var tint: Color = .white
+    var pressedScale: CGFloat = 0.97
+
     func makeBody(configuration: Configuration) -> some View {
-        LocktyInteractiveButtonBody(configuration: configuration)
+        LocktyInteractiveButtonBody(
+            configuration: configuration,
+            shape: shape,
+            tint: tint,
+            pressedScale: pressedScale
+        )
     }
 }
 
 private struct LocktyInteractiveButtonBody: View {
     let configuration: LocktyInteractiveButtonStyle.Configuration
+    var shape: AnyShape?
+    var tint: Color = .white
+    var pressedScale: CGFloat = 0.97
 
     @State private var isShowingPressedState = false
     @State private var hapticTrigger = 0
@@ -82,6 +100,12 @@ private struct LocktyInteractiveButtonBody: View {
 
     var body: some View {
         configuration.label
+            .locktyInteractiveSurface(
+                enabled: shape != nil,
+                tint: tint,
+                shape: shape ?? AnyShape(Rectangle()),
+                pressedScale: pressedScale
+            )
             .environment(\.locktySurfacePressed, isShowingPressedState)
             .animation(.smooth(duration: 0.18), value: isShowingPressedState)
             .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
@@ -108,8 +132,18 @@ private struct LocktyInteractiveButtonBody: View {
 }
 
 extension ButtonStyle where Self == LocktyInteractiveButtonStyle {
+    /// For a label that draws its own press surface, such as CardView.
     static var locktyInteractive: LocktyInteractiveButtonStyle {
         LocktyInteractiveButtonStyle()
+    }
+
+    /// For everything else: the style shrinks and highlights the button itself.
+    static func locktyInteractive<S: Shape>(
+        shape: S,
+        tint: Color = .white,
+        pressedScale: CGFloat = 0.97
+    ) -> LocktyInteractiveButtonStyle {
+        LocktyInteractiveButtonStyle(shape: AnyShape(shape), tint: tint, pressedScale: pressedScale)
     }
 }
 

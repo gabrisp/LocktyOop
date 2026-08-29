@@ -143,7 +143,6 @@ struct LocktyActivitySelectionView: View {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 24, weight: .medium))
                             }
-                            .buttonStyle(.plain)
                             .frame(width: 74, height: 74)
                             .background(
                                 Circle()
@@ -156,11 +155,7 @@ struct LocktyActivitySelectionView: View {
                                     )
                             )
                             .foregroundStyle(.black)
-                            .locktyInteractiveSurface(
-                                tint: Color.white,
-                                shape: Circle(),
-                                pressedScale: 0.97
-                            )
+                            .buttonStyle(.locktyInteractive(shape: Circle()))
                             .accessibilityLabel("Done")
                         }
                     )
@@ -279,12 +274,7 @@ struct LocktyActivitySelectionView: View {
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(Color.white.opacity(0.09)))
             }
-            .buttonStyle(.plain)
-            .locktyInteractiveSurface(
-                tint: .white,
-                shape: Circle(),
-                pressedScale: 0.97
-            )
+            .buttonStyle(.locktyInteractive(shape: Circle()))
         }
         .padding(.vertical, 8)
     }
@@ -357,13 +347,8 @@ struct LocktyActivitySelectionView: View {
                                 }
                                 .frame(width: 84, height: 84)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
                             .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))
-                            .locktyInteractiveSurface(
-                                tint: .white,
-                                shape: RoundedRectangle(cornerRadius: 22, style: .continuous),
-                                pressedScale: 0.97
-                            )
                         }
                     }
                 }

@@ -14,7 +14,7 @@ struct LocktyAppLockBadge: View {
     let token: ApplicationToken?
     /// Scales the finished badge. It no longer sets the icon's size -- nothing can --
     /// so it is a multiplier on the whole thing, ring included.
-    var scale: CGFloat = 1.5
+    var scale: CGFloat = 1.7
     /// When the running allowance began and ends. Nil means the app is simply locked.
     var unlockedFrom: Date?
     var unlockedUntil: Date?
@@ -134,7 +134,7 @@ struct LocktyAppLockBadge: View {
             // scaleEffect draws bigger without laying out bigger, so the row would still
             // reserve the unscaled size and the badges would overlap. This claims the
             // space the scaled badge actually occupies.
-            .frame(width: scaledSide, height: scaledSide)
+            .frame(width: scaledWidth, height: scaledSide)
             .overlay(alignment: .bottom) {
                 captionLabel(at: date)
                     .fixedSize()
@@ -147,6 +147,12 @@ struct LocktyAppLockBadge: View {
     private var scaledSide: CGFloat? {
         guard iconSize > 0 else { return nil }
         return (iconSize + inset * 2) * scale
+    }
+
+    /// A little wider than it is tall. The caption underneath is laid out at its natural
+    /// width and would otherwise run into the badge either side of it.
+    private var scaledWidth: CGFloat? {
+        scaledSide.map { $0 + 10 }
     }
 
     /// FamilyControls draws `Label(token)` at its own size and ignores the frame it is

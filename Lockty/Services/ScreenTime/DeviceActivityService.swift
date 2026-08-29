@@ -48,7 +48,14 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
         )
 
         let calendar = Calendar.current
-        let start = calendar.dateComponents([.hour, .minute, .second], from: allowance.startedAt)
+        // A minute before the allowance began, so now is unambiguously inside the window
+        // and the system starts counting immediately. An interval starting on the current
+        // second is a coin flip: miss it and monitoring does not begin until that time
+        // comes round again, which is a day late.
+        let start = calendar.dateComponents(
+            [.hour, .minute, .second],
+            from: allowance.startedAt.addingTimeInterval(-60)
+        )
         // A whole day rather than the allowance's own length: the interval only has to
         // be open while the threshold is being counted, and anything near the allowance
         // itself falls under the fifteen-minute floor.

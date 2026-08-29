@@ -44,11 +44,22 @@ final class ShieldActionExtension: ShieldActionDelegate {
             let context = makeUnlockRequest(for: applicationToken)
             writePendingPause(context)
 
-            // The open is attempted first so it has the foreground request in flight
-            // before the response is given, and the notification always goes out
-            // alongside it -- there is no way to observe whether the open landed, so it
-            // is the guaranteed way back. Lockty pulls the notification the moment it
-            // picks the request up, so a successful open leaves nothing stale behind.
+            // iOS 26.5 answers this itself: .openParentalControlsApp brings up the app
+            // that owns the shield, which is the whole point of the button. Everything
+            // below it -- the runtime openURL: attempt, the notification held open until
+            // it registered -- was working around the absence of exactly this.
+            //
+            // The request is already in the App Group, so Lockty finds it on foreground
+            // without needing the deep link to carry it.
+            if #available(iOS 26.5, *) {
+                completionHandler(.openParentalControlsApp)
+                return
+            }
+
+            // Older systems: ask through UIApplication and post the notification, which
+            // is the only guaranteed way back since nothing reports whether the open
+            // landed. Lockty pulls the notification the moment it picks the request up,
+            // so a successful open leaves nothing stale behind.
             openLockty(for: context)
 
             // .defer, never .close. Closing is what the secondary button is for; the

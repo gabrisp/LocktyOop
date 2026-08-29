@@ -5,8 +5,10 @@ struct MetricsHeaderGeometry {
     static let collapsedHeight: CGFloat = 60
     static let collapseDistance: CGFloat = 112
     static let expandedDiameter: CGFloat = 92
-    /// Wide enough for the number to sit centred inside the ring rather than fill it.
-    static let collapsedDiameter: CGFloat = 34
+    /// Collapsing thins the ring rather than closing it in on the number: the circle
+    /// keeps enough width for the value to sit centred inside it, so what shrinks is the
+    /// stroke, not the room.
+    static let collapsedDiameter: CGFloat = 46
     static let labelHeight: CGFloat = 16
     static let expandedLabelGap: CGFloat = 6
     static let collapsedLabelGap: CGFloat = 4
@@ -23,10 +25,10 @@ struct MetricsHeaderGeometry {
         Self.lerp(Self.expandedDiameter, Self.collapsedDiameter, progress: progress)
     }
 
-    /// Thinner at both ends than it was: a heavy ring around a small circle leaves the
-    /// number nowhere to sit.
+    /// Thins right down as it collapses. A hairline around a wide circle is what leaves
+    /// the number the middle of it.
     var strokeWidth: CGFloat {
-        Self.lerp(7, 2.5, progress: progress)
+        Self.lerp(7, 1.5, progress: progress)
     }
 
     var valueOpacity: CGFloat {

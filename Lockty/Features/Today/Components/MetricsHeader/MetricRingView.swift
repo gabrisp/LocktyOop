@@ -27,7 +27,7 @@ struct MetricRingView: View {
     /// Tracks the ring: large enough to read expanded, small enough to sit inside the
     /// collapsed ring rather than swallow it.
     private var valueFontSize: CGFloat {
-        MetricsHeaderGeometry.lerp(22, 11, progress: collapseProgress)
+        MetricsHeaderGeometry.lerp(22, 15, progress: collapseProgress)
     }
 
     private var label: some View {

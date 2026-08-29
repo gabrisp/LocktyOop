@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct TodayView: View {
     let day: Date
@@ -85,6 +86,7 @@ struct TodayView: View {
                 .ignoresSafeArea()
 
             scrollContent
+            topChromeBackdrop
             topChrome
         }
         .task(id: DayKey(date: day)) {
@@ -96,6 +98,41 @@ struct TodayView: View {
         .onDisappear {
             router.todayChromeCollapseProgress = 0
         }
+    }
+
+    /// The status bar / notch inset. Read from the window rather than a GeometryReader
+    /// because this sits inside a ZStack that already starts below it.
+    private var safeAreaTop: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        return scene?.keyWindow?.safeAreaInsets.top ?? 0
+    }
+
+    /// From the top of the screen down to just below the rings, whatever is currently
+    /// pinned in between.
+    private var topChromeBackdropHeight: CGFloat {
+        safeAreaTop + metricsHeaderOffsetY + headerTopInset + metricsGeometry.height + 6
+    }
+
+    /// A separate top-anchored layer rather than a background on the metrics header:
+    /// as a background it was tied to a frame that shifts when the shortcut row is
+    /// added or removed, so the gradient moved with it and no longer covered the safe
+    /// area. Anchored here it never moves -- only its height changes.
+    private var topChromeBackdrop: some View {
+        LinearGradient(
+            stops: [
+                .init(color: LocktyColors.background, location: 0),
+                .init(color: LocktyColors.background, location: 0.82),
+                .init(color: LocktyColors.background.opacity(0), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: topChromeBackdropHeight)
+        // Invisible while expanded, fading in as the header collapses.
+        .opacity(collapseProgress)
+        .allowsHitTesting(false)
+        .ignoresSafeArea(edges: .top)
     }
 
     private var topChrome: some View {
@@ -122,7 +159,6 @@ struct TodayView: View {
                 metrics: state.primaryMetrics.metrics,
                 collapseProgress: collapseProgress,
                 topInset: headerTopInset,
-                backdropTopOverhang: shortcutBlockHeight,
                 onMetricSelected: { metric in
                     switch metric.kind {
                     case .productivity: router.presentSheet(.productivityDetail(day))

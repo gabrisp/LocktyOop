@@ -15,6 +15,12 @@ struct LocktySectionTitle: View {
     /// Set when the section has a screen of its own. The title then reads as the way in:
     /// it grows to a real heading, carries a chevron, and the whole row is tappable.
     var onOpen: (() -> Void)?
+    /// Sits immediately after the title rather than at the trailing edge -- for marks
+    /// that belong to the words, like a live indicator, not for trailing counts.
+    var inlineAccessory: AnyView?
+    /// Draws the heading style and its chevron without taking the tap itself, for cards
+    /// that are already a button in their entirety.
+    var showsChevron = false
 
     @State private var isShowingInfo = false
 
@@ -41,6 +47,40 @@ struct LocktySectionTitle: View {
         self.onOpen = onOpen
     }
 
+    /// The heading form for a card that handles its own tap.
+    init<Inline: View>(
+        _ title: String,
+        showsChevron: Bool,
+        @ViewBuilder inlineAccessory: () -> Inline
+    ) {
+        self.title = title
+        self.showsSeparator = false
+        self.accessory = nil
+        self.showsChevron = showsChevron
+        self.inlineAccessory = AnyView(inlineAccessory())
+    }
+
+    init(_ title: String, showsChevron: Bool) {
+        self.title = title
+        self.showsSeparator = false
+        self.accessory = nil
+        self.showsChevron = showsChevron
+    }
+
+    init<Inline: View>(
+        _ title: String,
+        info: String? = nil,
+        onOpen: @escaping () -> Void,
+        @ViewBuilder inlineAccessory: () -> Inline
+    ) {
+        self.title = title
+        self.info = info
+        self.showsSeparator = false
+        self.accessory = nil
+        self.onOpen = onOpen
+        self.inlineAccessory = AnyView(inlineAccessory())
+    }
+
     init<Accessory: View>(
         _ title: String,
         info: String? = nil,
@@ -62,7 +102,7 @@ struct LocktySectionTitle: View {
             }
 
             HStack(spacing: LocktySpacing.xs) {
-                if onOpen != nil {
+                if onOpen != nil || showsChevron {
                     Text(title)
                         .font(.system(.headline, design: .default, weight: .bold))
                         .foregroundStyle(LocktyColors.primaryText)
@@ -70,6 +110,9 @@ struct LocktySectionTitle: View {
                     Image(systemName: "chevron.right")
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(LocktyColors.tertiaryText)
+
+                    inlineAccessory
+                        .padding(.leading, LocktySpacing.xs)
                 } else {
                     Text(title.uppercased())
                         .locktyEyebrow()

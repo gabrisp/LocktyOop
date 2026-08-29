@@ -12,7 +12,7 @@ import SwiftUI
 /// the lock and the whole border come back.
 struct LocktyAppLockBadge: View {
     let token: ApplicationToken?
-    var size: CGFloat = 62
+    var size: CGFloat = 72
     /// When the running allowance began and ends. Nil means the app is simply locked.
     var unlockedFrom: Date?
     var unlockedUntil: Date?
@@ -31,7 +31,10 @@ struct LocktyAppLockBadge: View {
     private var borderWidth: CGFloat { 2.5 }
     private var iconRadius: CGFloat { size * 0.24 }
     private var borderRadius: CGFloat { iconRadius + inset }
-    private var inset: CGFloat { 6 }
+    /// The gap between the icon and its ring. Small on purpose: at 6 the border read as
+    /// a box the icon was floating inside rather than as the icon's own outline, which
+    /// is what made the icons look shrunken.
+    private var inset: CGFloat { 3 }
 
     private var isUnlocked: Bool {
         guard let unlockedUntil else { return false }

@@ -97,6 +97,6 @@ struct UnlockRequestCard: View {
     /// The same badge the active mode card uses, so a blocked app looks the same
     /// wherever it is shown.
     private var appIcon: some View {
-        LocktyAppLockBadge(token: token, size: 50)
+        LocktyAppLockBadge(token: token, size: 58)
     }
 }

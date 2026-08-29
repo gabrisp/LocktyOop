@@ -93,18 +93,10 @@ struct AppUsageListCard: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: LocktySpacing.sm) {
-                Text("Tiempo de uso")
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .lineLimit(1)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(.subheadline, design: .default, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.58))
-
-                Spacer(minLength: 0)
-            }
+            // The same heading component the active mode card uses, in its chevron-only
+            // form: this card is a button in its entirety, so the title must not take
+            // the tap for itself.
+            LocktySectionTitle("Tiempo de uso", showsChevron: true)
 
             Text(totalDurationText)
                 .font(.system(.largeTitle, design: .default, weight: .semibold))

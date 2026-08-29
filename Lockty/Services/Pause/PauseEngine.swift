@@ -228,13 +228,23 @@ final class PauseEngine: ObservableObject {
     }
 
     /// Waits out the allowance and relocks on the second it expires.
+    ///
+    /// The sleep is checked rather than trusted. It is suspended along with the app, so
+    /// it can come back late -- which is what left the countdown sitting at 0:00 for a
+    /// while before anything happened -- and it can also come back a moment early. Both
+    /// end in the same place: keep looking until the allowance has actually run out.
     private func scheduleExpiryRelock(for allowance: ActivePauseAllowance) {
         expiryTask?.cancel()
-        let remaining = allowance.expiresAt.timeIntervalSinceNow
-        guard remaining > 0 else { return }
+        guard allowance.expiresAt.timeIntervalSinceNow > 0 else { return }
+        scheduleExpiryNotification(for: allowance)
 
         expiryTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(remaining))
+            while !Task.isCancelled {
+                let remaining = allowance.expiresAt.timeIntervalSinceNow
+                guard remaining > 0 else { break }
+                try? await Task.sleep(for: .seconds(min(remaining, 1)))
+            }
+
             guard !Task.isCancelled, let self else { return }
             // Re-read rather than trusting the captured allowance: it may already have
             // been relocked by the monitor extension, or replaced by a newer one.
@@ -243,6 +253,45 @@ final class PauseEngine: ObservableObject {
             else { return }
             await self.relock(allowance.context)
         }
+    }
+
+    /// Fires the moment the allowance runs out.
+    ///
+    /// The only way to say so when the app is not running: nothing can relock in the
+    /// background on the wall clock -- DeviceActivity refuses any window under fifteen
+    /// minutes -- so the phone is told, and opening Lockty from it relocks straight away.
+    private func scheduleExpiryNotification(for allowance: ActivePauseAllowance) {
+        let remaining = allowance.expiresAt.timeIntervalSinceNow
+        guard remaining > 0 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Se acabó el descanso"
+        content.body = "\(allowance.context.displayName) vuelve a estar bloqueada."
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let request = UNNotificationRequest(
+            identifier: Self.expiryNotificationIdentifier(for: allowance.id),
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: remaining, repeats: false)
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The expiry warning has nothing to warn about once the app is locked again.
+    private func clearExpiryNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { requests in
+            let identifiers = requests
+                .map(\.identifier)
+                .filter { $0.hasPrefix("pause-expiry-") }
+            guard !identifiers.isEmpty else { return }
+            center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        }
+    }
+
+    private static func expiryNotificationIdentifier(for allowanceID: UUID) -> String {
+        "pause-expiry-\(allowanceID.uuidString)"
     }
 
     func relock(_ context: PauseContext) async {
@@ -271,6 +320,7 @@ final class PauseEngine: ObservableObject {
                 runtime.shieldPolicy = effectivePolicy
             }
             clearPauseNotification(for: context.pauseRuleID)
+            clearExpiryNotifications()
             await liveActivityController.end()
             state = .locked(context)
         } catch {

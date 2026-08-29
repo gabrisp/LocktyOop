@@ -1446,15 +1446,16 @@ struct RoutineEditorView: View {
                     systemImage: "stop.circle",
                     tint: LocktyColors.unproductive
                 ) {
-                    Task {
-                        await viewModel.stopRoutine()
+                    // The sheet goes now. Waiting on the teardown before dismissing left
+                    // it sitting there for as long as ManagedSettings took to answer,
+                    // which read as the button having done nothing at all.
+                    withAnimation(.smooth(duration: 0.28)) {
                         // The card on Today is a request against the routine that was
                         // running. Ending the routine answers it.
-                        withAnimation(.smooth(duration: 0.28)) {
-                            router.pendingUnlock = nil
-                        }
-                        close()
+                        router.pendingUnlock = nil
                     }
+                    close()
+                    Task { await viewModel.stopRoutine() }
                 }
                 .padding(.top, LocktySpacing.sm)
             } else if viewModel.activeRoutine() == nil {
@@ -1727,6 +1728,7 @@ private struct ScheduleTimeField: View {
     let hour: Int
     let minute: Int
     let onChange: (Int, Int) -> Void
+    @State private var isShowingPicker = false
 
     private var displayText: String {
         String(format: "%02d:%02d", hour, minute)
@@ -1748,19 +1750,9 @@ private struct ScheduleTimeField: View {
     }
 
     var body: some View {
-        // A menu, not a popover. Hour and minute come through as their own submenus, so
-        // the time is picked in the row it belongs to instead of a wheel thrown over it.
-        Menu {
-            Picker("Hora", selection: hourBinding) {
-                ForEach(0..<24, id: \.self) { value in
-                    Text(String(format: "%02d", value)).tag(value)
-                }
-            }
-
-            Picker("Minuto", selection: minuteBinding) {
-                ForEach(minuteOptions, id: \.self) { value in
-                    Text(String(format: "%02d", value)).tag(value)
-                }
+        Button {
+            withAnimation(.smooth(duration: 0.22)) {
+                isShowingPicker = true
             }
         } label: {
             HStack(spacing: LocktySpacing.sm) {
@@ -1780,6 +1772,99 @@ private struct ScheduleTimeField: View {
         .buttonStyle(.plain)
         .tappable()
         .accessibilityLabel(label)
+        .popover(isPresented: $isShowingPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            ScheduleTimePopoverContent(
+                label: label,
+                hour: hourBinding,
+                minute: minuteBinding,
+                minuteOptions: minuteOptions
+            )
+            .id("schedule-popover-\(label)-\(hour)-\(minute)")
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func timeWheel<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.system(.caption, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+            content()
+                .labelsHidden()
+                .pickerStyle(.wheel)
+                .frame(width: 104, height: 144)
+                .clipped()
+        }
+    }
+}
+
+private struct ScheduleTimePopoverContent: View {
+    let label: String
+    @Binding var hour: Int
+    @Binding var minute: Int
+    let minuteOptions: [Int]
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(label)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .id("schedule-title-\(label)")
+
+            HStack(spacing: 0) {
+                timeWheel(title: "Horas") {
+                    Picker("Horas", selection: $hour) {
+                        ForEach(0..<24, id: \.self) { value in
+                            Text(String(format: "%02d", value)).tag(value)
+                        }
+                    }
+                }
+
+                timeWheel(title: "Minutos") {
+                    Picker("Minutos", selection: $minute) {
+                        ForEach(minuteOptions, id: \.self) { value in
+                            Text(String(format: "%02d", value)).tag(value)
+                        }
+                    }
+                }
+            }
+            .id("schedule-content-\(label)")
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .frame(width: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.black.opacity(0.96))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private func timeWheel<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.system(.caption, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+            content()
+                .labelsHidden()
+                .pickerStyle(.wheel)
+                .frame(width: 120, height: 152)
+                .clipped()
+                .id("schedule-wheel-\(label)-\(title)")
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

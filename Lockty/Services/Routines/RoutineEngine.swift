@@ -155,27 +155,15 @@ final class RoutineEngine: ObservableObject {
             state = .ending(activeRoutine.routineID)
         }
 
+        // Deliberately not one do/catch. Every step here used to be inside a single
+        // throwing block, so the first failure aborted the rest: with a stale pause rule
+        // stored, recomputing the shield threw .selectionNotConfigured before anything
+        // had been cleared, and stopping left the phone exactly as it was. Each step now
+        // fails on its own, and the two that matter -- the shields coming off and the
+        // runtime being cleared -- run first and cannot be skipped.
+        try? await shieldService.remove(storedState?.shieldPolicy ?? .empty)
+
         do {
-            let pauseRules = await pauseRuleRepository.rules()
-            let effectivePolicy = shieldPolicyResolver.resolve(
-                activeRoutine: nil,
-                activeBreak: nil,
-                // Not the live allowance: an allowance only exists to let an app through
-                // a routine's shield, and the routine is going.
-                activePauseAllowance: nil,
-                pauseRules: pauseRules
-            )
-
-            // The shields come off first. Persisting can fail, and a failed write that
-            // left the phone shielded is exactly the state there is no way back out of.
-            if effectivePolicy.blocksNothing {
-                try await shieldService.remove(effectivePolicy)
-            } else {
-                try await shieldService.apply(effectivePolicy)
-            }
-            await deviceActivityService.cancelPauseRelocks()
-            await PauseAllowanceLiveActivityTermination.endAll()
-
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.activeRoutine = nil
                 runtime.activeBreak = nil
@@ -187,21 +175,54 @@ final class RoutineEngine: ObservableObject {
                 runtime.pendingPause = nil
                 runtime.pendingEvents = []
                 runtime.recoveryFlags = []
-                runtime.shieldPolicy = effectivePolicy
+                runtime.shieldPolicy = .empty
             }
+        } catch {
+            print("Clearing the runtime state on stop failed: \(error.localizedDescription)")
+        }
 
-            if let activeRoutine {
+        // Detached, and not awaited. Neither is needed for the routine to be over, and
+        // both talk to daemons that can take their time answering -- awaiting them held
+        // the button that started this.
+        Task { [deviceActivityService] in
+            await deviceActivityService.cancelPauseRelocks()
+            await PauseAllowanceLiveActivityTermination.endAll()
+        }
+
+        // Anything a standalone Pause still blocks goes back on top of the cleared state.
+        // Its failure is survivable in the right direction: nothing shielded.
+        let pauseRules = await pauseRuleRepository.rules()
+        let residualPolicy = shieldPolicyResolver.resolve(
+            activeRoutine: nil,
+            activeBreak: nil,
+            // Not the live allowance: an allowance only exists to let an app through a
+            // routine's shield, and the routine is going.
+            activePauseAllowance: nil,
+            pauseRules: pauseRules
+        )
+        if !residualPolicy.blocksNothing {
+            do {
+                try await shieldService.apply(residualPolicy)
+            } catch {
+                print("Re-applying pause rules after stopping failed: \(error.localizedDescription)")
+            }
+        }
+
+        if let activeRoutine {
+            do {
                 try await finalizeExecution(
                     id: activeRoutine.id,
                     endedAt: Date(),
                     completionReason: .manualStop
                 )
-                state = .completed(activeRoutine.routineID)
-            } else {
-                state = .inactive
+            } catch {
+                // History, not state. A routine that could not be written to the log has
+                // still stopped.
+                print("Finalizing the execution log failed: \(error.localizedDescription)")
             }
-        } catch {
-            state = .failed(error.localizedDescription)
+            state = .completed(activeRoutine.routineID)
+        } else {
+            state = .inactive
         }
     }
 

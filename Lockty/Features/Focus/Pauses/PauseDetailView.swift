@@ -47,7 +47,7 @@ struct PauseDetailView: View {
                 if let rule = viewModel.rule {
                     CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text(rule.application.displayName).font(LocktyTypography.title)
+                            Text(rule.displayName).font(LocktyTypography.title)
                             Text(rule.isEnabled ? "Pause enabled" : "Pause disabled")
                                 .font(LocktyTypography.callout)
                                 .foregroundStyle(LocktyColors.secondaryText)
@@ -101,7 +101,7 @@ struct PauseDetailView: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle(viewModel.rule?.application.displayName ?? "Pause")
+        .navigationTitle(viewModel.rule?.displayName ?? "Pause")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let rule = viewModel.rule {

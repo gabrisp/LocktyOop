@@ -47,7 +47,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
             guard let domain = try? mapper.makeDomain(from: entity) else { return nil }
             syncSelectionStore(for: domain, entity: entity)
             return domain
-        }.sorted { $0.application.displayName < $1.application.displayName }
+        }.sorted { $0.displayName < $1.displayName }
     }
 
     func rule(id: UUID) async -> PauseRule? {
@@ -132,7 +132,7 @@ final class CoreDataPauseRuleRepository: PauseRuleRepository {
             guard let domain = try? mapper.makeDomain(from: entity) else { return nil }
             return PauseRuleSnapshot(rule: domain)
         }
-        .sorted { $0.application.displayName.localizedCaseInsensitiveCompare($1.application.displayName) == .orderedAscending }
+        .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
     private func syncSelectionStore(for rule: PauseRule, entity: PauseRuleEntity) {

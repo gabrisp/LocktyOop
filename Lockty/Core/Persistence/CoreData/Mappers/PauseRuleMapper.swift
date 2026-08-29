@@ -26,6 +26,7 @@ struct PauseRuleMapper {
         entity.familyActivitySelectionData = try selection?.archivedData()
         entity.appIconSystemName = rule.application.iconSystemName
         entity.appIconArtworkURL = rule.application.iconSource.remoteURL?.absoluteString
+        entity.customName = rule.customName
         entity.isEnabled = rule.isEnabled
         entity.allowanceDuration = rule.allowanceDuration
         entity.relockAfterAllowance = rule.relockAfterAllowance
@@ -74,6 +75,7 @@ struct PauseRuleMapper {
             return PauseRule(
                 id: entity.id,
                 application: application,
+                customName: entity.customName,
                 isEnabled: entity.isEnabled,
                 steps: steps,
                 allowanceDuration: entity.allowanceDuration,

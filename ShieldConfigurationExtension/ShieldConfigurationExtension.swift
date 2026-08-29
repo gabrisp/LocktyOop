@@ -31,39 +31,43 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     /// True only when an enabled Pause rule exists for this specific app — the
     /// secondary button offers the Pause flow, so it must not appear otherwise.
-    private func hasPauseRule(for application: Application?) -> Bool {
-        guard let application else { return false }
+    private func pauseRule(for application: Application?) -> PauseRuleSnapshot? {
+        guard let application else { return nil }
 
         let snapshots = AppGroupStore().loadPauseRuleSnapshots().filter(\.isEnabled)
-        guard !snapshots.isEmpty else { return false }
+        guard !snapshots.isEmpty else { return nil }
 
         if let token = application.token,
-           snapshots.contains(where: { $0.application.applicationToken == token }) {
-            return true
+           let match = snapshots.first(where: { $0.application.applicationToken == token }) {
+            return match
         }
 
         if let bundleIdentifier = application.bundleIdentifier,
-           snapshots.contains(where: {
+           let match = snapshots.first(where: {
                $0.application.bundleIdentifier == bundleIdentifier
                    || $0.application.id.rawValue == bundleIdentifier
            }) {
-            return true
+            return match
         }
 
-        return false
+        return nil
     }
 
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
-        let allowsPause = runtime?.pendingPause == nil && hasPauseRule(for: application)
+        let rule = pauseRule(for: application)
+        let allowsPause = runtime?.pendingPause == nil && rule != nil
         let activeRoutineName = runtime?.activeRoutine?.nameSnapshot
+        // Prefer the user's own label: the system only gives us an opaque token, so
+        // localizedDisplayName is frequently unavailable here.
+        let title = rule?.displayName ?? resourceName
 
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1),
             icon: UIImage(systemName: "lock.shield"),
             title: ShieldConfiguration.Label(
-                text: resourceName,
+                text: title,
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(

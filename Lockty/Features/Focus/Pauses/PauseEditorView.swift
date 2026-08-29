@@ -39,6 +39,7 @@ final class PauseEditorViewModel {
     let draftID: UUID
 
     var isEnabled = true
+    var customName = ""
     var allowanceMinutes = 5
     var relockAfterAllowance = true
     var steps: [PauseStep] = [.countdown(CountdownConfiguration(duration: 10)), .confirmation(ConfirmationConfiguration())]
@@ -88,6 +89,7 @@ final class PauseEditorViewModel {
         print("Pause editor load started pauseID=\(initialPauseID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         guard let initialPauseID, let rule = await repository.rule(id: initialPauseID) else { return }
         createdAt = rule.createdAt
+        customName = rule.customName ?? ""
         isEnabled = rule.isEnabled
         allowanceMinutes = max(Int(rule.allowanceDuration / 60), 1)
         relockAfterAllowance = rule.relockAfterAllowance
@@ -166,6 +168,7 @@ final class PauseEditorViewModel {
         let rule = PauseRule(
             id: editingID,
             application: application,
+            customName: customName,
             isEnabled: isEnabled,
             steps: sanitizedSteps,
             allowanceDuration: TimeInterval(allowanceMinutes * 60),
@@ -218,6 +221,7 @@ struct PauseEditorView: View {
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var showAppPicker = false
+    @State private var showNameInfo = false
 
     init(
         viewModel: PauseEditorViewModel,
@@ -423,9 +427,50 @@ struct PauseEditorView: View {
                 .buttonStyle(.plain)
                 .tappable()
 
-                Text(viewModel.selectedAppSummary)
-                    .font(LocktyTypography.body)
-                    .foregroundStyle(LocktyColors.primaryText)
+                HStack(spacing: LocktySpacing.xs) {
+                    CardView(
+                        radius: 14,
+                        padding: 0,
+                        expandsHorizontally: false
+                    ) {
+                        ZStack {
+                            // Invisible sizing text so the field hugs its content.
+                            Text(viewModel.customName.isEmpty ? "Pause name" : "\(viewModel.customName) ")
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(.clear)
+                                .lineLimit(1)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 12)
+
+                            TextField("Pause name", text: $viewModel.customName)
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 12)
+                        }
+                    }
+                    .frame(maxWidth: 320)
+
+                    Button {
+                        showNameInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(LocktyColors.tertiaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .tappable()
+                    .popover(isPresented: $showNameInfo) {
+                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                            Text("You can give this Pause a custom name. Apple only hands apps an anonymous token for your selection, so Lockty can't read the app's real name — a name you set here is what it will be called.")
+                                .font(LocktyTypography.callout)
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .frame(width: 240, alignment: .leading)
+                        }
+                        .presentationCompactAdaptation(.popover)
+                    }
+                }
             }
             .frame(maxWidth: .infinity)
         }

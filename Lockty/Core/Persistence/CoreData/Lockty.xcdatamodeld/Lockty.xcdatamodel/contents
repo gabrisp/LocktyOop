@@ -95,6 +95,7 @@
         <attribute name="appIconSystemName" optional="YES" attributeType="String"/>
         <attribute name="appID" attributeType="String"/>
         <attribute name="appTokenData" optional="YES" attributeType="Binary"/>
+        <attribute name="customName" optional="YES" attributeType="String"/>
         <attribute name="familyActivitySelectionData" optional="YES" attributeType="Binary"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>

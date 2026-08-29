@@ -3,6 +3,10 @@ import Foundation
 nonisolated struct PauseRule: Codable, Hashable, Identifiable {
     let id: UUID
     var application: AppIdentity
+    /// User-supplied label. The system only hands us an opaque token for a selected
+    /// app, so its real name isn't ours to read — this is what lets a Pause be
+    /// identifiable in our own UI.
+    var customName: String?
     var isEnabled: Bool
     var steps: [PauseStep]
     var allowanceDuration: TimeInterval
@@ -10,9 +14,16 @@ nonisolated struct PauseRule: Codable, Hashable, Identifiable {
     var createdAt: Date
     var updatedAt: Date
 
+    /// What to show for this Pause: the user's label when they gave one.
+    var displayName: String {
+        let trimmed = customName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? application.displayName : trimmed
+    }
+
     init(
         id: UUID = UUID(),
         application: AppIdentity,
+        customName: String? = nil,
         isEnabled: Bool,
         steps: [PauseStep],
         allowanceDuration: TimeInterval,
@@ -22,6 +33,7 @@ nonisolated struct PauseRule: Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.application = application
+        self.customName = customName
         self.isEnabled = isEnabled
         self.steps = steps
         self.allowanceDuration = allowanceDuration

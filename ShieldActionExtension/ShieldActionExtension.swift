@@ -68,7 +68,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
 
     private func postPauseNotification(snapshot: PauseRuleSnapshot) {
         let content = UNMutableNotificationContent()
-        content.title = "Open \(snapshot.application.displayName) mindfully"
+        content.title = "Open \(snapshot.displayName) mindfully"
         content.body = "Tap to continue in Lockty."
         content.sound = .default
         content.userInfo = ["pauseRuleID": snapshot.id.uuidString]
@@ -86,7 +86,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
         let context = PauseContext(
             pauseRuleID: snapshot.id,
             appID: snapshot.application.id,
-            displayName: snapshot.application.displayName,
+            displayName: snapshot.displayName,
             allowanceDuration: snapshot.allowanceDuration,
             steps: snapshot.steps,
             source: .shieldAction

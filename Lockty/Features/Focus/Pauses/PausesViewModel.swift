@@ -46,7 +46,7 @@ final class PausesViewModel {
                 let summary = calculator.summary(from: ruleEvents)
                 return PauseRuleSummaryState(
                     id: rule.id,
-                    name: rule.application.displayName,
+                    name: rule.displayName,
                     flow: rule.steps.map(\.title).joined(separator: " -> "),
                     successRate: summary.successRateValue.map { "\($0)% success" } ?? "No decisions",
                     stopped: summary.stoppedCount,

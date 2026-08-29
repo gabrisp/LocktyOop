@@ -110,6 +110,11 @@ struct TodayView: View {
             await viewModel.load(day: day)
         }
         .animation(.smooth(duration: 0.32), value: router.pendingUnlock?.id)
+        // Ending a routine takes its cards off the screen rather than having them
+        // disappear between one frame and the next: the mode card and the checklist both
+        // belong to the routine that was running.
+        .animation(.smooth(duration: 0.34), value: viewModel.activeRoutine?.id)
+        .animation(.smooth(duration: 0.34), value: state.activeRoutineChecklist?.id)
         .onChange(of: collapseProgress, initial: true) { _, newValue in
             router.todayChromeCollapseProgress = newValue
         }
@@ -275,6 +280,7 @@ struct TodayView: View {
                             }
                         }
                     )
+                    .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 // There is no loading layout at all. The screen used to swap itself for a
@@ -328,9 +334,10 @@ struct TodayView: View {
                             router.presentFullScreen(.unlockFlow(token))
                         },
                         onStop: {
-                            Task { await viewModel.stopActiveRoutine() }
+                            Task { await viewModel.stopActiveRoutine(day: day) }
                         }
                     )
+                    .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 AppUsageListCard(state: state) { appUsage, classification in

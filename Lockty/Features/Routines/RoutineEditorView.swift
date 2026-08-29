@@ -22,7 +22,10 @@ final class RoutineEditorViewModel: ObservableObject {
     let draftID: UUID
 
     @Published var name = ""
-    @Published var icon = ""
+    /// A new routine already has an icon: leaving it empty meant every screen that
+    /// shows one had to invent a fallback, and the icon read as missing rather than as
+    /// the one it starts with.
+    @Published var icon = RoutineEditorViewModel.defaultIcon
     @Published var mode: RoutineMode = .normal
     @Published var allowsPauseDuringStrictMode = true
     @Published var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
@@ -115,6 +118,8 @@ final class RoutineEditorViewModel: ObservableObject {
         createdAt = Date()
         refreshSelectionState()
     }
+
+    static let defaultIcon = "repeat"
 
     var isCreating: Bool { initialRoutineID == nil }
 
@@ -213,7 +218,7 @@ final class RoutineEditorViewModel: ObservableObject {
 
         createdAt = routine.createdAt
         name = routine.name
-        icon = routine.icon ?? ""
+        icon = routine.icon ?? RoutineEditorViewModel.defaultIcon
         mode = routine.mode
         triggers = routine.triggers.isEmpty ? [.manual] : routine.triggers
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
@@ -539,6 +544,18 @@ struct RoutineEditorView: View {
         isConfirmingDiscard = true
     }
 
+    /// What the bar is showing, which is not the same as which screen is showing.
+    ///
+    /// The bar is captured as a snapshot and only re-taken when this changes, so
+    /// anything its buttons read has to be in here -- the check was disabled while the
+    /// name was empty and kept that state after the name was typed, because nothing told
+    /// the bar to look again. It is separate from the content's id so keystrokes rebuild
+    /// the bar without re-running the screen transition.
+    private var chromeID: String {
+        let hasName = !viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return "\(contentID)-\(hasName)-\(viewModel.icon)"
+    }
+
     private var contentID: String {
         if let activeSheet {
             return activeSheet.id
@@ -562,7 +579,7 @@ struct RoutineEditorView: View {
     var body: some View {
         LocktyDynamicSheet(animation: sheetAnimation) {
             sheetContent
-                .locktyDynamicSheetChrome(id: contentID) {
+                .locktyDynamicSheetChrome(id: chromeID) {
                     centerChrome
                 } leading: {
                     leadingChrome
@@ -678,7 +695,7 @@ struct RoutineEditorView: View {
                 chromeTitleText("Nombre")
             } else {
                 HStack(spacing: LocktySpacing.sm) {
-                    Image(systemName: viewModel.icon.isEmpty ? "repeat" : viewModel.icon)
+                    Image(systemName: viewModel.icon)
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -769,7 +786,7 @@ struct RoutineEditorView: View {
                 Button {
                     isShowingIconPicker = true
                 } label: {
-                    Image(systemName: viewModel.icon.isEmpty ? "square.grid.2x2" : viewModel.icon)
+                    Image(systemName: viewModel.icon)
                         .font(.system(size: 18, weight: .light))
                         .foregroundStyle(LocktyColors.primaryText)
                         .frame(width: 52, height: 52)
@@ -1403,7 +1420,7 @@ private struct RoutineEditorHero: View {
     @State private var showIconPicker = false
 
     private var iconImage: some View {
-        Image(systemName: viewModel.icon.isEmpty ? "square.and.arrow.up.fill" : viewModel.icon)
+        Image(systemName: viewModel.icon)
             .font(.system(size: 22, weight: .ultraLight))
             .foregroundStyle(LocktyColors.primaryText)
     }

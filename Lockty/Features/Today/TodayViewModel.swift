@@ -31,8 +31,11 @@ final class TodayViewModel: ObservableObject {
     }
 
     /// Ends the running routine. Strict mode can refuse, which the engine decides.
-    func stopActiveRoutine() async {
+    func stopActiveRoutine(day: Date) async {
         await routineEngine.stop()
+        // The stopped routine's cards are read off the day's state, so it has to be
+        // reloaded or the checklist stays on screen with nothing behind it.
+        await load(day: day, force: true)
     }
 
     /// The allowance currently running, if any, so a released app can show its timer.

@@ -3,8 +3,8 @@ import SwiftUI
 /// The button for anything that commits: creating a routine, ending one.
 ///
 /// Held rather than tapped, and the holding is the whole design. An aura swells inside
-/// the glass as the press goes on and the fill closes behind it, so the button shows how
-/// far in you are instead of asking you to trust a timer you cannot see. Letting go
+/// the glass as the press goes on until it has washed over the whole button, so it shows
+/// how far in you are instead of asking you to trust a timer you cannot see. Letting go
 /// before the end drains it back and nothing happens.
 struct LocktyHoldButton: View {
     let title: String
@@ -29,8 +29,7 @@ struct LocktyHoldButton: View {
         content
             .frame(maxWidth: .infinity)
             .frame(height: 60)
-            .background(alignment: .leading) { aura }
-            .background(alignment: .leading) { fill }
+            .background { aura }
             .clipShape(Capsule(style: .continuous))
             .safeGlass(radius: 999, interactive: true)
             .clipShape(Capsule(style: .continuous))
@@ -68,34 +67,35 @@ struct LocktyHoldButton: View {
         .foregroundStyle(LocktyColors.primaryText)
     }
 
-    /// The glow that swells from where the press lands. Blurred well past its own edge so
-    /// it reads as light inside the glass rather than a shape sliding across it.
+    /// The progress *is* the aura: a wash of the tint shown through a blurred circle
+    /// that grows with the press.
+    ///
+    /// Masking light rather than drawing a shape is what keeps it reading as something
+    /// lit inside the glass. A capsule creeping across the button was a progress bar
+    /// wearing the button's shape, which is a different thing entirely.
     private var aura: some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [tint.opacity(0.85), tint.opacity(0.15), .clear],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: 90
-                )
-            )
-            .frame(width: 120, height: 120)
-            .scaleEffect(0.35 + progress * 2.4)
-            .opacity(progress == 0 ? 0 : 0.9)
-            .blur(radius: 26)
-            .offset(x: -20)
-            .allowsHitTesting(false)
-    }
-
-    /// Closes in behind the aura, so the button is visibly full at the moment it fires.
-    private var fill: some View {
         GeometryReader { proxy in
-            Capsule(style: .continuous)
-                .fill(tint.opacity(0.22))
-                .frame(width: proxy.size.width * progress)
+            let diameter = auraDiameter(in: proxy.size)
+
+            tint
+                .opacity(0.55)
+                .mask(alignment: .leading) {
+                    Circle()
+                        .frame(width: diameter, height: diameter)
+                        .blur(radius: 22)
+                        .offset(x: -diameter * 0.25)
+                        .frame(maxHeight: .infinity)
+                }
+                .opacity(progress == 0 ? 0 : 1)
         }
         .allowsHitTesting(false)
+    }
+
+    /// Big enough at the end to have washed over the whole button, so completing looks
+    /// like the button filling rather than the circle stopping somewhere short.
+    private func auraDiameter(in size: CGSize) -> CGFloat {
+        let full = size.width * 2.6
+        return 40 + (full - 40) * progress
     }
 
     private func beginHold() {

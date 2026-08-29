@@ -182,8 +182,16 @@ extension View {
     }
 }
 
-/// The bar's height: 16 above the buttons, a 44pt button, 4 below.
-private let locktyDynamicSheetBarHeight: CGFloat = 64
+/// The bar's parts, and its height derived from them.
+///
+/// Derived, not written down twice: the height the inset reserves and the padding the
+/// bar draws were two separate numbers, and every time one moved the other did not, so
+/// the bar sat above the space kept for it.
+private let locktyDynamicSheetBarTopPadding: CGFloat = 24
+private let locktyDynamicSheetBarBottomPadding: CGFloat = 4
+private let locktyDynamicSheetBarButtonSize: CGFloat = 44
+private let locktyDynamicSheetBarHeight: CGFloat =
+    locktyDynamicSheetBarTopPadding + locktyDynamicSheetBarButtonSize + locktyDynamicSheetBarBottomPadding
 
 /// A sheet that is exactly as tall as what is in it.
 ///
@@ -304,9 +312,9 @@ private struct LocktyDynamicSheetChromeOverlay: View {
         // line up with what they sit above. Only 4 underneath: the bar sits close to the
         // content it belongs to, not spaced off it.
         chromeContent
-            .padding(.top, LocktySpacing.lg)
+            .padding(.top, locktyDynamicSheetBarTopPadding)
             .padding(.horizontal, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.xs)
+            .padding(.bottom, locktyDynamicSheetBarBottomPadding)
     }
 
     @ViewBuilder
@@ -327,7 +335,7 @@ private struct LocktyDynamicSheetChromeOverlay: View {
     private var baseChromeContent: some View {
         HStack(spacing: LocktySpacing.md) {
             configuration.leading
-                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                .frame(minWidth: locktyDynamicSheetBarButtonSize, minHeight: locktyDynamicSheetBarButtonSize, alignment: .leading)
                 .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-leading", namespace: glassNamespace))
                 .id(configuration.transitionID)
                 .transition(.blurReplace.combined(with: .opacity))
@@ -342,7 +350,7 @@ private struct LocktyDynamicSheetChromeOverlay: View {
             Spacer(minLength: 0)
 
             configuration.trailing
-                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                .frame(minWidth: locktyDynamicSheetBarButtonSize, minHeight: locktyDynamicSheetBarButtonSize, alignment: .trailing)
                 .modifier(LocktyGlassTransitionSlotModifier(id: "dynamic-sheet-trailing", namespace: glassNamespace))
                 .id(configuration.transitionID)
                 .transition(.blurReplace.combined(with: .opacity))

@@ -219,7 +219,53 @@ struct LocktyDynamicSheet<Content: View>: View {
                 heightBeforeExplicitSize = sheetHeight
             }
         }
-        .modifier(LocktySheetDetentModifier(height: sheetHeight, sizes: chromeController.sizes))
+        // Animated on the target height rather than on the sizes changing: what the
+        // modifier interpolates is the number, so the number is what has to move.
+        .animation(animation, value: targetHeight)
+        .modifier(
+            LocktySheetDetentModifier(
+                height: targetHeight,
+                resizableDetents: resizableDetents
+            )
+        )
+    }
+
+    /// The one height the sheet should be right now, as a number.
+    ///
+    /// Even .large is a number here. Going from .height(x) to .large is a change of
+    /// detent kind, and there is nothing between the two for the animation to run
+    /// through -- it can only cut. Height to height is a value that can be interpolated,
+    /// and the system clamps the tall one to what the screen can actually show.
+    private var targetHeight: CGFloat {
+        guard let sizes = chromeController.sizes, sizes.count == 1, let only = sizes.first else {
+            return sheetHeight
+        }
+        return height(for: only)
+    }
+
+    private func height(for size: LocktyDynamicSheetSize) -> CGFloat {
+        switch size {
+        case .fit: sheetHeight
+        case .small: windowSize.height * 0.33
+        case .medium: windowSize.height * 0.5
+        case .large: windowSize.height
+        }
+    }
+
+    /// Only when a screen named more than one size, which is the only case where being
+    /// draggable means anything.
+    private var resizableDetents: Set<PresentationDetent>? {
+        guard let sizes = chromeController.sizes, sizes.count > 1 else { return nil }
+        return Set(sizes.map(detent(for:)))
+    }
+
+    private func detent(for size: LocktyDynamicSheetSize) -> PresentationDetent {
+        switch size {
+        case .fit: sheetHeight == .zero ? .medium : .height(sheetHeight)
+        case .small: .fraction(0.33)
+        case .medium: .medium
+        case .large: .large
+        }
     }
 
     private func setHeight(_ height: CGFloat) {
@@ -240,38 +286,24 @@ struct LocktyDynamicSheet<Content: View>: View {
 
 /// Animatable so the height is interpolated frame by frame.
 ///
-/// Swapping one `.height` detent for another hands the system two unrelated values with
-/// nothing in between, which is why resizing used to snap and needed a second detent kept
-/// around to animate towards. Interpolating the number and giving a new detent each frame
-/// is what actually moves it.
+/// Swapping one detent for another hands the system two unrelated values with nothing in
+/// between, so it can only cut. Interpolating the number and giving a new detent each
+/// frame is what actually moves the sheet -- which is why every size, full height
+/// included, arrives here as a number.
 private struct LocktySheetDetentModifier: ViewModifier, Animatable {
     var height: CGFloat
-    var sizes: [LocktyDynamicSheetSize]?
+    /// Set only when the screen named several sizes and can therefore be dragged.
+    var resizableDetents: Set<PresentationDetent>?
 
     var animatableData: CGFloat {
         get { height }
         set { height = newValue }
     }
 
-    /// What the screen asked for, or the height it measured.
-    ///
-    /// One detent is a sheet that cannot be dragged anywhere, which is the point when the
-    /// sheet is the size of its content. Several is the only case where dragging means
-    /// something, and then it is resizable.
     private var detents: Set<PresentationDetent> {
-        guard let sizes, !sizes.isEmpty else {
-            return height == .zero ? [.medium] : [.height(height)]
-        }
-        return Set(sizes.map(detent(for:)))
-    }
-
-    private func detent(for size: LocktyDynamicSheetSize) -> PresentationDetent {
-        switch size {
-        case .fit: height == .zero ? .medium : .height(height)
-        case .small: .fraction(0.33)
-        case .medium: .medium
-        case .large: .large
-        }
+        if let resizableDetents { return resizableDetents }
+        // One detent, so there is nothing to drag to.
+        return height == .zero ? [.medium] : [.height(height)]
     }
 
     func body(content: Content) -> some View {

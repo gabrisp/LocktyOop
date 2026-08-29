@@ -607,7 +607,7 @@ struct RoutineEditorView: View {
         }
     }
 
-    private var sheetAnimation: Animation { .snappy(duration: 0.8, extraBounce: 0.1) }
+    private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.1) }
 
     /// Which way the screens travel. Going deeper the new screen comes in from the right
     /// and the old one leaves to the left; coming back, both reverse. Without this every

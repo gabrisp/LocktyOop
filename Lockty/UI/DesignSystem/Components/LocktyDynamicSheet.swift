@@ -108,19 +108,14 @@ struct LocktyDynamicSheet<Content: View>: View {
     }
 
     var body: some View {
+        // No fixedSize anywhere. Forcing the ideal vertical size collapses a
+        // NavigationStack to nothing -- it has no ideal height, it takes what it is
+        // given -- which is why a sheet built around one came up empty. Height comes
+        // only from what the screen inside reports through locktySheetContent().
         content
             .transition(.blurReplace.combined(with: .opacity))
             .id(contentID)
             .animation(animation, value: contentID)
-            // Only when nothing inside is reporting its own height: a plain content view
-            // can be measured directly, a NavigationStack cannot.
-            .fixedSize(horizontal: false, vertical: reportedHeight == 0)
-            .onGeometryChange(for: CGSize.self) { proxy in
-                proxy.size
-            } action: { _, newValue in
-                guard reportedHeight == 0 else { return }
-                updateHeight(newValue.height)
-            }
             .onPreferenceChange(LocktySheetContentHeightKey.self) { newValue in
                 guard newValue > 0 else { return }
                 reportedHeight = newValue

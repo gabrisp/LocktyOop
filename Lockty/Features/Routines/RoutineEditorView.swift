@@ -566,6 +566,7 @@ struct RoutineEditorView: View {
                     onClose: { closePicker() },
                     onDone: { closePicker() }
                 )
+                .locktySheetExpanded()
             } else {
                 NavigationStack {
                     editorContent

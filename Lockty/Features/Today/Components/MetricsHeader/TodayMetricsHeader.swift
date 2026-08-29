@@ -7,6 +7,10 @@ struct TodayMetricsHeader: View {
     var topInset: CGFloat = 0
     /// Extra height the backdrop must cover for chrome pinned below the rings.
     var additionalBackdropHeight: CGFloat = 0
+    /// Height of chrome pinned ABOVE the rings. The backdrop is anchored to this view's
+    /// own frame, so anything sitting above it has to be paid for twice: once in height,
+    /// once as an upward offset, or the gradient starts below the screen top.
+    var backdropTopOverhang: CGFloat = 0
     var onMetricSelected: ((PrimaryMetric) -> Void)?
 
     private var geometry: MetricsHeaderGeometry {
@@ -23,7 +27,7 @@ struct TodayMetricsHeader: View {
     /// Exactly the area the backdrop should cover: the safe area above the header plus
     /// the header's own current content height (which shrinks as it collapses), plus 2.
     private var backdropHeight: CGFloat {
-        safeAreaTop + geometry.height + topInset + additionalBackdropHeight + 6
+        safeAreaTop + backdropTopOverhang + geometry.height + topInset + additionalBackdropHeight + 6
     }
 
     var body: some View {
@@ -56,6 +60,7 @@ struct TodayMetricsHeader: View {
             )
             .frame(maxWidth: .infinity)
             .frame(height: backdropHeight)
+            .offset(y: -backdropTopOverhang)
             // Invisible while expanded, fading in as the header collapses.
             .opacity(collapseProgress)
             .ignoresSafeArea(edges: .top)

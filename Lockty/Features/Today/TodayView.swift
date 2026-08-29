@@ -6,6 +6,9 @@ struct TodayView: View {
     @Bindable var router: AppRouter
 
     @State private var scrollOffset: CGFloat = 0
+    /// Routines/Pauses hide on a downward scroll and come back the moment the finger
+    /// goes the other way, independently of how collapsed the rings are.
+    @State private var areShortcutsHidden = false
 
     private var state: TodayDayState {
         viewModel.state(for: day)
@@ -35,19 +38,32 @@ struct TodayView: View {
         MetricsHeaderGeometry(progress: collapseProgress)
     }
 
-    /// Routines/Pauses sit directly under the rings and stay pinned with them, so this
-    /// tracks the header's shrinking height rather than being a fixed offset.
+    private var shortcutHideProgress: CGFloat {
+        areShortcutsHidden ? 1 : 0
+    }
+
+    /// The vertical space the shortcut row occupies, which collapses to nothing as it
+    /// hides so everything below it rides up.
+    private var shortcutBlockHeight: CGFloat {
+        (shortcutRowHeight + topChromeSpacing) * (1 - shortcutHideProgress)
+    }
+
+    private var dateSliderBlockHeight: CGFloat {
+        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
+    }
+
+    /// Routines/Pauses sit above the rings now, pinned between the date slider and them.
     private var shortcutRowOffsetY: CGFloat {
-        metricsHeaderOffsetY + headerTopInset + metricsGeometry.height + topChromeSpacing
+        dateSliderBlockHeight + headerTopInset
     }
 
     private var topChromeExpandedHeight: CGFloat {
         DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
-            + MetricsHeaderGeometry.expandedHeight + topChromeSpacing + shortcutRowHeight
+            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
     }
 
     private var metricsHeaderOffsetY: CGFloat {
-        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
+        dateSliderBlockHeight + shortcutBlockHeight
     }
 
     /// Shrinks away as the header collapses. This used to lerp and was flattened to a
@@ -106,7 +122,7 @@ struct TodayView: View {
                 metrics: state.primaryMetrics.metrics,
                 collapseProgress: collapseProgress,
                 topInset: headerTopInset,
-                additionalBackdropHeight: topChromeSpacing + shortcutRowHeight,
+                backdropTopOverhang: shortcutBlockHeight,
                 onMetricSelected: { metric in
                     switch metric.kind {
                     case .productivity: router.presentSheet(.productivityDetail(day))
@@ -117,8 +133,9 @@ struct TodayView: View {
             )
             .offset(y: metricsHeaderOffsetY)
 
-            // Directly under the rings, and pinned along with them: unlike the date
-            // slider these don't fade, they stay reachable while scrolling.
+            // Above the rings and pinned with them. They fade out on a downward scroll
+            // and the rings ride up into the space; a scroll up brings them straight
+            // back, even while the rings stay collapsed.
             HStack(spacing: LocktySpacing.sm) {
                 TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
                     router.push(.routinesList)
@@ -129,9 +146,26 @@ struct TodayView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .frame(height: shortcutRowHeight)
+            .opacity(1 - shortcutHideProgress)
             .offset(y: shortcutRowOffsetY)
+            .allowsHitTesting(!areShortcutsHidden)
         }
         .offset(y: overscrollPullDistance)
+    }
+
+    /// Hides the shortcut row while the content is being pulled up, and reveals it on
+    /// any upward movement. Direction, not absolute offset, so it comes back without
+    /// having to scroll all the way to the top.
+    private func updateShortcutVisibility(from oldValue: CGFloat, to newValue: CGFloat) {
+        let delta = newValue - oldValue
+        // Small deltas are bounce and rubber-banding, not a deliberate scroll.
+        guard abs(delta) > 2 else { return }
+
+        let shouldHide = delta > 0 && newValue > MetricsHeaderGeometry.collapseDistance
+        guard shouldHide != areShortcutsHidden else { return }
+        withAnimation(.smooth(duration: 0.3)) {
+            areShortcutsHidden = shouldHide
+        }
     }
 
     private var scrollContent: some View {
@@ -239,8 +273,9 @@ struct TodayView: View {
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
-        } action: { _, newValue in
+        } action: { oldValue, newValue in
             scrollOffset = newValue
+            updateShortcutVisibility(from: oldValue, to: newValue)
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
     }

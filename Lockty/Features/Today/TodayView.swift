@@ -255,16 +255,16 @@ struct TodayView: View {
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
-//                if let checklist = state.activeRoutineChecklist {
-//                    ActiveRoutineChecklistCard(
-//                        state: checklist,
-//                        onToggle: { item in
-//                            Task {
-//                                await viewModel.toggleActiveRoutineTask(item.id, day: day)
-//                            }
-//                        }
-//                    )
-//                }
+                if let checklist = state.activeRoutineChecklist {
+                    ActiveRoutineChecklistCard(
+                        state: checklist,
+                        onToggle: { item in
+                            Task {
+                                await viewModel.toggleActiveRoutineTask(item.id, day: day)
+                            }
+                        }
+                    )
+                }
 
                 // There is no loading layout at all. The screen used to swap itself for a
                 // spinner card, so everything mounted and jumped into place once the
@@ -302,6 +302,21 @@ struct TodayView: View {
 //                        }
 //                    }
 //                }
+
+                // Order on Today: checklist, the running mode, then usage. The mode card
+                // only exists while something is actually running.
+                if let activeRoutine = viewModel.activeRoutine {
+                    ActiveModeCard(
+                        routine: activeRoutine,
+                        tokens: viewModel.activeRoutineTokens,
+                        onOpenApps: {
+                            router.presentSheet(.liveSession)
+                        },
+                        onUnlock: { _ in
+                            router.presentSheet(.liveSession)
+                        }
+                    )
+                }
 
                 AppUsageListCard(state: state) { appUsage, classification in
                     viewModel.updateClassification(

@@ -69,7 +69,22 @@ extension AppIdentity.ID {
             return
         }
 
-        self.init(rawValue: "token.\(String(describing: token))")
+        self.init(rawValue: AppIdentity.ID.tokenIdentifier(for: token))
+    }
+
+    /// A stable, genuinely distinct id for a token with nothing else to go on.
+    ///
+    /// This used to be `String(describing: token)`, which prints the same text for every
+    /// ApplicationToken -- so every app on the device collapsed into one identity. A
+    /// routine blocking eleven apps resolved to a policy with one, every stored selection
+    /// looked like a subset of every policy, and the merge then unioned every record it
+    /// had: twenty scopes, twenty-four apps and three whole categories shielded at once.
+    /// The encoded token is unique per app and stable across launches.
+    nonisolated static func tokenIdentifier(for token: ManagedSettings.ApplicationToken) -> String {
+        guard let data = try? JSONEncoder().encode(token) else {
+            return "token.unknown"
+        }
+        return "token.\(data.base64EncodedString())"
     }
 }
 
@@ -126,5 +141,20 @@ extension AppIdentity {
             iconSystemName: iconSystemName,
             iconSource: .screenTimeToken
         )
+    }
+}
+
+extension String {
+    /// A UUID derived from this string, so an unlock request for an app that no routine
+    /// owns still has a stable id to key its notification and its pending event on.
+    nonisolated var stableUUID: UUID {
+        var bytes = Array(Data(utf8).prefix(16))
+        while bytes.count < 16 { bytes.append(0) }
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }

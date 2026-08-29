@@ -62,6 +62,16 @@ extension ScreenTimeSelectionRecord {
             || !selection.webDomainTokens.isEmpty
         guard hasAnySelection else { return false }
 
+        // A record that resolves to no application ids at all is not "covered by every
+        // policy" -- the empty set is a subset of anything, so without this a record
+        // whose ids could not be derived was merged into every shield.
+        guard !blockedApplications.isEmpty || !selection.applicationTokens.isEmpty else {
+            return false
+        }
+        if !selection.applicationTokens.isEmpty && blockedApplications.isEmpty {
+            return false
+        }
+
         // Exempt apps count as covered: a pause allowance removes the released app from
         // blockedApplications, and without this the routine record that also contains
         // that app stopped being a subset, so the merge dropped the record whole and

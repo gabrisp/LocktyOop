@@ -41,11 +41,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
     ) {
         switch action {
         case .primaryButtonPressed:
-            guard let context = makeUnlockRequest(for: applicationToken) else {
-                completionHandler(.close)
-                return
-            }
-
+            let context = makeUnlockRequest(for: applicationToken)
             writePendingPause(context)
 
             // The open is attempted first so it has the foreground request in flight
@@ -69,24 +65,30 @@ final class ShieldActionExtension: ShieldActionDelegate {
     }
 
     /// Builds the request from the running routine's own pause policy.
-    private func makeUnlockRequest(for token: ApplicationToken) -> PauseContext? {
-        guard let runtime = try? appGroupStore.loadRuntimeState(),
-              let activeRoutine = runtime.activeRoutine,
-              activeRoutine.pausePolicySnapshot.offersPause
-        else { return nil }
+    ///
+    /// Always returns one. It used to return nil when there was no active routine or the
+    /// routine had no pause configured, and the caller answered .close on nil -- so the
+    /// primary button's only visible effect was shutting the app. The standard flow
+    /// stands in for every case it cannot read a policy for.
+    private func makeUnlockRequest(for token: ApplicationToken) -> PauseContext {
+        let runtime = try? appGroupStore.loadRuntimeState()
+        let activeRoutine = runtime?.activeRoutine
+        let policy = activeRoutine
+            .map(\.pausePolicySnapshot)
+            .flatMap { $0.offersPause ? $0 : nil }
+            ?? RoutinePausePolicy()
 
-        let policy = activeRoutine.pausePolicySnapshot
         let application = Application(token: token)
         let identity = AppIdentity(token: token)
 
         return PauseContext(
-            pauseRuleID: activeRoutine.routineID,
+            pauseRuleID: activeRoutine?.routineID ?? identity.id.rawValue.stableUUID,
             appID: identity.id,
             applicationToken: token,
             displayName: application.localizedDisplayName ?? identity.displayName,
             allowanceDuration: policy.allowanceDuration,
             steps: policy.steps,
-            activeRoutineID: activeRoutine.routineID,
+            activeRoutineID: activeRoutine?.routineID,
             source: .shieldAction
         )
     }

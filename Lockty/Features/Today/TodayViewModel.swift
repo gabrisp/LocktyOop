@@ -1,5 +1,7 @@
-import Foundation
 import Combine
+import FamilyControls
+import Foundation
+import ManagedSettings
 import OSLog
 import SwiftUI
 
@@ -11,12 +13,30 @@ private func todayLogger() -> Logger {
 final class TodayViewModel: ObservableObject {
     private let dataProvider: TodayDataProviding
     private let routineEngine: RoutineEngine
+    private let selectionStore: ScreenTimeSelectionStore
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
 
-    init(dataProvider: TodayDataProviding, routineEngine: RoutineEngine) {
+    init(
+        dataProvider: TodayDataProviding,
+        routineEngine: RoutineEngine,
+        selectionStore: ScreenTimeSelectionStore
+    ) {
         self.dataProvider = dataProvider
         self.routineEngine = routineEngine
+        self.selectionStore = selectionStore
+    }
+
+    var activeRoutine: ActiveRoutine? {
+        routineEngine.activeRoutine()
+    }
+
+    /// The apps the running routine is holding shut, as tokens so their real icons can
+    /// be drawn. The routine's stored ids can't produce a token, only the selection can.
+    var activeRoutineTokens: [ApplicationToken] {
+        guard let activeRoutine else { return [] }
+        let selection = (try? selectionStore.load(scope: .routine(activeRoutine.routineID)))?.applicationTokens ?? []
+        return selection.stablePrefix(selection.count)
     }
 
     func load(day: Date, force: Bool = false) async {

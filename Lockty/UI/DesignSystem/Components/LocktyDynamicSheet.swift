@@ -363,12 +363,14 @@ struct LocktyDynamicSheetBarButton<Label: View>: View {
 
     var body: some View {
         Button(action: action) {
+            // Bare glyph, no glass behind it: the bar is not a surface, so a button that
+            // brings its own reads as a chip stuck onto it.
             label
                 .foregroundStyle(LocktyColors.primaryText)
                 .frame(minWidth: 44, minHeight: 44)
-                .safeGlass(radius: 22, interactive: true)
+                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()
     }
 }

@@ -237,11 +237,6 @@ struct TodayView: View {
         }
     }
 
-    /// Whether the day's numbers are still standing in for real ones.
-    private var isAwaitingData: Bool {
-        state.loadingState != .loaded
-    }
-
     private var scrollContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
@@ -271,17 +266,10 @@ struct TodayView: View {
 //                    )
 //                }
 
-                // The whole loading branch is gone. It used to swap the screen for a
+                // There is no loading layout at all. The screen used to swap itself for a
                 // spinner card, so everything mounted and jumped into place once the
-                // report landed. The real layout is always on screen now, holding
-                // placeholder values, redacted and blurred until the data arrives --
-                // then the values fill in and the blur lifts.
-                if case .unavailable(let message) = state.loadingState {
-                    Text(message)
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.tertiaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                // report landed. The real cards are on screen from the first frame; each
+                // individual unknown value inside them blurs itself until it is known.
 
 //                DailyPerspectiveStackSection(
 //                    perspectives: viewModel.visiblePerspectives(for: day),
@@ -322,10 +310,6 @@ struct TodayView: View {
                         day: day
                     )
                 }
-                .redacted(reason: isAwaitingData ? .placeholder : [])
-                .blur(radius: isAwaitingData ? 5 : 0)
-                .disabled(isAwaitingData)
-                .animation(.smooth(duration: 0.35), value: isAwaitingData)
 
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)

@@ -2,6 +2,12 @@ import SwiftUI
 
 struct AppUsageListCard: View {
     let state: TodayDayState
+
+    /// Whether the numbers in this card are placeholders. Used per value, never on the
+    /// card as a whole: the labels, the divider and the layout are real from the start.
+    private var isPlaceholder: Bool {
+        state.loadingState != .loaded
+    }
     let onClassificationChange: (AppUsageState, AppClassification) -> Void
     let onAppSelected: ((AppUsageState) -> Void)? = nil
 
@@ -51,7 +57,8 @@ struct AppUsageListCard: View {
                             ForEach(visibleAppUsages) { appUsage in
                                 AppUsageSummaryRow(
                                     state: appUsage,
-                                    largestDuration: largestVisibleDuration
+                                    largestDuration: largestVisibleDuration,
+                                    isPlaceholder: isPlaceholder
                                 )
                             }
                         }
@@ -109,6 +116,7 @@ struct AppUsageListCard: View {
                 .locktyNumericTransition(trigger: totalDurationText)
                 .foregroundStyle(LocktyColors.primaryText)
                 .lineLimit(1)
+                .locktyPlaceholder(isPlaceholder)
                 .padding(.top, 4)
 
 //            Text("Hoy")
@@ -131,6 +139,7 @@ struct AppUsageListCard: View {
 private struct AppUsageSummaryRow: View {
     let state: AppUsageState
     let largestDuration: TimeInterval
+    var isPlaceholder = false
 
     /// Room kept for the duration so the longest bar still leaves space for it.
     private let durationColumnWidth: CGFloat = 64
@@ -160,12 +169,14 @@ private struct AppUsageSummaryRow: View {
                 size: 50,
                 chrome: .plain
             )
+            .locktyPlaceholder(isPlaceholder)
 
             VStack(alignment: .leading, spacing: 0) {
                 LocktyAppNameText(app: state.app, scale: 0.86)
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .lineLimit(1)
+                    .locktyPlaceholder(isPlaceholder)
 
                 // The duration sits right after the bar ends, not pinned to the far
                 // right: the bar used to take all the remaining width, which pushed the
@@ -179,6 +190,7 @@ private struct AppUsageSummaryRow: View {
                         Capsule(style: .continuous)
                             .fill(barColor)
                             .frame(width: max(22, available * progress), height: 4)
+                            .locktyPlaceholder(isPlaceholder)
 
                         Text(state.durationText)
                             .font(.system(.subheadline, design: .default, weight: .regular))
@@ -187,6 +199,7 @@ private struct AppUsageSummaryRow: View {
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .locktyNumericTransition(trigger: state.durationText)
+                            .locktyPlaceholder(isPlaceholder)
 
                         Spacer(minLength: 0)
                     }

@@ -127,6 +127,14 @@ final class RoutineEditorViewModel: ObservableObject {
         routineEngine.activeRoutine()
     }
 
+    /// Ends the routine this editor is showing, when it is the one running.
+    func stopRoutine() async {
+        await routineEngine.stop()
+        if case .failed(let message) = routineEngine.state {
+            errorMessage = message
+        }
+    }
+
     /// Manual start from the routine's own sheet (hold-to-start).
     func startRoutine() async {
         guard let initialRoutineID,
@@ -1285,6 +1293,31 @@ struct RoutineEditorView: View {
             if !trimmedReadOnlyTasks.isEmpty {
                 sectionHeading("To Do", systemImage: "checklist")
                 readOnlyTasksCard
+            }
+
+            // Start it, or end it if it is the one running. While a different routine
+            // is running there is no button at all: starting this one would mean
+            // stopping that one, which is not a decision this button should make.
+            if isRoutineActive {
+                LocktyHoldButton(
+                    title: "Mantén para finalizar",
+                    systemImage: "stop.circle",
+                    tint: LocktyColors.unproductive
+                ) {
+                    Task {
+                        await viewModel.stopRoutine()
+                        close()
+                    }
+                }
+                .padding(.top, LocktySpacing.sm)
+            } else if viewModel.activeRoutine() == nil {
+                LocktyHoldButton(title: "Mantén para empezar", systemImage: "play.fill") {
+                    Task {
+                        await startRoutine()
+                        close()
+                    }
+                }
+                .padding(.top, LocktySpacing.sm)
             }
         }
         .padding(.horizontal, LocktySpacing.lg)

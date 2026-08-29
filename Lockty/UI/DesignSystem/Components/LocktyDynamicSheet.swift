@@ -75,7 +75,10 @@ extension EnvironmentValues {
 private struct LocktyDynamicSheetChromeModifier<Center: View, Leading: View, Trailing: View>: ViewModifier {
     @Environment(\.locktyDynamicSheetChromeController) private var chromeController
 
-    let ownerID = UUID()
+    /// @State, not a stored let. A ViewModifier is a struct rebuilt on every body pass,
+    /// so a plain `let ownerID = UUID()` is a different id each time -- what registered
+    /// and what tries to unregister never match, and nothing is ever cleared.
+    @State private var ownerID = UUID()
     let updateID: AnyHashable
     let center: Center
     let leading: Leading
@@ -106,7 +109,10 @@ private struct LocktyDynamicSheetChromeModifier<Center: View, Leading: View, Tra
 private struct LocktyDynamicSheetSizesModifier: ViewModifier {
     @Environment(\.locktyDynamicSheetChromeController) private var chromeController
 
-    let ownerID = UUID()
+    /// Same reason as the chrome modifier: a regenerated id meant clearSizes never
+    /// matched, so the sheet stayed on the size the screen it left had asked for and
+    /// never went back to measuring the content.
+    @State private var ownerID = UUID()
     let sizes: [LocktyDynamicSheetSize]
 
     func body(content: Content) -> some View {

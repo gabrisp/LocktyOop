@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 import UserNotifications
 
 final class StartupCoordinator: ObservableObject {
@@ -51,10 +52,7 @@ final class StartupCoordinator: ObservableObject {
             await requestNotificationsIfNeeded()
 
             let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
-            router.pendingUnlock = presentedPause?.context
-            if let presentedPause {
-                clearUnlockNotification(for: presentedPause.context.pauseRuleID)
-            }
+            present(presentedPause)
 
             consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
         } catch {
@@ -80,10 +78,7 @@ final class StartupCoordinator: ObservableObject {
         // whatever the user was doing is also what made it loop, since pendingPause
         // survives until the flow is actually answered.
         let presentedPause = runtimeState.pendingPause.flatMap { $0.isValid ? $0 : nil }
-        router.pendingUnlock = presentedPause?.context
-        if let presentedPause {
-            clearUnlockNotification(for: presentedPause.context.pauseRuleID)
-        }
+        present(presentedPause)
 
         consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
     }
@@ -97,6 +92,24 @@ final class StartupCoordinator: ObservableObject {
     private func requestNotificationsIfNeeded() async {
         guard await notificationService.refreshAuthorization() == .notDetermined else { return }
         _ = await notificationService.requestAuthorization()
+    }
+
+    /// Puts the unlock request on screen, on the screen that shows it.
+    ///
+    /// The shield opens Lockty straight into whatever tab it was left on, and the card
+    /// lives on Today -- so arriving from a blocked app could land on Routines with the
+    /// request nowhere in sight.
+    private func present(_ presentedPause: PendingPauseContext?) {
+        guard let presentedPause else {
+            router.pendingUnlock = nil
+            return
+        }
+
+        withAnimation(.smooth(duration: 0.3)) {
+            router.select(.today)
+            router.pendingUnlock = presentedPause.context
+        }
+        clearUnlockNotification(for: presentedPause.context.pauseRuleID)
     }
 
     /// The shield posts a notification alongside opening the app, because it cannot tell
@@ -150,7 +163,10 @@ final class StartupCoordinator: ObservableObject {
         switch event.payload {
         case .pauseRequested(let context):
             guard !pauseAlreadyPresented else { return }
-            router.pendingUnlock = context
+            withAnimation(.smooth(duration: 0.3)) {
+                router.select(.today)
+                router.pendingUnlock = context
+            }
         case .routineStartRequested:
             break
         case .settingsRequested:

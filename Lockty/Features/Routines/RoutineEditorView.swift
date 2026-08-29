@@ -605,7 +605,9 @@ struct RoutineEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            if !isEditing {
+            // Hidden only while editing an existing routine, where the checkmark
+            // returns to reading. Creating always keeps a way out.
+            if !isEditing || isCreating {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         close()
@@ -640,8 +642,9 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        // Dismissing mid-edit would silently drop the changes.
-        .interactiveDismissDisabled(isEditing)
+        // Only while editing an existing routine: creating one has an xmark and must
+        // stay dismissable, otherwise opening it by mistake leaves no way out.
+        .interactiveDismissDisabled(isEditing && !isCreating)
         .task {
             await viewModel.load()
         }

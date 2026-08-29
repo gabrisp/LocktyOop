@@ -6,9 +6,12 @@ struct DigitalBalanceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text("DIGITAL BALANCE")
-                .locktyEyebrow()
-                .padding(.top, 16)
+            LocktySectionTitle(
+                "Digital Balance",
+                info: "How your screen time was split across the day, coloured by how each app is classified. Taller bands mean heavier use in that part of the day.",
+                showsSeparator: false
+            )
+            .padding(.top, 16)
 
             Button(action: action) {
                 CardView(radius: LocktyRadius.large, padding: LocktySpacing.md, interactive: true) {

@@ -37,8 +37,14 @@ struct HomeView: View {
         }
         .animation(.smooth(duration: 0.3), value: activeRoutine?.id)
         .sheet(item: $router.sheet) { route in
-            destinationFactory.sheet(for: route)
-                .navigationTransition(.zoom(sourceID: route.id, in: liveSessionZoom))
+            // Only the live session zooms, and only from the bottom bar that opened it —
+            // every other sheet has no matching source and must present normally.
+            if route == .liveSession {
+                destinationFactory.sheet(for: route)
+                    .navigationTransition(.zoom(sourceID: SheetRoute.liveSession.id, in: liveSessionZoom))
+            } else {
+                destinationFactory.sheet(for: route)
+            }
         }
         .fullScreenCover(item: $router.fullScreen) { route in
             destinationFactory.fullScreen(for: route)

@@ -29,12 +29,24 @@ struct TodayView: View {
         6
     }
 
+    private var shortcutRowHeight: CGFloat { 52 }
+
+    /// Where the Routines/Pauses row sits: directly under the date slider.
+    private var shortcutRowOffsetY: CGFloat {
+        DayPageSliderMetrics.barHeight + topChromeSpacing
+    }
+
+    /// The slider and the shortcut row both collapse away, so the rings rise past both.
+    private var chromeAboveHeaderHeight: CGFloat {
+        DayPageSliderMetrics.barHeight + topChromeSpacing + shortcutRowHeight + topChromeSpacing
+    }
+
     private var topChromeExpandedHeight: CGFloat {
-        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset + MetricsHeaderGeometry.expandedHeight
+        chromeAboveHeaderHeight + headerTopInset + MetricsHeaderGeometry.expandedHeight
     }
 
     private var metricsHeaderOffsetY: CGFloat {
-        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
+        chromeAboveHeaderHeight * (1 - dateSliderHideProgress)
     }
 
     /// Shrinks away as the header collapses. This used to lerp and was flattened to a
@@ -88,6 +100,22 @@ struct TodayView: View {
             )
             .opacity(1 - dateSliderHideProgress)
             .offset(y: -dateSliderHideProgress * 12)
+
+            // Routines and Pauses replaced the tabs. They sit between the calendar and
+            // the rings, and fade out with the slider as the header collapses.
+            HStack(spacing: LocktySpacing.sm) {
+                TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
+                    router.push(.routinesList)
+                }
+                TodaySectionShortcut(title: "Pauses", systemImage: "pause.circle") {
+                    router.push(.pausesList)
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .frame(height: shortcutRowHeight)
+            .offset(y: shortcutRowOffsetY)
+            .opacity(1 - dateSliderHideProgress)
+            .allowsHitTesting(dateSliderHideProgress < 0.05)
 
             TodayMetricsHeader(
                 metrics: state.primaryMetrics.metrics,
@@ -159,26 +187,12 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
-                // Routines and Pauses replaced the tabs, so they're reached from here.
-                HStack(spacing: LocktySpacing.sm) {
-                    TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
-                        router.presentSheet(.routinesList)
-                    }
-                    TodaySectionShortcut(title: "Pauses", systemImage: "pause.circle") {
-                        router.presentSheet(.pausesList)
-                    }
-                }
-
                 DailyPerspectiveStackSection(
                     perspectives: viewModel.visiblePerspectives(for: day),
                     onDismiss: { perspective in
                         viewModel.dismissPerspective(perspective.id, day: day)
                     }
                 )
-                // Cancel the column's horizontal padding and re-apply it inside the
-                // section, so the swipe-out is clipped at the screen edge rather than
-                // at the padding inset (which looked cut off mid-card).
-                .padding(.horizontal, -LocktySpacing.md)
 
                 MyDaySection(activities: state.activities)
 
@@ -187,9 +201,12 @@ struct TodayView: View {
                 }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Text("BREAKDOWN")
-                        .locktyEyebrow()
-                        .padding(.top, 16)
+                    LocktySectionTitle(
+                        "Breakdown",
+                        info: "Headline numbers for the day. Tap any card to see what went into it.",
+                        showsSeparator: false
+                    )
+                    .padding(.top, 16)
                 TodayMetricGrid(state: state) { metric in
                     switch metric {
                     case .screenTime: router.presentSheet(.screenTimeDetail(day))

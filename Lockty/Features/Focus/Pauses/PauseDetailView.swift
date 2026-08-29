@@ -58,11 +58,10 @@ struct PauseDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Rectangle()
-                            .fill(LocktyColors.separator)
-                            .frame(height: 0.5)
-                        Text("FLOW")
-                            .locktyEyebrow()
+                        LocktySectionTitle(
+                            "Flow",
+                            info: "The steps you go through before this app opens. They run in this order every time."
+                        )
 
                         CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -78,11 +77,10 @@ struct PauseDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Rectangle()
-                            .fill(LocktyColors.separator)
-                            .frame(height: 0.5)
-                        Text("RECENT EVENTS")
-                            .locktyEyebrow()
+                        LocktySectionTitle(
+                            "Recent Events",
+                            info: "Every time this Pause was triggered and what you decided: Abandoned means you closed the app instead of continuing."
+                        )
 
                         CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {

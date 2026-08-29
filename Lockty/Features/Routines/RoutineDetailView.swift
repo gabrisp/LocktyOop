@@ -167,11 +167,10 @@ struct RoutineDetailView: View {
 
                     if !routine.tasks.isEmpty {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Rectangle()
-                                .fill(LocktyColors.separator)
-                                .frame(height: 0.5)
-                            Text("CHECKLIST")
-                                .locktyEyebrow()
+                            LocktySectionTitle(
+                                "Checklist",
+                                info: "Tasks to work through while this routine runs. Ticking them off applies to the current run only."
+                            )
 
                             CardView {
                                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -187,11 +186,10 @@ struct RoutineDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Rectangle()
-                            .fill(LocktyColors.separator)
-                            .frame(height: 0.5)
-                        Text("RECENT RUNS")
-                            .locktyEyebrow()
+                        LocktySectionTitle(
+                            "Recent Runs",
+                            info: "The last times this routine ran, with how long each one lasted. A run still going shows as Active."
+                        )
 
                         CardView {
                             VStack(alignment: .leading, spacing: LocktySpacing.sm) {

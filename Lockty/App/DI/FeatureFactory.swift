@@ -57,14 +57,14 @@ struct FeatureFactory {
         }
     }
 
-    func makeRoutinesListSheet() -> some View {
-        LocktySectionSheet(title: "Routines") {
+    func makeRoutinesList() -> some View {
+        LocktySectionScreen(title: "Routines") {
             RoutinesView(viewModel: routinesViewModel, router: router)
         }
     }
 
-    func makePausesListSheet() -> some View {
-        LocktySectionSheet(title: "Pauses") {
+    func makePausesList() -> some View {
+        LocktySectionScreen(title: "Pauses") {
             PausesView(viewModel: pausesViewModel, router: router)
         }
     }

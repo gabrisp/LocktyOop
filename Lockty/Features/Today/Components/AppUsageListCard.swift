@@ -17,12 +17,11 @@ struct AppUsageListCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            HStack {
-                Text("APPS")
-                    .locktyEyebrow()
-
-                Spacer()
-
+            LocktySectionTitle(
+                "Apps",
+                info: "Time per app for this day. Set an app as productive, neutral or unproductive to change how it counts towards your numbers.",
+                showsSeparator: false
+            ) {
                 Text("\(state.appUsages.count)")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(LocktyColors.tertiaryText)

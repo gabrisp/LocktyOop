@@ -15,6 +15,12 @@ struct DestinationFactory {
         case .settings:
             featureFactory.makeSettingsView()
 
+        case .routinesList:
+            featureFactory.makeRoutinesList()
+
+        case .pausesList:
+            featureFactory.makePausesList()
+
         case .pauseDetail(let id):
             featureFactory.makePauseDetail(pauseID: id)
 
@@ -40,12 +46,6 @@ struct DestinationFactory {
 
         case .liveSession:
             featureFactory.makeLiveSessionSheet()
-
-        case .routinesList:
-            featureFactory.makeRoutinesListSheet()
-
-        case .pausesList:
-            featureFactory.makePausesListSheet()
 
         case .routineEditor(let route):
             featureFactory.makeRoutineEditor(route: route)

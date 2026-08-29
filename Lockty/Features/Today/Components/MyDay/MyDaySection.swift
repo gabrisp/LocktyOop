@@ -13,9 +13,12 @@ struct MyDaySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text("MY DAY")
-                .locktyEyebrow()
-                .padding(.top, 16)
+            LocktySectionTitle(
+                "My Day",
+                info: "Your day as a timeline: routines, focus periods, detox gaps and distractions, in the order they happened. Tap any entry for its details.",
+                showsSeparator: false
+            )
+            .padding(.top, 16)
 
             if activities.isEmpty {
                 CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {

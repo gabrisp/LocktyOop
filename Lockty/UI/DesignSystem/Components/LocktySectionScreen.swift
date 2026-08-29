@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Wrapper for the sheets that replaced the old tabs: a title, the section's own
-/// content, and nothing else — no navigation chrome.
-struct LocktySectionSheet<Content: View>: View {
+/// Wrapper for the screens that replaced the old tabs. They're pushed onto the
+/// navigation stack, so their own sheets (editors, pickers) present on top of them.
+struct LocktySectionScreen<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
 
@@ -18,7 +18,7 @@ struct LocktySectionSheet<Content: View>: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .locktyScreenBackground()
+        .toolbarVisibility(.hidden, for: .navigationBar)
     }
 }

@@ -34,9 +34,6 @@ struct DailyPerspectiveStackSection: View {
                 .zIndex(Double(visiblePerspectives.count - index))
             }
         }
-        // Padding lives inside the clip so cards sit inset from the screen edge while
-        // the fly-out still runs all the way to that edge before being clipped.
-        .padding(.horizontal, LocktySpacing.md)
         .padding(.bottom, peekInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()

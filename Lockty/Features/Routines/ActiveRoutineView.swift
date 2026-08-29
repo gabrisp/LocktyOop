@@ -135,11 +135,10 @@ struct ActiveRoutineView: View {
                     }
 
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Rectangle()
-                            .fill(LocktyColors.separator)
-                            .frame(height: 0.5)
-                        Text("CHECKLIST")
-                            .locktyEyebrow()
+                        LocktySectionTitle(
+                            "Checklist",
+                            info: "Tasks for this run. Tap one to tick it off, tap again to undo."
+                        )
 
                         CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {

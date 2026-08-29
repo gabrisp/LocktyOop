@@ -306,22 +306,11 @@ private struct LocktyDynamicSheetChromeOverlay: View {
             .padding(.horizontal, LocktySpacing.md)
             .padding(.top, LocktySpacing.xs)
             .padding(.bottom, LocktySpacing.sm)
+            // No background. A material paints its own tinted surface over whatever is
+            // behind it, which made the bar read as a panel sitting on the content
+            // rather than as part of the sheet.
             .background(alignment: .top) {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.3)
-                    .mask {
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0),
-                                .init(color: .black, location: 0.72),
-                                .init(color: .black.opacity(0.55), location: 0.9),
-                                .init(color: .clear, location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
+                Color.clear.blur(radius: 18)
             }
     }
 

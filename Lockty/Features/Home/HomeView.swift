@@ -13,6 +13,10 @@ struct HomeView: View {
             Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
                 NavigationStack(path: $router.todayPath) {
                     featureFactory.makeTodayView(day: router.selectedDay)
+                        // Painted inside the NavigationStack: applying it only at
+                        // RootView left it behind the TabView/NavigationStack
+                        // containers, which draw over it, so the aura never showed.
+                        .locktyScreenBackground()
                         .navigationDestination(for: AppRoute.self) { route in
                             destinationFactory.destination(for: route)
                         }
@@ -24,6 +28,7 @@ struct HomeView: View {
             Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
                 NavigationStack(path: $router.focusPath) {
                     featureFactory.makeFocusView()
+                        .locktyScreenBackground()
                         .navigationDestination(for: AppRoute.self) { route in
                             destinationFactory.destination(for: route)
                         }

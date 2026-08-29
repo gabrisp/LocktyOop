@@ -35,7 +35,14 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
         let activeRoutine = runtime?.activeRoutine
-        let offersUnlock = activeRoutine?.pausePolicySnapshot.offersPause == true
+        // Strict mode is the only thing that takes the unlock button away. It used to
+        // hang on the routine's stored pause policy, so a routine saved without one
+        // showed a shield whose only button closed the app -- and the standard
+        // wait-then-confirm flow, which the action extension always falls back to, was
+        // never reachable.
+        let offersUnlock = activeRoutine.map { routine in
+            routine.modeSnapshot != .strict || routine.allowsPauseDuringStrictMode
+        } ?? false
 
         let subtitle = activeRoutine.map { routine in
             offersUnlock

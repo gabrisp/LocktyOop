@@ -52,11 +52,6 @@ final class PauseAllowanceLiveActivityController: PauseAllowanceLiveActivityCont
     }
 
     func end() async {
-        #if canImport(ActivityKit)
-        guard #available(iOS 16.1, *) else { return }
-        for activity in Activity<PauseAllowanceActivityAttributes>.activities {
-            await activity.end(nil, dismissalPolicy: .immediate)
-        }
-        #endif
+        await PauseAllowanceLiveActivityTermination.endAll()
     }
 }

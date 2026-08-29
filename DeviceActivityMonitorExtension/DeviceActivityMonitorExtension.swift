@@ -67,7 +67,10 @@ private struct RuntimeRepairCoordinator {
 
         runtimeState.activeRoutine = nil
         runtimeState.activeBreak = nil
+        runtimeState.activePauseAllowance = nil
+        runtimeState.pendingPause = nil
         try? store.saveRuntimeState(runtimeState)
+        PauseAllowanceLiveActivityTermination.endAllDetached()
         repairRuntimeState(activityName: activityName)
     }
 
@@ -80,6 +83,11 @@ private struct RuntimeRepairCoordinator {
                 state.activePauseAllowance = nil
                 state.pendingPause = nil
             }
+            // The countdown on the Lock Screen is the allowance. Reaching the threshold
+            // is the allowance ending, so the activity has to end with it -- it used to
+            // be left running against an allowance that no longer existed, still ticking
+            // down over apps this call has already re-shielded.
+            PauseAllowanceLiveActivityTermination.endAllDetached()
         }
         repairRuntimeState(activityName: activity.rawValue)
     }
@@ -91,6 +99,7 @@ private struct RuntimeRepairCoordinator {
            runtimeState.activePauseAllowance?.isExpired == true {
             runtimeState.activePauseAllowance = nil
             runtimeState.pendingPause = nil
+            PauseAllowanceLiveActivityTermination.endAllDetached()
         }
 
         if activityName.hasPrefix("lockty.break."),

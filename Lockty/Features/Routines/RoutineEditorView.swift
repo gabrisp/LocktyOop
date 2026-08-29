@@ -1311,6 +1311,11 @@ struct RoutineEditorView: View {
                 ) {
                     Task {
                         await viewModel.stopRoutine()
+                        // The card on Today is a request against the routine that was
+                        // running. Ending the routine answers it.
+                        withAnimation(.smooth(duration: 0.28)) {
+                            router.pendingUnlock = nil
+                        }
                         close()
                     }
                 }

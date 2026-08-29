@@ -76,7 +76,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
         let policy = activeRoutine
             .map(\.pausePolicySnapshot)
             .flatMap { $0.offersPause ? $0 : nil }
-            ?? RoutinePausePolicy()
+            ?? .standard
 
         let application = Application(token: token)
         let identity = AppIdentity(token: token)

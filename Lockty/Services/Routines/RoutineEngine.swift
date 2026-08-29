@@ -119,55 +119,87 @@ final class RoutineEngine: ObservableObject {
         }
     }
 
+    /// Ends whatever is running and takes the whole session down with it.
+    ///
+    /// The routine is taken from the App Group when this engine's own state doesn't
+    /// carry one: a routine started by the monitor extension, or a state left at .failed
+    /// by some earlier operation, used to fall through to a silent return here -- the
+    /// sheet closed, the routine read as over, and every app stayed shielded with nothing
+    /// left on screen offering to unshield it. Stopping is now unconditional: even with
+    /// no routine anywhere it still clears the restrictions, because the shields are what
+    /// the user is actually asking to be rid of.
     func stop() async {
-        let activeRoutine: ActiveRoutine
+        let storedState = try? appGroupStore.loadRuntimeState()
+        let activeRoutine: ActiveRoutine?
 
         switch state {
         case .active(let routine):
             activeRoutine = routine
-        case .onBreak(let routine, let breakState):
+        case .onBreak(let routine, _):
             activeRoutine = routine
-            _ = breakState
         default:
-            return
+            activeRoutine = storedState?.activeRoutine
         }
 
-        let decision = strictModePolicy.decision(
-            for: .stopRoutine,
-            activeRoutine: activeRoutine
-        )
-        guard decision.isAllowed else {
-            state = .failed(decision.reason ?? "Stopping this routine is not allowed.")
-            state = .active(activeRoutine)
-            return
-        }
+        if let activeRoutine {
+            let decision = strictModePolicy.decision(
+                for: .stopRoutine,
+                activeRoutine: activeRoutine
+            )
+            guard decision.isAllowed else {
+                state = .failed(decision.reason ?? "Stopping this routine is not allowed.")
+                state = .active(activeRoutine)
+                return
+            }
 
-        state = .ending(activeRoutine.routineID)
+            state = .ending(activeRoutine.routineID)
+        }
 
         do {
-            try await finalizeExecution(
-                id: activeRoutine.id,
-                endedAt: Date(),
-                completionReason: .manualStop
-            )
             let pauseRules = await pauseRuleRepository.rules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: nil,
                 activeBreak: nil,
-                activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
+                // Not the live allowance: an allowance only exists to let an app through
+                // a routine's shield, and the routine is going.
+                activePauseAllowance: nil,
                 pauseRules: pauseRules
             )
-            try appGroupStore.updateRuntimeState { runtime in
-                runtime.activeRoutine = nil
-                runtime.activeBreak = nil
-                runtime.shieldPolicy = effectivePolicy
-            }
+
+            // The shields come off first. Persisting can fail, and a failed write that
+            // left the phone shielded is exactly the state there is no way back out of.
             if effectivePolicy.blocksNothing {
-                try await shieldService.remove(activeRoutine.shieldPolicy)
+                try await shieldService.remove(effectivePolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
             }
-            state = .completed(activeRoutine.routineID)
+            await deviceActivityService.cancelPauseRelocks()
+            await PauseAllowanceLiveActivityTermination.endAll()
+
+            try appGroupStore.updateRuntimeState { runtime in
+                runtime.activeRoutine = nil
+                runtime.activeBreak = nil
+                // Everything the routine was carrying goes with it: the allowance it
+                // granted, the unlock the shield left waiting, the events queued behind
+                // them. These outlived the routine and kept the pending-unlock card on
+                // Today for a routine that had already ended.
+                runtime.activePauseAllowance = nil
+                runtime.pendingPause = nil
+                runtime.pendingEvents = []
+                runtime.recoveryFlags = []
+                runtime.shieldPolicy = effectivePolicy
+            }
+
+            if let activeRoutine {
+                try await finalizeExecution(
+                    id: activeRoutine.id,
+                    endedAt: Date(),
+                    completionReason: .manualStop
+                )
+                state = .completed(activeRoutine.routineID)
+            } else {
+                state = .inactive
+            }
         } catch {
             state = .failed(error.localizedDescription)
         }

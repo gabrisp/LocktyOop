@@ -7,6 +7,8 @@ protocol DeviceActivityServicing {
     func schedulePauseRelock(_ allowance: ActivePauseAllowance) async throws
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws
     func syncRoutineSchedules(_ snapshots: [RoutineScheduleSnapshot]) async throws
+    /// Drops every allowance monitor, whatever it was counting.
+    func cancelPauseRelocks() async
 }
 
 struct LiveDeviceActivityService: DeviceActivityServicing {
@@ -60,6 +62,15 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
             during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false),
             events: [Self.pauseAllowanceEvent: event]
         )
+    }
+
+    /// Ending a routine ends the allowances it granted, and a monitor left counting
+    /// against a routine that is over reaches its threshold later and re-applies a shield
+    /// for something nobody is running any more.
+    func cancelPauseRelocks() async {
+        let pauseActivities = center.activities.filter { $0.rawValue.hasPrefix("lockty.pause.") }
+        guard !pauseActivities.isEmpty else { return }
+        center.stopMonitoring(pauseActivities)
     }
 
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws {

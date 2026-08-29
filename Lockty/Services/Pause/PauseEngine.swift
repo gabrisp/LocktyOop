@@ -24,6 +24,13 @@ final class PauseEngine: ObservableObject {
     private let liveActivityController: PauseAllowanceLiveActivityControlling
 
     @Published private(set) var state: PauseEngineState = .idle
+    /// Relocks on the allowance's own clock while the app is running.
+    ///
+    /// The monitor extension's usage threshold only fires once the granted minutes have
+    /// actually been spent in the released apps, so an allowance the user let run out
+    /// with Lockty open never ended by itself: the countdown reached zero and everything
+    /// stayed unlocked until something else recomputed the shields.
+    private var expiryTask: Task<Void, Never>?
 
     init(
         shieldService: ShieldServicing,
@@ -46,6 +53,7 @@ final class PauseEngine: ObservableObject {
     func restore(from runtimeState: RuntimeState) async {
         if let allowance = runtimeState.activePauseAllowance, !allowance.isExpired {
             state = .temporarilyAllowed(allowance)
+            scheduleExpiryRelock(for: allowance)
         } else if let allowance = runtimeState.activePauseAllowance, allowance.isExpired {
             state = .relocking(allowance.context)
             await relock(allowance.context)
@@ -172,6 +180,7 @@ final class PauseEngine: ObservableObject {
             )
             clearPauseNotification(for: context.pauseRuleID)
             await liveActivityController.start(for: allowance)
+            scheduleExpiryRelock(for: allowance)
             state = .temporarilyAllowed(allowance)
         } catch {
             state = .failed(error.localizedDescription)
@@ -218,7 +227,27 @@ final class PauseEngine: ObservableObject {
         center.removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
+    /// Waits out the allowance and relocks on the second it expires.
+    private func scheduleExpiryRelock(for allowance: ActivePauseAllowance) {
+        expiryTask?.cancel()
+        let remaining = allowance.expiresAt.timeIntervalSinceNow
+        guard remaining > 0 else { return }
+
+        expiryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled, let self else { return }
+            // Re-read rather than trusting the captured allowance: it may already have
+            // been relocked by the monitor extension, or replaced by a newer one.
+            guard let stored = try? self.appGroupStore.loadRuntimeState().activePauseAllowance,
+                  stored.id == allowance.id
+            else { return }
+            await self.relock(allowance.context)
+        }
+    }
+
     func relock(_ context: PauseContext) async {
+        expiryTask?.cancel()
+        expiryTask = nil
         state = .relocking(context)
 
         do {

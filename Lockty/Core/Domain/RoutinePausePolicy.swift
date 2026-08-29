@@ -33,6 +33,10 @@ nonisolated struct RoutinePausePolicy: Codable, Hashable {
     /// Disabled, so a routine that hasn't been given a pause blocks outright.
     static let off = RoutinePausePolicy(isEnabled: false, steps: [])
 
+    /// Wait, then confirm. What every unlock falls back to when no flow can be read --
+    /// a shield with no way through it is a bug, not a stricter setting.
+    static let standard = RoutinePausePolicy(isEnabled: true, steps: defaultSteps)
+
     var offersPause: Bool {
         isEnabled && !steps.isEmpty
     }

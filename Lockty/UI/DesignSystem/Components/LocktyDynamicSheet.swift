@@ -175,9 +175,6 @@ extension View {
     }
 }
 
-/// The bar's height: 16 above the buttons, a 44pt button, 4 below.
-private let locktyDynamicSheetBarHeight: CGFloat = 64
-
 /// A sheet that is exactly as tall as what is in it.
 ///
 /// It measures and nothing else. Swapping between screens, and the transition that goes
@@ -199,35 +196,34 @@ struct LocktyDynamicSheet<Content: View>: View {
 
 
     var body: some View {
-        ZStack(alignment: .top) {
-            content
-                // safeAreaPadding, not padding: on a scrolling screen this becomes a
-                // content inset, so the list starts below the bar but travels under it
-                // instead of being cut off at it.
-                .safeAreaPadding(.top, chromeController.configuration == nil ? 0 : locktyDynamicSheetBarHeight)
-                .environment(\.locktyDynamicSheetChromeController, chromeController)
-                /// As this will fix the size of the view in the vertical direction!
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGSize.self) {
-                    isVisible ? $0.size : .zero
-                } action: { newValue in
-                    guard newValue != .zero else { return }
+        content
+            .environment(\.locktyDynamicSheetChromeController, chromeController)
+            // safeAreaInset, not a ZStack overlay: an overlay aligned to the top of a
+            // stack is placed against that stack's bounds, which are not the sheet's --
+            // so the bar drifted above the sheet's own edge. An inset is laid out by the
+            // sheet, reserves its own room, and still lets scrolling content pass under.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let chrome = chromeController.configuration {
+                    LocktyDynamicSheetChromeOverlay(configuration: chrome)
+                        .transition(.blurReplace.combined(with: .opacity))
+                }
+            }
+            /// As this will fix the size of the view in the vertical direction!
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGSize.self) {
+                isVisible ? $0.size : .zero
+            } action: { newValue in
+                guard newValue != .zero else { return }
 
-                    if sheetHeight == .zero {
+                if sheetHeight == .zero {
+                    sheetHeight = min(newValue.height, windowSize.height)
+                } else {
+                    withAnimation(animation) {
                         sheetHeight = min(newValue.height, windowSize.height)
-                    } else {
-                        withAnimation(animation) {
-                            sheetHeight = min(newValue.height, windowSize.height)
-                        }
                     }
                 }
-                .task { isVisible = true }
-
-            if let chrome = chromeController.configuration {
-                LocktyDynamicSheetChromeOverlay(configuration: chrome)
-                    .transition(.blurReplace.combined(with: .opacity))
             }
-        }
+            .task { isVisible = true }
         .modifier(
             LocktySheetDetentModifier(
                 height: sheetHeight,

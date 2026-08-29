@@ -1,15 +1,18 @@
 import SwiftUI
 
 struct PauseView: View {
-    // @State, not @Bindable: the factory builds a fresh PauseViewModel every time the
-    // presenting body re-evaluates, so a non-owning reference meant the countdown was
-    // replaced by a brand-new one on each render and never left its starting second.
-    @State private var viewModel: PauseViewModel
+    // @StateObject on both counts. It has to own the instance, because the factory
+    // builds a fresh PauseViewModel every time the presenting body re-evaluates and a
+    // non-owning reference meant the countdown was replaced on each render. And it has
+    // to be a StateObject and not @State: PauseViewModel is an ObservableObject, which
+    // @State does not subscribe to at all -- the countdown ticked away internally while
+    // the view never redrew, so the number simply sat there.
+    @StateObject private var viewModel: PauseViewModel
     let router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: PauseViewModel, router: AppRouter) {
-        _viewModel = State(initialValue: viewModel)
+        _viewModel = StateObject(wrappedValue: viewModel)
         self.router = router
     }
 

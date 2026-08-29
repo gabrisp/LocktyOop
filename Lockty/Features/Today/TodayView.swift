@@ -309,6 +309,7 @@ struct TodayView: View {
                     ActiveModeCard(
                         routine: activeRoutine,
                         tokens: viewModel.activeRoutineTokens,
+                        allowance: viewModel.activePauseAllowance,
                         onOpenApps: {
                             router.presentSheet(.liveSession)
                         },

@@ -13,6 +13,7 @@ private func todayLogger() -> Logger {
 final class TodayViewModel: ObservableObject {
     private let dataProvider: TodayDataProviding
     private let routineEngine: RoutineEngine
+    private let pauseEngine: PauseEngine
     private let selectionStore: ScreenTimeSelectionStore
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
@@ -20,11 +21,21 @@ final class TodayViewModel: ObservableObject {
     init(
         dataProvider: TodayDataProviding,
         routineEngine: RoutineEngine,
+        pauseEngine: PauseEngine,
         selectionStore: ScreenTimeSelectionStore
     ) {
         self.dataProvider = dataProvider
         self.routineEngine = routineEngine
+        self.pauseEngine = pauseEngine
         self.selectionStore = selectionStore
+    }
+
+    /// The allowance currently running, if any, so a released app can show its timer.
+    var activePauseAllowance: ActivePauseAllowance? {
+        guard case .temporarilyAllowed(let allowance) = pauseEngine.state,
+              !allowance.isExpired
+        else { return nil }
+        return allowance
     }
 
     var activeRoutine: ActiveRoutine? {

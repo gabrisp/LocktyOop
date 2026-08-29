@@ -149,7 +149,12 @@ final class AppContainer {
             pauseEventRepository: pauseEventRepository,
             routineExecutionRepository: routineExecutionRepository
         )
-        let todayViewModel = TodayViewModel(dataProvider: todayPipeline, routineEngine: routineEngine, selectionStore: selectionStore)
+        let todayViewModel = TodayViewModel(
+            dataProvider: todayPipeline,
+            routineEngine: routineEngine,
+            pauseEngine: pauseEngine,
+            selectionStore: selectionStore
+        )
         let routineScheduleCoordinator = RoutineScheduleCoordinator(
             repository: routineRepository,
             appGroupStore: appGroupStore,

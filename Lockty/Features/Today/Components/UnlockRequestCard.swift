@@ -94,32 +94,9 @@ struct UnlockRequestCard: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: context.id)
     }
 
-    /// The app's own icon inside a padded, outlined tile, with a lock over it so the card
-    /// reads at a glance even before the copy does.
-    @ViewBuilder
+    /// The same badge the active mode card uses, so a blocked app looks the same
+    /// wherever it is shown.
     private var appIcon: some View {
-        ZStack {
-            if let token {
-                Label(token)
-                    .labelStyle(.iconOnly)
-                    .id(token)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-            } else {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(LocktyColors.elevatedBackground)
-                    .frame(width: 44, height: 44)
-            }
-
-            Image(systemName: "lock.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.45), radius: 4)
-        }
-        .padding(5)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(LocktyColors.productive.opacity(0.75), lineWidth: 1.5)
-        }
+        LocktyAppLockBadge(token: token, size: 50)
     }
 }

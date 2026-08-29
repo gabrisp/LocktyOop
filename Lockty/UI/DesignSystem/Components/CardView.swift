@@ -30,8 +30,22 @@ struct CardView<Content: View>: View {
         _borderVariantIndex = State(initialValue: styleVariant ?? LocktyCardBorderVariantAllocator.next())
     }
 
+    /// The card's own size, so its corner can be proportional to it.
+    @State private var measuredSize: CGSize = .zero
+
+    /// Proportional to the card, not a fixed number. `radius` is only the value used for
+    /// the very first frame, before the size is known; after that every card is rounded
+    /// to the same proportion as the full-width usage card, which is the only way the
+    /// curvature reads the same on a tile and on a full-width card at once.
+    ///
+    /// Measuring cannot feed back into layout here: the radius only drives the fill, the
+    /// clip and the border, never the frame.
+    private var resolvedRadius: CGFloat {
+        measuredSize == .zero ? radius : LocktyRadius.card(for: measuredSize)
+    }
+
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: resolvedRadius, style: .continuous)
         let resolvedTint = tint ?? .white
 
         content
@@ -42,6 +56,9 @@ struct CardView<Content: View>: View {
                 maxHeight: height,
                 alignment: .leading
             )
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { newValue in
+                measuredSize = newValue
+            }
             .background {
                 LocktyCardSurface(
                     shape: shape,

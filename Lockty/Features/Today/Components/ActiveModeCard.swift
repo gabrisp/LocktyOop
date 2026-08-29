@@ -7,10 +7,19 @@ import SwiftUI
 struct ActiveModeCard: View {
     let routine: ActiveRoutine
     let tokens: [ApplicationToken]
+    /// The allowance running right now, so the app it released shows its timer instead
+    /// of a lock.
+    var allowance: ActivePauseAllowance?
     let onOpenApps: () -> Void
     let onUnlock: (ApplicationToken) -> Void
 
     private var radius: CGFloat { LocktyRadius.medium }
+
+    /// The one app the running allowance has released, if it is one of these.
+    private var releasedToken: ApplicationToken? {
+        guard let allowance else { return nil }
+        return tokens.first { AppIdentity.ID(token: $0) == allowance.context.appID }
+    }
 
     private var blockedCountText: String {
         let count = tokens.isEmpty ? routine.shieldPolicy.blockedApplications.count : tokens.count
@@ -56,33 +65,17 @@ struct ActiveModeCard: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: LocktySpacing.lg) {
                 ForEach(tokens, id: \.self) { token in
+                    let released = releasedToken == token
+
                     Button {
                         onUnlock(token)
                     } label: {
-                        VStack(spacing: LocktySpacing.sm) {
-                            ZStack {
-                                Label(token)
-                                    .labelStyle(.iconOnly)
-                                    .id(token)
-                                    .frame(width: 54, height: 54)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .shadow(color: .black.opacity(0.5), radius: 5)
-                            }
-                            .padding(4)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(LocktyColors.productive.opacity(0.7), lineWidth: 1.5)
-                            }
-
-                            Text("Desbloquear")
-                                .font(.system(.caption, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.productive)
-                                .lineLimit(1)
-                        }
+                        LocktyAppLockBadge(
+                            token: token,
+                            unlockedFrom: released ? allowance?.startedAt : nil,
+                            unlockedUntil: released ? allowance?.expiresAt : nil,
+                            caption: released ? .remainingTime : .action("Desbloquear")
+                        )
                     }
                     .buttonStyle(.plain)
                     .tappable()

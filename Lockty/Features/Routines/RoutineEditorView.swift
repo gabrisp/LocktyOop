@@ -495,6 +495,9 @@ struct RoutineEditorView: View {
     @State private var editorHeight: CGFloat = 420
     @State private var namingHeight: CGFloat = 140
     /// Raised by a pushed screen that needs the whole sheet, and lowered when it leaves.
+    ///
+    /// Opening one goes straight to full height without measuring anything, and coming
+    /// back returns to the height that was already measured rather than taking it again.
     @State private var isChildFullHeight = false
 
     init(
@@ -991,6 +994,11 @@ struct RoutineEditorView: View {
             GeometryReader { proxy in
                 Color.clear
                     .onChange(of: proxy.size.height, initial: true) { _, newValue in
+                        // Frozen while a screen is pushed over it. The editor is still
+                        // in the stack and gets laid out at the full height the child
+                        // asked for, so reading it then would overwrite the height to
+                        // come back to with the height being left.
+                        guard !isChildFullHeight else { return }
                         editorHeight = newValue
                     }
             }

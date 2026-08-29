@@ -494,6 +494,8 @@ struct RoutineEditorView: View {
     @State private var pickerHeight: CGFloat?
     @State private var editorHeight: CGFloat = 420
     @State private var namingHeight: CGFloat = 140
+    /// Raised by a pushed screen that needs the whole sheet, and lowered when it leaves.
+    @State private var isChildFullHeight = false
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -547,14 +549,23 @@ struct RoutineEditorView: View {
         return isNaming ? "naming" : "editor"
     }
 
-    /// Every size the sheet can be: what the editor actually measures, what the naming
-    /// screen measures, and full for the pushed picker.
+    /// Exactly one size at a time, unless the screen showing says otherwise.
     ///
-    /// The two heights were guessed constants and were simply wrong -- the sheet stood
-    /// taller or shorter than what was in it. They come from the content now, the same
-    /// way the pushed screen reads its own height.
+    /// A set with one detent in it is a sheet that cannot be dragged to another size,
+    /// which is the point: these screens are as tall as what they contain, and there is
+    /// no second size for the user to want. The value itself still moves -- it is
+    /// whatever the content just measured.
     private var detents: Set<PresentationDetent> {
-        [editorDetent, namingDetent, .large]
+        guard isChildFullHeight else { return [currentDetent] }
+        // The pushed picker is a screen of its own and can be pulled back down to the
+        // height it came from.
+        return [editorDetent, .large]
+    }
+
+    /// The size the sheet should be right now.
+    private var currentDetent: PresentationDetent {
+        if isChildFullHeight { return .large }
+        return isNaming ? namingDetent : editorDetent
     }
 
     private var editorDetent: PresentationDetent {
@@ -584,21 +595,12 @@ struct RoutineEditorView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .presentationDetents(detents, selection: $selectedDetent)
-            .onAppear { selectedDetent = editorDetent }
-            .onChange(of: isNaming) { _, naming in
+            // The selection follows whatever the current screen says it should be, so
+            // it is always a detent the set still contains.
+            .onChange(of: currentDetent, initial: true) { _, newValue in
                 withAnimation(.smooth(duration: 0.3)) {
-                    selectedDetent = naming ? namingDetent : editorDetent
+                    selectedDetent = newValue
                 }
-            }
-            // Keeps the selection on the measured height as the content settles, or the
-            // sheet stays at whatever it was when it first appeared.
-            .onChange(of: editorHeight) { _, _ in
-                guard !isNaming else { return }
-                selectedDetent = editorDetent
-            }
-            .onChange(of: namingHeight) { _, _ in
-                guard isNaming else { return }
-                selectedDetent = namingDetent
             }
         }
     }
@@ -869,8 +871,8 @@ struct RoutineEditorView: View {
                     pickerHeight = newValue
                 }
             }
-            .onAppear { selectedDetent = .large }
-            .onDisappear { selectedDetent = editorDetent }
+            .onAppear { isChildFullHeight = true }
+            .onDisappear { isChildFullHeight = false }
         } label: {
             HStack {
                 Text("Apps seleccionadas")
@@ -948,8 +950,10 @@ struct RoutineEditorView: View {
         // Built to the design, not assembled from the app's other pieces. A List would
         // impose its own row insets, separators and background, and the design has none
         // of those -- what it has is two cards under each heading.
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
+        // No scroll view. The sheet is as tall as this is, so there is never anything
+        // below the fold to scroll to -- and a scroll view here would report the height
+        // it was given rather than the height of what is in it.
+        VStack(alignment: .leading, spacing: 18) {
                 sectionHeading("Durante este horario", systemImage: "calendar")
 
                 scheduleCard
@@ -979,21 +983,19 @@ struct RoutineEditorView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, LocktySpacing.sm)
             }
-            .padding(.horizontal, LocktySpacing.lg)
-            .padding(.top, LocktySpacing.md)
-            .padding(.bottom, LocktySpacing.xl)
-            // Measured on the stack inside the scroll view, not on the scroll view: a
-            // scroll view reports the space it was given, which is the sheet's height.
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onChange(of: proxy.size.height, initial: true) { _, newValue in
-                            editorHeight = newValue
-                        }
-                }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: proxy.size.height, initial: true) { _, newValue in
+                        editorHeight = newValue
+                    }
             }
         }
-        .scrollIndicators(.hidden)
+        .frame(maxHeight: .infinity, alignment: .top)
 
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

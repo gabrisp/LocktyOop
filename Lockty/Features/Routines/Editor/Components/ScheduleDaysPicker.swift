@@ -35,16 +35,5 @@ struct ScheduleDaysPicker: View {
     }
 }
 
-private extension Weekday {
-    var shortLabel: String {
-        switch self {
-        case .sunday: "S"
-        case .monday: "M"
-        case .tuesday: "T"
-        case .wednesday: "W"
-        case .thursday: "T"
-        case .friday: "F"
-        case .saturday: "S"
-        }
-    }
-}
+// The English initials this used to carry now live on Weekday itself, in Spanish, since
+// that is what the screens using them are written in.

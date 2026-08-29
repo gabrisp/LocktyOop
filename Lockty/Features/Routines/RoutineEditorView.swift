@@ -488,6 +488,10 @@ struct RoutineEditorView: View {
     @State private var isShowingIconPicker = false
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
+    @State private var selectedDetent: PresentationDetent = .height(560)
+    /// The pushed picker's real height, handed back to it so it fills the sheet it just
+    /// asked to grow rather than the height the stack proposed on the way in.
+    @State private var pickerHeight: CGFloat?
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -541,36 +545,28 @@ struct RoutineEditorView: View {
         return isNaming ? "naming" : "editor"
     }
 
+    /// Every size the sheet can be. Declared up front and never rebuilt: the sheet moves
+    /// by changing which one is selected, and swapping the set out instead gives the
+    /// system nothing to animate between.
+    private let detents: Set<PresentationDetent> = [.height(220), .height(560), .large]
+
+    private var editorDetent: PresentationDetent { .height(560) }
+    private var namingDetent: PresentationDetent { .height(220) }
+
     var body: some View {
-        LocktyDynamicSheet(
-            animation: .smooth(duration: 0.34),
-            contentID: contentID,
-            isExpanded: isPickingApps
-        ) {
-            if isNaming {
-                namingContent
-            } else if isPickingApps {
-                LocktyActivitySelectionView(
-                    title: "Seleccionadas",
-                    addLabel: "Añadir App o categoría",
-                    selection: Binding(
-                        get: { viewModel.selectionPreview },
-                        set: { newValue in
-                            withAnimation(.smooth(duration: 0.28)) {
-                                viewModel.replaceSelection(newValue)
-                            }
-                        }
-                    ),
-                    rules: .routine,
-                    suggestions: viewModel.suggestedApplications,
-                    onClose: { closePicker() },
-                    onDone: { closePicker() }
-                )
-                .locktySheetExpanded()
-            } else {
-                NavigationStack {
+        NavigationStack {
+            Group {
+                if isNaming {
+                    namingContent
+                } else {
                     editorContent
                 }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .presentationDetents(detents, selection: $selectedDetent)
+            .onAppear { selectedDetent = editorDetent }
+            .onChange(of: isNaming) { _, naming in
+                selectedDetent = naming ? namingDetent : editorDetent
             }
         }
     }
@@ -642,7 +638,6 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
-        .locktySheetContent()
     }
 
     /// Section heading: a glyph and a label, both in full colour. The eyebrow form is
@@ -667,185 +662,289 @@ struct RoutineEditorView: View {
         viewModel.refreshSelectionState()
     }
 
-    private var editorContent: some View {
-        // A plain Form. The sections, the rows, the disclosure and the push all come
-        // from Apple rather than being rebuilt out of cards -- this screen is a settings
-        // screen and there is nothing here a Form does not already do.
-        Form {
-            if viewModel.isEditingBlocked {
-                Section {
-                    Text(viewModel.editingBlockDecision.reason ?? "Esta rutina no se puede editar ahora.")
-                        .font(LocktyTypography.callout)
-                        .foregroundStyle(LocktyColors.secondaryText)
+    private var cardFill: Color { Color.white.opacity(0.055) }
+    private var cardRadius: CGFloat { 30 }
+
+    /// The two times in one card, joined down the left by the dotted run between them.
+    private var scheduleCard: some View {
+        VStack(spacing: 0) {
+            timeRow(
+                label: "De",
+                hour: viewModel.scheduleTrigger.hour,
+                minute: viewModel.scheduleTrigger.minute,
+                isStart: true
+            ) { hour, minute in
+                viewModel.updateSchedule {
+                    $0.hour = hour
+                    $0.minute = minute
                 }
             }
 
-            Section {
-                LabeledContent("De") {
-                    ScheduleTimeField(
-                        label: "De",
-                        hour: viewModel.scheduleTrigger.hour,
-                        minute: viewModel.scheduleTrigger.minute
-                    ) { hour, minute in
-                        viewModel.updateSchedule {
-                            $0.hour = hour
-                            $0.minute = minute
-                        }
-                    }
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+                .padding(.leading, 52)
+
+            timeRow(
+                label: "A",
+                hour: viewModel.scheduleTrigger.endHour,
+                minute: viewModel.scheduleTrigger.endMinute,
+                isStart: false
+            ) { hour, minute in
+                viewModel.updateSchedule {
+                    $0.endHour = hour
+                    $0.endMinute = minute
                 }
-
-                LabeledContent("A") {
-                    ScheduleTimeField(
-                        label: "A",
-                        hour: viewModel.scheduleTrigger.endHour,
-                        minute: viewModel.scheduleTrigger.endMinute
-                    ) { hour, minute in
-                        viewModel.updateSchedule {
-                            $0.endHour = hour
-                            $0.endMinute = minute
-                        }
-                    }
-                }
-
-                ScheduleDaysPicker(
-                    selectedWeekdays: Binding(
-                        get: { viewModel.scheduleTrigger.weekdays },
-                        set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
-                    )
-                )
-            } header: {
-                Label("Durante este horario", systemImage: "calendar")
-            }
-            .disabled(!isEditing)
-
-            Section {
-                // A push inside the sheet, not a screen swapped in underneath it: the
-                // sheet's own stack carries it, and the picker asks for full height on
-                // the way in and gives it back on the way out.
-                NavigationLink {
-                    LocktyActivitySelectionView(
-                        title: "Seleccionadas",
-                        addLabel: "Añadir App o categoría",
-                        selection: Binding(
-                            get: { viewModel.selectionPreview },
-                            set: { newValue in
-                                withAnimation(.smooth(duration: 0.28)) {
-                                    viewModel.replaceSelection(newValue)
-                                }
-                            }
-                        ),
-                        rules: .routine,
-                        suggestions: viewModel.suggestedApplications,
-                        onClose: {},
-                        onDone: {}
-                    )
-                    .locktySheetExpanded()
-                    .navigationBarTitleDisplayMode(.inline)
-                } label: {
-                    LabeledContent(
-                        "Apps seleccionadas",
-                        value: RestrictionSummary.appsAndCategories(
-                            apps: viewModel.selectionPreview.applicationTokens.count,
-                            categories: viewModel.selectionPreview.categoryTokens.count
-                        ) ?? "Ninguna"
-                    )
-                }
-
-                NavigationLink {
-                    RoutineDomainsSheet(viewModel: viewModel)
-                        .locktySheetExpanded()
-                        .navigationBarTitleDisplayMode(.inline)
-                } label: {
-                    LabeledContent(
-                        "Sitios web",
-                        value: RestrictionSummary.domains(viewModel.blockedDomains.count) ?? "Ninguno"
-                    )
-                }
-
-                Toggle(isOn: $viewModel.allowsPauseDuringStrictMode) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Permitir pausas")
-                        Text("Si se apaga, no se permiten desbloqueos.")
-                            .font(LocktyTypography.caption)
-                            .foregroundStyle(LocktyColors.secondaryText)
-                    }
-                }
-            } header: {
-                Label("Apps bloqueadas", systemImage: "shield")
-            }
-            .disabled(!isEditing)
-
-            // Pause and checklist are out of creating a routine for now. Kept whole,
-            // waiting on where they should live.
-//            Section {
-//                Picker("Flujo", selection: $viewModel.pauseFlowID) {
-//                    Text("Por defecto").tag(UUID?.none)
-//                    ForEach(viewModel.pauseFlows) { flow in
-//                        Text(flow.name).tag(UUID?.some(flow.id))
-//                    }
-//                }
-//            } header: {
-//                Label("Pausa", systemImage: "hourglass")
-//            }
-//            .disabled(!isEditing)
-//
-//            Section {
-//                ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { _, $task in
-//                    if isEditing {
-//                        TextField("Tarea", text: $task.title)
-//                    } else {
-//                        Text(task.title)
-//                    }
-//                }
-//                .onDelete { offsets in
-//                    viewModel.tasks.remove(atOffsets: offsets)
-//                }
-//
-//                if isEditing {
-//                    Button {
-//                        withAnimation(.smooth(duration: 0.24)) { viewModel.addTask() }
-//                    } label: {
-//                        Label("Añadir tarea", systemImage: "plus")
-//                    }
-//                }
-//            } header: {
-//                Label("Checklist", systemImage: "checklist")
-//            }
-
-            if !isEditing, !isCreating {
-                Section {
-                    HoldDownButton(
-                        text: isRoutineActive ? "" : "Mantén para empezar",
-                        sessionStartedAt: isRoutineActive ? activeRoutineStartedAt : nil
-                    ) {
-                        Task { await startRoutine() }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .listRowBackground(Color.clear)
-            }
-
-            if isEditing {
-                Section {
-                    HoldDownButton(text: isCreating ? "Mantén para crear" : "Mantén para guardar") {
-                        Task {
-                            if await viewModel.save() {
-                                if isCreating {
-                                    close()
-                                } else {
-                                    withAnimation(.smooth(duration: 0.28)) { isEditing = false }
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .listRowBackground(Color.clear)
             }
         }
-        // Inside the NavigationStack, on the content itself: the stack fills the sheet
-        // and would report the sheet's own height back to it.
-        .locktySheetContent()
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .overlay(alignment: .topLeading) {
+            // The run between the two marks, drawn once across both rows rather than
+            // half in each, so it lines up whatever the rows end up measuring.
+            Rectangle()
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 1)
+                .padding(.leading, 27)
+                .padding(.top, 34)
+                .padding(.bottom, 34)
+        }
+    }
+
+    private func timeRow(
+        label: String,
+        hour: Int,
+        minute: Int,
+        isStart: Bool,
+        onChange: @escaping (Int, Int) -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            Circle()
+                .fill(isStart ? Color.white.opacity(0.75) : .clear)
+                .overlay {
+                    if !isStart {
+                        Circle().stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                    }
+                }
+                .frame(width: 9, height: 9)
+                .frame(width: 56, alignment: .center)
+
+            Text(label)
+                .font(.system(.title3, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            Spacer(minLength: 0)
+
+            ScheduleTimeField(label: label, hour: hour, minute: minute, onChange: onChange)
+        }
+        .padding(.trailing, LocktySpacing.lg)
+        .frame(height: 68)
+    }
+
+    /// The weekday circles, with the name of whatever preset they add up to.
+    private var daysCard: some View {
+        let selected = viewModel.scheduleTrigger.weekdays
+
+        return VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            HStack {
+                Text("Estos días:")
+                    .font(.system(.title3, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                Text(RoutineEditorView.presetName(for: selected))
+                    .font(.system(.title3, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            HStack(spacing: 10) {
+                ForEach(Weekday.orderedWeek, id: \.self) { weekday in
+                    let isOn = selected.contains(weekday)
+
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            viewModel.updateSchedule {
+                                if isOn { $0.weekdays.remove(weekday) } else { $0.weekdays.insert(weekday) }
+                            }
+                        }
+                    } label: {
+                        Text(weekday.shortLabel)
+                            .font(.system(.title3, design: .default, weight: .regular))
+                            .foregroundStyle(isOn ? .black : LocktyColors.primaryText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background {
+                                if isOn {
+                                    Circle().fill(.white)
+                                } else {
+                                    Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                }
+                            }
+                    }
+                    .buttonStyle(.locktyInteractive(shape: Circle()))
+                }
+            }
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.vertical, LocktySpacing.lg)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    /// The name for a set of days when it happens to be one, and the count when it isn't.
+    private static func presetName(for weekdays: Set<Weekday>) -> String {
+        let weekend: Set<Weekday> = [.saturday, .sunday]
+        let workweek: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
+
+        switch weekdays {
+        case []: return "Nunca"
+        case weekend: return "Fines de semana"
+        case workweek: return "Entre semana"
+        case Set(Weekday.orderedWeek): return "Todos los días"
+        default: return weekdays.count == 1 ? "1 día" : "\(weekdays.count) días"
+        }
+    }
+
+    private var appsRow: some View {
+        NavigationLink {
+            GeometryReader { proxy in
+                LocktyActivitySelectionView(
+                    title: "Seleccionadas",
+                    addLabel: "Añadir App o categoría",
+                    selection: Binding(
+                        get: { viewModel.selectionPreview },
+                        set: { newValue in
+                            withAnimation(.smooth(duration: 0.28)) {
+                                viewModel.replaceSelection(newValue)
+                            }
+                        }
+                    ),
+                    rules: .routine,
+                    suggestions: viewModel.suggestedApplications,
+                    onClose: {},
+                    onDone: {}
+                )
+                .navigationBarTitleDisplayMode(.inline)
+                .frame(maxHeight: pickerHeight)
+                .animation(.default, value: pickerHeight)
+                .onChange(of: proxy.size.height) { _, newValue in
+                    pickerHeight = newValue
+                }
+            }
+            .onAppear { selectedDetent = .large }
+            .onDisappear { selectedDetent = editorDetent }
+        } label: {
+            HStack {
+                Text("Apps seleccionadas")
+                    .font(.system(.title3, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                Text(
+                    RestrictionSummary.appsAndCategories(
+                        apps: viewModel.selectionPreview.applicationTokens.count,
+                        categories: viewModel.selectionPreview.categoryTokens.count
+                    ) ?? "Ninguna"
+                )
+                .font(.system(.title3, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .padding(.horizontal, LocktySpacing.lg)
+            .frame(height: 68)
+            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 30, style: .continuous)))
+    }
+
+    private var strictRow: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: LocktySpacing.sm) {
+                    Text("Modo estricto")
+                        .font(.system(.title3, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    HStack(spacing: 3) {
+                        Image(systemName: "bolt.fill")
+                        Text("PRO")
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(LocktyColors.productive)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .stroke(LocktyColors.productive.opacity(0.55), lineWidth: 1)
+                    }
+                }
+
+                Text("No se permiten desbloqueos")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            // On when the routine is strict. It used to be bound to a different setting
+            // and read inverted next to its own subtitle.
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { viewModel.mode == .strict },
+                    set: { viewModel.mode = $0 ? .strict : .normal }
+                )
+            )
+            .labelsHidden()
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.vertical, LocktySpacing.lg)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var editorContent: some View {
+        // Built to the design, not assembled from the app's other pieces. A List would
+        // impose its own row insets, separators and background, and the design has none
+        // of those -- what it has is two cards under each heading.
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 26) {
+                sectionHeading("Durante este horario", systemImage: "calendar")
+
+                scheduleCard
+
+                daysCard
+
+                sectionHeading("Apps bloqueadas", systemImage: "lock.shield")
+
+                appsRow
+
+                strictRow
+
+                HoldDownButton(
+                    text: isCreating ? "Mantén para confirmar" : "Mantén para guardar",
+                    isProminent: true
+                ) {
+                    Task {
+                        if await viewModel.save() {
+                            if isCreating {
+                                close()
+                            } else {
+                                withAnimation(.smooth(duration: 0.28)) { isEditing = false }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, LocktySpacing.sm)
+            }
+            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.top, LocktySpacing.md)
+            .padding(.bottom, LocktySpacing.xl)
+        }
+        .scrollIndicators(.hidden)
+
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -1138,59 +1237,35 @@ private struct ScheduleTimeField: View {
             draftDate = Calendar.current.date(from: components) ?? Date()
             isPresented = true
         } label: {
-            VStack(spacing: LocktySpacing.xs) {
-                Text(label.uppercased())
-                    .locktyEyebrow()
+            HStack(spacing: LocktySpacing.sm) {
                 Text(displayText)
-                    .font(.system(size: 20, weight: .light, design: .default))
-                    .foregroundStyle(LocktyColors.primaryText)
+                    .font(.system(.title3, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: displayText)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
             }
-            .padding(.horizontal, LocktySpacing.lg)
-            .padding(.vertical, LocktySpacing.sm)
-            .safeGlass(radius: 12, interactive: true)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .tappable()
         .popover(isPresented: $isPresented) {
-            // Two wheels of our own rather than a DatePicker: hours and minutes each get
-            // the same wheel the rest of the app uses, with the selection pill fixed in
-            // the middle, instead of a system control that looks like nothing else here.
-            HStack(spacing: 0) {
-                LocktyWheelPicker(
-                    items: Array(0..<24),
-                    selection: Binding(
-                        get: { hour },
-                        set: { onChange($0 ?? hour, minute) }
-                    ),
-                    rowHeight: 44
-                ) { value in
-                    Text(String(format: "%02d", value))
-                        .font(.system(.title3, design: .default, weight: value == hour ? .semibold : .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .monospacedDigit()
-                        .frame(maxWidth: .infinity)
+            // Apple's own wheel. The app's wheel picker is for the flows, where the rows
+            // are app names and minutes; a time is a time and the system already has the
+            // control for it.
+            DatePicker("", selection: $draftDate, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .padding()
+                .onChange(of: draftDate) { _, newValue in
+                    let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                    onChange(components.hour ?? hour, components.minute ?? minute)
                 }
-
-                LocktyWheelPicker(
-                    items: Array(0..<60),
-                    selection: Binding(
-                        get: { minute },
-                        set: { onChange(hour, $0 ?? minute) }
-                    ),
-                    rowHeight: 44
-                ) { value in
-                    Text(String(format: "%02d", value))
-                        .font(.system(.title3, design: .default, weight: value == minute ? .semibold : .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .monospacedDigit()
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(width: 220, height: 308)
-            .presentationCompactAdaptation(.popover)
+                .presentationCompactAdaptation(.popover)
         }
     }
 }

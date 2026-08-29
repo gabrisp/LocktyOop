@@ -61,6 +61,24 @@ nonisolated enum Weekday: Int, Codable, CaseIterable, Hashable, Identifiable {
     case saturday = 7
 
     var id: Int { rawValue }
+
+    /// Monday first, the way a week is written here. `allCases` follows the raw values,
+    /// which start on Sunday because that is what Calendar's weekday numbering does.
+    static let orderedWeek: [Weekday] = [
+        .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
+    ]
+
+    var shortLabel: String {
+        switch self {
+        case .monday: "L"
+        case .tuesday: "M"
+        case .wednesday: "X"
+        case .thursday: "J"
+        case .friday: "V"
+        case .saturday: "S"
+        case .sunday: "D"
+        }
+    }
 }
 
 nonisolated struct RoutineAlarmTrigger: Codable, Hashable, Identifiable {

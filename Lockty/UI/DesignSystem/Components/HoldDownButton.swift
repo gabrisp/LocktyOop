@@ -12,6 +12,9 @@ struct HoldDownButton: View {
     var sessionStartedAt: Date?
     var paddingHorizontal: CGFloat = 25
     var paddingVertical: CGFloat = 10
+    /// Matches the unlock flow's primary: the same full-width capsule at the same
+    /// height, so a commit looks like a commit wherever it is.
+    var isProminent = false
     var duration: CGFloat = 1
     var scale: CGFloat = 0.95
     var action: () -> Void
@@ -26,22 +29,33 @@ struct HoldDownButton: View {
 
     var body: some View {
         labelContent
-            .font(LocktyTypography.body)
-            .foregroundStyle(LocktyColors.primaryText)
-            .padding(.vertical, paddingVertical)
-            .padding(.horizontal, paddingHorizontal)
+            .font(isProminent
+                ? .system(.headline, design: .default, weight: .semibold)
+                : LocktyTypography.body)
+            .foregroundStyle(isProminent ? .black : LocktyColors.primaryText)
+            .frame(maxWidth: isProminent ? .infinity : nil)
+            .frame(height: isProminent ? 60 : nil)
+            .padding(.vertical, isProminent ? 0 : paddingVertical)
+            .padding(.horizontal, isProminent ? 0 : paddingHorizontal)
+            .background {
+                if isProminent {
+                    Capsule().fill(.white)
+                }
+            }
             .background {
                 if !isDisplayOnly && !isCompleted {
                     GeometryReader { geometry in
                         Capsule()
-                            .fill(LocktyColors.primaryText.opacity(0.14))
+                            // Over white the fill has to darken, not lighten, or the
+                            // progress is invisible on the button it is filling.
+                            .fill(isProminent ? Color.black.opacity(0.14) : LocktyColors.primaryText.opacity(0.14))
                             .frame(width: geometry.size.width * progress)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
             .contentShape(Capsule())
-            .safeGlass(radius: 999, interactive: !isDisplayOnly)
+            .safeGlass(radius: 999, interactive: !isDisplayOnly && !isProminent)
             .clipShape(Capsule())
             .allowsHitTesting(!isDisplayOnly)
             .scaleEffect(isHolding ? scale : 1)

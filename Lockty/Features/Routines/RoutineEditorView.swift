@@ -497,7 +497,6 @@ struct RoutineEditorView: View {
                             set: { newValue in viewModel.updateSchedule { $0.weekdays = newValue } }
                         )
                     )
-                    .disabled(!isEditing)
 
                     HStack(spacing: LocktySpacing.xl) {
                         ScheduleTimeField(
@@ -535,6 +534,8 @@ struct RoutineEditorView: View {
                         }
                     }
                 }
+                // Reading mode: the whole schedule block is inert, days and times alike.
+                .disabled(!isEditing)
 
                 editorSection(
                     title: "Checklist",
@@ -545,6 +546,7 @@ struct RoutineEditorView: View {
                             ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { index, $task in
                                 RoutineTaskEditorRow(
                                     task: $task,
+                                    isEditing: isEditing,
                                     onRemove: {
                                         withAnimation(.smooth(duration: 0.24)) {
                                             viewModel.removeTask(id: task.id)
@@ -558,29 +560,32 @@ struct RoutineEditorView: View {
                                 }
                             }
 
-                            Divider()
-                                .padding(.leading, 20)
+                            // Reading mode has no way to add or remove a task.
+                            if isEditing {
+                                Divider()
+                                    .padding(.leading, 20)
 
-                            Button {
-                                withAnimation(.smooth(duration: 0.24)) {
-                                    viewModel.addTask()
+                                Button {
+                                    withAnimation(.smooth(duration: 0.24)) {
+                                        viewModel.addTask()
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .regular))
+                                        Text("Add task")
+                                            .font(LocktyTypography.callout)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .foregroundStyle(LocktyColors.secondaryText)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 18, weight: .regular))
-                                    Text("Add task")
-                                        .font(LocktyTypography.callout)
-                                    Spacer(minLength: 0)
-                                }
-                                .foregroundStyle(LocktyColors.secondaryText)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                .tappable()
                             }
-                            .buttonStyle(.plain)
-                            .tappable()
                         }
                     }
                 }
@@ -731,6 +736,12 @@ private struct RoutineEditorHero: View {
     var isEditing: Bool = true
     @State private var showIconPicker = false
 
+    private var iconImage: some View {
+        Image(systemName: viewModel.icon.isEmpty ? "square.and.arrow.up.fill" : viewModel.icon)
+            .font(.system(size: 22, weight: .ultraLight))
+            .foregroundStyle(LocktyColors.primaryText)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
             VStack(spacing: LocktySpacing.sm) {
@@ -738,48 +749,62 @@ private struct RoutineEditorHero: View {
                     .font(.footnote)
                     .foregroundStyle(LocktyColors.tertiaryText)
 
-                Button {
-                    guard isEditing else { return }
-                    showIconPicker = true
-                } label: {
-                    Image(systemName: viewModel.icon.isEmpty ? "square.and.arrow.up.fill" : viewModel.icon)
-                        .font(.system(size: 22, weight: .ultraLight))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 50, height: 50)
-                        .safeGlass(radius: 12, interactive: true)
-                }
-                .buttonStyle(.plain)
-                .tappable()
-                .popover(isPresented: $showIconPicker) {
-                    RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
-                        .presentationCompactAdaptation(.popover)
-                }
-
-                CardView(
-                    radius: 14,
-                    padding: 0,
-                    expandsHorizontally: false
-                ) {
-                    ZStack {
-                        Text(viewModel.name.isEmpty ? "Routine name" : "\(viewModel.name) ")
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(.clear)
-                            .lineLimit(1)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 12)
-
-                        TextField("Routine name", text: $viewModel.name)
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 12)
+                // Reading mode is inert: the icon loses its tappable glass and the name
+                // loses its field background, so nothing on screen invites an edit.
+                if isEditing {
+                    Button {
+                        showIconPicker = true
+                    } label: {
+                        iconImage
+                            .frame(width: 50, height: 50)
+                            .safeGlass(radius: 12, interactive: true)
                     }
+                    .buttonStyle(.plain)
+                    .tappable()
+                    .popover(isPresented: $showIconPicker) {
+                        RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
+                            .presentationCompactAdaptation(.popover)
+                    }
+                } else {
+                    iconImage
+                        .frame(width: 50, height: 50)
                 }
-                // No minimum width: the invisible sizing text above already makes the
-                // field hug its content, so a floor only forced it wider than the
-                // placeholder it's meant to match.
-                .frame(maxWidth: 320)
+
+                if isEditing {
+                    CardView(
+                        radius: 14,
+                        padding: 0,
+                        expandsHorizontally: false
+                    ) {
+                        ZStack {
+                            Text(viewModel.name.isEmpty ? "Routine name" : "\(viewModel.name) ")
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(.clear)
+                                .lineLimit(1)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 12)
+
+                            TextField("Routine name", text: $viewModel.name)
+                                .font(LocktyTypography.body)
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 12)
+                        }
+                    }
+                    // No minimum width: the invisible sizing text above already makes the
+                    // field hug its content, so a floor only forced it wider than the
+                    // placeholder it's meant to match.
+                    .frame(maxWidth: 320)
+                } else {
+                    Text(viewModel.name)
+                        .font(LocktyTypography.body)
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: 320)
+                }
             }
             .frame(maxWidth: .infinity)
 
@@ -803,22 +828,31 @@ private struct RoutineEditorHero: View {
 
 private struct RoutineTaskEditorRow: View {
     @Binding var task: EditableRoutineTask
+    var isEditing: Bool = true
     let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            TextField("Task", text: $task.title)
-                .font(LocktyTypography.headline)
-                .foregroundStyle(LocktyColors.primaryText)
+            if isEditing {
+                TextField("Task", text: $task.title)
+                    .font(LocktyTypography.headline)
+                    .foregroundStyle(LocktyColors.primaryText)
+            } else {
+                Text(task.title)
+                    .font(LocktyTypography.headline)
+                    .foregroundStyle(LocktyColors.primaryText)
+            }
 
             Spacer(minLength: 0)
 
-            Button(role: .destructive, action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(LocktyColors.tertiaryText)
+            if isEditing {
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 18, weight: .light))
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

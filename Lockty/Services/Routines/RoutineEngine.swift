@@ -80,6 +80,7 @@ final class RoutineEngine {
         let activeRoutine = ActiveRoutine(
             routineID: routine.id,
             nameSnapshot: routine.name,
+            iconSnapshot: routine.icon,
             modeSnapshot: routine.mode,
             startedAt: Date(),
             trigger: trigger,

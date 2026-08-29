@@ -181,16 +181,16 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     ]
                 ),
                 perspective: perspective,
-                perspectives: makeDummyPerspectiveStack(
+                perspectives: makePerspectiveStack(
                     primary: perspective,
-                    mostProductivePeriodText: timeRangeText(start: mostProductiveBucket?.start, end: mostProductiveBucket?.end),
-                    distractionPeriodText: timeRangeText(start: distractionBucket?.start, end: distractionBucket?.end),
+                    mostProductiveBucket: mostProductiveBucket,
+                    distractionBucket: distractionBucket,
                     leadingDistractionApps: summary.applications
                         .filter { $0.classification == .unproductive }
                         .sorted { $0.duration > $1.duration }
                         .prefix(2)
                         .map { $0.app.displayName },
-                    bestDetoxText: LocktyDurationFormatter.abbreviated(bestDetox.duration ?? 0)
+                    bestDetoxDuration: bestDetox.duration
                 ),
                 activities: activities,
                 metrics: TodayMetricsState(
@@ -487,30 +487,60 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         )
     }
 
-    private func makeDummyPerspectiveStack(
+    /// Only builds the cards whose data actually exists. Emitting all of them
+    /// unconditionally produced confident sentences about nothing — "landed around No
+    /// clear period", "best detox was 0m from your unproductive apps" — which read as
+    /// real findings.
+    private func makePerspectiveStack(
         primary: DailyPerspective,
-        mostProductivePeriodText: String,
-        distractionPeriodText: String,
+        mostProductiveBucket: UsageTimelineBucket?,
+        distractionBucket: UsageTimelineBucket?,
         leadingDistractionApps: [String],
-        bestDetoxText: String
+        bestDetoxDuration: TimeInterval?
     ) -> [DailyPerspective] {
-        let appsText = leadingDistractionApps.isEmpty ? "your unproductive apps" : leadingDistractionApps.joined(separator: " and ")
+        var perspectives = [primary]
 
-        return [
-            primary,
-            DailyPerspective(
-                id: "focus-window",
-                title: "Focus window",
-                body: "Your strongest focused stretch landed around \(mostProductivePeriodText).",
-                tone: .focused
-            ),
-            DailyPerspective(
-                id: "detox-distraction",
-                title: "Detox and drift",
-                body: "Your best detox was \(bestDetoxText), while distraction pressure rose near \(distractionPeriodText) from \(appsText).",
-                tone: .balanced
+        if let mostProductiveBucket {
+            perspectives.append(
+                DailyPerspective(
+                    id: "focus-window",
+                    title: "Focus window",
+                    body: "Your strongest focused stretch landed around \(timeRangeText(start: mostProductiveBucket.start, end: mostProductiveBucket.end)).",
+                    tone: .focused
+                )
             )
-        ]
+        }
+
+        if let bestDetoxDuration, bestDetoxDuration > 0 {
+            let detoxText = LocktyDurationFormatter.abbreviated(bestDetoxDuration)
+            var body = "Your longest phone-free stretch was \(detoxText)."
+
+            // The distraction half only gets appended when there's something concrete to
+            // name, so the sentence never trails off into a placeholder.
+            if let distractionBucket, !leadingDistractionApps.isEmpty {
+                body += " Distraction pressure rose near \(timeRangeText(start: distractionBucket.start, end: distractionBucket.end)) from \(leadingDistractionApps.joined(separator: " and "))."
+            }
+
+            perspectives.append(
+                DailyPerspective(
+                    id: "detox-distraction",
+                    title: "Detox and drift",
+                    body: body,
+                    tone: .balanced
+                )
+            )
+        } else if let distractionBucket, !leadingDistractionApps.isEmpty {
+            perspectives.append(
+                DailyPerspective(
+                    id: "detox-distraction",
+                    title: "Drift",
+                    body: "Distraction pressure rose near \(timeRangeText(start: distractionBucket.start, end: distractionBucket.end)) from \(leadingDistractionApps.joined(separator: " and ")).",
+                    tone: .balanced
+                )
+            )
+        }
+
+        return perspectives
     }
 
     private func makeRawDebugText(

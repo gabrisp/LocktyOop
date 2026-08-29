@@ -4,6 +4,9 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
     let id: UUID
     var routineID: UUID
     var nameSnapshot: String
+    /// The routine's icon at the time it started, so anything showing the running
+    /// session can render it without loading the routine back from storage.
+    var iconSnapshot: String?
     var modeSnapshot: RoutineMode
     var startedAt: Date
     var expectedEndAt: Date?
@@ -17,6 +20,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         routineID: UUID,
         nameSnapshot: String,
+        iconSnapshot: String? = nil,
         modeSnapshot: RoutineMode,
         startedAt: Date,
         expectedEndAt: Date? = nil,
@@ -29,6 +33,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         self.id = id
         self.routineID = routineID
         self.nameSnapshot = nameSnapshot
+        self.iconSnapshot = iconSnapshot
         self.modeSnapshot = modeSnapshot
         self.startedAt = startedAt
         self.expectedEndAt = expectedEndAt

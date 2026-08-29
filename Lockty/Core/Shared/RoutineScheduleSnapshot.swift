@@ -6,6 +6,7 @@ import Foundation
 nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     var id: UUID
     var name: String
+    var icon: String?
     var mode: RoutineMode
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
@@ -16,6 +17,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     init(routine: Routine, schedule: RoutineSchedule) {
         id = routine.id
         name = routine.name
+        icon = routine.icon
         mode = routine.mode
         blockedApplications = routine.blockedApplications
         blockedDomains = routine.blockedDomains
@@ -29,6 +31,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         ActiveRoutine(
             routineID: id,
             nameSnapshot: name,
+            iconSnapshot: icon,
             modeSnapshot: mode,
             startedAt: startedAt,
             trigger: .schedule(schedule),

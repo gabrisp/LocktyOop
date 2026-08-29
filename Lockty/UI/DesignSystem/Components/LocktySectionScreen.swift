@@ -7,18 +7,18 @@ struct LocktySectionScreen<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
+        // The title lives in the navigation bar, not in the scroll content: these are
+        // pushed screens, so the native inline title sits next to the native back
+        // button instead of being duplicated as a large heading underneath it.
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                Text(title)
-                    .font(LocktyTypography.largeTitle)
-                    .foregroundStyle(LocktyColors.primaryText)
-
                 content
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.lg)
         }
         .locktyScreenBackground()
-        .toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

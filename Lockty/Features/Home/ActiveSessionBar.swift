@@ -10,7 +10,7 @@ struct ActiveSessionBar: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: LocktySpacing.md) {
-                Image(systemName: routine.iconName)
+                Image(systemName: routine.iconSnapshot?.isEmpty == false ? routine.iconSnapshot! : "repeat")
                     .font(.system(size: 16, weight: .light))
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(width: 28, height: 28)
@@ -59,8 +59,4 @@ struct ActiveSessionBar: View {
         }
         return String(format: "%d:%02d", minutes, remaining)
     }
-}
-
-private extension ActiveRoutine {
-    var iconName: String { "repeat" }
 }

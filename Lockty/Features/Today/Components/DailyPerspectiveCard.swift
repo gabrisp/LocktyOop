@@ -16,10 +16,12 @@ struct DailyPerspectiveStackSection: View {
     var body: some View {
         // Height comes from the tallest card (it used to be hardcoded to 152, so longer
         // copy overflowed) and the section collapses on its own once all are dismissed.
-        // The card slides up to 420pt sideways on dismissal, so the section is pinned to
-        // the container width and clipped — without that the fly-out renders far outside
-        // these bounds. (An earlier version skipped clipping to keep a rotation visible;
-        // there is no rotation any more, so straightforward clipping is correct here.)
+        // The card slides up to 420pt sideways on dismissal, so it has to be clipped —
+        // but clipping at the card's own width crops the swipe right at the card edge.
+        // Clipping to a rect inset outwards by the scroll content's horizontal padding
+        // puts the cut at the screen edge instead, and because it's a clip shape rather
+        // than a real frame change the layout width is untouched, so no horizontal
+        // overscroll appears.
         ZStack(alignment: .top) {
             ForEach(Array(visiblePerspectives.enumerated().reversed()), id: \.element.id) { index, perspective in
                 DismissibleDailyPerspectiveCard(
@@ -36,7 +38,7 @@ struct DailyPerspectiveStackSection: View {
         }
         .padding(.bottom, peekInset)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .clipped()
+        .clipShape(Rectangle().inset(by: -LocktySpacing.md))
         .animation(.smooth(duration: 0.3), value: visiblePerspectives.map(\.id))
     }
 }

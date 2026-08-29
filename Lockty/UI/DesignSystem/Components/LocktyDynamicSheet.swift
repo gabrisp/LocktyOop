@@ -201,6 +201,10 @@ struct LocktyDynamicSheet<Content: View>: View {
                     // height to return to was already measured on the way in, and
                     // reading again mid-transition catches the content still moving.
                     guard heightBeforeExplicitSize == nil else { return }
+                    // A reading at the ceiling is the content still laid out to fill --
+                    // the frame from the screen that just left has not been dropped yet,
+                    // and taking it would leave the sheet stuck at full height.
+                    guard newValue.height < windowSize.height - 110 else { return }
                     setHeight(newValue.height)
                 }
 
@@ -404,12 +408,10 @@ struct LocktyDynamicSheetBarButton<Label: View>: View {
 
     var body: some View {
         Button(action: action) {
-            // Bare glyph, no glass behind it: the bar is not a surface, so a button that
-            // brings its own reads as a chip stuck onto it.
             label
                 .foregroundStyle(LocktyColors.primaryText)
                 .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Circle())
+                .safeGlass(radius: 22, interactive: true)
         }
         .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()

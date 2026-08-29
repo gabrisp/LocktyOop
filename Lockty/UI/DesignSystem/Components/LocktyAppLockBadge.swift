@@ -13,8 +13,8 @@ import SwiftUI
 struct LocktyAppLockBadge: View {
     let token: ApplicationToken?
     /// Scales the finished badge. It no longer sets the icon's size -- nothing can --
-    /// so it is a multiplier on the whole thing, ring and caption included.
-    var scale: CGFloat = 1
+    /// so it is a multiplier on the whole thing, ring included.
+    var scale: CGFloat = 1.5
     /// When the running allowance began and ends. Nil means the app is simply locked.
     var unlockedFrom: Date?
     var unlockedUntil: Date?
@@ -128,13 +128,25 @@ struct LocktyAppLockBadge: View {
                         .rotationEffect(.degrees(-90))
                 }
             }
+            // Scaled as one piece -- icon, gap and ring together -- so the proportions
+            // set above survive whatever size a caller wants the badge at.
+            .scaleEffect(scale)
+            // scaleEffect draws bigger without laying out bigger, so the row would still
+            // reserve the unscaled size and the badges would overlap. This claims the
+            // space the scaled badge actually occupies.
+            .frame(width: scaledSide, height: scaledSide)
             .overlay(alignment: .bottom) {
                 captionLabel(at: date)
                     .fixedSize()
-                    .offset(y: 20)
+                    .offset(y: 18)
             }
             .padding(.bottom, caption == .none ? 0 : 20)
-            .scaleEffect(scale)
+    }
+
+    /// The finished badge's side: the measured icon, its gap, and the scale applied.
+    private var scaledSide: CGFloat? {
+        guard iconSize > 0 else { return nil }
+        return (iconSize + inset * 2) * scale
     }
 
     /// FamilyControls draws `Label(token)` at its own size and ignores the frame it is

@@ -24,6 +24,10 @@ struct UsageTimelineChart: View {
                         )
                     }
 
+                    // Explicitly filling the reader's size: each bar's two halves are
+                    // maxHeight: .infinity, so without this the row collapsed to its
+                    // intrinsic height on any day with no overlay bands to stretch the
+                    // ZStack, leaving the bars adrift from the baseline underneath.
                     HStack(alignment: .center, spacing: 3) {
                         ForEach(state.buckets) { bucket in
                             TimelineBucketBar(
@@ -33,6 +37,7 @@ struct UsageTimelineChart: View {
                             )
                         }
                     }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
 
                     Rectangle()
                         .fill(LocktyColors.cardStroke)

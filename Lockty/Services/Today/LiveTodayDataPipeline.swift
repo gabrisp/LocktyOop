@@ -61,6 +61,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             let routineExecutions = (try? await routineExecutionRepository.executions(from: dayStart, to: dayEnd)) ?? []
             let timelineBuckets = makeTimelineBuckets(
                 snapshot: snapshot,
+                dayStart: dayStart,
                 classifications: Dictionary(uniqueKeysWithValues: summary.applications.map { ($0.app.id, $0.classification) })
             )
             let bestDetox = bestDetoxCalculator.longestInactivePeriod(
@@ -251,13 +252,31 @@ struct LiveTodayDataPipeline: TodayDataProviding {
         await classificationRepository.saveClassification(classification, for: appID)
     }
 
+    /// One bucket per hour of the day, always 24 of them.
+    ///
+    /// The chart draws buckets as an evenly spaced row and positions its overlay bands
+    /// by real time of day, so buckets have to be a fixed time grid too -- emitting one
+    /// bucket per raw activity segment put a 3am segment right next to a 10pm one, which
+    /// made the bars, the bands and the 00/06/12/18/24 axis three different x scales.
+    /// A segment spanning several hours has its time split across them by overlap.
     private func makeTimelineBuckets(
         snapshot: ScreenTimeReportSnapshot?,
+        dayStart: Date,
         classifications: [AppIdentity.ID: AppClassification]
     ) -> [UsageTimelineBucket] {
         guard let snapshot else { return [] }
 
-        return snapshot.activitySegments.map { segment in
+        let calendar = Calendar.current
+        let hourStarts: [Date] = (0..<24).compactMap {
+            calendar.date(byAdding: .hour, value: $0, to: dayStart)
+        }
+        guard hourStarts.count == 24 else { return [] }
+
+        var productive = [TimeInterval](repeating: 0, count: 24)
+        var neutral = [TimeInterval](repeating: 0, count: 24)
+        var unproductive = [TimeInterval](repeating: 0, count: 24)
+
+        for segment in snapshot.activitySegments {
             let totals = segment.applicationDurations.reduce(into: (productive: TimeInterval(0), neutral: TimeInterval(0), unproductive: TimeInterval(0))) { partialResult, item in
                 switch classifications[item.key] ?? .neutral {
                 case .productive:
@@ -269,12 +288,37 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 }
             }
 
-            return UsageTimelineBucket(
-                start: segment.dateInterval.start,
-                end: segment.dateInterval.end,
-                productive: totals.productive,
-                neutral: totals.neutral,
-                unproductive: totals.unproductive,
+            let span = segment.dateInterval.duration
+            for hour in 0..<24 where span > 0 {
+                let hourStart = hourStarts[hour]
+                let hourEnd = hourStart.addingTimeInterval(3600)
+                let overlapStart = max(segment.dateInterval.start, hourStart)
+                let overlapEnd = min(segment.dateInterval.end, hourEnd)
+                let overlap = overlapEnd.timeIntervalSince(overlapStart)
+                guard overlap > 0 else { continue }
+
+                let share = overlap / span
+                productive[hour] += totals.productive * share
+                neutral[hour] += totals.neutral * share
+                unproductive[hour] += totals.unproductive * share
+            }
+
+            // A zero-length segment overlaps no hour at all, but still carries
+            // durations, so it lands whole in the hour it started in.
+            if span <= 0, let hour = hourStarts.lastIndex(where: { $0 <= segment.dateInterval.start }) {
+                productive[hour] += totals.productive
+                neutral[hour] += totals.neutral
+                unproductive[hour] += totals.unproductive
+            }
+        }
+
+        return (0..<24).map { hour in
+            UsageTimelineBucket(
+                start: hourStarts[hour],
+                end: hourStarts[hour].addingTimeInterval(3600),
+                productive: productive[hour],
+                neutral: neutral[hour],
+                unproductive: unproductive[hour],
                 confidence: .inferred
             )
         }

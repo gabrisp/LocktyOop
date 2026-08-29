@@ -102,7 +102,7 @@ final class StartupCoordinator {
         case .routineStartRequested:
             break
         case .settingsRequested:
-            router.push(.settings)
+            router.presentSheet(.settings)
         }
     }
 }

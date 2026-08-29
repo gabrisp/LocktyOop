@@ -6,26 +6,11 @@ struct DestinationFactory {
     @ViewBuilder
     func destination(for route: AppRoute) -> some View {
         switch route {
-        case .today(let day):
-            featureFactory.makeTodayView(day: day)
-
-        case .routineDetail(let id):
-            featureFactory.makeRoutineDetail(routineID: id)
-
-        case .settings:
-            featureFactory.makeSettingsView()
-
         case .routinesList:
             featureFactory.makeRoutinesList()
 
         case .pausesList:
             featureFactory.makePausesList()
-
-        case .pauseDetail(let id):
-            featureFactory.makePauseDetail(pauseID: id)
-
-        case .applicationDetails(let id, let day):
-            featureFactory.makeApplicationDetails(appID: id, day: day)
         }
     }
 
@@ -43,6 +28,12 @@ struct DestinationFactory {
 
         case .systemAccess:
             featureFactory.makeSystemAccessSheet()
+
+        case .settings:
+            featureFactory.makeSettingsView()
+
+        case .applicationDetails(let id, let day):
+            featureFactory.makeApplicationDetails(appID: id, day: day)
 
         case .liveSession:
             featureFactory.makeLiveSessionSheet()

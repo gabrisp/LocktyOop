@@ -297,7 +297,7 @@ struct ApplicationDetailView: View {
                         }
                         .tappable()
                         .onTapGesture {
-                            router.push(.pauseDetail(pauseRule.id))
+                            router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: pauseRule.id)))
                         }
                     }
 
@@ -308,7 +308,7 @@ struct ApplicationDetailView: View {
                                     .font(LocktyTypography.headline)
                                 ForEach(viewModel.relatedRoutines) { routine in
                                     Button {
-                                        router.push(.routineDetail(routine.id))
+                                        router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
                                     } label: {
                                         HStack {
                                             Text(routine.name)

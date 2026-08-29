@@ -31,22 +31,23 @@ struct TodayView: View {
 
     private var shortcutRowHeight: CGFloat { 52 }
 
-    /// Where the Routines/Pauses row sits: directly under the date slider.
-    private var shortcutRowOffsetY: CGFloat {
-        DayPageSliderMetrics.barHeight + topChromeSpacing
+    private var metricsGeometry: MetricsHeaderGeometry {
+        MetricsHeaderGeometry(progress: collapseProgress)
     }
 
-    /// The slider and the shortcut row both collapse away, so the rings rise past both.
-    private var chromeAboveHeaderHeight: CGFloat {
-        DayPageSliderMetrics.barHeight + topChromeSpacing + shortcutRowHeight + topChromeSpacing
+    /// Routines/Pauses sit directly under the rings and stay pinned with them, so this
+    /// tracks the header's shrinking height rather than being a fixed offset.
+    private var shortcutRowOffsetY: CGFloat {
+        metricsHeaderOffsetY + headerTopInset + metricsGeometry.height + topChromeSpacing
     }
 
     private var topChromeExpandedHeight: CGFloat {
-        chromeAboveHeaderHeight + headerTopInset + MetricsHeaderGeometry.expandedHeight
+        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
+            + MetricsHeaderGeometry.expandedHeight + topChromeSpacing + shortcutRowHeight
     }
 
     private var metricsHeaderOffsetY: CGFloat {
-        chromeAboveHeaderHeight * (1 - dateSliderHideProgress)
+        (DayPageSliderMetrics.barHeight + topChromeSpacing) * (1 - dateSliderHideProgress)
     }
 
     /// Shrinks away as the header collapses. This used to lerp and was flattened to a
@@ -101,8 +102,23 @@ struct TodayView: View {
             .opacity(1 - dateSliderHideProgress)
             .offset(y: -dateSliderHideProgress * 12)
 
-            // Routines and Pauses replaced the tabs. They sit between the calendar and
-            // the rings, and fade out with the slider as the header collapses.
+            TodayMetricsHeader(
+                metrics: state.primaryMetrics.metrics,
+                collapseProgress: collapseProgress,
+                topInset: headerTopInset,
+                additionalBackdropHeight: topChromeSpacing + shortcutRowHeight,
+                onMetricSelected: { metric in
+                    switch metric.kind {
+                    case .productivity: router.presentSheet(.productivityDetail(day))
+                    case .control: router.presentSheet(.controlDetail(day))
+                    case .detox: router.presentSheet(.detoxDetail(day))
+                    }
+                }
+            )
+            .offset(y: metricsHeaderOffsetY)
+
+            // Directly under the rings, and pinned along with them: unlike the date
+            // slider these don't fade, they stay reachable while scrolling.
             HStack(spacing: LocktySpacing.sm) {
                 TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
                     router.push(.routinesList)
@@ -114,22 +130,6 @@ struct TodayView: View {
             .padding(.horizontal, LocktySpacing.md)
             .frame(height: shortcutRowHeight)
             .offset(y: shortcutRowOffsetY)
-            .opacity(1 - dateSliderHideProgress)
-            .allowsHitTesting(dateSliderHideProgress < 0.05)
-
-            TodayMetricsHeader(
-                metrics: state.primaryMetrics.metrics,
-                collapseProgress: collapseProgress,
-                topInset: headerTopInset,
-                onMetricSelected: { metric in
-                    switch metric.kind {
-                    case .productivity: router.presentSheet(.productivityDetail(day))
-                    case .control: router.presentSheet(.controlDetail(day))
-                    case .detox: router.presentSheet(.detoxDetail(day))
-                    }
-                }
-            )
-            .offset(y: metricsHeaderOffsetY)
         }
         .offset(y: overscrollPullDistance)
     }

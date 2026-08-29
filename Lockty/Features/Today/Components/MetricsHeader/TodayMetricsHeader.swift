@@ -5,6 +5,8 @@ struct TodayMetricsHeader: View {
     let metrics: [PrimaryMetric]
     let collapseProgress: CGFloat
     var topInset: CGFloat = 0
+    /// Extra height the backdrop must cover for chrome pinned below the rings.
+    var additionalBackdropHeight: CGFloat = 0
     var onMetricSelected: ((PrimaryMetric) -> Void)?
 
     private var geometry: MetricsHeaderGeometry {
@@ -21,7 +23,7 @@ struct TodayMetricsHeader: View {
     /// Exactly the area the backdrop should cover: the safe area above the header plus
     /// the header's own current content height (which shrinks as it collapses), plus 2.
     private var backdropHeight: CGFloat {
-        safeAreaTop + geometry.height + topInset + 6
+        safeAreaTop + geometry.height + topInset + additionalBackdropHeight + 6
     }
 
     var body: some View {

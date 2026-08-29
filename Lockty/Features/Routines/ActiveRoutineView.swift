@@ -78,7 +78,7 @@ struct ActiveRoutineView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Open") {
-                            router.push(.routineDetail(viewModel.routineID))
+                            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: viewModel.routineID)))
                         }
                     }
                 }

@@ -23,7 +23,7 @@ struct SystemEventRouter {
             return .startRoutine(routineID)
 
         case .settingsRequested:
-            return .push(.settings)
+            return .sheet(.settings)
         }
     }
 }

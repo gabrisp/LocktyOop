@@ -37,7 +37,7 @@ struct PausesView: View {
                 }
             } else {
                 ForEach(viewModel.state.rules) { rule in
-                    Button { router.push(.pauseDetail(rule.id)) } label: {
+                    Button { router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: rule.id))) } label: {
                         CardView(interactive: true) {
                             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                                 HStack {

@@ -239,7 +239,7 @@ struct LocktyActivitySelectionView: View {
                 Spacer(minLength: 0)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 16, style: .continuous)))
         .tappable()
     }
 
@@ -347,7 +347,7 @@ struct LocktyActivitySelectionView: View {
                                 }
                                 .frame(width: 84, height: 84)
                             }
-                            .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
+                            .buttonStyle(.locktyInteractive(brighten: true))
                             .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))
                         }
                     }
@@ -536,7 +536,7 @@ private struct LocktyOfficialActivityPickerSheet: View {
                             )
                             .foregroundStyle(canSave ? .black.opacity(0.72) : .white.opacity(0.28))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
                     .disabled(!canSave)
 
                     Button {
@@ -546,8 +546,11 @@ private struct LocktyOfficialActivityPickerSheet: View {
                         Text("Cancelar")
                             .font(.system(.body, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.primaryText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .contentShape(Capsule(style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
                 }
                 .padding(.horizontal, LocktySpacing.xl)
                 .padding(.top, LocktySpacing.sm)

@@ -75,6 +75,12 @@ struct LocktyInteractiveButtonStyle: ButtonStyle {
     /// a surface chained onto the Button from outside never sees it and the button just
     /// sits there. Handing the shape to the style puts the surface where it can read it.
     var shape: AnyShape?
+    /// Lights the label itself instead of laying a shape over it.
+    ///
+    /// For content that already has its own silhouette -- an app icon, say -- where any
+    /// shape drawn on top is a rectangle sitting over the artwork. Adding light to what
+    /// is there needs no shape at all.
+    var brightens = false
     var tint: Color = .white
     var pressedScale: CGFloat = 0.97
 
@@ -82,6 +88,7 @@ struct LocktyInteractiveButtonStyle: ButtonStyle {
         LocktyInteractiveButtonBody(
             configuration: configuration,
             shape: shape,
+            brightens: brightens,
             tint: tint,
             pressedScale: pressedScale
         )
@@ -91,6 +98,7 @@ struct LocktyInteractiveButtonStyle: ButtonStyle {
 private struct LocktyInteractiveButtonBody: View {
     let configuration: LocktyInteractiveButtonStyle.Configuration
     var shape: AnyShape?
+    var brightens = false
     var tint: Color = .white
     var pressedScale: CGFloat = 0.97
 
@@ -100,6 +108,9 @@ private struct LocktyInteractiveButtonBody: View {
 
     var body: some View {
         configuration.label
+            .brightness(brightens && isShowingPressedState ? 0.16 : 0)
+            .saturation(brightens && isShowingPressedState ? 1.1 : 1)
+            .scaleEffect(brightens && isShowingPressedState ? pressedScale : 1)
             .locktyInteractiveSurface(
                 enabled: shape != nil,
                 tint: tint,
@@ -144,6 +155,14 @@ extension ButtonStyle where Self == LocktyInteractiveButtonStyle {
         pressedScale: CGFloat = 0.97
     ) -> LocktyInteractiveButtonStyle {
         LocktyInteractiveButtonStyle(shape: AnyShape(shape), tint: tint, pressedScale: pressedScale)
+    }
+
+    /// For artwork: brightens what is there rather than putting a shape over it.
+    static func locktyInteractive(
+        brighten: Bool,
+        pressedScale: CGFloat = 0.97
+    ) -> LocktyInteractiveButtonStyle {
+        LocktyInteractiveButtonStyle(brightens: brighten, pressedScale: pressedScale)
     }
 }
 

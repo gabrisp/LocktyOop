@@ -80,7 +80,7 @@ struct ActiveModeCard: View {
                             caption: released ? .remainingTime : .action("Desbloquear")
                         )
                     }
-                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
+                    .buttonStyle(.locktyInteractive(brighten: true))
                     .tappable()
                 }
             }

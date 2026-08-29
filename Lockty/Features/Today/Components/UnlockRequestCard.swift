@@ -66,7 +66,7 @@ struct UnlockRequestCard: View {
                     .contentShape(Rectangle())
                     .safeGlass(radius: radius - LocktySpacing.lg, interactive: true)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: radius - LocktySpacing.lg, style: .continuous)))
                 .tappable()
             }
         }

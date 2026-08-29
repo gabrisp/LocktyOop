@@ -12,7 +12,9 @@ import SwiftUI
 /// the lock and the whole border come back.
 struct LocktyAppLockBadge: View {
     let token: ApplicationToken?
-    var size: CGFloat = 72
+    /// Scales the finished badge. It no longer sets the icon's size -- nothing can --
+    /// so it is a multiplier on the whole thing, ring and caption included.
+    var scale: CGFloat = 1
     /// When the running allowance began and ends. Nil means the app is simply locked.
     var unlockedFrom: Date?
     var unlockedUntil: Date?
@@ -28,13 +30,21 @@ struct LocktyAppLockBadge: View {
         case remainingTime
     }
 
-    private var borderWidth: CGFloat { 2.5 }
-    private var iconRadius: CGFloat { size * 0.24 }
-    private var borderRadius: CGFloat { iconRadius + inset }
-    /// The gap between the icon and its ring. Small on purpose: at 6 the border read as
-    /// a box the icon was floating inside rather than as the icon's own outline, which
-    /// is what made the icons look shrunken.
-    private var inset: CGFloat { 3 }
+    private var borderWidth: CGFloat { 2 }
+    /// The transparent gap between the icon and its ring.
+    private var inset: CGFloat { 2 }
+
+    /// The icon's own drawn size, measured rather than imposed.
+    ///
+    /// Forcing a width and a height on Label(token) was the whole problem: FamilyControls
+    /// draws it at its own size inside whatever frame it is handed, so a bigger frame
+    /// only ever bought more empty space around a same-sized icon. The badge is now the
+    /// icon plus two points, and the ring is drawn around that.
+    @State private var iconSize: CGFloat = 0
+
+    private var borderRadius: CGFloat {
+        iconSize * 0.23 + inset
+    }
 
     private var isUnlocked: Bool {
         guard let unlockedUntil else { return false }
@@ -90,13 +100,15 @@ struct LocktyAppLockBadge: View {
         let locked = progress <= 0
 
         return icon
-            // No clip on the icon: Apple draws Label(token) with its own bleed, and
-            // clipping it to the frame shaved the top edge off.
-            .frame(width: size, height: size)
+            // Measured, never framed: the badge takes the icon's size, not the other way
+            // round. No clip either -- Apple draws Label(token) with its own bleed.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
+                iconSize = newValue
+            }
             .overlay {
                 if locked {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: size * 0.32, weight: .semibold))
+                        .font(.system(size: max(iconSize * 0.34, 14), weight: .semibold))
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.5), radius: 5)
                 }
@@ -122,6 +134,7 @@ struct LocktyAppLockBadge: View {
                     .offset(y: 20)
             }
             .padding(.bottom, caption == .none ? 0 : 20)
+            .scaleEffect(scale)
     }
 
     /// FamilyControls draws `Label(token)` at its own size and ignores the frame it is
@@ -133,12 +146,11 @@ struct LocktyAppLockBadge: View {
         if let token {
             Label(token)
                 .labelStyle(.iconOnly)
-                .font(.system(size: size))
-                .scaleEffect(size / 34)
                 .id(token)
         } else {
-            RoundedRectangle(cornerRadius: iconRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(LocktyColors.elevatedBackground)
+                .frame(width: 52, height: 52)
         }
     }
 

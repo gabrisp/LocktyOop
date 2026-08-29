@@ -134,11 +134,15 @@ struct ActiveRoutineView: View {
                         }
                     }
 
-                    CardView {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Checklist")
-                                .font(LocktyTypography.headline)
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("CHECKLIST")
+                            .locktyEyebrow()
 
+                        CardView {
+                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                             ForEach(activeRoutine.taskCompletions.sorted { $0.orderSnapshot < $1.orderSnapshot }) { completion in
                                 Button {
                                     Task {
@@ -161,6 +165,7 @@ struct ActiveRoutineView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        }
                         }
                     }
 

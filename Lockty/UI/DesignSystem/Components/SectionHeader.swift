@@ -7,9 +7,10 @@ struct SectionHeader: View {
 
     var body: some View {
         HStack {
-            Text(title)
-                .font(LocktyTypography.headline)
-                .foregroundStyle(LocktyColors.primaryText)
+            // Same eyebrow treatment the rest of the app's section titles use, so the
+            // remaining SectionHeader call sites don't look like a different design.
+            Text(title.uppercased())
+                .locktyEyebrow()
 
             Spacer()
 

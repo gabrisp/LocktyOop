@@ -166,33 +166,47 @@ struct RoutineDetailView: View {
                     }
 
                     if !routine.tasks.isEmpty {
-                        CardView {
-                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                                Text("Checklist").font(LocktyTypography.headline)
-                                ForEach(routine.tasks.sorted { $0.order < $1.order }) { task in
-                                    HStack {
-                                        Text(task.title)
-                                        Spacer()
+                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                            Rectangle()
+                                .fill(LocktyColors.separator)
+                                .frame(height: 0.5)
+                            Text("CHECKLIST")
+                                .locktyEyebrow()
+
+                            CardView {
+                                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                                    ForEach(routine.tasks.sorted { $0.order < $1.order }) { task in
+                                        HStack {
+                                            Text(task.title)
+                                            Spacer()
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    CardView {
-                        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Recent Runs").font(LocktyTypography.headline)
-                            if viewModel.recentExecutions.isEmpty {
-                                Text("No executions recorded yet.")
-                                    .font(LocktyTypography.callout)
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                            } else {
-                                ForEach(viewModel.recentExecutions.prefix(10)) { execution in
-                                    HStack {
-                                        Text(execution.startedAt.formatted(date: .abbreviated, time: .shortened))
-                                        Spacer()
-                                        Text(execution.endedAt.map { LocktyDurationFormatter.abbreviated($0.timeIntervalSince(execution.startedAt)) } ?? "Active")
-                                            .foregroundStyle(LocktyColors.secondaryText)
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("RECENT RUNS")
+                            .locktyEyebrow()
+
+                        CardView {
+                            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                                if viewModel.recentExecutions.isEmpty {
+                                    Text("No executions recorded yet.")
+                                        .font(LocktyTypography.callout)
+                                        .foregroundStyle(LocktyColors.secondaryText)
+                                } else {
+                                    ForEach(viewModel.recentExecutions.prefix(10)) { execution in
+                                        HStack {
+                                            Text(execution.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                            Spacer()
+                                            Text(execution.endedAt.map { LocktyDurationFormatter.abbreviated($0.timeIntervalSince(execution.startedAt)) } ?? "Active")
+                                                .foregroundStyle(LocktyColors.secondaryText)
+                                        }
                                     }
                                 }
                             }

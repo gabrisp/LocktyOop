@@ -57,9 +57,15 @@ struct PauseDetailView: View {
                         }
                     }
 
-                    CardView {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("FLOW")
+                            .locktyEyebrow()
+
+                        CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Flow").font(LocktyTypography.headline)
                             ForEach(Array(rule.steps.enumerated()), id: \.element.id) { index, step in
                                 HStack {
                                     Text("\(index + 1). \(step.title)")
@@ -68,11 +74,18 @@ struct PauseDetailView: View {
                                 }
                             }
                         }
+                        }
                     }
 
-                    CardView {
+                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                        Rectangle()
+                            .fill(LocktyColors.separator)
+                            .frame(height: 0.5)
+                        Text("RECENT EVENTS")
+                            .locktyEyebrow()
+
+                        CardView {
                         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                            Text("Recent Events").font(LocktyTypography.headline)
                             if viewModel.events.isEmpty {
                                 Text("No Pause history yet.")
                                     .font(LocktyTypography.callout)
@@ -94,6 +107,7 @@ struct PauseDetailView: View {
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }

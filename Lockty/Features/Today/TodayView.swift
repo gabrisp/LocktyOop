@@ -68,11 +68,12 @@ struct TodayView: View {
         dateSliderBlockHeight + headerTopInset
     }
 
-    /// What the pinned chrome takes at the top of the scroll content: the ring, and the
-    /// inset above it. The date slider and the shortcut row are still commented out, so
-    /// they claim nothing.
+    /// Zero while nothing is pinned at the top: the ring is commented out along with the
+    /// date slider and the shortcut row, so the content must not be pushed down to clear
+    /// chrome that isn't there.
     private var topChromeExpandedHeight: CGFloat {
-        headerTopInset + MetricsHeaderGeometry.expandedHeight
+        0
+//        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
     }
@@ -193,19 +194,20 @@ struct TodayView: View {
 //            .opacity(1 - dateSliderHideProgress)
 //            .offset(y: -dateSliderHideProgress * 12)
 
-            TodayMetricsHeader(
-                metrics: state.primaryMetrics.metrics,
-                collapseProgress: collapseProgress,
-                topInset: headerTopInset,
-                onMetricSelected: { metric in
-                    switch metric.kind {
-                    case .productivity: router.presentSheet(.productivityDetail(day))
-                    case .control: router.presentSheet(.controlDetail(day))
-                    case .detox: router.presentSheet(.detoxDetail(day))
-                    }
-                }
-            )
-            .offset(y: metricsHeaderOffsetY)
+//            TodayMetricsHeader(
+//                metrics: state.primaryMetrics.metrics,
+//                collapseProgress: collapseProgress,
+//                topInset: headerTopInset,
+//                onMetricSelected: { metric in
+//                    switch metric.kind {
+//                    case .productivity: router.presentSheet(.productivityDetail(day))
+//                    case .control: router.presentSheet(.controlDetail(day))
+//                    case .detox: router.presentSheet(.detoxDetail(day))
+//                    }
+//                }
+//            )
+//            .offset(y: metricsHeaderOffsetY)
+            EmptyView()
 
             // Above the rings and pinned with them. They fade out on a downward scroll
             // and the rings ride up into the space; a scroll up brings them straight

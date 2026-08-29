@@ -24,6 +24,7 @@ final class PausesViewModel {
     private let eventRepository: PauseEventRepository
     private let calculator: PauseSuccessCalculating
     private(set) var state = PausesOverviewState()
+    private(set) var recentEvents: [PauseEvent] = []
 
     init(
         ruleRepository: PauseRuleRepository,
@@ -33,6 +34,12 @@ final class PausesViewModel {
         self.ruleRepository = ruleRepository
         self.eventRepository = eventRepository
         self.calculator = calculator
+    }
+
+    /// Pause events recorded since the given moment — used by the live session sheet
+    /// to show what happened during the routine that's currently running.
+    func eventsSince(_ date: Date) -> [PauseEvent] {
+        recentEvents.filter { $0.triggeredAt >= date }
     }
 
     func load() async {
@@ -57,6 +64,7 @@ final class PausesViewModel {
 
         withAnimation(.smooth(duration: 0.28)) {
             state = loaded
+            recentEvents = events
         }
     }
 }

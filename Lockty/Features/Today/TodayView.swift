@@ -159,6 +159,16 @@ struct TodayView: View {
                     LiveScreenTimeReportCard(day: day)
                 }
 
+                // Routines and Pauses replaced the tabs, so they're reached from here.
+                HStack(spacing: LocktySpacing.sm) {
+                    TodaySectionShortcut(title: "Routines", systemImage: "repeat") {
+                        router.presentSheet(.routinesList)
+                    }
+                    TodaySectionShortcut(title: "Pauses", systemImage: "pause.circle") {
+                        router.presentSheet(.pausesList)
+                    }
+                }
+
                 DailyPerspectiveStackSection(
                     perspectives: viewModel.visiblePerspectives(for: day),
                     onDismiss: { perspective in

@@ -41,6 +41,34 @@ struct FeatureFactory {
         SettingsView()
     }
 
+    @ViewBuilder
+    func makeLiveSessionSheet() -> some View {
+        if let routine = routineEngine.activeRoutine() {
+            LiveSessionSheet(
+                routine: routine,
+                pauseEvents: pausesViewModel.eventsSince(routine.startedAt),
+                onStop: {
+                    Task {
+                        await routineEngine.stop()
+                        router.dismissSheet()
+                    }
+                }
+            )
+        }
+    }
+
+    func makeRoutinesListSheet() -> some View {
+        LocktySectionSheet(title: "Routines") {
+            RoutinesView(viewModel: routinesViewModel, router: router)
+        }
+    }
+
+    func makePausesListSheet() -> some View {
+        LocktySectionSheet(title: "Pauses") {
+            PausesView(viewModel: pausesViewModel, router: router)
+        }
+    }
+
     func makePauseView(context: PauseContext) -> PauseView {
         PauseView(
             viewModel: PauseViewModel(context: context, engine: pauseEngine),

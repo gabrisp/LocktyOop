@@ -38,6 +38,15 @@ struct DestinationFactory {
         case .systemAccess:
             featureFactory.makeSystemAccessSheet()
 
+        case .liveSession:
+            featureFactory.makeLiveSessionSheet()
+
+        case .routinesList:
+            featureFactory.makeRoutinesListSheet()
+
+        case .pausesList:
+            featureFactory.makePausesListSheet()
+
         case .routineEditor(let route):
             featureFactory.makeRoutineEditor(route: route)
 

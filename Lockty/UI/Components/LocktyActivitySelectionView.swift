@@ -133,35 +133,12 @@ struct LocktyActivitySelectionView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                    LocktyTopBar(
-                        title: title,
-                        leading: {
-                            LocktyTopBarIconAction(systemImage: "chevron.left", label: "Back", action: onClose)
-                        },
-                        trailing: {
-                            Button(action: onDone) {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 24, weight: .medium))
-                            }
-                            .frame(width: 74, height: 74)
-                            .background(
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color(red: 0.80, green: 1.0, blue: 0.63), Color(red: 0.58, green: 0.94, blue: 0.98)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            )
-                            .foregroundStyle(.black)
-                            .buttonStyle(.locktyInteractive(shape: Circle()))
-                            .accessibilityLabel("Done")
-                        }
-                    )
-                    .padding(.top, LocktySpacing.sm)
-
+                    // No top bar of its own. This is pushed inside a navigation stack
+                    // now, which already carries the way back, and the selection is
+                    // written straight through the binding -- there is nothing for a
+                    // confirm button to confirm.
                     addButton
+                        .padding(.top, LocktySpacing.sm)
 
                     selectedItemsSection
 

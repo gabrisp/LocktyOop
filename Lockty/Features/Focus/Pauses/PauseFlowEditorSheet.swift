@@ -94,7 +94,7 @@ struct PauseFlowEditorSheet: View {
     }
 
     var body: some View {
-        LocktyDynamicSheet(animation: .smooth(duration: 0.32), contentID: viewModel.contentID) {
+        LocktyDynamicSheet(animation: .snappy(duration: 0.3, extraBounce: 0)) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 nameField
 

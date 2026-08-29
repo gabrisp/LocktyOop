@@ -2,12 +2,6 @@ import Combine
 import SwiftUI
 import UIKit
 
-enum LocktyDynamicSheetNavigationDirection {
-    case none
-    case forward
-    case backward
-}
-
 enum LocktyDynamicSheetSize: Hashable {
     case fit
     case small
@@ -150,14 +144,15 @@ extension View {
     }
 }
 
+/// A sheet that is exactly as tall as what is in it.
+///
+/// It measures and nothing else. Swapping between screens, and the transition that goes
+/// with it, belongs to the content -- a ZStack with a switch, each branch in a
+/// geometryGroup -- because the sheet resizing and the content changing have to be one
+/// movement, and only the content knows when it is changing.
 struct LocktyDynamicSheet<Content: View>: View {
-    let animation: Animation
-    /// Identity of the screen on show. Changing it crossfades the content and re-measures
-    /// -- the sheet has no navigation stack, it swaps what is in it, so this is what
-    /// stands in for a push.
-    let contentID: AnyHashable?
-    let navigationDirection: LocktyDynamicSheetNavigationDirection
-    let content: Content
+    var animation: Animation = .snappy(duration: 0.3, extraBounce: 0)
+    @ViewBuilder var content: Content
 
     @State private var sheetHeight: CGFloat = 0
     /// iOS 17 lays a sheet out before it is on screen and the first measurement comes
@@ -168,34 +163,24 @@ struct LocktyDynamicSheet<Content: View>: View {
     }()
     @StateObject private var chromeController = LocktyDynamicSheetChromeController()
 
-    init(
-        animation: Animation = .easeInOut(duration: 0.28),
-        contentID: AnyHashable? = nil,
-        navigationDirection: LocktyDynamicSheetNavigationDirection = .none,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.animation = animation
-        self.contentID = contentID
-        self.navigationDirection = navigationDirection
-        self.content = content()
-    }
-
     var body: some View {
         ZStack(alignment: .top) {
-            transitionedContent
+            content
                 .padding(.top, chromeController.configuration == nil ? 0 : 66)
-                .id(contentID)
-                .animation(animation, value: contentID)
                 .environment(\.locktyDynamicSheetChromeController, chromeController)
-                // On the content, inside the stack -- not on the ZStack. Applied outside
-                // it, the fixed size and the measurement take in the bar overlay too,
-                // and the bar is laid out on top of the content rather than under it, so
-                // what came back was neither the content's height nor a stable one.
-                .fixedSize(horizontal: false, vertical: true)
+                // On the content, inside the stack: applied outside it these take in the
+                // bar overlay too, and the bar sits on top of the content rather than
+                // under it, so what came back was neither the content's height nor a
+                // stable one.
+                // Only while the sheet is sizing itself to the content. A screen that
+                // named its own size wants to fill the sheet it asked for, and pinning
+                // it to its ideal height leaves it sitting at the top of an empty one.
+                .fixedSize(horizontal: false, vertical: chromeController.sizes == nil)
+                .frame(maxHeight: chromeController.sizes == nil ? nil : .infinity)
                 .onGeometryChange(for: CGSize.self) {
                     isVisible ? $0.size : .zero
                 } action: { newValue in
-                    guard newValue != .zero else { return }
+                    guard newValue != .zero, chromeController.sizes == nil else { return }
                     setHeight(newValue.height)
                 }
 
@@ -221,39 +206,6 @@ struct LocktyDynamicSheet<Content: View>: View {
 
     private var windowSize: CGSize {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.size ?? .zero
-    }
-
-    @ViewBuilder
-    private var transitionedContent: some View {
-        switch navigationDirection {
-        case .none:
-            content
-                .transition(.blurReplace.combined(with: .opacity))
-        case .forward:
-            content
-                .transition(
-                    .asymmetric(
-                        insertion: .move(edge: .trailing)
-                            .combined(with: AnyTransition(.blurReplace))
-                            .combined(with: .opacity),
-                        removal: .move(edge: .leading)
-                            .combined(with: AnyTransition(.blurReplace))
-                            .combined(with: .opacity)
-                    )
-                )
-        case .backward:
-            content
-                .transition(
-                    .asymmetric(
-                        insertion: .move(edge: .leading)
-                            .combined(with: AnyTransition(.blurReplace))
-                            .combined(with: .opacity),
-                        removal: .move(edge: .trailing)
-                            .combined(with: AnyTransition(.blurReplace))
-                            .combined(with: .opacity)
-                    )
-                )
-        }
     }
 }
 

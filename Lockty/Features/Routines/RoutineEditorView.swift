@@ -495,7 +495,6 @@ struct RoutineEditorView: View {
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
     @FocusState private var isNameFieldFocused: Bool
-    @State private var sheetNavigationDirection: LocktyDynamicSheetNavigationDirection = .none
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -560,13 +559,8 @@ struct RoutineEditorView: View {
     }
 
     var body: some View {
-        LocktyDynamicSheet(
-            animation: .smooth(duration: 0.32),
-            contentID: contentID,
-            navigationDirection: sheetNavigationDirection
-        ) {
+        LocktyDynamicSheet(animation: sheetAnimation) {
             sheetContent
-                .id(contentID)
                 .locktyDynamicSheetChrome(id: contentID) {
                     centerChrome
                 } leading: {
@@ -612,25 +606,47 @@ struct RoutineEditorView: View {
         }
     }
 
-    @ViewBuilder
+    private var sheetAnimation: Animation { .snappy(duration: 0.3, extraBounce: 0) }
+
+    /// The screens, swapped in place. There is no navigation stack: one ZStack holds
+    /// whichever screen is current and each branch is its own geometryGroup, so the
+    /// sheet resizing and the content changing move together instead of the transition
+    /// being measured mid-flight.
     private var sheetContent: some View {
-        switch activeSheet {
-        case .apps:
-            selectionScreen
-                .locktyDynamicSheetSizes([.large])
-        case .domains:
-            domainsScreen
-                .locktyDynamicSheetSizes([.large])
-        case nil:
-            switch currentCompactScreen {
-            case .naming:
-                namingContent
-            case .editing:
-                editorContent
-            case .reading:
-                readOnlyContent
+        ZStack {
+            switch activeSheet {
+            case .apps:
+                // A screen of its own: it asked for the whole sheet, so it has to fill
+                // it rather than sit at the top of it at its own ideal height.
+                selectionScreen
+                    .frame(maxHeight: .infinity)
+                    .locktyDynamicSheetSizes([.large])
+                    .geometryGroup()
+                    .transition(.blurReplace(.upUp))
+            case .domains:
+                domainsScreen
+                    .frame(maxHeight: .infinity)
+                    .locktyDynamicSheetSizes([.large])
+                    .geometryGroup()
+                    .transition(.blurReplace(.upUp))
+            case nil:
+                switch currentCompactScreen {
+                case .naming:
+                    namingContent
+                        .geometryGroup()
+                        .transition(.blurReplace(.upUp))
+                case .editing:
+                    editorContent
+                        .geometryGroup()
+                        .transition(.blurReplace(.downUp))
+                case .reading:
+                    readOnlyContent
+                        .geometryGroup()
+                        .transition(.blurReplace(.downUp))
+                }
             }
         }
+        .geometryGroup()
     }
 
     /// The middle of the bar. On the routine itself that is its icon beside its name,
@@ -771,31 +787,27 @@ struct RoutineEditorView: View {
     }
 
     private func closePicker() {
-        withAnimation(.smooth(duration: 0.34)) {
-            sheetNavigationDirection = .backward
+        withAnimation(sheetAnimation) {
             activeSheet = nil
         }
         viewModel.refreshSelectionState()
     }
 
     private func openChildSheet(_ sheet: RoutineEditorLocalSheet) {
-        withAnimation(.smooth(duration: 0.34)) {
-            sheetNavigationDirection = .forward
+        withAnimation(sheetAnimation) {
             activeSheet = sheet
         }
     }
 
     private func enterEditingFlow() {
-        withAnimation(.smooth(duration: 0.34)) {
-            sheetNavigationDirection = .forward
+        withAnimation(sheetAnimation) {
             isEditing = true
             isNaming = true
         }
     }
 
     private func exitNaming() {
-        withAnimation(.smooth(duration: 0.34)) {
-            sheetNavigationDirection = .backward
+        withAnimation(sheetAnimation) {
             isNaming = false
         }
         isNameFieldFocused = false

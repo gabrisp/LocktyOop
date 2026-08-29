@@ -311,10 +311,10 @@ struct TodayView: View {
                         tokens: viewModel.activeRoutineTokens,
                         allowance: viewModel.activePauseAllowance,
                         onOpenApps: {
-                            router.presentSheet(.liveSession)
+                            router.presentFullScreen(.unlockFlow(nil))
                         },
-                        onUnlock: { _ in
-                            router.presentSheet(.liveSession)
+                        onUnlock: { token in
+                            router.presentFullScreen(.unlockFlow(token))
                         }
                     )
                 }

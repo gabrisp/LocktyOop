@@ -1,4 +1,6 @@
 import Foundation
+import FamilyControls
+import ManagedSettings
 import SwiftUI
 
 struct FeatureFactory {
@@ -74,6 +76,50 @@ struct FeatureFactory {
             viewModel: PauseViewModel(context: context, engine: pauseEngine),
             router: router
         )
+    }
+
+    func makeUnlockFlow(token: ApplicationToken?) -> UnlockFlowView {
+        let activeRoutine = routineEngine.activeRoutine()
+        let blockedTokens: [ApplicationToken] = activeRoutine.map { routine in
+            let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?.applicationTokens ?? []
+            return selection.stablePrefix(selection.count)
+        } ?? []
+
+        return UnlockFlowView(
+            tokens: blockedTokens,
+            initialToken: token,
+            defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60)
+        ) { chosenToken, minutes in
+            Task { @MainActor in
+                await grantAllowance(for: chosenToken, minutes: minutes, activeRoutine: activeRoutine)
+                router.dismissFullScreen()
+            }
+        } onClose: {
+            router.dismissFullScreen()
+        }
+    }
+
+    /// Grants the allowance the flow just asked for.
+    private func grantAllowance(
+        for token: ApplicationToken?,
+        minutes: Int,
+        activeRoutine: ActiveRoutine?
+    ) async {
+        guard let token else { return }
+        let identity = AppIdentity(token: token)
+        let context = PauseContext(
+            pauseRuleID: activeRoutine?.routineID ?? identity.id.rawValue.stableUUID,
+            appID: identity.id,
+            applicationToken: token,
+            displayName: identity.displayName,
+            allowanceDuration: TimeInterval(minutes * 60),
+            // No steps: the waiting already happened, or was never asked for. This grants
+            // the allowance the flow settled on.
+            steps: [],
+            activeRoutineID: activeRoutine?.routineID,
+            source: .app
+        )
+        await pauseEngine.allowTemporarily(context, intention: nil)
     }
 
     func makeRoutineDetail(routineID: UUID) -> RoutineDetailView {

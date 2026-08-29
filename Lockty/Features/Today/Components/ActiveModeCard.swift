@@ -59,8 +59,9 @@ struct ActiveModeCard: View {
         }
     }
 
-    /// The blocked apps, each behind a lock, with the row's own unlock button floating
-    /// over the middle of it.
+    /// The blocked apps, each behind a lock. Tapping one opens the unlock flow for that
+    /// app -- there is no separate button over the row, because picking the app is the
+    /// first thing the flow would ask for anyway.
     private var blockedApps: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: LocktySpacing.lg) {
@@ -88,24 +89,5 @@ struct ActiveModeCard: View {
         // it back inside the content -- otherwise the icons stop short and the row reads
         // as clipped rather than scrollable.
         .padding(.horizontal, -LocktySpacing.lg)
-        .overlay {
-            // Floating over the row rather than under it: it is the shortcut for the
-            // whole set, and the per-app buttons behind it stay reachable either side.
-            Button(action: onOpenApps) {
-                Label {
-                    Text("Desbloquear apps")
-                        .font(.system(.headline, design: .default, weight: .regular))
-                } icon: {
-                    Image(systemName: "lock.open.fill")
-                        .font(.system(size: 15, weight: .regular))
-                }
-                .foregroundStyle(.black)
-                .padding(.horizontal, LocktySpacing.lg)
-                .padding(.vertical, LocktySpacing.md)
-                .background(Capsule(style: .continuous).fill(.white))
-            }
-            .buttonStyle(.plain)
-            .tappable()
-        }
     }
 }

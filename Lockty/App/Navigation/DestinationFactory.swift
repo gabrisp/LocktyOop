@@ -90,6 +90,9 @@ struct DestinationFactory {
 
         case .activeRoutine(let id):
             featureFactory.makeActiveRoutine(routineID: id)
+
+        case .unlockFlow(let token):
+            featureFactory.makeUnlockFlow(token: token)
         }
     }
 }

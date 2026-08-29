@@ -45,6 +45,8 @@ nonisolated enum PauseSource: String, Codable, Hashable {
     case shieldAction
     case notification
     case deepLink
+    /// Started inside Lockty, from the unlock flow.
+    case app
     case development
 }
 

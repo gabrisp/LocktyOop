@@ -589,7 +589,11 @@ struct RoutineEditorView: View {
         }
         .onChange(of: isNaming, initial: false) { _, newValue in
             guard newValue else { return }
-            DispatchQueue.main.async {
+            // After the transition has put the field on screen. Focusing on the same
+            // runloop turn asks a text field that does not exist yet to take the
+            // keyboard, and nothing happens.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(340))
                 isNameFieldFocused = true
             }
         }
@@ -703,7 +707,9 @@ struct RoutineEditorView: View {
                     .font(.system(size: 18, weight: .medium))
             }
             .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        } else if !isEditing && !isCreating && !viewModel.isEditingBlocked {
+        } else if !viewModel.isEditingBlocked {
+            // Also while creating. It used to be shown only when reading an existing
+            // routine, so a new one had no way to reach the screen that names it.
             LocktyDynamicSheetBarButton(action: enterEditingFlow) {
                 Image(systemName: "pencil")
                     .font(.system(size: 15, weight: .medium))

@@ -187,21 +187,22 @@ struct LocktyDynamicSheet<Content: View>: View {
                 .id(contentID)
                 .animation(animation, value: contentID)
                 .environment(\.locktyDynamicSheetChromeController, chromeController)
+                // On the content, inside the stack -- not on the ZStack. Applied outside
+                // it, the fixed size and the measurement take in the bar overlay too,
+                // and the bar is laid out on top of the content rather than under it, so
+                // what came back was neither the content's height nor a stable one.
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGSize.self) {
+                    isVisible ? $0.size : .zero
+                } action: { newValue in
+                    guard newValue != .zero else { return }
+                    setHeight(newValue.height)
+                }
 
             if let chrome = chromeController.configuration {
                 LocktyDynamicSheetChromeOverlay(configuration: chrome)
                     .transition(.blurReplace.combined(with: .opacity))
             }
-        }
-        // Pins the content to its ideal height so it can be measured. There is no
-        // navigation stack in the way to collapse -- the stack is faked by swapping
-        // content -- which is what makes measuring directly possible at all.
-        .fixedSize(horizontal: false, vertical: true)
-        .onGeometryChange(for: CGSize.self) {
-            isVisible ? $0.size : .zero
-        } action: { newValue in
-            guard newValue != .zero else { return }
-            setHeight(newValue.height)
         }
         .task { isVisible = true }
         .modifier(LocktySheetDetentModifier(height: sheetHeight, sizes: chromeController.sizes))

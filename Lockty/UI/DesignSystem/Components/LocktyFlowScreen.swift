@@ -17,6 +17,10 @@ struct LocktyFlowScreen<Content: View>: View {
     let primaryTitle: String
     var secondaryTitle: String?
     var isPrimaryEnabled = true
+    /// Seconds the primary button is held shut for when this step appears. The rest is
+    /// the whole point of the flow: it is what makes opening the app a decision rather
+    /// than a reflex, so it runs on every step that has one, every time.
+    var restSeconds: Int = 0
     /// The chip in the top right. Tapping it takes the flow back to that choice.
     var accessoryToken: ApplicationToken?
     var onAccessory: (() -> Void)?
@@ -25,33 +29,46 @@ struct LocktyFlowScreen<Content: View>: View {
     var onSecondary: (() -> Void)?
     @ViewBuilder var content: Content
 
+    /// Counts down from restSeconds. Restarted whenever the step changes, so each step
+    /// gets its own wait rather than inheriting whatever was left of the last one.
+    @State private var remainingRest = 0
+
+    private var isResting: Bool { remainingRest > 0 }
+
+    private var canPressPrimary: Bool { isPrimaryEnabled && !isResting }
+
     var body: some View {
         ZStack {
             LocktyScreenBackground()
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                header
-
+            // The content owns the whole screen and the chrome is laid over it, rather
+            // than the three of them sharing a stack. Sharing one meant the content was
+            // centred on whatever was left between two bars and the wheel was cut short
+            // by them; overlaid, it runs the full height and the chrome floats on top.
+            VStack(spacing: LocktySpacing.xl) {
                 Text(title)
                     .font(.system(.title2, design: .default, weight: .bold))
                     .foregroundStyle(LocktyColors.primaryText)
-                    .padding(.top, LocktySpacing.lg)
-
-                Spacer(minLength: 0)
 
                 content
                     .transition(.blurReplace.combined(with: .opacity))
                     .id(stepID)
-
-                Spacer(minLength: 0)
-
-                footer
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .top) { header }
+            .overlay(alignment: .bottom) { footer }
             .padding(.horizontal, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.lg)
         }
         .animation(.smooth(duration: 0.34), value: stepID)
+        .task(id: stepID) {
+            remainingRest = restSeconds
+            while remainingRest > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                remainingRest -= 1
+            }
+        }
     }
 
     private var header: some View {
@@ -94,19 +111,29 @@ struct LocktyFlowScreen<Content: View>: View {
     private var footer: some View {
         VStack(spacing: LocktySpacing.md) {
             Button(action: onPrimary) {
-                Text(primaryTitle)
+                Text(isResting ? "\(remainingRest)" : primaryTitle)
                     .font(.system(.headline, design: .default, weight: .semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.snappy(duration: 0.25), value: remainingRest)
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
-                    .contentTransition(.opacity)
-                    .background(Capsule(style: .continuous).fill(.white))
+                    .background(Capsule(style: .continuous).fill(isResting ? .white.opacity(0.55) : .white))
             }
             .buttonStyle(.locktyInteractive)
             .locktyInteractiveSurface(enabled: true, shape: Capsule(style: .continuous))
             .tappable()
-            .disabled(!isPrimaryEnabled)
+            .disabled(!canPressPrimary)
             .opacity(isPrimaryEnabled ? 1 : 0.4)
+            .animation(.smooth(duration: 0.3), value: isResting)
+            // Ticks that firm up as the wait runs out, and a solid one when it opens.
+            .sensoryFeedback(trigger: remainingRest) { _, new in
+                guard new > 0, restSeconds > 0 else { return nil }
+                let elapsed = 1 - Double(new) / Double(restSeconds)
+                return .impact(weight: .light, intensity: 0.25 + 0.75 * elapsed)
+            }
+            .sensoryFeedback(.impact(weight: .medium), trigger: isResting) { _, new in !new }
 
             if let secondaryTitle, let onSecondary {
                 Button(action: onSecondary) {

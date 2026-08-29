@@ -91,7 +91,12 @@ struct FeatureFactory {
             defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60)
         ) { chosenToken, minutes in
             Task { @MainActor in
-                await grantAllowance(for: chosenToken, minutes: minutes, activeRoutine: activeRoutine)
+                await grantAllowance(
+                    for: chosenToken,
+                    among: blockedTokens,
+                    minutes: minutes,
+                    activeRoutine: activeRoutine
+                )
                 router.dismissFullScreen()
             }
         } onClose: {
@@ -100,21 +105,30 @@ struct FeatureFactory {
     }
 
     /// Grants the allowance the flow just asked for.
+    ///
+    /// A nil token is the flow's "all apps" choice: it releases everything the routine
+    /// is holding shut rather than nothing, which is what it did while an allowance
+    /// could only ever name one app.
     private func grantAllowance(
         for token: ApplicationToken?,
+        among blockedTokens: [ApplicationToken],
         minutes: Int,
         activeRoutine: ActiveRoutine?
     ) async {
-        guard let token else { return }
-        let identity = AppIdentity(token: token)
+        let released = token.map { [$0] } ?? blockedTokens
+        guard let representative = released.first else { return }
+
+        let identity = AppIdentity(token: representative)
+        let releasedIDs = Set(released.map(AppIdentity.ID.init(token:)))
         let context = PauseContext(
             pauseRuleID: activeRoutine?.routineID ?? identity.id.rawValue.stableUUID,
             appID: identity.id,
-            applicationToken: token,
-            displayName: identity.displayName,
+            applicationToken: representative,
+            releasedApplications: releasedIDs,
+            displayName: token == nil ? "Todas las apps" : identity.displayName,
             allowanceDuration: TimeInterval(minutes * 60),
-            // No steps: the waiting already happened, or was never asked for. This grants
-            // the allowance the flow settled on.
+            // No steps: the wait already happened in the flow itself. This grants the
+            // allowance it settled on.
             steps: [],
             activeRoutineID: activeRoutine?.routineID,
             source: .app

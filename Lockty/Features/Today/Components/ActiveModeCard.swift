@@ -15,10 +15,10 @@ struct ActiveModeCard: View {
 
     private var radius: CGFloat { LocktyRadius.medium }
 
-    /// The one app the running allowance has released, if it is one of these.
-    private var releasedToken: ApplicationToken? {
-        guard let allowance else { return nil }
-        return tokens.first { AppIdentity.ID(token: $0) == allowance.context.appID }
+    /// Every app the running allowance has released. More than one when the unlock flow
+    /// was answered with "all apps".
+    private var releasedIDs: Set<AppIdentity.ID> {
+        allowance?.releasedApplications ?? []
     }
 
     private var blockedCountText: String {
@@ -66,7 +66,7 @@ struct ActiveModeCard: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: LocktySpacing.lg) {
                 ForEach(tokens, id: \.self) { token in
-                    let released = releasedToken == token
+                    let released = releasedIDs.contains(AppIdentity.ID(token: token))
 
                     Button {
                         onUnlock(token)

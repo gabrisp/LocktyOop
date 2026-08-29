@@ -9,6 +9,10 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
     /// An AppIdentity rebuilt from appID alone has no token and falls back to a
     /// placeholder square.
     var applicationToken: ApplicationToken?
+    /// Every app this release covers. Normally just `appID`, but the unlock flow's
+    /// "all apps" choice releases the whole set the routine is holding shut, and an
+    /// allowance that can only name one app cannot express that.
+    var releasedApplications: Set<AppIdentity.ID>
     var displayName: String
     var allowanceDuration: TimeInterval
     var steps: [PauseStep]
@@ -21,6 +25,7 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         pauseRuleID: UUID,
         appID: AppIdentity.ID,
         applicationToken: ApplicationToken? = nil,
+        releasedApplications: Set<AppIdentity.ID> = [],
         displayName: String,
         allowanceDuration: TimeInterval,
         steps: [PauseStep],
@@ -32,6 +37,9 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         self.pauseRuleID = pauseRuleID
         self.appID = appID
         self.applicationToken = applicationToken
+        // Defaults to the single app it names, so every existing caller keeps its
+        // meaning without saying anything new.
+        self.releasedApplications = releasedApplications.isEmpty ? [appID] : releasedApplications
         self.displayName = displayName
         self.allowanceDuration = allowanceDuration
         self.steps = steps
@@ -88,5 +96,10 @@ nonisolated struct ActivePauseAllowance: Codable, Hashable, Identifiable {
 
     var isExpired: Bool {
         Date() >= expiresAt
+    }
+
+    /// Everything this allowance is currently releasing.
+    var releasedApplications: Set<AppIdentity.ID> {
+        context.releasedApplications.isEmpty ? [context.appID] : context.releasedApplications
     }
 }

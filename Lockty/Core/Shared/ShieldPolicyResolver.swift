@@ -17,9 +17,11 @@ struct ShieldPolicyResolver {
             reasons.append(activeRoutine.shieldPolicy.reason)
         }
 
+        let releasedApplications = activePauseAllowance?.releasedApplications ?? []
+
         let enabledPauseRules = pauseRules.filter(\.isEnabled)
         for rule in enabledPauseRules {
-            let isTemporarilyAllowed = activePauseAllowance?.context.appID == rule.application.id
+            let isTemporarilyAllowed = releasedApplications.contains(rule.application.id)
             if !isTemporarilyAllowed {
                 blockedApplications.insert(rule.application.id)
                 reasons.append(.pause(rule.application.id))
@@ -30,7 +32,7 @@ struct ShieldPolicyResolver {
         // loop above only skips it when it came from a pause rule, so an app blocked by
         // an active routine stayed shielded and "Continue" appeared to do nothing.
         var exemptApplications = Set<AppIdentity.ID>()
-        if let allowedAppID = activePauseAllowance?.context.appID {
+        for allowedAppID in releasedApplications {
             blockedApplications.remove(allowedAppID)
             exemptApplications.insert(allowedAppID)
         }

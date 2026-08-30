@@ -30,6 +30,8 @@ final class AppPickerViewModel: ObservableObject {
             "Choose Apps and Websites"
         case .routine:
             "Choose Apps"
+        case .rule:
+            "Choose Apps"
         case .pause:
             "Choose App"
         case .appGroup:
@@ -49,6 +51,8 @@ final class AppPickerViewModel: ObservableObject {
             return "Pauses support exactly one application."
         case .routine:
             return "Domains are configured separately in the routine editor."
+        case .rule:
+            return "Rules choose the applications they evaluate and restrict."
         case .appGroup:
             return "Reusable App Groups contain applications only."
         case .distracting:
@@ -64,6 +68,8 @@ final class AppPickerViewModel: ObservableObject {
             return "Choose the apps and websites Lockty can use across routines, pauses and reports."
         case .routine:
             return "Choose the applications this routine will restrict when it starts."
+        case .rule:
+            return "Choose the applications this rule will evaluate and restrict."
         case .pause:
             return "Choose the one application that will trigger this Pause flow."
         case .appGroup:
@@ -85,7 +91,7 @@ final class AppPickerViewModel: ObservableObject {
         switch scope {
         case .library:
             .library
-        case .routine:
+        case .routine, .rule:
             .routine
         case .pause:
             .pause
@@ -98,7 +104,7 @@ final class AppPickerViewModel: ObservableObject {
         switch scope {
         case .library:
             "Añadir App o sitio web"
-        case .routine:
+        case .routine, .rule:
             "Añadir App o categoría"
         case .pause:
             "Añadir App"
@@ -142,7 +148,7 @@ final class AppPickerViewModel: ObservableObject {
         switch scope {
         case .library:
             appsOnlyScope = false
-        case .routine, .pause, .appGroup, .distracting:
+        case .routine, .rule, .pause, .appGroup, .distracting:
             appsOnlyScope = true
         }
 

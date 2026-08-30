@@ -6,6 +6,9 @@ struct DestinationFactory {
     @ViewBuilder
     func destination(for route: AppRoute) -> some View {
         switch route {
+        case .rulesList:
+            featureFactory.makeRulesList()
+
         case .routinesList:
             featureFactory.makeRoutinesList()
 
@@ -64,6 +67,9 @@ struct DestinationFactory {
 
         case .liveSession:
             featureFactory.makeLiveSessionSheet()
+
+        case .ruleEditor(let route):
+            featureFactory.makeRuleEditor(route: route)
 
         case .routineEditor(let route):
             featureFactory.makeRoutineEditor(route: route)

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct FocusView: View {
     @ObservedObject var viewModel: FocusViewModel
-    let routinesViewModel: RoutinesViewModel
+    let rulesViewModel: RulesViewModel
     let frictionsViewModel: FrictionsViewModel
     @ObservedObject var appsViewModel: AppsLibraryViewModel
     @ObservedObject var router: AppRouter
@@ -18,10 +18,10 @@ struct FocusView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                section(title: "Routines") {
-                    router.push(.routinesList)
+                section(title: "Rules") {
+                    router.push(.rulesList)
                 } content: {
-                    routinesRow
+                    rulesRow
                 }
 
                 section(title: "Frictions") {
@@ -52,14 +52,14 @@ struct FocusView: View {
         }
         .task {
             await frictionRepository.seedDefaultFrictionIfNeeded()
-            await routinesViewModel.load()
+            await rulesViewModel.load()
             await frictionsViewModel.load()
             await appsViewModel.load()
         }
         .onChange(of: router.sheet) { _, newValue in
             guard newValue == nil else { return }
             Task {
-                await routinesViewModel.load()
+                await rulesViewModel.load()
                 await frictionsViewModel.load()
                 await appsViewModel.load()
             }
@@ -78,26 +78,33 @@ struct FocusView: View {
         }
     }
 
-    private var routinesRow: some View {
+    private var rulesRow: some View {
         horizontalRow {
-            addTile(title: "New Routine") {
-                router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
+            addTile(title: "New Rule") {
+                router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: nil)))
             }
 
-            ForEach(routinesViewModel.routines) { routine in
-                RoutineCard(
-                    routine: routine,
-                    isActive: routinesViewModel.activeRoutineID() == routine.id,
-                    applicationTokens: routinesViewModel.tokens(for: routine.id),
-                    onOpen: {
-                        router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+            ForEach(rulesViewModel.rules) { rule in
+                Group {
+                    if let routine = rule.routineBridge {
+                        RoutineCard(
+                            routine: routine,
+                            isActive: rulesViewModel.activeScheduleRuleID() == rule.id,
+                            applicationTokens: rulesViewModel.tokens(for: rule.id)
+                        ) {
+                            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: rule.id)))
+                        }
+                    } else {
+                        RuleCard(rule: rule, applicationTokens: rulesViewModel.tokens(for: rule.id)) {
+                            router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: rule.id)))
+                        }
                     }
-                )
+                }
                 .frame(width: tileWidth)
                 .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))
             }
         }
-        .animation(.smooth(duration: 0.34), value: routinesViewModel.routines.map(\.id))
+        .animation(.smooth(duration: 0.34), value: rulesViewModel.rules.map(\.id))
     }
 
     private var frictionsRow: some View {

@@ -2,15 +2,15 @@ import SwiftUI
 
 private enum FocusCreationScreen {
     case choice
-    case routine
+    case rule
     case friction
 }
 
 struct FocusCreationChoiceSheet: View {
     @ObservedObject var router: AppRouter
-    let makeRoutineEditor: (@escaping () -> Void) -> AnyView
+    let makeRuleEditor: (@escaping () -> Void) -> AnyView
     let makeFrictionEditor: (@escaping () -> Void) -> AnyView
-    let releaseRoutineEditor: () -> Void
+    let releaseRuleEditor: () -> Void
     let releaseFrictionEditor: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -41,8 +41,8 @@ struct FocusCreationChoiceSheet: View {
                         }
                         .geometryGroup()
                         .transition(screenTransition)
-                case .routine:
-                    makeRoutineEditor(returnToChoice)
+                case .rule:
+                    makeRuleEditor(returnToChoice)
                         .geometryGroup()
                         .transition(screenTransition)
                 case .friction:
@@ -72,11 +72,11 @@ struct FocusCreationChoiceSheet: View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
                 creationTile(
-                    title: "Routine",
-                    subtitle: "Apps, schedule, rules",
-                    systemImage: "repeat"
+                    title: "Rule",
+                    subtitle: "Schedule, opens, limits",
+                    systemImage: "line.3.horizontal.decrease.circle"
                 ) {
-                    open(.routine)
+                    open(.rule)
                 }
 
                 creationTile(
@@ -99,7 +99,7 @@ struct FocusCreationChoiceSheet: View {
     }
 
     private func dismissSheet() {
-        releaseRoutineEditor()
+        releaseRuleEditor()
         releaseFrictionEditor()
         dismiss()
     }

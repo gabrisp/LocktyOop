@@ -1,6 +1,7 @@
 import Foundation
 
 enum AppRoute: Hashable {
+    case rulesList
     case routinesList
     case frictionsList
     case appsList

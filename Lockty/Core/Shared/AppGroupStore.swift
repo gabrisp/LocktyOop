@@ -294,6 +294,18 @@ final class AppGroupStore {
         try writeData(data, fileName: "autofocus-configuration.json", legacyDefaultsKey: nil)
     }
 
+    nonisolated func loadStoredRules() -> [Rule] {
+        guard let data = (try? readData(fileName: "rules.json", legacyDefaultsKey: nil)) ?? nil else {
+            return []
+        }
+        return (try? decoder.decode([Rule].self, from: data)) ?? []
+    }
+
+    nonisolated func saveStoredRules(_ rules: [Rule]) throws {
+        let data = try encoder.encode(rules)
+        try writeData(data, fileName: "rules.json", legacyDefaultsKey: nil)
+    }
+
     nonisolated private func readData(
         fileName: String,
         legacyDefaultsKey: String?

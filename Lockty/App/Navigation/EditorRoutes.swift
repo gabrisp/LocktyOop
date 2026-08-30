@@ -2,15 +2,18 @@ import Foundation
 
 struct FocusCreationChoiceRoute: Hashable, Identifiable {
     let draftID: UUID
+    let ruleDraftID: UUID
     let routineDraftID: UUID
     let frictionDraftID: UUID
 
     init(
         draftID: UUID = UUID(),
+        ruleDraftID: UUID = UUID(),
         routineDraftID: UUID = UUID(),
         frictionDraftID: UUID = UUID()
     ) {
         self.draftID = draftID
+        self.ruleDraftID = ruleDraftID
         self.routineDraftID = routineDraftID
         self.frictionDraftID = frictionDraftID
     }
@@ -29,6 +32,24 @@ struct RoutineEditorRoute: Hashable, Identifiable {
         self.routineID = routineID
         self.draftID = draftID
         self.startsEditing = startsEditing ?? (routineID == nil)
+    }
+
+    var id: UUID { draftID }
+}
+
+struct RuleEditorRoute: Hashable, Identifiable {
+    let ruleID: UUID?
+    let draftID: UUID
+    let routineDraftID: UUID
+
+    init(
+        ruleID: UUID?,
+        draftID: UUID = UUID(),
+        routineDraftID: UUID = UUID()
+    ) {
+        self.ruleID = ruleID
+        self.draftID = draftID
+        self.routineDraftID = routineDraftID
     }
 
     var id: UUID { draftID }

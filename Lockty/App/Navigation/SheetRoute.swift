@@ -10,6 +10,7 @@ enum SheetRoute: Hashable, Identifiable {
     case settings
     case applicationDetails(AppIdentity.ID, day: Date?)
     case liveSession
+    case ruleEditor(RuleEditorRoute)
     case routineEditor(RoutineEditorRoute)
     case pauseEditor(PauseEditorRoute)
     case pauseFlowEditor(PauseFlowEditorRoute)
@@ -35,6 +36,7 @@ enum SheetRoute: Hashable, Identifiable {
         case .settings: "settings"
         case .applicationDetails(let id, let day): "application-details-\(id.rawValue)-\(day?.timeIntervalSince1970 ?? 0)"
         case .liveSession: "live-session"
+        case .ruleEditor(let route): "rule-editor-\(route.draftID.uuidString)"
         case .routineEditor(let route): "routine-editor-\(route.draftID.uuidString)"
         case .pauseEditor(let route): "pause-editor-\(route.draftID.uuidString)"
         case .pauseFlowEditor(let route): "pause-flow-editor-\(route.draftID.uuidString)"

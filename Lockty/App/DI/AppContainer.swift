@@ -23,6 +23,7 @@ final class AppContainer {
     let notificationService: NotificationServicing
 
     let todayViewModel: TodayViewModel
+    let rulesViewModel: RulesViewModel
     let routinesViewModel: RoutinesViewModel
     let focusViewModel: FocusViewModel
     let frictionsViewModel: FrictionsViewModel
@@ -54,6 +55,7 @@ final class AppContainer {
         locationService: LocationTriggerServicing,
         notificationService: NotificationServicing,
         todayViewModel: TodayViewModel,
+        rulesViewModel: RulesViewModel,
         routinesViewModel: RoutinesViewModel,
         focusViewModel: FocusViewModel,
         frictionsViewModel: FrictionsViewModel,
@@ -83,6 +85,7 @@ final class AppContainer {
         self.locationService = locationService
         self.notificationService = notificationService
         self.todayViewModel = todayViewModel
+        self.rulesViewModel = rulesViewModel
         self.routinesViewModel = routinesViewModel
         self.focusViewModel = focusViewModel
         self.frictionsViewModel = frictionsViewModel
@@ -132,6 +135,10 @@ final class AppContainer {
             controller: persistenceController,
             selectionStore: selectionStore
         )
+        let ruleRepository = HybridRuleRepository(
+            routineRepository: routineRepository,
+            appGroupStore: appGroupStore
+        )
         let alarmService = LiveAlarmService()
         let routineEngine = RoutineEngine(
             shieldService: shieldService,
@@ -179,6 +186,12 @@ final class AppContainer {
             scheduleCoordinator: routineScheduleCoordinator,
             selectionStore: selectionStore
         )
+        let rulesViewModel = RulesViewModel(
+            routineEngine: routineEngine,
+            repository: ruleRepository,
+            appGroupRepository: appGroupRepository,
+            selectionStore: selectionStore
+        )
         let focusViewModel = FocusViewModel()
         let pauseFlowRepository = AppGroupPauseFlowRepository(appGroupStore: appGroupStore)
         let frictionRepository = AppGroupFrictionRepository(
@@ -218,6 +231,7 @@ final class AppContainer {
         let featureFactory = FeatureFactory(
             router: router,
             todayViewModel: todayViewModel,
+            rulesViewModel: rulesViewModel,
             routinesViewModel: routinesViewModel,
             focusViewModel: focusViewModel,
             frictionsViewModel: frictionsViewModel,
@@ -227,6 +241,7 @@ final class AppContainer {
             selectionStore: selectionStore,
             pauseEngine: pauseEngine,
             routineEngine: routineEngine,
+            ruleRepository: ruleRepository,
             routineRepository: routineRepository,
             routineExecutionRepository: routineExecutionRepository,
             pauseRuleRepository: pauseRuleRepository,
@@ -274,6 +289,7 @@ final class AppContainer {
             locationService: locationService,
             notificationService: notificationService,
             todayViewModel: todayViewModel,
+            rulesViewModel: rulesViewModel,
             routinesViewModel: routinesViewModel,
             focusViewModel: focusViewModel,
             frictionsViewModel: frictionsViewModel,

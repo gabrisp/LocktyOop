@@ -6,6 +6,7 @@ import SwiftUI
 struct FeatureFactory {
     let router: AppRouter
     let todayViewModel: TodayViewModel
+    let rulesViewModel: RulesViewModel
     let routinesViewModel: RoutinesViewModel
     let focusViewModel: FocusViewModel
     let frictionsViewModel: FrictionsViewModel
@@ -15,6 +16,7 @@ struct FeatureFactory {
     let selectionStore: ScreenTimeSelectionStore
     let pauseEngine: PauseEngine
     let routineEngine: RoutineEngine
+    let ruleRepository: RuleRepository
     let routineRepository: RoutineRepository
     let routineExecutionRepository: RoutineExecutionRepository
     let pauseRuleRepository: PauseRuleRepository
@@ -39,12 +41,18 @@ struct FeatureFactory {
     func makeFocusView() -> FocusView {
         FocusView(
             viewModel: focusViewModel,
-            routinesViewModel: routinesViewModel,
+            rulesViewModel: rulesViewModel,
             frictionsViewModel: frictionsViewModel,
             appsViewModel: appsViewModel,
             router: router,
             frictionRepository: frictionRepository
         )
+    }
+
+    func makeRulesList() -> some View {
+        LocktySectionScreen(title: "Rules") {
+            RulesView(viewModel: rulesViewModel, router: router)
+        }
     }
 
     func makeLifetimeView() -> LifetimeView {
@@ -143,22 +151,41 @@ struct FeatureFactory {
     func makeFocusCreationChoiceSheet(route: FocusCreationChoiceRoute) -> FocusCreationChoiceSheet {
         FocusCreationChoiceSheet(
             router: router,
-            makeRoutineEditor: { onReturnToParent in
+            makeRuleEditor: { onReturnToParent in
                 AnyView(
-                    RoutineEditorView(
-                        viewModel: editorStore.routineEditor(
-                            route: RoutineEditorRoute(routineID: nil, draftID: route.routineDraftID),
-                            repository: routineRepository,
+                    RuleEditorView(
+                        viewModel: editorStore.ruleEditor(
+                            route: RuleEditorRoute(
+                                ruleID: nil,
+                                draftID: route.ruleDraftID,
+                                routineDraftID: route.routineDraftID
+                            ),
+                            repository: ruleRepository,
                             selectionStore: selectionStore,
-                            routineEngine: routineEngine,
-                            usageDataService: usageDataService,
-                            pauseFlowRepository: pauseFlowRepository
+                            frictionRepository: frictionRepository
                         ),
-                        router: router,
-                        startsEditing: true,
+                        makeScheduleRuleEditor: { onReturnToRuleChoice in
+                            AnyView(
+                                RoutineEditorView(
+                                    viewModel: editorStore.routineEditor(
+                                        route: RoutineEditorRoute(routineID: nil, draftID: route.routineDraftID),
+                                        repository: routineRepository,
+                                        selectionStore: selectionStore,
+                                        routineEngine: routineEngine,
+                                        usageDataService: usageDataService,
+                                        pauseFlowRepository: pauseFlowRepository
+                                    ),
+                                    router: router,
+                                    startsEditing: true,
+                                    isEmbeddedInParentSheet: true,
+                                    onReturnToParent: onReturnToRuleChoice,
+                                    onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) }
+                                )
+                            )
+                        },
                         isEmbeddedInParentSheet: true,
                         onReturnToParent: onReturnToParent,
-                        onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) }
+                        onCloseEditor: { editorStore.releaseRuleEditor(draftID: route.ruleDraftID) }
                     )
                 )
             },
@@ -176,7 +203,7 @@ struct FeatureFactory {
                     )
                 )
             },
-            releaseRoutineEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) },
+            releaseRuleEditor: { editorStore.releaseRuleEditor(draftID: route.ruleDraftID) },
             releaseFrictionEditor: { editorStore.releaseFrictionEditor(draftID: route.frictionDraftID) }
         )
     }
@@ -332,6 +359,41 @@ struct FeatureFactory {
             router: router,
             startsEditing: route.startsEditing,
             onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.draftID) }
+        )
+    }
+
+    func makeRuleEditor(route: RuleEditorRoute) -> RuleEditorView {
+        RuleEditorView(
+            viewModel: editorStore.ruleEditor(
+                route: route,
+                repository: ruleRepository,
+                selectionStore: selectionStore,
+                frictionRepository: frictionRepository
+            ),
+            makeScheduleRuleEditor: { onReturnToRuleChoice in
+                AnyView(
+                    RoutineEditorView(
+                        viewModel: editorStore.routineEditor(
+                            route: RoutineEditorRoute(
+                                routineID: route.ruleID,
+                                draftID: route.routineDraftID,
+                                startsEditing: route.ruleID == nil
+                            ),
+                            repository: routineRepository,
+                            selectionStore: selectionStore,
+                            routineEngine: routineEngine,
+                            usageDataService: usageDataService,
+                            pauseFlowRepository: pauseFlowRepository
+                        ),
+                        router: router,
+                        startsEditing: route.ruleID == nil,
+                        isEmbeddedInParentSheet: true,
+                        onReturnToParent: onReturnToRuleChoice,
+                        onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) }
+                    )
+                )
+            },
+            onCloseEditor: { editorStore.releaseRuleEditor(draftID: route.draftID) }
         )
     }
 

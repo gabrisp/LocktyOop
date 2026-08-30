@@ -3,6 +3,7 @@ import Foundation
 nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
     case library
     case routine(UUID)
+    case rule(UUID)
     case pause(UUID)
     case appGroup(UUID)
     case distracting
@@ -13,6 +14,8 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
             "library"
         case .routine(let id):
             "routine-\(id.uuidString)"
+        case .rule(let id):
+            "rule-\(id.uuidString)"
         case .pause(let id):
             "pause-\(id.uuidString)"
         case .appGroup(let id):

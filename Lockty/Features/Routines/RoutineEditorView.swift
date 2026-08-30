@@ -1544,39 +1544,45 @@ struct RoutineEditorView: View {
 
     private var breakDetailsCard: some View {
         VStack(spacing: 0) {
-            breakStepperRow(
+            breakMenuRow(
                 title: "Max breaks",
                 valueText: "\(viewModel.maximumBreaks)",
-                decrementDisabled: viewModel.maximumBreaks <= 1,
-                incrementDisabled: viewModel.maximumBreaks >= 8,
-                onDecrement: { viewModel.maximumBreaks = max(viewModel.maximumBreaks - 1, 1) },
-                onIncrement: { viewModel.maximumBreaks = min(viewModel.maximumBreaks + 1, 8) }
+                options: Array(1...8),
+                format: { "\($0)" },
+                selection: Binding(
+                    get: { viewModel.maximumBreaks },
+                    set: { viewModel.maximumBreaks = $0 }
+                )
             )
 
             Divider()
                 .overlay(Color.white.opacity(0.10))
                 .padding(.leading, 16)
 
-            breakStepperRow(
+            breakMenuRow(
                 title: "Break duration",
                 valueText: "\(viewModel.maximumBreakMinutes) min",
-                decrementDisabled: viewModel.maximumBreakMinutes <= 1,
-                incrementDisabled: viewModel.maximumBreakMinutes >= 15,
-                onDecrement: { viewModel.maximumBreakMinutes = max(viewModel.maximumBreakMinutes - 1, 1) },
-                onIncrement: { viewModel.maximumBreakMinutes = min(viewModel.maximumBreakMinutes + 1, 15) }
+                options: Array(1...15),
+                format: { "\($0) min" },
+                selection: Binding(
+                    get: { viewModel.maximumBreakMinutes },
+                    set: { viewModel.maximumBreakMinutes = $0 }
+                )
             )
 
             Divider()
                 .overlay(Color.white.opacity(0.10))
                 .padding(.leading, 16)
 
-            breakStepperRow(
+            breakMenuRow(
                 title: "Cooldown",
                 valueText: "\(viewModel.minimumBreakIntervalMinutes) min",
-                decrementDisabled: viewModel.minimumBreakIntervalMinutes <= 1,
-                incrementDisabled: viewModel.minimumBreakIntervalMinutes >= 180,
-                onDecrement: { viewModel.minimumBreakIntervalMinutes = max(viewModel.minimumBreakIntervalMinutes - 1, 1) },
-                onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 180) }
+                options: Array(stride(from: 5, through: 180, by: 5)),
+                format: { "\($0) min" },
+                selection: Binding(
+                    get: { viewModel.minimumBreakIntervalMinutes },
+                    set: { viewModel.minimumBreakIntervalMinutes = $0 }
+                )
             )
         }
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
@@ -1664,48 +1670,52 @@ struct RoutineEditorView: View {
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
-    private func breakStepperRow(
+    private func breakMenuRow(
         title: String,
         valueText: String,
-        decrementDisabled: Bool,
-        incrementDisabled: Bool,
-        onDecrement: @escaping () -> Void,
-        onIncrement: @escaping () -> Void
+        options: [Int],
+        format: @escaping (Int) -> String,
+        selection: Binding<Int>
     ) -> some View {
-        HStack(spacing: LocktySpacing.md) {
-            Text(title)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.primaryText)
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: LocktySpacing.sm) {
-                Button(action: onDecrement) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 28, height: 28)
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    withAnimation(.smooth(duration: 0.22)) {
+                        selection.wrappedValue = option
+                    }
+                } label: {
+                    if selection.wrappedValue == option {
+                        Label(format(option), systemImage: "checkmark")
+                    } else {
+                        Text(format(option))
+                    }
                 }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-                .disabled(decrementDisabled)
-
-                Text(valueText)
-                    .font(.system(.subheadline, design: .default, weight: .regular))
-                    .foregroundStyle(LocktyColors.secondaryText)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .frame(minWidth: 72, alignment: .center)
-
-                Button(action: onIncrement) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-                .disabled(incrementDisabled)
             }
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: LocktySpacing.xs) {
+                    Text(valueText)
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.vertical, LocktySpacing.md)
+        .buttonStyle(.plain)
     }
 
     private func breakTriggerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

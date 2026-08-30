@@ -17,11 +17,11 @@ final class CoreDataAppClassificationRepository: AppClassificationRepository {
         request.fetchLimit = 1
         let savedClassification = (try? context.fetch(request).first).flatMap(mapper.makeDomain(from:))
 
-        if let savedClassification, savedClassification != .neutral {
+        if let savedClassification {
             return savedClassification
         }
 
-        return AppClassificationHeuristics.classification(appID: appID) ?? savedClassification
+        return AppClassificationHeuristics.classification(appID: appID)
     }
 
     func allClassifications() async -> [AppIdentity.ID: AppClassification] {

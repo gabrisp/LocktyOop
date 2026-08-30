@@ -10,7 +10,7 @@ struct FocusView: View {
 
     private var gutter: CGFloat { LocktySpacing.lg }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
-    private var appTileWidth: CGFloat { 136 }
+    private var appTileWidth: CGFloat { 110 }
     private var appFolderShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 28, style: .continuous)
     }

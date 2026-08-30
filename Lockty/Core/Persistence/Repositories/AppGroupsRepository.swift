@@ -93,10 +93,6 @@ final class AutoFocusManager {
             await classificationRepository.saveClassification(.unproductive, for: added)
         }
 
-        for removed in previousIDs.subtracting(newIDs) {
-            await classificationRepository.saveClassification(.neutral, for: removed)
-        }
-
         var configuration = await repository.loadConfiguration()
         configuration.distractingApplicationIDs = newIDs
         configuration.updatedAt = Date()

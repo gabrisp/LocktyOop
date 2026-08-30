@@ -20,9 +20,6 @@ final class RuleEditorViewModel: ObservableObject {
     @Published var minimumBreakIntervalMinutes = 60
     @Published var breakResetPeriod: RuleResetPeriod = .daily
     @Published var requiredFrictionID: UUID?
-    @Published var breakTriggerManual = true
-    @Published var breakTriggerNFC = false
-    @Published var breakTriggerLocation = false
     @Published var errorMessage: String?
     @Published private(set) var selectionPreview = FamilyActivitySelection()
     @Published private(set) var selectedApplicationCount = 0
@@ -50,9 +47,6 @@ final class RuleEditorViewModel: ObservableObject {
         var minimumBreakIntervalMinutes: Int
         var breakResetPeriod: RuleResetPeriod
         var requiredFrictionID: UUID?
-        var breakTriggerManual: Bool
-        var breakTriggerNFC: Bool
-        var breakTriggerLocation: Bool
         var selectedApplicationCount: Int
     }
 
@@ -109,9 +103,6 @@ final class RuleEditorViewModel: ObservableObject {
             minimumBreakIntervalMinutes: minimumBreakIntervalMinutes,
             breakResetPeriod: breakResetPeriod,
             requiredFrictionID: requiredFrictionID,
-            breakTriggerManual: breakTriggerManual,
-            breakTriggerNFC: breakTriggerNFC,
-            breakTriggerLocation: breakTriggerLocation,
             selectedApplicationCount: selectedApplicationCount
         )
     }
@@ -148,9 +139,6 @@ final class RuleEditorViewModel: ObservableObject {
         minimumBreakIntervalMinutes = max(rule.breakPolicy.cooldownMinutes, 1)
         breakResetPeriod = rule.breakPolicy.resetPeriod
         requiredFrictionID = rule.breakPolicy.requiredFrictionID
-        breakTriggerManual = rule.breakPolicy.allowedTriggers.contains(.manual)
-        breakTriggerNFC = rule.breakPolicy.allowedTriggers.contains(.nfc)
-        breakTriggerLocation = rule.breakPolicy.allowedTriggers.contains(.location)
         if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
             try? selectionStore.save(selection, scope: draftSelectionScope)
         } else {
@@ -212,9 +200,6 @@ final class RuleEditorViewModel: ObservableObject {
         if maximumBreaks <= 0 {
             maximumBreaks = 2
         }
-        if !breakTriggerManual && !breakTriggerNFC && !breakTriggerLocation {
-            breakTriggerManual = true
-        }
         if requiredFrictionID == nil {
             requiredFrictionID = frictions.first?.id
         }
@@ -247,12 +232,6 @@ final class RuleEditorViewModel: ObservableObject {
             return false
         }
 
-        let triggers = Set([
-            breakTriggerManual ? BreakTrigger.manual : nil,
-            breakTriggerNFC ? BreakTrigger.nfc : nil,
-            breakTriggerLocation ? BreakTrigger.location : nil
-        ].compactMap { $0 })
-
         let rule = Rule(
             id: editingID,
             name: trimmedName,
@@ -282,7 +261,7 @@ final class RuleEditorViewModel: ObservableObject {
                 maximumBreaks: breaksAllowed ? maximumBreaks : 0,
                 resetPeriod: breakResetPeriod,
                 cooldownMinutes: breaksAllowed ? minimumBreakIntervalMinutes : 0,
-                allowedTriggers: breaksAllowed ? triggers : [],
+                allowedTriggers: breaksAllowed ? [.manual] : [],
                 requiredFrictionID: breaksAllowed ? requiredFrictionID : nil,
                 frictionPolicy: selectedFriction?.flow.policy ?? .off
             ),
@@ -564,7 +543,7 @@ struct RuleEditorView: View {
                 isGoingBack = false
                 withAnimation(sheetAnimation) {
                     isShowingKindChoice = false
-                    isNaming = true
+                    isNaming = false
                 }
             }
         } label: {
@@ -649,46 +628,54 @@ struct RuleEditorView: View {
         VStack(spacing: 0) {
             switch viewModel.kind {
             case .openCountLimit:
-                stepperRow(
+                menuRow(
                     title: "Max opens",
                     valueText: "\(viewModel.maximumOpens)",
-                    decrementDisabled: viewModel.maximumOpens <= 1,
-                    incrementDisabled: viewModel.maximumOpens >= 50,
-                    onDecrement: { viewModel.maximumOpens = max(viewModel.maximumOpens - 1, 1) },
-                    onIncrement: { viewModel.maximumOpens = min(viewModel.maximumOpens + 1, 50) }
+                    options: Array(1...50),
+                    format: { "\($0)" },
+                    selection: Binding(
+                        get: { viewModel.maximumOpens },
+                        set: { viewModel.maximumOpens = $0 }
+                    )
                 )
 
                 dividerInset
 
-                stepperRow(
+                menuRow(
                     title: "Window",
                     valueText: "\(viewModel.openCountWindowHours) h",
-                    decrementDisabled: viewModel.openCountWindowHours <= 1,
-                    incrementDisabled: viewModel.openCountWindowHours >= 24,
-                    onDecrement: { viewModel.openCountWindowHours = max(viewModel.openCountWindowHours - 1, 1) },
-                    onIncrement: { viewModel.openCountWindowHours = min(viewModel.openCountWindowHours + 1, 24) }
+                    options: Array(1...24),
+                    format: { "\($0) h" },
+                    selection: Binding(
+                        get: { viewModel.openCountWindowHours },
+                        set: { viewModel.openCountWindowHours = $0 }
+                    )
                 )
             case .dailyUsageLimit:
-                stepperRow(
+                menuRow(
                     title: "Daily usage",
                     valueText: "\(viewModel.maximumDailyMinutes) min",
-                    decrementDisabled: viewModel.maximumDailyMinutes <= 5,
-                    incrementDisabled: viewModel.maximumDailyMinutes >= 360,
-                    onDecrement: { viewModel.maximumDailyMinutes = max(viewModel.maximumDailyMinutes - 5, 5) },
-                    onIncrement: { viewModel.maximumDailyMinutes = min(viewModel.maximumDailyMinutes + 5, 360) }
+                    options: Array(stride(from: 5, through: 360, by: 5)),
+                    format: { "\($0) min" },
+                    selection: Binding(
+                        get: { viewModel.maximumDailyMinutes },
+                        set: { viewModel.maximumDailyMinutes = $0 }
+                    )
                 )
 
                 dividerInset
 
                 resetPeriodRow(selection: $viewModel.dailyResetPeriod)
             case .sessionDurationLimit:
-                stepperRow(
+                menuRow(
                     title: "Session limit",
                     valueText: "\(viewModel.maximumSessionMinutes) min",
-                    decrementDisabled: viewModel.maximumSessionMinutes <= 1,
-                    incrementDisabled: viewModel.maximumSessionMinutes >= 120,
-                    onDecrement: { viewModel.maximumSessionMinutes = max(viewModel.maximumSessionMinutes - 1, 1) },
-                    onIncrement: { viewModel.maximumSessionMinutes = min(viewModel.maximumSessionMinutes + 1, 120) }
+                    options: Array(1...120),
+                    format: { "\($0) min" },
+                    selection: Binding(
+                        get: { viewModel.maximumSessionMinutes },
+                        set: { viewModel.maximumSessionMinutes = $0 }
+                    )
                 )
             case .schedule, .none:
                 EmptyView()
@@ -785,62 +772,47 @@ struct RuleEditorView: View {
 
             if viewModel.breaksAllowed {
                 VStack(spacing: 0) {
-                    stepperRow(
+                    menuRow(
                         title: "Max breaks",
                         valueText: "\(viewModel.maximumBreaks)",
-                        decrementDisabled: viewModel.maximumBreaks <= 1,
-                        incrementDisabled: viewModel.maximumBreaks >= 8,
-                        onDecrement: { viewModel.maximumBreaks = max(viewModel.maximumBreaks - 1, 1) },
-                        onIncrement: { viewModel.maximumBreaks = min(viewModel.maximumBreaks + 1, 8) }
+                        options: Array(1...8),
+                        format: { "\($0)" },
+                        selection: Binding(
+                            get: { viewModel.maximumBreaks },
+                            set: { viewModel.maximumBreaks = $0 }
+                        )
                     )
 
                     dividerInset
 
-                    stepperRow(
+                    menuRow(
                         title: "Break duration",
                         valueText: "\(viewModel.maximumBreakMinutes) min",
-                        decrementDisabled: viewModel.maximumBreakMinutes <= 1,
-                        incrementDisabled: viewModel.maximumBreakMinutes >= 15,
-                        onDecrement: { viewModel.maximumBreakMinutes = max(viewModel.maximumBreakMinutes - 1, 1) },
-                        onIncrement: { viewModel.maximumBreakMinutes = min(viewModel.maximumBreakMinutes + 1, 15) }
+                        options: Array(1...15),
+                        format: { "\($0) min" },
+                        selection: Binding(
+                            get: { viewModel.maximumBreakMinutes },
+                            set: { viewModel.maximumBreakMinutes = $0 }
+                        )
                     )
 
                     dividerInset
 
-                    stepperRow(
+                    menuRow(
                         title: "Cooldown",
                         valueText: "\(viewModel.minimumBreakIntervalMinutes) min",
-                        decrementDisabled: viewModel.minimumBreakIntervalMinutes <= 5,
-                        incrementDisabled: viewModel.minimumBreakIntervalMinutes >= 240,
-                        onDecrement: { viewModel.minimumBreakIntervalMinutes = max(viewModel.minimumBreakIntervalMinutes - 5, 5) },
-                        onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 240) }
+                        options: Array(stride(from: 5, through: 240, by: 5)),
+                        format: { "\($0) min" },
+                        selection: Binding(
+                            get: { viewModel.minimumBreakIntervalMinutes },
+                            set: { viewModel.minimumBreakIntervalMinutes = $0 }
+                        )
                     )
 
                     dividerInset
 
                     resetPeriodRow(selection: $viewModel.breakResetPeriod)
                 }
-                .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
-
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Text("Allowed triggers")
-                        .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    HStack(spacing: LocktySpacing.sm) {
-                        triggerChip(title: "Manual", isSelected: viewModel.breakTriggerManual) {
-                            viewModel.breakTriggerManual.toggle()
-                        }
-                        triggerChip(title: "NFC", isSelected: viewModel.breakTriggerNFC) {
-                            viewModel.breakTriggerNFC.toggle()
-                        }
-                        triggerChip(title: "Location", isSelected: viewModel.breakTriggerLocation) {
-                            viewModel.breakTriggerLocation.toggle()
-                        }
-                    }
-                }
-                .padding(.horizontal, LocktySpacing.md)
-                .padding(.vertical, LocktySpacing.md)
                 .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
 
                 sectionHeading("Friction", systemImage: "sparkles.rectangle.stack")
@@ -969,48 +941,52 @@ struct RuleEditorView: View {
         }
     }
 
-    private func stepperRow(
+    private func menuRow(
         title: String,
         valueText: String,
-        decrementDisabled: Bool,
-        incrementDisabled: Bool,
-        onDecrement: @escaping () -> Void,
-        onIncrement: @escaping () -> Void
+        options: [Int],
+        format: @escaping (Int) -> String,
+        selection: Binding<Int>
     ) -> some View {
-        HStack(spacing: LocktySpacing.md) {
-            Text(title)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.primaryText)
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: LocktySpacing.sm) {
-                Button(action: onDecrement) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 28, height: 28)
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    withAnimation(.smooth(duration: 0.22)) {
+                        selection.wrappedValue = option
+                    }
+                } label: {
+                    if selection.wrappedValue == option {
+                        Label(format(option), systemImage: "checkmark")
+                    } else {
+                        Text(format(option))
+                    }
                 }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-                .disabled(decrementDisabled)
-
-                Text(valueText)
-                    .font(.system(.subheadline, design: .default, weight: .regular))
-                    .foregroundStyle(LocktyColors.secondaryText)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .frame(minWidth: 88, alignment: .center)
-
-                Button(action: onIncrement) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.locktyInteractive(shape: Circle()))
-                .disabled(incrementDisabled)
             }
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: LocktySpacing.xs) {
+                    Text(valueText)
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(LocktyColors.tertiaryText)
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.vertical, LocktySpacing.md)
+        .buttonStyle(.plain)
     }
 
     private func resetPeriodRow(selection: Binding<RuleResetPeriod>) -> some View {
@@ -1046,21 +1022,6 @@ struct RuleEditorView: View {
                 .foregroundStyle(isSelected ? .black : LocktyColors.primaryText)
                 .padding(.horizontal, 14)
                 .frame(height: 36)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isSelected ? Color.white : Color.white.opacity(0.06))
-                }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func triggerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(isSelected ? .black : LocktyColors.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(isSelected ? Color.white : Color.white.opacity(0.06))

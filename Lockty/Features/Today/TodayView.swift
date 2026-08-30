@@ -295,37 +295,37 @@ struct TodayView: View {
                 // report landed. The real cards are on screen from the first frame; each
                 // individual unknown value inside them blurs itself until it is known.
 
-//                DailyPerspectiveStackSection(
-//                    perspectives: viewModel.visiblePerspectives(for: day),
-//                    onDismiss: { perspective in
-//                        viewModel.dismissPerspective(perspective.id, day: day)
-//                    }
-//                )
-//
-//                MyDaySection(activities: state.activities)
-//
-//                DigitalBalanceCard(state: state.timeline) {
-//                    router.presentSheet(.digitalBalanceDetail(day))
-//                }
-//
-//                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-//                    LocktySectionTitle(
-//                        "Breakdown",
-//                        info: "Headline numbers for the day. Tap any card to see what went into it.",
-//                        showsSeparator: false
-//                    )
-//                    .padding(.top, 16)
-//                    TodayMetricGrid(state: state) { metric in
-//                        switch metric {
-//                        case .screenTime: router.presentSheet(.screenTimeDetail(day))
-//                        case .bestDetox: router.presentSheet(.detoxDetail(day))
-//                        case .routines: router.presentSheet(.routineDaySummary(day))
-//                        case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
-//                        case .distractions: router.presentSheet(.distractionsDetail(day))
-//                        case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
-//                        }
-//                    }
-//                }
+                DailyPerspectiveStackSection(
+                    perspectives: viewModel.visiblePerspectives(for: day),
+                    onDismiss: { perspective in
+                        viewModel.dismissPerspective(perspective.id, day: day)
+                    }
+                )
+
+                MyDaySection(activities: state.activities)
+
+                DigitalBalanceCard(state: state.timeline) {
+                    router.presentSheet(.digitalBalanceDetail(day))
+                }
+
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    LocktySectionTitle(
+                        "Breakdown",
+                        info: "Headline numbers for the day. Tap any card to see what went into it.",
+                        showsSeparator: false
+                    )
+                    .padding(.top, 16)
+                    TodayMetricGrid(state: state) { metric in
+                        switch metric {
+                        case .screenTime: router.presentSheet(.screenTimeDetail(day))
+                        case .bestDetox: router.presentSheet(.detoxDetail(day))
+                        case .routines: router.presentSheet(.routineDaySummary(day))
+                        case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
+                        case .distractions: router.presentSheet(.distractionsDetail(day))
+                        case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
+                        }
+                    }
+                }
 
                 // Order on Today: checklist, the running mode, then usage. The mode card
                 // only exists while something is actually running.

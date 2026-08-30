@@ -237,7 +237,7 @@ struct AppsListView: View {
     private let folderShape = RoundedRectangle(cornerRadius: 28, style: .continuous)
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: LocktySpacing.lg) {
+        LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
             Button {
                 router.push(.distractingGroup)
             } label: {
@@ -294,6 +294,7 @@ struct DistractingGroupView: View {
                     subtitle: viewModel.distractingTokens.isEmpty ? "0 elementos" : "\(viewModel.distractingTokens.count) elementos",
                     tokens: viewModel.distractingTokens
                 )
+                .frame(maxWidth: .infinity)
 
                 settingsRow(
                     title: "Apps",
@@ -564,6 +565,13 @@ struct AppGroupEditorView: View {
     var body: some View {
         LocktySectionScreen(title: viewModel.title) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                AppFolderCard(
+                    title: viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Nuevo grupo" : viewModel.name,
+                    subtitle: viewModel.selectedCount == 1 ? "1 elemento" : "\(viewModel.selectedCount) elementos",
+                    tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
+                )
+                .frame(maxWidth: .infinity)
+
                 CardView {
                     VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                         Text("Name")
@@ -657,28 +665,30 @@ struct AppGroupSelectionView: View {
 }
 
 struct AddAppFolderCard: View {
-    private let folderSide: CGFloat = 136
+    private let folderSide: CGFloat = 110
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white.opacity(0.045))
                 .frame(width: folderSide, height: folderSide)
                 .overlay {
                     Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .regular))
+                        .font(.system(size: 23, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
                 }
 
             Text("Nuevo grupo")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
-                .multilineTextAlignment(.leading)
+                .multilineTextAlignment(.center)
 
             Text("Reusable")
-                .font(.system(size: 13, weight: .regular))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
+                .multilineTextAlignment(.center)
         }
+        .frame(width: folderSide)
     }
 }
 
@@ -687,53 +697,55 @@ struct AppFolderCard: View {
     let subtitle: String
     let tokens: [ApplicationToken]
 
-    private let folderSide: CGFloat = 136
-    private let iconScale: CGFloat = 1.22
+    private let folderSide: CGFloat = 110
+    private let iconScale: CGFloat = 1.52
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.white.opacity(0.045))
                 .frame(width: folderSide, height: folderSide)
                 .overlay {
                     folderGrid
-                        .padding(18)
+                        .padding(10)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
-                .multilineTextAlignment(.leading)
+                .multilineTextAlignment(.center)
                 .lineLimit(2)
 
             Text(subtitle)
-                .font(.system(size: 13, weight: .regular))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
+                .multilineTextAlignment(.center)
                 .lineLimit(1)
         }
+        .frame(width: folderSide)
     }
 
     private var folderGrid: some View {
         let visible = Array(tokens.prefix(4))
         let overflow = max(0, tokens.count - 4)
 
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
             ForEach(Array(visible.enumerated()), id: \.offset) { index, token in
                 if index == 3, overflow > 0 {
                     ZStack(alignment: .center) {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(Color.white.opacity(0.05))
                         Text("+\(overflow)")
-                            .font(.system(size: 21, weight: .medium))
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(LocktyColors.primaryText)
                     }
-                    .frame(height: 44)
+                    .frame(height: 38)
                 } else {
                     Label(token)
                         .labelStyle(.iconOnly)
                         .scaleEffect(iconScale)
-                        .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
                 }
             }
 
@@ -752,6 +764,6 @@ struct AppFolderCard: View {
     private var placeholderDot: some View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .fill(Color.white.opacity(0.035))
-            .frame(height: 44)
+            .frame(height: 38)
     }
 }

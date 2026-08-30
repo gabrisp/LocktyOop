@@ -56,11 +56,12 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     )
 
     static func routine(_ routine: Routine) -> ShieldPolicy {
-        ShieldPolicy(
+        let selectionScopes = Set([ScreenTimeSelectionScope.routine(routine.id)] + routine.appGroupIDs.map(ScreenTimeSelectionScope.appGroup))
+        return ShieldPolicy(
             blockedApplications: routine.blockedApplications,
             blockedDomains: routine.blockedDomains,
             reason: .routine(routine.id),
-            selectionScopes: [.routine(routine.id)]
+            selectionScopes: selectionScopes
         )
     }
 }

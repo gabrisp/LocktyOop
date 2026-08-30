@@ -15,6 +15,7 @@ final class TodayViewModel: ObservableObject {
     private let routineEngine: RoutineEngine
     private let pauseEngine: PauseEngine
     private let selectionStore: ScreenTimeSelectionStore
+    private let autoFocusManager: AutoFocusManager
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
 
@@ -22,12 +23,14 @@ final class TodayViewModel: ObservableObject {
         dataProvider: TodayDataProviding,
         routineEngine: RoutineEngine,
         pauseEngine: PauseEngine,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        autoFocusManager: AutoFocusManager
     ) {
         self.dataProvider = dataProvider
         self.routineEngine = routineEngine
         self.pauseEngine = pauseEngine
         self.selectionStore = selectionStore
+        self.autoFocusManager = autoFocusManager
     }
 
     /// Ends the running routine. Strict mode can refuse, which the engine decides.
@@ -133,6 +136,7 @@ final class TodayViewModel: ObservableObject {
                 appID: appID,
                 classification: classification
             )
+            await autoFocusManager.updateMembership(for: appID, classification: classification)
             let updated = await dataProvider.dayState(for: day)
             withAnimation(.smooth(duration: 0.28)) {
                 days[key] = updated

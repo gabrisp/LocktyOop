@@ -18,6 +18,7 @@ struct Routine: Codable, Hashable, Identifiable {
     var color: RoutineColor
     var mode: RoutineMode
     var triggers: [RoutineTrigger]
+    var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
     var tasks: [RoutineTask]
@@ -40,6 +41,7 @@ struct Routine: Codable, Hashable, Identifiable {
         color: RoutineColor = .mint,
         mode: RoutineMode,
         triggers: [RoutineTrigger],
+        appGroupIDs: Set<UUID> = [],
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
         tasks: [RoutineTask],
@@ -57,6 +59,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.color = color
         self.mode = mode
         self.triggers = triggers
+        self.appGroupIDs = appGroupIDs
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
         self.tasks = tasks
@@ -89,6 +92,7 @@ extension Routine {
         color: .sky,
         mode: .strict,
         triggers: [.manual],
+        appGroupIDs: [],
         blockedApplications: ["instagram", "youtube"],
         blockedDomains: ["instagram.com", "youtube.com"],
         tasks: [
@@ -111,6 +115,7 @@ extension Routine {
         color: .amber,
         mode: .normal,
         triggers: [.manual],
+        appGroupIDs: [],
         blockedApplications: ["instagram", "youtube", "whatsapp"],
         blockedDomains: ["x.com"],
         tasks: [

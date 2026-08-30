@@ -4,11 +4,16 @@ struct FocusView: View {
     @ObservedObject var viewModel: FocusViewModel
     let routinesViewModel: RoutinesViewModel
     let frictionsViewModel: FrictionsViewModel
+    @ObservedObject var appsViewModel: AppsLibraryViewModel
     @ObservedObject var router: AppRouter
     let frictionRepository: FrictionRepository
 
     private var gutter: CGFloat { LocktySpacing.lg }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
+    private var appTileWidth: CGFloat { 136 }
+    private var appFolderShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 28, style: .continuous)
+    }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -23,6 +28,12 @@ struct FocusView: View {
                     router.push(.frictionsList)
                 } content: {
                     frictionsRow
+                }
+
+                section(title: "Apps") {
+                    router.push(.appsList)
+                } content: {
+                    appsRow
                 }
             }
             .padding(.horizontal, gutter)
@@ -43,12 +54,14 @@ struct FocusView: View {
             await frictionRepository.seedDefaultFrictionIfNeeded()
             await routinesViewModel.load()
             await frictionsViewModel.load()
+            await appsViewModel.load()
         }
         .onChange(of: router.sheet) { _, newValue in
             guard newValue == nil else { return }
             Task {
                 await routinesViewModel.load()
                 await frictionsViewModel.load()
+                await appsViewModel.load()
             }
         }
     }
@@ -102,6 +115,50 @@ struct FocusView: View {
             }
         }
         .animation(.smooth(duration: 0.34), value: frictionsViewModel.frictions.map(\.id))
+    }
+
+    private var appsRow: some View {
+        horizontalRow {
+            Button {
+                router.push(.distractingGroup)
+            } label: {
+                AppFolderCard(
+                    title: "Distrayendo",
+                    subtitle: folderCountText(appsViewModel.distractingTokens.count),
+                    tokens: appsViewModel.distractingTokens
+                )
+                .frame(width: appTileWidth)
+            }
+            .buttonStyle(.locktyInteractive(shape: appFolderShape))
+
+            ForEach(appsViewModel.appGroups) { group in
+                Button {
+                    router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: group.id)))
+                } label: {
+                    AppFolderCard(
+                        title: group.name,
+                        subtitle: folderCountText(appsViewModel.tokens(for: group.id).count),
+                        tokens: appsViewModel.tokens(for: group.id)
+                    )
+                    .frame(width: appTileWidth)
+                }
+                .buttonStyle(.locktyInteractive(shape: appFolderShape))
+            }
+
+            Button {
+                router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: nil)))
+            } label: {
+                AddAppFolderCard()
+                    .frame(width: appTileWidth)
+            }
+            .buttonStyle(.locktyInteractive(shape: appFolderShape))
+        }
+        .animation(.smooth(duration: 0.34), value: appsViewModel.appGroups.map(\.id))
+        .animation(.smooth(duration: 0.34), value: appsViewModel.distractingTokens.count)
+    }
+
+    private func folderCountText(_ count: Int) -> String {
+        count == 1 ? "1 elemento" : "\(count) elementos"
     }
 
     @ViewBuilder

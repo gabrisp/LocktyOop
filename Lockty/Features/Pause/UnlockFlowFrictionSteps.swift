@@ -1292,22 +1292,15 @@ struct UnlockPersonalVideoStepView: View {
 
     @State private var player: AVPlayer?
     @State private var phase: UnlockVideoPhase = .loading
-    @State private var feedbackTone: UnlockFeedbackTone = .neutral
+    @State private var videoAspectRatio: CGFloat = 9 / 16
+    @State private var isMuted = false
+    @State private var isPlaying = false
+    @State private var didCompletePlayback = false
     @State private var observationToken: NSObjectProtocol?
 
     var body: some View {
-        UnlockStepSurface(tone: feedbackTone, shakeTrigger: 0) {
+        UnlockStepSurface(tone: surfaceTone, shakeTrigger: 0) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                HStack {
-                    Text(configuration.displayName ?? "Personal video")
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    Spacer(minLength: 0)
-
-                    phaseBadge
-                }
-
                 Group {
                     switch phase {
                     case .missing:
@@ -1315,21 +1308,8 @@ struct UnlockPersonalVideoStepView: View {
                     case .failed(let message):
                         unavailableMessage(message)
                     default:
-                        VideoPreviewLayer(player: player)
-                            .frame(height: 260)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .stroke(LocktyColors.cardStroke, lineWidth: 1)
-                            )
+                        videoPlayer
                     }
-                }
-
-                if case .finished = phase {
-                    Text("Playback completed.")
-                        .font(LocktyTypography.caption)
-                        .foregroundStyle(LocktyColors.productive)
-                        .transition(.blurReplace.combined(with: .opacity))
                 }
             }
         }
@@ -1344,63 +1324,31 @@ struct UnlockPersonalVideoStepView: View {
         }
     }
 
-    private var phaseBadge: some View {
-        Text(phaseLabel)
-            .font(.system(.caption, design: .rounded, weight: .semibold))
-            .foregroundStyle(phaseForeground)
-            .padding(.horizontal, LocktySpacing.sm)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(phaseBackground)
-            )
-            .contentTransition(.interpolate)
-    }
-
-    private var phaseLabel: String {
+    private var surfaceTone: UnlockFeedbackTone {
         switch phase {
-        case .loading:
-            "Loading"
-        case .playing:
-            "Playing"
-        case .finished:
-            "Done"
-        case .missing, .failed:
-            "Missing"
-        }
-    }
-
-    private var phaseForeground: Color {
-        switch phase {
-        case .finished:
-            .black
-        case .missing, .failed:
-            LocktyColors.error
-        default:
-            LocktyColors.primaryText
-        }
-    }
-
-    private var phaseBackground: Color {
-        switch phase {
-        case .finished:
-            LocktyColors.productive
-        case .missing, .failed:
-            LocktyColors.error.opacity(0.14)
-        default:
-            LocktyColors.elevatedBackground
-        }
-    }
-
-    private var feedbackToneResolved: UnlockFeedbackTone {
-        switch phase {
-        case .finished:
-            .success
         case .missing, .failed:
             .error
         default:
             .neutral
         }
+    }
+
+    private var videoPlayer: some View {
+        VideoPreviewLayer(player: player)
+            .aspectRatio(videoAspectRatio, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(videoBorderColor, lineWidth: didCompletePlayback ? 1.5 : 1)
+            }
+            .shadow(color: videoGlowColor, radius: didCompletePlayback ? 20 : 0)
+            .overlay(alignment: .bottomTrailing) {
+                videoControls
+                    .padding(14)
+            }
+            .animation(.smooth(duration: 0.24), value: didCompletePlayback)
+            .animation(.smooth(duration: 0.24), value: phase)
     }
 
     private func unavailableMessage(_ message: String) -> some View {
@@ -1416,6 +1364,59 @@ struct UnlockPersonalVideoStepView: View {
         .frame(maxWidth: .infinity, minHeight: 220, alignment: .center)
     }
 
+    private var videoControls: some View {
+        HStack(spacing: 10) {
+            videoControlButton(
+                systemImage: isPlaying ? "pause.fill" : "play.fill",
+                action: togglePlayback
+            )
+            videoControlButton(
+                systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                action: toggleMute
+            )
+            videoControlButton(
+                systemImage: "arrow.counterclockwise",
+                action: replay
+            )
+        }
+    }
+
+    private func videoControlButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(LocktyColors.primaryText)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color.black.opacity(0.54))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var videoBorderColor: Color {
+        switch phase {
+        case .missing, .failed:
+            LocktyColors.error
+        default:
+            didCompletePlayback ? LocktyColors.productive : LocktyColors.cardStroke
+        }
+    }
+
+    private var videoGlowColor: Color {
+        switch phase {
+        case .missing, .failed:
+            LocktyColors.error.opacity(0.16)
+        default:
+            didCompletePlayback ? LocktyColors.productive.opacity(0.28) : .clear
+        }
+    }
+
     @MainActor
     private func prepareVideo() async {
         status = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
@@ -1423,17 +1424,21 @@ struct UnlockPersonalVideoStepView: View {
             NotificationCenter.default.removeObserver(observationToken)
             self.observationToken = nil
         }
+        didCompletePlayback = false
+        isMuted = false
+        isPlaying = false
 
         guard let url = resolveVideoURL(fileName: configuration.videoFileName) else {
             phase = .missing
-            feedbackTone = .error
             return
         }
 
+        videoAspectRatio = resolvedAspectRatio(for: url)
         let player = AVPlayer(url: url)
+        player.isMuted = isMuted
         self.player = player
         phase = .playing
-        feedbackTone = .neutral
+        isPlaying = true
         player.play()
 
         observationToken = NotificationCenter.default.addObserver(
@@ -1442,9 +1447,50 @@ struct UnlockPersonalVideoStepView: View {
             queue: .main
         ) { _ in
             phase = .finished
-            feedbackTone = .success
+            didCompletePlayback = true
+            isPlaying = false
             status = .ready
         }
+    }
+
+    private func togglePlayback() {
+        guard let player else { return }
+        if isPlaying {
+            player.pause()
+            isPlaying = false
+            return
+        }
+
+        player.play()
+        isPlaying = true
+    }
+
+    private func toggleMute() {
+        isMuted.toggle()
+        player?.isMuted = isMuted
+    }
+
+    private func replay() {
+        guard let player else { return }
+        player.seek(to: .zero)
+        player.play()
+        phase = didCompletePlayback ? .finished : .playing
+        isPlaying = true
+    }
+
+    private func resolvedAspectRatio(for url: URL) -> CGFloat {
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .video).first else {
+            return 9 / 16
+        }
+
+        let transformedSize = track.naturalSize.applying(track.preferredTransform)
+        let width = abs(transformedSize.width)
+        let height = abs(transformedSize.height)
+        guard width > 0, height > 0 else {
+            return 9 / 16
+        }
+        return width / height
     }
 }
 
@@ -1453,7 +1499,7 @@ private struct VideoPreviewLayer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PlayerContainerView {
         let view = PlayerContainerView()
-        view.playerLayer.videoGravity = .resizeAspectFill
+        view.playerLayer.videoGravity = .resizeAspect
         return view
     }
 

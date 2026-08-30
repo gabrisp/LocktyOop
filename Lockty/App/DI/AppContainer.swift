@@ -107,6 +107,13 @@ final class AppContainer {
         let authorizationService = LiveScreenTimeAuthorizationService()
         let classificationRepository = CoreDataAppClassificationRepository(controller: persistenceController)
         let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        let appGroupRepository = AppGroupStoreUserAppGroupRepository(appGroupStore: appGroupStore)
+        let autoFocusRepository = AppGroupStoreAutoFocusRepository(appGroupStore: appGroupStore)
+        let autoFocusManager = AutoFocusManager(
+            repository: autoFocusRepository,
+            classificationRepository: classificationRepository,
+            selectionStore: selectionStore
+        )
         let editorStore = EditorViewModelStore()
         let usageDataService = LiveUsageDataService(
             appGroupStore: appGroupStore,
@@ -156,7 +163,8 @@ final class AppContainer {
             dataProvider: todayPipeline,
             routineEngine: routineEngine,
             pauseEngine: pauseEngine,
-            selectionStore: selectionStore
+            selectionStore: selectionStore,
+            autoFocusManager: autoFocusManager
         )
         let routineScheduleCoordinator = RoutineScheduleCoordinator(
             repository: routineRepository,
@@ -166,6 +174,7 @@ final class AppContainer {
         let routinesViewModel = RoutinesViewModel(
             routineEngine: routineEngine,
             repository: routineRepository,
+            appGroupRepository: appGroupRepository,
             shieldService: shieldService,
             scheduleCoordinator: routineScheduleCoordinator,
             selectionStore: selectionStore
@@ -178,6 +187,16 @@ final class AppContainer {
             appGroupStore: appGroupStore
         )
         let frictionsViewModel = FrictionsViewModel(repository: frictionRepository)
+        let appsViewModel = AppsLibraryViewModel(
+            appGroupRepository: appGroupRepository,
+            autoFocusManager: autoFocusManager,
+            selectionStore: selectionStore
+        )
+        let distractingGroupViewModel = DistractingGroupViewModel(
+            autoFocusManager: autoFocusManager,
+            frictionRepository: frictionRepository,
+            selectionStore: selectionStore
+        )
         let pausesViewModel = PausesViewModel(
             ruleRepository: pauseRuleRepository,
             eventRepository: pauseEventRepository,
@@ -215,6 +234,10 @@ final class AppContainer {
             frictionRepository: frictionRepository,
             pauseEventRepository: pauseEventRepository,
             classificationRepository: classificationRepository,
+            appGroupRepository: appGroupRepository,
+            autoFocusManager: autoFocusManager,
+            appsViewModel: appsViewModel,
+            distractingGroupViewModel: distractingGroupViewModel,
             haptics: haptics,
             nfcService: nfcService,
             locationService: locationService,

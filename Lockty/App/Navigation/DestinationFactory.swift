@@ -11,6 +11,27 @@ struct DestinationFactory {
 
         case .frictionsList:
             featureFactory.makeFrictionsList()
+
+        case .appsList:
+            featureFactory.makeAppsList()
+
+        case .distractingGroup:
+            featureFactory.makeDistractingGroup()
+
+        case .distractingApps:
+            featureFactory.makeDistractingAppsSelection()
+
+        case .distractingIntervention:
+            featureFactory.makeDistractingInterventionPicker()
+
+        case .distractingFriction:
+            featureFactory.makeDistractingFrictionPicker()
+
+        case .appGroupEditor(let route):
+            featureFactory.makeAppGroupEditor(route: route)
+
+        case .appGroupSelection(let route):
+            featureFactory.makeAppGroupSelection(route: route)
         }
     }
 

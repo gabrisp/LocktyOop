@@ -5,6 +5,7 @@ final class EditorViewModelStore {
     private var routineEditors: [UUID: RoutineEditorViewModel] = [:]
     private var pauseEditors: [UUID: PauseEditorViewModel] = [:]
     private var frictionEditors: [UUID: FrictionEditorViewModel] = [:]
+    private var appGroupEditors: [UUID: AppGroupEditorViewModel] = [:]
 
     func routineEditor(
         route: RoutineEditorRoute,
@@ -83,5 +84,28 @@ final class EditorViewModelStore {
 
     func releaseFrictionEditor(draftID: UUID) {
         frictionEditors.removeValue(forKey: draftID)
+    }
+
+    func appGroupEditor(
+        route: AppGroupEditorRoute,
+        repository: UserAppGroupRepository,
+        selectionStore: ScreenTimeSelectionStore
+    ) -> AppGroupEditorViewModel {
+        if let existing = appGroupEditors[route.draftID] {
+            return existing
+        }
+
+        let created = AppGroupEditorViewModel(
+            appGroupID: route.appGroupID,
+            draftID: route.draftID,
+            repository: repository,
+            selectionStore: selectionStore
+        )
+        appGroupEditors[route.draftID] = created
+        return created
+    }
+
+    func releaseAppGroupEditor(draftID: UUID) {
+        appGroupEditors.removeValue(forKey: draftID)
     }
 }

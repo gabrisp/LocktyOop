@@ -22,6 +22,10 @@ struct FeatureFactory {
     let frictionRepository: FrictionRepository
     let pauseEventRepository: PauseEventRepository
     let classificationRepository: AppClassificationRepository
+    let appGroupRepository: UserAppGroupRepository
+    let autoFocusManager: AutoFocusManager
+    let appsViewModel: AppsLibraryViewModel
+    let distractingGroupViewModel: DistractingGroupViewModel
     let haptics: HapticsProviding
     let nfcService: NFCServicing
     let locationService: LocationTriggerServicing
@@ -37,6 +41,7 @@ struct FeatureFactory {
             viewModel: focusViewModel,
             routinesViewModel: routinesViewModel,
             frictionsViewModel: frictionsViewModel,
+            appsViewModel: appsViewModel,
             router: router,
             frictionRepository: frictionRepository
         )
@@ -84,6 +89,55 @@ struct FeatureFactory {
         LocktySectionScreen(title: "Frictions") {
             FrictionsView(viewModel: frictionsViewModel, router: router)
         }
+    }
+
+    func makeAppsList() -> some View {
+        LocktySectionScreen(title: "Apps") {
+            AppsListView(viewModel: appsViewModel, router: router)
+        }
+    }
+
+    func makeDistractingGroup() -> some View {
+        DistractingGroupView(viewModel: distractingGroupViewModel, router: router)
+    }
+
+    func makeDistractingAppsSelection() -> some View {
+        DistractingAppsSelectionView(manager: autoFocusManager, router: router)
+    }
+
+    func makeDistractingInterventionPicker() -> some View {
+        DistractingInterventionPickerView(viewModel: distractingGroupViewModel, router: router)
+    }
+
+    func makeDistractingFrictionPicker() -> some View {
+        DistractingFrictionPickerView(
+            viewModel: distractingGroupViewModel,
+            frictionRepository: frictionRepository,
+            router: router
+        )
+    }
+
+    func makeAppGroupEditor(route: AppGroupEditorRoute) -> some View {
+        AppGroupEditorView(
+            viewModel: editorStore.appGroupEditor(
+                route: route,
+                repository: appGroupRepository,
+                selectionStore: selectionStore
+            ),
+            router: router,
+            onCloseEditor: { editorStore.releaseAppGroupEditor(draftID: route.draftID) }
+        )
+    }
+
+    func makeAppGroupSelection(route: AppGroupEditorRoute) -> some View {
+        AppGroupSelectionView(
+            viewModel: editorStore.appGroupEditor(
+                route: route,
+                repository: appGroupRepository,
+                selectionStore: selectionStore
+            ),
+            router: router
+        )
     }
 
     func makeFocusCreationChoiceSheet(route: FocusCreationChoiceRoute) -> FocusCreationChoiceSheet {

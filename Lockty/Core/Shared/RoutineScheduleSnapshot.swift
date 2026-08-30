@@ -8,6 +8,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     var name: String
     var icon: String?
     var mode: RoutineMode
+    var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
     var breakPolicy: BreakPolicy
@@ -20,6 +21,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         name = routine.name
         icon = routine.icon
         mode = routine.mode
+        appGroupIDs = routine.appGroupIDs
         blockedApplications = routine.blockedApplications
         blockedDomains = routine.blockedDomains
         breakPolicy = routine.breakPolicy
@@ -36,6 +38,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
         mode = try container.decode(RoutineMode.self, forKey: .mode)
+        appGroupIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .appGroupIDs) ?? []
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
@@ -46,7 +49,8 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
 
     /// The ActiveRoutine to write into runtime state when the interval starts.
     func makeActiveRoutine(startedAt: Date) -> ActiveRoutine {
-        ActiveRoutine(
+        let selectionScopes = Set([ScreenTimeSelectionScope.routine(id)] + appGroupIDs.map(ScreenTimeSelectionScope.appGroup))
+        return ActiveRoutine(
             routineID: id,
             nameSnapshot: name,
             iconSnapshot: icon,
@@ -57,7 +61,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
                 blockedApplications: blockedApplications,
                 blockedDomains: blockedDomains,
                 reason: .routine(id),
-                selectionScopes: [.routine(id)]
+                selectionScopes: selectionScopes
             ),
             breakPolicySnapshot: breakPolicy,
             pausePolicySnapshot: pausePolicy,

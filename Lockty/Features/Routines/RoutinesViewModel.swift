@@ -7,6 +7,7 @@ import SwiftUI
 final class RoutinesViewModel: ObservableObject {
     private let routineEngine: RoutineEngine
     private let repository: RoutineRepository
+    private let appGroupRepository: UserAppGroupRepository
     private let shieldService: ShieldServicing
     private let scheduleCoordinator: RoutineScheduleCoordinator
     private let selectionStore: ScreenTimeSelectionStore
@@ -20,6 +21,7 @@ final class RoutinesViewModel: ObservableObject {
     init(
         routineEngine: RoutineEngine,
         repository: RoutineRepository,
+        appGroupRepository: UserAppGroupRepository,
         shieldService: ShieldServicing,
         scheduleCoordinator: RoutineScheduleCoordinator,
         selectionStore: ScreenTimeSelectionStore
@@ -27,6 +29,7 @@ final class RoutinesViewModel: ObservableObject {
         self.scheduleCoordinator = scheduleCoordinator
         self.routineEngine = routineEngine
         self.repository = repository
+        self.appGroupRepository = appGroupRepository
         self.shieldService = shieldService
         self.selectionStore = selectionStore
     }
@@ -38,9 +41,13 @@ final class RoutinesViewModel: ObservableObject {
     func load() async {
         do {
             let loaded = try await repository.routines()
+            let availableGroups = await appGroupRepository.appGroups()
             let tokens = loaded.reduce(into: [UUID: [ApplicationToken]]()) { result, routine in
-                let selection = (try? selectionStore.load(scope: .routine(routine.id)))?.applicationTokens ?? []
-                result[routine.id] = selection.stablePrefix(selection.count)
+                let groupScopes = availableGroups
+                    .filter { routine.appGroupIDs.contains($0.id) }
+                    .map { ScreenTimeSelectionScope.appGroup($0.id) }
+                let merged = selectionStore.mergedSelection(scopes: Set([.routine(routine.id)] + groupScopes))
+                result[routine.id] = merged.applicationTokens.stablePrefix(merged.applicationTokens.count)
             }
             withAnimation(.smooth(duration: 0.28)) {
                 routines = loaded

@@ -35,6 +35,15 @@ struct LocktyActivitySelectionRules: Hashable {
         maximumWebDomains: 0,
         pickerSeedStrategy: .empty
     )
+    static let appGroup = LocktyActivitySelectionRules(
+        allowsApplications: true,
+        allowsCategories: false,
+        allowsWebDomains: false,
+        maximumApplications: nil,
+        maximumCategories: 0,
+        maximumWebDomains: 0,
+        pickerSeedStrategy: .currentSelection
+    )
 }
 
 private enum LocktyActivitySelectionViolation: Hashable {

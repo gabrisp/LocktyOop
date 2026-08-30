@@ -69,3 +69,15 @@ struct FrictionEditorRoute: Hashable, Identifiable {
 
     var id: UUID { draftID }
 }
+
+struct AppGroupEditorRoute: Hashable, Identifiable {
+    let appGroupID: UUID?
+    let draftID: UUID
+
+    init(appGroupID: UUID?, draftID: UUID = UUID()) {
+        self.appGroupID = appGroupID
+        self.draftID = draftID
+    }
+
+    var id: UUID { draftID }
+}

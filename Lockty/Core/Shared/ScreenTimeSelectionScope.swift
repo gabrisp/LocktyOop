@@ -4,6 +4,8 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
     case library
     case routine(UUID)
     case pause(UUID)
+    case appGroup(UUID)
+    case distracting
 
     var id: String {
         switch self {
@@ -13,6 +15,10 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
             "routine-\(id.uuidString)"
         case .pause(let id):
             "pause-\(id.uuidString)"
+        case .appGroup(let id):
+            "app-group-\(id.uuidString)"
+        case .distracting:
+            "distracting"
         }
     }
 }

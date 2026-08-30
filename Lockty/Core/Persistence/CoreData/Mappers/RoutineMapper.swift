@@ -35,6 +35,7 @@ struct RoutineMapper {
         entity.createdAt = routine.createdAt
         entity.updatedAt = routine.updatedAt
         entity.startAlarmEnabled = routine.startAlarmEnabled
+        entity.appGroupIDsData = try encoder.encode(routine.appGroupIDs)
         entity.blockedApplicationIDsData = try encoder.encode(routine.blockedApplications)
         entity.blockedDomainsData = try encoder.encode(routine.blockedDomains)
         entity.breakPolicyData = try encoder.encode(routine.breakPolicy)
@@ -89,10 +90,6 @@ struct RoutineMapper {
         guard let mode = RoutineMode(rawValue: entity.modeRawValue) else {
             throw RoutineMapperError.invalidMode
         }
-        guard let color = RoutineColor(rawValue: entity.colorRawValue) else {
-            throw RoutineMapperError.invalidPayload
-        }
-
         do {
             let tasks = entity.tasks
                 .map { taskEntity in
@@ -117,9 +114,12 @@ struct RoutineMapper {
                 id: entity.id,
                 name: entity.name,
                 icon: entity.icon,
-                color: color,
+                color: entity.colorRawValue.flatMap(RoutineColor.init(rawValue:)) ?? .mint,
                 mode: mode,
                 triggers: triggers.isEmpty ? [.manual] : triggers,
+                appGroupIDs: try entity.appGroupIDsData.map {
+                    try decoder.decode(Set<UUID>.self, from: $0)
+                } ?? [],
                 blockedApplications: try decoder.decode(Set<AppIdentity.ID>.self, from: entity.blockedApplicationIDsData),
                 blockedDomains: try decoder.decode(Set<String>.self, from: entity.blockedDomainsData),
                 tasks: tasks,

@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     let container: AppContainer
     @Environment(\.scenePhase) private var scenePhase
+    @State private var onboardingAuthorizationState: ScreenTimeAuthorizationState = .notDetermined
 
     var body: some View {
         Group {
@@ -15,11 +16,14 @@ struct RootView: View {
 
             case .onboarding:
                 OnboardingView(
-                    authorizationState: container.screenTimeAuthorizationService.currentState,
+                    authorizationState: onboardingAuthorizationState,
                     onContinue: {
                         Task {
-                            _ = await container.screenTimeAuthorizationService.requestAuthorization()
-                            container.session.completeOnboarding()
+                            let state = await container.screenTimeAuthorizationService.requestAuthorization()
+                            await MainActor.run {
+                                onboardingAuthorizationState = state
+                                completeOnboardingIfAuthorized(state)
+                            }
                         }
                     }
                 )
@@ -36,10 +40,14 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .task {
             await container.startupCoordinator.startIfNeeded()
+            await refreshOnboardingAuthorizationState()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
-            Task { await container.startupCoordinator.handleForeground() }
+            Task {
+                await refreshOnboardingAuthorizationState()
+                await container.startupCoordinator.handleForeground()
+            }
         }
         // lockty://unlock — the shield's primary button opens this directly, and the
         // notification it falls back to carries it too. Either way it lands on the same
@@ -47,6 +55,20 @@ struct RootView: View {
         .onOpenURL { url in
             guard url.scheme == "lockty", url.host == "unlock" else { return }
             Task { await container.startupCoordinator.handleForeground() }
+        }
+    }
+
+    @MainActor
+    private func completeOnboardingIfAuthorized(_ state: ScreenTimeAuthorizationState) {
+        guard state == .authorized || state == .authorizedWithDataAccess else { return }
+        container.session.completeOnboarding()
+    }
+
+    private func refreshOnboardingAuthorizationState() async {
+        let state = await container.screenTimeAuthorizationService.refreshAuthorizationState()
+        await MainActor.run {
+            onboardingAuthorizationState = state
+            completeOnboardingIfAuthorized(state)
         }
     }
 }

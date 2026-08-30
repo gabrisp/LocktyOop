@@ -32,6 +32,10 @@ final class AppPickerViewModel: ObservableObject {
             "Choose Apps"
         case .pause:
             "Choose App"
+        case .appGroup:
+            "Choose Apps"
+        case .distracting:
+            "Distracting Apps"
         }
     }
 
@@ -45,6 +49,10 @@ final class AppPickerViewModel: ObservableObject {
             return "Pauses support exactly one application."
         case .routine:
             return "Domains are configured separately in the routine editor."
+        case .appGroup:
+            return "Reusable App Groups contain applications only."
+        case .distracting:
+            return "Distracting is the AutoFocus-managed app group."
         case .library:
             return nil
         }
@@ -58,6 +66,10 @@ final class AppPickerViewModel: ObservableObject {
             return "Choose the applications this routine will restrict when it starts."
         case .pause:
             return "Choose the one application that will trigger this Pause flow."
+        case .appGroup:
+            return "Choose the applications this reusable App Group should contain."
+        case .distracting:
+            return "Choose the applications AutoFocus should treat as Distracting."
         }
     }
 
@@ -77,6 +89,8 @@ final class AppPickerViewModel: ObservableObject {
             .routine
         case .pause:
             .pause
+        case .appGroup, .distracting:
+            .appGroup
         }
     }
 
@@ -87,6 +101,8 @@ final class AppPickerViewModel: ObservableObject {
         case .routine:
             "Añadir App o categoría"
         case .pause:
+            "Añadir App"
+        case .appGroup, .distracting:
             "Añadir App"
         }
     }
@@ -126,7 +142,7 @@ final class AppPickerViewModel: ObservableObject {
         switch scope {
         case .library:
             appsOnlyScope = false
-        case .routine, .pause:
+        case .routine, .pause, .appGroup, .distracting:
             appsOnlyScope = true
         }
 

@@ -269,6 +269,31 @@ final class AppGroupStore {
         )
     }
 
+    nonisolated func loadUserAppGroups() -> [AppGroup] {
+        guard let data = (try? readData(fileName: "user-app-groups.json", legacyDefaultsKey: nil)) ?? nil else {
+            return []
+        }
+        return (try? decoder.decode([AppGroup].self, from: data)) ?? []
+    }
+
+    nonisolated func saveUserAppGroups(_ groups: [AppGroup]) throws {
+        let data = try encoder.encode(groups)
+        try writeData(data, fileName: "user-app-groups.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func loadAutoFocusConfiguration() -> AutoFocusConfiguration {
+        guard let data = (try? readData(fileName: "autofocus-configuration.json", legacyDefaultsKey: nil)) ?? nil,
+              let configuration = try? decoder.decode(AutoFocusConfiguration.self, from: data) else {
+            return .default
+        }
+        return configuration
+    }
+
+    nonisolated func saveAutoFocusConfiguration(_ configuration: AutoFocusConfiguration) throws {
+        let data = try encoder.encode(configuration)
+        try writeData(data, fileName: "autofocus-configuration.json", legacyDefaultsKey: nil)
+    }
+
     nonisolated private func readData(
         fileName: String,
         legacyDefaultsKey: String?

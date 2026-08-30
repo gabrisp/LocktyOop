@@ -15,8 +15,13 @@ final class CoreDataAppClassificationRepository: AppClassificationRepository {
         let request = AppClassificationEntity.fetchRequest()
         request.predicate = NSPredicate(format: "appID == %@", appID.rawValue)
         request.fetchLimit = 1
-        guard let entity = try? context.fetch(request).first else { return nil }
-        return mapper.makeDomain(from: entity)
+        let savedClassification = (try? context.fetch(request).first).flatMap(mapper.makeDomain(from:))
+
+        if let savedClassification, savedClassification != .neutral {
+            return savedClassification
+        }
+
+        return AppClassificationHeuristics.classification(appID: appID) ?? savedClassification
     }
 
     func allClassifications() async -> [AppIdentity.ID: AppClassification] {

@@ -255,43 +255,17 @@ final class RoutineEngine: ObservableObject {
 
     func startBreak(trigger: BreakTrigger) async {
         guard case .active(let activeRoutine) = state else { return }
-        let decision = strictModePolicy.decision(for: .startBreak, activeRoutine: activeRoutine)
-        guard decision.isAllowed else {
-            state = .failed(decision.reason ?? "Break is not allowed.")
-            state = .active(activeRoutine)
-            return
-        }
-
-        guard activeRoutine.breakPolicySnapshot.maximumBreaks > 0 else {
-            state = .failed("This routine does not allow breaks.")
-            state = .active(activeRoutine)
-            return
-        }
-
-        guard activeRoutine.breakPolicySnapshot.allowedTriggers.contains(trigger) else {
-            state = .failed("This break trigger is not allowed for the active routine.")
+        switch await breakAvailability(for: activeRoutine.routineID, trigger: trigger, requiresFriction: false) {
+        case .available:
+            break
+        case .unavailable(let unavailable):
+            state = .failed(unavailable.message)
             state = .active(activeRoutine)
             return
         }
 
         do {
             let existing = try await executionRepository.execution(id: activeRoutine.id)
-            let breakHistory = existing?.breakHistory ?? []
-            guard breakHistory.count < activeRoutine.breakPolicySnapshot.maximumBreaks else {
-                state = .failed("Break limit reached.")
-                state = .active(activeRoutine)
-                return
-            }
-
-            if let lastBreak = breakHistory.last, let endedAt = lastBreak.endedAt {
-                let elapsed = Date().timeIntervalSince(endedAt)
-                guard elapsed >= activeRoutine.breakPolicySnapshot.minimumInterval else {
-                    state = .failed("The minimum break interval has not passed yet.")
-                    state = .active(activeRoutine)
-                    return
-                }
-            }
-
             let activeBreak = ActiveBreak(
                 routineID: activeRoutine.routineID,
                 startedAt: Date(),
@@ -338,6 +312,98 @@ final class RoutineEngine: ObservableObject {
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    func breakAvailability(
+        for routineID: UUID?,
+        trigger: BreakTrigger,
+        requiresFriction: Bool
+    ) async -> BreakAvailability {
+        guard let routineID,
+              let activeRoutine = activeRoutine(),
+              activeRoutine.routineID == routineID
+        else {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Rule inactive",
+                    message: "Esta rule ya no esta activa."
+                )
+            )
+        }
+
+        let strictDecision = strictModePolicy.decision(for: .startBreak, activeRoutine: activeRoutine)
+        guard strictDecision.isAllowed else {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Strict mode",
+                    message: strictDecision.reason ?? "Esta routine no permite breaks ahora."
+                )
+            )
+        }
+
+        let policy = activeRoutine.breakPolicySnapshot
+        guard policy.maximumBreaks > 0 else {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Breaks disabled",
+                    message: "Blocked means blocked."
+                )
+            )
+        }
+
+        guard policy.allowedTriggers.contains(trigger) else {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Break unavailable",
+                    message: "Este trigger no esta permitido en esta rule."
+                )
+            )
+        }
+
+        if requiresFriction && !activeRoutine.pausePolicySnapshot.offersPause {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Friction required",
+                    message: "Selecciona una friction dentro de Break."
+                )
+            )
+        }
+
+        do {
+            let breakHistory = try await executionRepository.execution(id: activeRoutine.id)?.breakHistory ?? []
+            guard breakHistory.count < policy.maximumBreaks else {
+                return .unavailable(
+                    BreakUnavailableState(
+                        title: "Break limit reached",
+                        message: "Has alcanzado el maximo de breaks."
+                    )
+                )
+            }
+
+            if let lastEndedAt = breakHistory.compactMap(\.endedAt).max() {
+                let elapsed = Date().timeIntervalSince(lastEndedAt)
+                guard elapsed >= policy.minimumInterval else {
+                    let remainingSeconds = max(policy.minimumInterval - elapsed, 0)
+                    let remainingMinutes = max(Int(ceil(remainingSeconds / 60)), 1)
+                    return .unavailable(
+                        BreakUnavailableState(
+                            title: "Cooldown",
+                            message: "Espera para volver a pedir otro break.",
+                            remainingMinutes: remainingMinutes
+                        )
+                    )
+                }
+            }
+        } catch {
+            return .unavailable(
+                BreakUnavailableState(
+                    title: "Break unavailable",
+                    message: error.localizedDescription
+                )
+            )
+        }
+
+        return .available
     }
 
     func endBreakIfNeeded(reason: RoutineCompletionReason = .naturalCompletion) async {

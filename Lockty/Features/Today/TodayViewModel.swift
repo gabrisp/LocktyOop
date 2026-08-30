@@ -163,6 +163,17 @@ final class TodayViewModel: ObservableObject {
         }
     }
 
+    func breakAvailability(for context: PauseContext) async -> BreakAvailability {
+        guard let activeRoutineID = context.activeRoutineID else {
+            return .available
+        }
+        return await routineEngine.breakAvailability(
+            for: activeRoutineID,
+            trigger: .manual,
+            requiresFriction: true
+        )
+    }
+
     private func shouldRetry(after loadingState: TodayLoadingState) -> Bool {
         guard case .unavailable(let message) = loadingState else { return false }
         return message.localizedCaseInsensitiveContains("no screen time usage data")

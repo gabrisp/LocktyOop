@@ -49,4 +49,21 @@ enum LocktyColors {
         case .unproductive: unproductive
         }
     }
+
+    static func routine(_ color: RoutineColor) -> Color {
+        switch color {
+        case .mint:
+            Color(red: 0.43, green: 0.92, blue: 0.76)
+        case .sky:
+            Color(red: 0.45, green: 0.78, blue: 1.0)
+        case .amber:
+            Color(red: 1.0, green: 0.78, blue: 0.40)
+        case .coral:
+            Color(red: 1.0, green: 0.54, blue: 0.49)
+        case .rose:
+            Color(red: 1.0, green: 0.48, blue: 0.71)
+        case .violet:
+            Color(red: 0.72, green: 0.58, blue: 1.0)
+        }
+    }
 }

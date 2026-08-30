@@ -3,6 +3,7 @@ import Foundation
 enum SheetRoute: Hashable, Identifiable {
     case focusCreationChoice(FocusCreationChoiceRoute)
     case appClassification(AppIdentity.ID)
+    case breakStatus(BreakUnavailableState)
     case routineBreak(UUID)
     case appPicker(ScreenTimeSelectionScope)
     case systemAccess
@@ -27,6 +28,7 @@ enum SheetRoute: Hashable, Identifiable {
         switch self {
         case .focusCreationChoice(let route): "focus-creation-choice-\(route.draftID.uuidString)"
         case .appClassification(let id): "app-classification-\(id.rawValue)"
+        case .breakStatus(let state): "break-status-\(state.id.uuidString)"
         case .routineBreak(let id): "routine-break-\(id.uuidString)"
         case .appPicker(let scope): "app-picker-\(scope.id)"
         case .systemAccess: "system-access"

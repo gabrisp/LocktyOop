@@ -22,6 +22,30 @@ nonisolated struct BreakPolicy: Codable, Hashable {
     )
 }
 
+nonisolated enum BreakAvailability: Hashable {
+    case available
+    case unavailable(BreakUnavailableState)
+}
+
+nonisolated struct BreakUnavailableState: Hashable, Identifiable {
+    let id: UUID
+    var title: String
+    var message: String
+    var remainingMinutes: Int?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        message: String,
+        remainingMinutes: Int? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.message = message
+        self.remainingMinutes = remainingMinutes
+    }
+}
+
 nonisolated struct ActiveBreak: Codable, Hashable, Identifiable {
     let id: UUID
     var routineID: UUID

@@ -23,6 +23,9 @@ struct DestinationFactory {
         case .appClassification(let appID):
             featureFactory.makeClassificationSheet(appID: appID)
 
+        case .breakStatus(let state):
+            featureFactory.makeBreakStatusSheet(state: state)
+
         case .routineBreak(let routineID):
             featureFactory.makeRoutineBreakSheet(routineID: routineID)
 

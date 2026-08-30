@@ -263,12 +263,17 @@ struct TodayView: View {
                 // on this screen that is waiting on an answer.
                 if let pendingUnlock = router.pendingUnlock {
                     UnlockRequestCard(context: pendingUnlock) {
-                        withAnimation(.smooth(duration: 0.28)) {
-                            router.pendingUnlock = nil
+                        Task { @MainActor in
+                            switch await viewModel.breakAvailability(for: pendingUnlock) {
+                            case .available:
+                                withAnimation(.smooth(duration: 0.28)) {
+                                    router.pendingUnlock = nil
+                                }
+                                router.presentFullScreen(.unlockFlow(pendingUnlock.applicationToken))
+                            case .unavailable(let unavailable):
+                                router.presentSheet(.breakStatus(unavailable))
+                            }
                         }
-                        // The unlock flow, the same one everything else opens. The old
-                        // per-step pause screen is gone.
-                        router.presentFullScreen(.unlockFlow(pendingUnlock.applicationToken))
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }

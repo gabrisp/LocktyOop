@@ -29,6 +29,7 @@ struct RoutineMapper {
         entity.id = routine.id
         entity.name = routine.name
         entity.icon = routine.icon
+        entity.colorRawValue = routine.color.rawValue
         entity.modeRawValue = routine.mode.rawValue
         entity.allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         entity.createdAt = routine.createdAt
@@ -88,6 +89,9 @@ struct RoutineMapper {
         guard let mode = RoutineMode(rawValue: entity.modeRawValue) else {
             throw RoutineMapperError.invalidMode
         }
+        guard let color = RoutineColor(rawValue: entity.colorRawValue) else {
+            throw RoutineMapperError.invalidPayload
+        }
 
         do {
             let tasks = entity.tasks
@@ -113,6 +117,7 @@ struct RoutineMapper {
                 id: entity.id,
                 name: entity.name,
                 icon: entity.icon,
+                color: color,
                 mode: mode,
                 triggers: triggers.isEmpty ? [.manual] : triggers,
                 blockedApplications: try decoder.decode(Set<AppIdentity.ID>.self, from: entity.blockedApplicationIDsData),

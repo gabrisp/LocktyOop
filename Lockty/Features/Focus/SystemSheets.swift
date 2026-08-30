@@ -140,6 +140,50 @@ struct RoutineBreakSheet: View {
     }
 }
 
+struct BreakStatusSheet: View {
+    let state: BreakUnavailableState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        LocktyDynamicSheet {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                EditorTopBar(title: state.title, onClose: { dismiss() })
+
+                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+                    VStack(spacing: LocktySpacing.md) {
+                        if let remainingMinutes = state.remainingMinutes {
+                            VStack(spacing: 6) {
+                                Text("\(remainingMinutes)")
+                                    .font(.system(size: 56, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(LocktyColors.primaryText)
+                                    .contentTransition(.numericText())
+                                    .monospacedDigit()
+                                Text(remainingMinutes == 1 ? "minuto" : "minutos")
+                                    .font(LocktyTypography.callout)
+                                    .foregroundStyle(LocktyColors.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+
+                        Text(state.message)
+                            .font(LocktyTypography.body)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                PrimaryButton("Cerrar", systemImage: "xmark") {
+                    dismiss()
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.lg)
+        }
+    }
+}
+
 @MainActor
 final class RoutineBreakSheetViewModel: ObservableObject {
     let routineID: UUID

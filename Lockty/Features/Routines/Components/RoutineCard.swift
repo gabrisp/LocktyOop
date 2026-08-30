@@ -10,6 +10,10 @@ struct RoutineCard: View {
     var applicationTokens: [ApplicationToken] = []
     let onOpen: () -> Void
 
+    private var accent: Color {
+        LocktyColors.routine(routine.color)
+    }
+
     private var schedule: RoutineSchedule? {
         routine.triggers.compactMap { trigger -> RoutineSchedule? in
             guard case .schedule(let schedule) = trigger else { return nil }
@@ -65,14 +69,15 @@ struct RoutineCard: View {
                         Image(systemName: routine.icon?.isEmpty == false ? routine.icon! : "repeat")
                             .font(.system(size: 16, weight: .light))
                             .foregroundStyle(LocktyColors.primaryText)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(accent.opacity(0.22)))
 
                         Spacer(minLength: 0)
 
                         if isActive {
                             Text("ACTIVE")
                                 .locktyEyebrow()
-                                .foregroundStyle(LocktyColors.productive)
+                                .foregroundStyle(accent)
                         }
                     }
 
@@ -87,7 +92,7 @@ struct RoutineCard: View {
                             .padding(.vertical, 5)
                             .overlay {
                                 Capsule(style: .continuous)
-                                    .stroke(LocktyColors.cardStroke, lineWidth: 1)
+                                    .stroke(accent.opacity(0.34), lineWidth: 1)
                             }
                     }
 
@@ -107,6 +112,10 @@ struct RoutineCard: View {
                         Spacer(minLength: 0)
                     }
                 }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: RoutineGridMetrics.tileRadius, style: .continuous)
+                    .stroke(accent.opacity(0.16), lineWidth: 1)
             }
         }
         .buttonStyle(.locktyInteractive)

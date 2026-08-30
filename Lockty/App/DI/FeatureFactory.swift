@@ -50,6 +50,10 @@ struct FeatureFactory {
         SystemAccessSheet(viewModel: systemAccessViewModel)
     }
 
+    func makeBreakStatusSheet(state: BreakUnavailableState) -> BreakStatusSheet {
+        BreakStatusSheet(state: state)
+    }
+
     func makeSettingsView() -> SettingsView {
         SettingsView()
     }
@@ -139,6 +143,20 @@ struct FeatureFactory {
             locationService: locationService
         ) { chosenToken, minutes, intention in
             Task { @MainActor in
+                if let activeRoutine {
+                    switch await routineEngine.breakAvailability(
+                        for: activeRoutine.routineID,
+                        trigger: .manual,
+                        requiresFriction: true
+                    ) {
+                    case .available:
+                        break
+                    case .unavailable(let unavailable):
+                        router.dismissFullScreen()
+                        router.presentSheet(.breakStatus(unavailable))
+                        return
+                    }
+                }
                 await grantAllowance(
                     for: chosenToken,
                     among: blockedTokens,
@@ -184,6 +202,45 @@ struct FeatureFactory {
             source: .app
         )
         await pauseEngine.allowTemporarily(context, intention: intention)
+        await recordAllowanceBreakIfNeeded(
+            activeRoutine: activeRoutine,
+            duration: context.allowanceDuration,
+            trigger: .manual
+        )
+    }
+
+    private func recordAllowanceBreakIfNeeded(
+        activeRoutine: ActiveRoutine?,
+        duration: TimeInterval,
+        trigger: BreakTrigger
+    ) async {
+        guard let activeRoutine else { return }
+        guard case .temporarilyAllowed(let allowance) = pauseEngine.state,
+              allowance.context.activeRoutineID == activeRoutine.routineID
+        else {
+            return
+        }
+
+        do {
+            var execution = try await routineExecutionRepository.execution(id: activeRoutine.id) ?? RoutineExecution(
+                id: activeRoutine.id,
+                routineID: activeRoutine.routineID,
+                routineName: activeRoutine.nameSnapshot,
+                startedAt: activeRoutine.startedAt,
+                taskCompletions: activeRoutine.taskCompletions
+            )
+            let startedAt = Date()
+            execution.breakHistory.append(
+                RoutineBreakRecord(
+                    startedAt: startedAt,
+                    endedAt: startedAt.addingTimeInterval(duration),
+                    trigger: trigger
+                )
+            )
+            try await routineExecutionRepository.save(execution)
+        } catch {
+            print("Recording allowance break failed: \(error.localizedDescription)")
+        }
     }
 
     func makePauseFlowEditor(route: PauseFlowEditorRoute) -> PauseFlowEditorSheet {

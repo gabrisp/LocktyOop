@@ -26,6 +26,7 @@ final class RoutineEditorViewModel: ObservableObject {
     /// shows one had to invent a fallback, and the icon read as missing rather than as
     /// the one it starts with.
     @Published var icon = RoutineEditorViewModel.defaultIcon
+    @Published var color: RoutineColor = .mint
     @Published var mode: RoutineMode = .normal
     @Published var allowsPauseDuringStrictMode = true
     @Published var tasks: [EditableRoutineTask] = [EditableRoutineTask()]
@@ -60,6 +61,7 @@ final class RoutineEditorViewModel: ObservableObject {
     private struct Snapshot: Equatable {
         var name: String
         var icon: String
+        var color: RoutineColor
         var mode: RoutineMode
         var triggers: [RoutineTrigger]
         var tasks: [EditableRoutineTask]
@@ -74,6 +76,7 @@ final class RoutineEditorViewModel: ObservableObject {
         Snapshot(
             name: name,
             icon: icon,
+            color: color,
             mode: mode,
             triggers: triggers,
             tasks: tasks,
@@ -179,6 +182,10 @@ final class RoutineEditorViewModel: ObservableObject {
         sanitizedTasks().count
     }
 
+    var breaksAllowed: Bool {
+        maximumBreaks > 0
+    }
+
     /// A routine can't be edited while it is the one running -- in any mode, not only
     /// Strict. Its restrictions are already applied, so a mid-run edit would leave the
     /// live shield and the stored routine describing different things.
@@ -236,6 +243,7 @@ final class RoutineEditorViewModel: ObservableObject {
         createdAt = routine.createdAt
         name = routine.name
         icon = routine.icon ?? RoutineEditorViewModel.defaultIcon
+        color = routine.color
         mode = routine.mode
         triggers = routine.triggers.isEmpty ? [.manual] : routine.triggers
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
@@ -277,12 +285,8 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     /// The flow this routine will use.
-    ///
-    /// Falls back to the first saved flow -- the one seeded on first run -- rather than
-    /// to nothing: a routine with no flow chosen offered no pause at all, so its apps
-    /// could not be unlocked by any means.
     var selectedPauseFlow: PauseFlow? {
-        pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } } ?? pauseFlows.first
+        pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } }
     }
 
     private func loadSuggestedApplications() async {
@@ -400,6 +404,7 @@ final class RoutineEditorViewModel: ObservableObject {
             id: editingID,
             name: trimmedName,
             icon: icon.isEmpty ? nil : icon,
+            color: color,
             mode: mode,
             triggers: triggers,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
@@ -463,6 +468,26 @@ final class RoutineEditorViewModel: ObservableObject {
         )
     }
 
+    func setBreaksAllowed(_ isAllowed: Bool) {
+        guard isAllowed else {
+            maximumBreaks = 0
+            return
+        }
+
+        if maximumBreaks <= 0 {
+            maximumBreaks = 2
+        }
+        if maximumBreakMinutes <= 0 {
+            maximumBreakMinutes = 5
+        }
+        if minimumBreakIntervalMinutes <= 0 {
+            minimumBreakIntervalMinutes = 60
+        }
+        if !breakTriggerManual && !breakTriggerNFC && !breakTriggerLocation {
+            breakTriggerManual = true
+        }
+    }
+
     private func normalizeDomain(_ rawValue: String) -> String? {
         let trimmed = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -509,6 +534,8 @@ struct RoutineAppPickerSheet: View {
 private enum RoutineEditorLocalSheet: String, Identifiable {
     case apps
     case domains
+    case breakSettings
+    case color
     /// Writing a new pause without leaving the routine that will use it.
     case pauseFlow
 
@@ -729,6 +756,14 @@ struct RoutineEditorView: View {
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
+            case .breakSettings:
+                breakSettingsScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
+            case .color:
+                colorScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case .pauseFlow:
                 // Measured like the routine's own screens: a pause is a name and a few
                 // steps, and the sheet is as tall as they come out.
@@ -764,6 +799,10 @@ struct RoutineEditorView: View {
             chromeTitleText("Seleccionadas")
         case .domains:
             chromeTitleText("Websites")
+        case .breakSettings:
+            chromeTitleText("Break")
+        case .color:
+            chromeTitleText("Color")
         case .pauseFlow:
             chromeTitleText(pauseFlowEditor?.title ?? "New friction")
         case nil:
@@ -870,7 +909,7 @@ struct RoutineEditorView: View {
                         .font(.system(size: 18, weight: .light))
                         .foregroundStyle(LocktyColors.primaryText)
                         .frame(width: 52, height: 52)
-                        .background(Circle().fill(LocktyColors.elevatedBackground))
+                        .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
                 }
                 .buttonStyle(.locktyInteractive(shape: Circle()))
                 .popover(isPresented: $isShowingIconPicker) {
@@ -878,6 +917,26 @@ struct RoutineEditorView: View {
                         .presentationCompactAdaptation(.popover)
                 }
             }
+
+            HStack(spacing: LocktySpacing.sm) {
+                ForEach(RoutineColor.allCases) { routineColor in
+                    Button {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            viewModel.color = routineColor
+                        }
+                    } label: {
+                        Circle()
+                            .fill(LocktyColors.routine(routineColor))
+                            .frame(width: 24, height: 24)
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(viewModel.color == routineColor ? 0.9 : 0.22), lineWidth: viewModel.color == routineColor ? 2 : 1)
+                            }
+                    }
+                    .buttonStyle(.locktyInteractive(shape: Circle()))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
@@ -1237,50 +1296,58 @@ struct RoutineEditorView: View {
         }
     }
 
-    /// The pause this routine offers on the apps it blocks.
-    ///
-    /// A menu rather than a screen: picking one of the saved flows is one tap, and
-    /// writing a new one is the last item, which pushes the pause editor into this same
-    /// sheet.
-    private var pauseRow: some View {
-        Menu {
-            ForEach(viewModel.pauseFlows) { flow in
-                Button {
-                    withAnimation(.smooth(duration: 0.24)) {
-                        viewModel.pauseFlowID = flow.id
-                    }
-                } label: {
-                    if viewModel.pauseFlowID == flow.id {
-                        Label(flow.name, systemImage: "checkmark")
-                    } else {
-                        Text(flow.name)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                openPauseFlowEditor()
-            } label: {
-                Label("New friction", systemImage: "plus")
-            }
+    private var breakRow: some View {
+        Button {
+            openChildSheet(.breakSettings)
         } label: {
             HStack(spacing: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Friction")
+                    Text("Break")
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    Text(pauseFlowSummary)
+                    Text(breakSummary)
                         .font(.system(.footnote, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                 }
 
                 Spacer(minLength: 0)
 
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+    }
+
+    private var colorRow: some View {
+        Button {
+            openChildSheet(.color)
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Color")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(viewModel.color.rawValue.capitalized)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                Circle()
+                    .fill(LocktyColors.routine(viewModel.color))
+                    .frame(width: 18, height: 18)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
             .padding(.horizontal, LocktySpacing.md)
@@ -1297,19 +1364,50 @@ struct RoutineEditorView: View {
         return "\(flow.name) · \(stepCount == 1 ? "1 paso" : "\(stepCount) pasos")"
     }
 
-    private var readOnlyPauseRow: some View {
+    private var breakSummary: String {
+        guard viewModel.breaksAllowed else { return "No breaks allowed" }
+        let breakCount = viewModel.maximumBreaks == 1 ? "1 break" : "\(viewModel.maximumBreaks) breaks"
+        let duration = "\(viewModel.maximumBreakMinutes)m"
+        let friction = viewModel.selectedPauseFlow?.name ?? "No friction"
+        return "\(breakCount) · \(duration) · \(friction)"
+    }
+
+    private var readOnlyBreakRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Friction")
+                Text("Break")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
-                Text(pauseFlowSummary)
+                Text(breakSummary)
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
 
             Spacer(minLength: 0)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var readOnlyColorRow: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Color")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(viewModel.color.rawValue.capitalized)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Circle()
+                .fill(LocktyColors.routine(viewModel.color))
+                .frame(width: 18, height: 18)
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
@@ -1331,6 +1429,78 @@ struct RoutineEditorView: View {
         }
     }
 
+    private var breakSettingsScreen: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sectionHeading("Break policy", systemImage: "figure.walk")
+
+            breakAvailabilityCard
+
+            if viewModel.breaksAllowed {
+                breakDetailsCard
+                breakTriggersCard
+            }
+
+            sectionHeading("Friction", systemImage: "sparkles.rectangle.stack")
+
+            frictionSelectionCard
+
+            Button {
+                openPauseFlowEditor()
+            } label: {
+                HStack(spacing: LocktySpacing.sm) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Create friction")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(LocktyColors.primaryText)
+                .padding(.horizontal, LocktySpacing.md)
+                .frame(height: 52)
+                .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            }
+            .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var colorScreen: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sectionHeading("Routine color", systemImage: "paintpalette")
+
+            HStack(spacing: LocktySpacing.sm) {
+                ForEach(RoutineColor.allCases) { routineColor in
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            viewModel.color = routineColor
+                        }
+                    } label: {
+                        Circle()
+                            .fill(LocktyColors.routine(routineColor))
+                            .frame(width: 38, height: 38)
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(viewModel.color == routineColor ? 0.95 : 0.2), lineWidth: viewModel.color == routineColor ? 2 : 1)
+                            }
+                    }
+                    .buttonStyle(.locktyInteractive(shape: Circle()))
+                }
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
     private func openPauseFlowEditor() {
         pauseFlowEditor = viewModel.makePauseFlowEditor()
         openChildSheet(.pauseFlow)
@@ -1339,9 +1509,218 @@ struct RoutineEditorView: View {
     private func closePauseFlowEditor() {
         isGoingBack = true
         withAnimation(sheetAnimation) {
-            activeSheet = nil
+            activeSheet = .breakSettings
         }
         pauseFlowEditor = nil
+    }
+
+    private var breakAvailabilityCard: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Allow breaks")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(viewModel.breaksAllowed ? "This rule can temporarily bypass its restriction." : "Blocked means blocked.")
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { viewModel.breaksAllowed },
+                    set: { viewModel.setBreaksAllowed($0) }
+                )
+            )
+            .labelsHidden()
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var breakDetailsCard: some View {
+        VStack(spacing: 0) {
+            breakStepperRow(
+                title: "Max breaks",
+                valueText: "\(viewModel.maximumBreaks)",
+                decrementDisabled: viewModel.maximumBreaks <= 1,
+                incrementDisabled: viewModel.maximumBreaks >= 8,
+                onDecrement: { viewModel.maximumBreaks = max(viewModel.maximumBreaks - 1, 1) },
+                onIncrement: { viewModel.maximumBreaks = min(viewModel.maximumBreaks + 1, 8) }
+            )
+
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+                .padding(.leading, 16)
+
+            breakStepperRow(
+                title: "Break duration",
+                valueText: "\(viewModel.maximumBreakMinutes) min",
+                decrementDisabled: viewModel.maximumBreakMinutes <= 1,
+                incrementDisabled: viewModel.maximumBreakMinutes >= 15,
+                onDecrement: { viewModel.maximumBreakMinutes = max(viewModel.maximumBreakMinutes - 1, 1) },
+                onIncrement: { viewModel.maximumBreakMinutes = min(viewModel.maximumBreakMinutes + 1, 15) }
+            )
+
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+                .padding(.leading, 16)
+
+            breakStepperRow(
+                title: "Cooldown",
+                valueText: "\(viewModel.minimumBreakIntervalMinutes) min",
+                decrementDisabled: viewModel.minimumBreakIntervalMinutes <= 1,
+                incrementDisabled: viewModel.minimumBreakIntervalMinutes >= 180,
+                onDecrement: { viewModel.minimumBreakIntervalMinutes = max(viewModel.minimumBreakIntervalMinutes - 1, 1) },
+                onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 180) }
+            )
+        }
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var breakTriggersCard: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            Text("Allowed triggers")
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            HStack(spacing: LocktySpacing.sm) {
+                breakTriggerChip(
+                    title: "Manual",
+                    isSelected: viewModel.breakTriggerManual,
+                    action: { viewModel.breakTriggerManual.toggle() }
+                )
+                breakTriggerChip(
+                    title: "NFC",
+                    isSelected: viewModel.breakTriggerNFC,
+                    action: { viewModel.breakTriggerNFC.toggle() }
+                )
+                breakTriggerChip(
+                    title: "Location",
+                    isSelected: viewModel.breakTriggerLocation,
+                    action: { viewModel.breakTriggerLocation.toggle() }
+                )
+            }
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private var frictionSelectionCard: some View {
+        VStack(spacing: 0) {
+            if viewModel.pauseFlows.isEmpty {
+                HStack {
+                    Text("No saved frictions yet")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, LocktySpacing.md)
+                .padding(.vertical, LocktySpacing.md)
+            } else {
+                ForEach(Array(viewModel.pauseFlows.enumerated()), id: \.element.id) { index, flow in
+                    Button {
+                        withAnimation(.smooth(duration: 0.24)) {
+                            viewModel.pauseFlowID = flow.id
+                        }
+                    } label: {
+                        HStack(spacing: LocktySpacing.md) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(flow.name)
+                                    .font(.system(.subheadline, design: .default, weight: .regular))
+                                    .foregroundStyle(LocktyColors.primaryText)
+
+                                Text("\(flow.steps.count == 1 ? "1 step" : "\(flow.steps.count) steps") · \(flow.summary)")
+                                    .font(.system(.footnote, design: .default, weight: .regular))
+                                    .foregroundStyle(LocktyColors.secondaryText)
+                                    .lineLimit(2)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: viewModel.pauseFlowID == flow.id ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundStyle(viewModel.pauseFlowID == flow.id ? LocktyColors.productive : LocktyColors.secondaryText)
+                        }
+                        .padding(.horizontal, LocktySpacing.md)
+                        .padding(.vertical, LocktySpacing.md)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < viewModel.pauseFlows.count - 1 {
+                        Divider()
+                            .overlay(Color.white.opacity(0.10))
+                            .padding(.leading, 16)
+                    }
+                }
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private func breakStepperRow(
+        title: String,
+        valueText: String,
+        decrementDisabled: Bool,
+        incrementDisabled: Bool,
+        onDecrement: @escaping () -> Void,
+        onIncrement: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            Text(title)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: LocktySpacing.sm) {
+                Button(action: onDecrement) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .disabled(decrementDisabled)
+
+                Text(valueText)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .frame(minWidth: 72, alignment: .center)
+
+                Button(action: onIncrement) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .disabled(incrementDisabled)
+            }
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
+    }
+
+    private func breakTriggerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(isSelected ? .black : LocktyColors.primaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isSelected ? Color.white : Color.white.opacity(0.06))
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var strictRow: some View {
@@ -1434,7 +1813,9 @@ struct RoutineEditorView: View {
 
                 appsRow
 
-                pauseRow
+                colorRow
+
+                breakRow
 
                 strictRow
 
@@ -1473,7 +1854,9 @@ struct RoutineEditorView: View {
 
             appsRow
 
-            readOnlyPauseRow
+            readOnlyColorRow
+
+            readOnlyBreakRow
 
             strictReadOnlyRow
 

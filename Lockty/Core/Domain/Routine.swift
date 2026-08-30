@@ -1,9 +1,21 @@
 import Foundation
 
+nonisolated enum RoutineColor: String, Codable, CaseIterable, Hashable, Identifiable {
+    case mint
+    case sky
+    case amber
+    case coral
+    case rose
+    case violet
+
+    var id: String { rawValue }
+}
+
 struct Routine: Codable, Hashable, Identifiable {
     let id: UUID
     var name: String
     var icon: String?
+    var color: RoutineColor
     var mode: RoutineMode
     var triggers: [RoutineTrigger]
     var blockedApplications: Set<AppIdentity.ID>
@@ -25,6 +37,7 @@ struct Routine: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         name: String,
         icon: String? = nil,
+        color: RoutineColor = .mint,
         mode: RoutineMode,
         triggers: [RoutineTrigger],
         blockedApplications: Set<AppIdentity.ID>,
@@ -41,6 +54,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.id = id
         self.name = name
         self.icon = icon
+        self.color = color
         self.mode = mode
         self.triggers = triggers
         self.blockedApplications = blockedApplications
@@ -72,6 +86,7 @@ extension Routine {
     static let mockDeepWork = Routine(
         name: "Deep Work",
         icon: "brain.head.profile",
+        color: .sky,
         mode: .strict,
         triggers: [.manual],
         blockedApplications: ["instagram", "youtube"],
@@ -93,6 +108,7 @@ extension Routine {
     static let mockMorning = Routine(
         name: "Morning Reset",
         icon: "sun.max",
+        color: .amber,
         mode: .normal,
         triggers: [.manual],
         blockedApplications: ["instagram", "youtube", "whatsapp"],

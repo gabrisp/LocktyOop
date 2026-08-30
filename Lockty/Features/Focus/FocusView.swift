@@ -3,15 +3,10 @@ import SwiftUI
 struct FocusView: View {
     @ObservedObject var viewModel: FocusViewModel
     let routinesViewModel: RoutinesViewModel
-    let pausesViewModel: PausesViewModel
+    let frictionsViewModel: FrictionsViewModel
     @ObservedObject var router: AppRouter
-    let pauseFlowRepository: PauseFlowRepository
+    let frictionRepository: FrictionRepository
 
-    @State private var flows: [PauseFlow] = []
-
-    /// The page gutter. Each horizontal row cancels it and re-applies it inside its own
-    /// content, so cards scroll all the way to the screen edge instead of being clipped
-    /// at the column, while still starting and ending flush with the titles above them.
     private var gutter: CGFloat { LocktySpacing.lg }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
 
@@ -24,28 +19,36 @@ struct FocusView: View {
                     routinesRow
                 }
 
-                section(title: "Pauses") {
-                    router.push(.pausesList)
+                section(title: "Frictions") {
+                    router.push(.frictionsList)
                 } content: {
-                    flowsRow
+                    frictionsRow
                 }
             }
             .padding(.horizontal, gutter)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .scrollIndicators(.hidden)
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .task {
-            await routinesViewModel.load()
-            await pausesViewModel.load()
+        .navigationTitle("Focus")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    router.presentSheet(.focusCreationChoice(FocusCreationChoiceRoute()))
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
         }
-        .task { await loadFlows() }
+        .task {
+            await frictionRepository.seedDefaultFrictionIfNeeded()
+            await routinesViewModel.load()
+            await frictionsViewModel.load()
+        }
         .onChange(of: router.sheet) { _, newValue in
             guard newValue == nil else { return }
             Task {
                 await routinesViewModel.load()
-                await pausesViewModel.load()
-                await loadFlows()
+                await frictionsViewModel.load()
             }
         }
     }
@@ -78,57 +81,27 @@ struct FocusView: View {
                     }
                 )
                 .frame(width: tileWidth)
-                // A ForEach insertion has no transition of its own, so a new routine
-                // appeared fully formed and shoved the row along. It arrives instead.
                 .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))
             }
         }
         .animation(.smooth(duration: 0.34), value: routinesViewModel.routines.map(\.id))
     }
 
-    private func loadFlows() async {
-        let loaded = await pauseFlowRepository.flows()
-        withAnimation(.smooth(duration: 0.28)) {
-            flows = loaded
-        }
-    }
-
-    /// Saved ways of pausing. No app on any of them -- a flow is picked up by a routine,
-    /// and covers whatever that routine blocks.
-    private var flowsRow: some View {
+    private var frictionsRow: some View {
         horizontalRow {
-            addTile(title: "New Pause") {
-                router.presentSheet(.pauseFlowEditor(PauseFlowEditorRoute(flowID: nil)))
+            addTile(title: "New Friction") {
+                router.presentSheet(.frictionEditor(FrictionEditorRoute(frictionID: nil)))
             }
 
-            ForEach(flows) { flow in
-                PauseFlowCard(flow: flow) {
-                    router.presentSheet(.pauseFlowEditor(PauseFlowEditorRoute(flowID: flow.id)))
+            ForEach(frictionsViewModel.frictions) { friction in
+                FrictionFocusCard(friction: friction) {
+                    router.presentSheet(.frictionEditor(FrictionEditorRoute(frictionID: friction.id)))
                 }
                 .frame(width: tileWidth)
                 .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))
             }
         }
-        .animation(.smooth(duration: 0.34), value: flows.map(\.id))
-    }
-
-    @available(*, deprecated, message: "The per-app pause list, kept while flows take over.")
-    private var pausesRow: some View {
-        horizontalRow {
-            // No way in to creating one while a routine is running.
-            if !pausesViewModel.isLockedByActiveRoutine {
-                addTile(title: "New Pause") {
-                    router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: nil)))
-                }
-            }
-
-            ForEach(pausesViewModel.state.rules) { rule in
-                PauseCard(rule: rule) {
-                    router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
-                }
-                .frame(width: tileWidth)
-            }
-        }
+        .animation(.smooth(duration: 0.34), value: frictionsViewModel.frictions.map(\.id))
     }
 
     @ViewBuilder
@@ -140,14 +113,10 @@ struct FocusView: View {
             .padding(.horizontal, gutter)
         }
         .scrollIndicators(.hidden)
-        // The cards grow under a press, and a scroll view clips its content by default,
-        // so without this the grow was cut off at the row's own bounds.
         .scrollClipDisabled()
         .padding(.horizontal, -gutter)
     }
 
-    /// Centred circle and label rather than the corner icon the other tiles use: this is
-    /// the action, not one more item in the row.
     private func addTile(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             CardView(radius: RoutineGridMetrics.tileRadius, interactive: true, height: RoutineGridMetrics.tileHeight) {
@@ -176,10 +145,8 @@ struct FocusView: View {
     }
 }
 
-
-/// Grid tile for a pause flow: what it is called and what it puts you through.
-private struct PauseFlowCard: View {
-    let flow: PauseFlow
+private struct FrictionFocusCard: View {
+    let friction: Friction
     let onOpen: () -> Void
 
     var body: some View {
@@ -190,19 +157,19 @@ private struct PauseFlowCard: View {
                 height: RoutineGridMetrics.tileHeight
             ) {
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    Image(systemName: flow.icon?.isEmpty == false ? flow.icon! : "hourglass")
+                    Image(systemName: friction.icon ?? "slider.horizontal.3")
                         .font(.system(size: 16, weight: .light))
                         .foregroundStyle(LocktyColors.primaryText)
                         .frame(width: 24, height: 24)
 
                     Spacer(minLength: 0)
 
-                    Text(flow.summary)
+                    Text(friction.summary)
                         .font(LocktyTypography.caption)
                         .foregroundStyle(LocktyColors.secondaryText)
                         .lineLimit(1)
 
-                    Text(flow.name)
+                    Text(friction.name)
                         .font(.system(.subheadline, design: .default, weight: .bold))
                         .foregroundStyle(LocktyColors.primaryText)
                         .lineLimit(2)

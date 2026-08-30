@@ -41,7 +41,7 @@ final class PauseAllowanceLiveActivityController: PauseAllowanceLiveActivityCont
         do {
             _ = try Activity.request(
                 attributes: attributes,
-                content: ActivityContent(state: state, staleDate: allowance.expiresAt),
+                content: ActivityContent(state: state, staleDate: nil),
                 pushType: nil
             )
             liveActivityLogger.notice("Started pause allowance Live Activity for \(allowance.context.displayName, privacy: .public)")

@@ -116,7 +116,6 @@ final class RoutineEditorViewModel: ObservableObject {
         self.usageDataService = usageDataService
         self.pauseFlowRepository = pauseFlowRepository
         createdAt = Date()
-        refreshSelectionState()
     }
 
     static let defaultIcon = "repeat"
@@ -153,7 +152,15 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     var selectionScope: ScreenTimeSelectionScope {
+        draftSelectionScope
+    }
+
+    private var persistedSelectionScope: ScreenTimeSelectionScope {
         .routine(editingID)
+    }
+
+    private var draftSelectionScope: ScreenTimeSelectionScope {
+        .routine(draftID)
     }
 
     var selectedWebsiteCount: Int {
@@ -217,6 +224,8 @@ final class RoutineEditorViewModel: ObservableObject {
         await loadPauseFlows()
         // A new routine's baseline is its empty form, so typing a name already counts.
         guard let initialRoutineID else {
+            try? selectionStore.remove(scope: draftSelectionScope)
+            refreshSelectionState()
             captureBaseline()
             return
         }
@@ -245,6 +254,11 @@ final class RoutineEditorViewModel: ObservableObject {
         breakTriggerNFC = routine.breakPolicy.allowedTriggers.contains(.nfc)
         breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
         blockedDomains = routine.blockedDomains.sorted()
+        if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
+            try? selectionStore.save(selection, scope: draftSelectionScope)
+        } else {
+            try? selectionStore.remove(scope: draftSelectionScope)
+        }
         refreshSelectionState()
         captureBaseline()
         print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
@@ -299,7 +313,7 @@ final class RoutineEditorViewModel: ObservableObject {
 
     func refreshSelectionState() {
         do {
-            let selection = try selectionStore.load(scope: selectionScope)
+            let selection = try selectionStore.load(scope: draftSelectionScope)
             selectionPreview = selection
             selectedApplicationCount = selection.applicationTokens.count + selection.categoryTokens.count
             print("Routine editor refreshed selection scope=\(selectionScope.id) apps=\(selection.applicationTokens.count)")
@@ -322,7 +336,7 @@ final class RoutineEditorViewModel: ObservableObject {
         selectionPreview = normalized
         selectedApplicationCount = normalized.applicationTokens.count + normalized.categoryTokens.count
         do {
-            try selectionStore.save(normalized, scope: selectionScope)
+            try selectionStore.save(normalized, scope: draftSelectionScope)
             print("Routine editor replaced selection scope=\(selectionScope.id) apps=\(normalized.applicationTokens.count) categories=\(normalized.categoryTokens.count)")
         } catch {
             errorMessage = error.localizedDescription
@@ -403,7 +417,8 @@ final class RoutineEditorViewModel: ObservableObject {
         )
 
         do {
-            try selectionStore.save(selection, scope: selectionScope)
+            try selectionStore.save(selection, scope: persistedSelectionScope)
+            try? selectionStore.remove(scope: draftSelectionScope)
             try await repository.save(routine)
             routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(self.blockedDomains.count)")
             print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(blockedDomains.count)")
@@ -460,6 +475,10 @@ final class RoutineEditorViewModel: ObservableObject {
         guard trimmed.contains("."), !trimmed.contains(" ") else { return nil }
         return trimmed
     }
+
+    func discardDraft() {
+        try? selectionStore.remove(scope: draftSelectionScope)
+    }
 }
 
 struct RoutineAppPickerSheet: View {
@@ -505,6 +524,8 @@ private enum RoutineEditorCompactScreen: Hashable {
 struct RoutineEditorView: View {
     @StateObject private var viewModel: RoutineEditorViewModel
     let router: AppRouter
+    let isEmbeddedInParentSheet: Bool
+    let onReturnToParent: (() -> Void)?
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RoutineEditorLocalSheet?
@@ -529,11 +550,15 @@ struct RoutineEditorView: View {
         viewModel: RoutineEditorViewModel,
         router: AppRouter,
         startsEditing: Bool = true,
+        isEmbeddedInParentSheet: Bool = false,
+        onReturnToParent: (() -> Void)? = nil,
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         _isEditing = State(initialValue: startsEditing && !viewModel.isEditingBlocked)
         self.router = router
+        self.isEmbeddedInParentSheet = isEmbeddedInParentSheet
+        self.onReturnToParent = onReturnToParent
         self.onCloseEditor = onCloseEditor
     }
 
@@ -551,9 +576,20 @@ struct RoutineEditorView: View {
         await viewModel.startRoutine()
     }
 
-    private func close() {
+    private func dismissEditor() {
+        viewModel.discardDraft()
         onCloseEditor()
         dismiss()
+    }
+
+    private func returnToParentOrDismiss() {
+        viewModel.discardDraft()
+        onCloseEditor()
+        if let onReturnToParent {
+            onReturnToParent()
+        } else {
+            dismiss()
+        }
     }
 
     /// Leaving is free until something has been edited, and then it asks. Applies to the
@@ -561,7 +597,7 @@ struct RoutineEditorView: View {
     /// unsaved state.
     private func requestClose() {
         guard viewModel.hasChanges else {
-            close()
+            returnToParentOrDismiss()
             return
         }
         isConfirmingDiscard = true
@@ -600,15 +636,14 @@ struct RoutineEditorView: View {
     }
 
     var body: some View {
-        LocktyDynamicSheet(animation: sheetAnimation) {
-            sheetContent
-                .locktyDynamicSheetChrome(id: chromeID) {
-                    centerChrome
-                } leading: {
-                    leadingChrome
-                } trailing: {
-                    trailingChrome
+        Group {
+            if isEmbeddedInParentSheet {
+                editorScaffold
+            } else {
+                LocktyDynamicSheet(animation: sheetAnimation) {
+                    editorScaffold
                 }
+            }
         }
         .interactiveDismissDisabled(viewModel.hasChanges && activeSheet == nil)
         .confirmationDialog(
@@ -616,7 +651,7 @@ struct RoutineEditorView: View {
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { close() }
+            Button("Descartar", role: .destructive) { returnToParentOrDismiss() }
             Button("Seguir editando", role: .cancel) {}
         }
         .task {
@@ -645,6 +680,17 @@ struct RoutineEditorView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+    }
+
+    private var editorScaffold: some View {
+        sheetContent
+            .locktyDynamicSheetChrome(id: chromeID) {
+                centerChrome
+            } leading: {
+                leadingChrome
+            } trailing: {
+                trailingChrome
+            }
     }
 
     private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
@@ -719,7 +765,7 @@ struct RoutineEditorView: View {
         case .domains:
             chromeTitleText("Websites")
         case .pauseFlow:
-            chromeTitleText(pauseFlowEditor?.title ?? "Nueva pausa")
+            chromeTitleText(pauseFlowEditor?.title ?? "New friction")
         case nil:
             if isNaming {
                 chromeTitleText("Nombre")
@@ -1217,12 +1263,12 @@ struct RoutineEditorView: View {
             Button {
                 openPauseFlowEditor()
             } label: {
-                Label("Nueva pausa", systemImage: "plus")
+                Label("New friction", systemImage: "plus")
             }
         } label: {
             HStack(spacing: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Pausa")
+                    Text("Friction")
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -1254,7 +1300,7 @@ struct RoutineEditorView: View {
     private var readOnlyPauseRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Pausa")
+                Text("Friction")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
@@ -1399,7 +1445,7 @@ struct RoutineEditorView: View {
                         if await viewModel.save() {
                             // Confirming closes the sheet and leaves the routine made.
                             if isCreating {
-                                close()
+                                dismissEditor()
                             } else {
                                 withAnimation(sheetAnimation) { isEditing = false }
                             }
@@ -1453,7 +1499,7 @@ struct RoutineEditorView: View {
                         // running. Ending the routine answers it.
                         router.pendingUnlock = nil
                     }
-                    close()
+                    dismissEditor()
                     Task { await viewModel.stopRoutine() }
                 }
                 .padding(.top, LocktySpacing.sm)
@@ -1461,7 +1507,7 @@ struct RoutineEditorView: View {
                 LocktyHoldButton(title: "Mantén para empezar", systemImage: "play.fill") {
                     Task {
                         await startRoutine()
-                        close()
+                        dismissEditor()
                     }
                 }
                 .padding(.top, LocktySpacing.sm)

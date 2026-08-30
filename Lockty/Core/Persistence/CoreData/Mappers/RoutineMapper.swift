@@ -38,6 +38,8 @@ struct RoutineMapper {
         entity.blockedDomainsData = try encoder.encode(routine.blockedDomains)
         entity.breakPolicyData = try encoder.encode(routine.breakPolicy)
         entity.familyActivitySelectionData = try selection?.archivedData()
+        entity.pauseFlowID = routine.pauseFlowID
+        entity.pausePolicyData = try encoder.encode(routine.pausePolicy)
 
         ChildDiffSync.apply(
             context: context,
@@ -118,6 +120,10 @@ struct RoutineMapper {
                 tasks: tasks,
                 startAlarmEnabled: entity.startAlarmEnabled,
                 breakPolicy: try decoder.decode(BreakPolicy.self, from: entity.breakPolicyData),
+                pauseFlowID: entity.pauseFlowID,
+                pausePolicy: try entity.pausePolicyData.map {
+                    try decoder.decode(RoutinePausePolicy.self, from: $0)
+                } ?? .off,
                 allowsPauseDuringStrictMode: entity.allowsPauseDuringStrictMode,
                 createdAt: entity.createdAt,
                 updatedAt: entity.updatedAt

@@ -4,5 +4,5 @@ import Foundation
 /// including the editors and detail screens opened from inside these two.
 enum AppRoute: Hashable {
     case routinesList
-    case pausesList
+    case frictionsList
 }

@@ -11,34 +11,46 @@ struct UnlockFlowView: View {
     let tokens: [ApplicationToken]
     /// Preselected when the flow was opened from a specific app.
     var initialToken: ApplicationToken?
+    let frictionSteps: [PauseStep]
     let allowanceRange: ClosedRange<Int>
-    let onUnlock: (ApplicationToken?, Int) -> Void
+    let nfcService: NFCServicing?
+    let locationService: LocationTriggerServicing?
+    let onUnlock: (ApplicationToken?, Int, String?) -> Void
     let onClose: () -> Void
 
     private enum Step: Hashable {
-        /// The wait, on its own screen. It used to be a gate on the duration step's
-        /// button, which made the waiting something you sat through while already being
-        /// asked a question -- as its own step it is the only thing happening.
         case rest
         case app
+        case friction(Int)
         case duration
     }
 
     @State private var step: Step = .rest
     @State private var selectedOptionID: String?
     @State private var minutes: Int?
+    @State private var returnStep: Step = .rest
+    @State private var currentStepStatus = UnlockFlowStepStatus.ready
+    @State private var operationsSubmitTrigger = 0
+    @State private var nfcScanTrigger = 0
+    @State private var locationCheckTrigger = 0
 
     init(
         tokens: [ApplicationToken],
         initialToken: ApplicationToken? = nil,
+        frictionSteps: [PauseStep] = [],
         allowanceRange: ClosedRange<Int> = 1...15,
         defaultMinutes: Int = 5,
-        onUnlock: @escaping (ApplicationToken?, Int) -> Void,
+        nfcService: NFCServicing? = nil,
+        locationService: LocationTriggerServicing? = nil,
+        onUnlock: @escaping (ApplicationToken?, Int, String?) -> Void,
         onClose: @escaping () -> Void
     ) {
         self.tokens = tokens
         self.initialToken = initialToken
+        self.frictionSteps = frictionSteps
         self.allowanceRange = allowanceRange
+        self.nfcService = nfcService
+        self.locationService = locationService
         self.onUnlock = onUnlock
         self.onClose = onClose
         // Falls back to the first blocked app rather than to nothing: the flow always
@@ -52,7 +64,7 @@ struct UnlockFlowView: View {
 
     private static let allAppsOptionID = "all"
 
-    private static func optionID(for token: ApplicationToken) -> String {
+    nonisolated private static func optionID(for token: ApplicationToken) -> String {
         AppIdentity.ID(token: token).rawValue
     }
 
@@ -71,14 +83,83 @@ struct UnlockFlowView: View {
 
     private var title: String {
         switch step {
-        case .rest: "Respira..."
-        case .app: "Quiero usar..."
-        case .duration: "Durante..."
+        case .rest:
+            return "Respira..."
+        case .app:
+            return "Quiero usar..."
+        case .friction(let index):
+            guard frictionSteps.indices.contains(index) else { return "" }
+            switch frictionSteps[index] {
+            case .wordSearch, .letterMatch, .operations:
+                return ""
+            default:
+                return frictionSteps[index].title
+            }
+        case .duration:
+            return "Durante..."
         }
     }
 
     private var primaryTitle: String {
-        step == .duration ? "Desbloquear" : "Continuar"
+        switch step {
+        case .app:
+            "Listo"
+        case .duration:
+            "Desbloquear"
+        case .friction:
+            currentStepStatus.primaryState.title
+        default:
+            "Continuar"
+        }
+    }
+
+    private var currentFrictionStep: PauseStep? {
+        guard case .friction(let index) = step, frictionSteps.indices.contains(index) else { return nil }
+        return frictionSteps[index]
+    }
+
+    private var restSeconds: Int {
+        switch step {
+        case .rest:
+            return 5
+        case .friction(let index):
+            guard frictionSteps.indices.contains(index) else { return 0 }
+            switch frictionSteps[index] {
+            case .countdown(let configuration):
+                return Int(configuration.duration)
+            case .breathing(let configuration):
+                return max(configuration.breathCount * 4, 1)
+            default:
+                return 0
+            }
+        default:
+            return 0
+        }
+    }
+
+    private var isPrimaryEnabled: Bool {
+        switch step {
+        case .friction:
+            return currentStepStatus.primaryState.isEnabled
+        default:
+            return true
+        }
+    }
+
+    private var capturedIntention: String? {
+        let trimmed = currentStepStatus.intentionText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var nextMainStepAfterRest: Step {
+        frictionSteps.isEmpty ? .duration : .friction(0)
+    }
+
+    private func advanceFromFriction(at index: Int) {
+        let nextIndex = frictionSteps.index(after: index)
+        withAnimation(.smooth(duration: 0.34)) {
+            step = frictionSteps.indices.contains(nextIndex) ? .friction(nextIndex) : .duration
+        }
     }
 
     var body: some View {
@@ -87,22 +168,24 @@ struct UnlockFlowView: View {
             stepID: step,
             primaryTitle: primaryTitle,
             secondaryTitle: "Déjalo",
-            // The wait is the rest step and nothing else. Every other step is answering
-            // a question, and a question does not need to be waited out.
-            restSeconds: step == .rest ? 5 : 0,
-            // On every step but the app one, where it would open the screen already
-            // showing. During the rest it is the only thing there is to do.
+            isPrimaryEnabled: isPrimaryEnabled,
+            restSeconds: restSeconds,
             accessoryToken: step == .app ? nil : selectedToken,
             onAccessory: {
+                returnStep = step
                 withAnimation(.smooth(duration: 0.34)) { step = .app }
             },
             onClose: onClose,
             onPrimary: {
                 switch step {
-                case .rest, .app:
-                    withAnimation(.smooth(duration: 0.34)) { step = .duration }
+                case .rest:
+                    withAnimation(.smooth(duration: 0.34)) { step = nextMainStepAfterRest }
+                case .app:
+                    withAnimation(.smooth(duration: 0.34)) { step = returnStep }
+                case .friction(let index):
+                    handlePrimaryActionForFriction(at: index)
                 case .duration:
-                    onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound)
+                    onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound, capturedIntention)
                 }
             },
             onSecondary: onClose
@@ -116,6 +199,9 @@ struct UnlockFlowView: View {
                     appRow(id)
                 }
 
+            case .friction(let index):
+                frictionContent(frictionSteps[index])
+
             case .duration:
                 LocktyWheelPicker(items: Array(allowanceRange), selection: $minutes) { value in
                     Text(value == 1 ? "1 minuto" : "\(value) minutos")
@@ -124,6 +210,150 @@ struct UnlockFlowView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+        }
+        .onChange(of: step, initial: true) { _, newValue in
+            resetCurrentStepStatus(for: newValue)
+        }
+    }
+
+    @ViewBuilder
+    private func frictionContent(_ frictionStep: PauseStep) -> some View {
+        switch frictionStep {
+        case .countdown(let configuration):
+            UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
+                VStack(spacing: LocktySpacing.lg) {
+                    Image(systemName: "timer")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(LocktyColors.primaryText)
+                    Text("\(Int(configuration.duration)) seconds")
+                        .font(.system(.title3, design: .rounded, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+        case .breathing(let configuration):
+            UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
+                VStack(spacing: LocktySpacing.lg) {
+                    BreathingRest()
+                    Text("\(configuration.breathCount) slow breaths")
+                        .font(.system(.title3, design: .rounded, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+        case .intention(let configuration),
+             .intentionTemplate(let configuration),
+             .customIntention(let configuration):
+            UnlockIntentionStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .confirmation(let configuration):
+            UnlockConfirmationStepView(configuration: configuration)
+
+        case .personalText(let configuration):
+            UnlockPersonalTextStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .wordSearch(let configuration):
+            UnlockWordSearchStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .letterMatch(let configuration):
+            UnlockLetterMatchStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .operations(let configuration):
+            UnlockOperationsStepView(
+                configuration: configuration,
+                submitTrigger: operationsSubmitTrigger,
+                status: $currentStepStatus
+            )
+
+        case .personalVideo(let configuration):
+            UnlockPersonalVideoStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .nfcTag(let configuration):
+            UnlockNFCTagStepView(
+                configuration: configuration,
+                scanTrigger: nfcScanTrigger,
+                nfcService: nfcService,
+                status: $currentStepStatus
+            )
+
+        case .location(let configuration):
+            UnlockLocationStepView(
+                configuration: configuration,
+                checkTrigger: locationCheckTrigger,
+                locationService: locationService,
+                status: $currentStepStatus
+            )
+        }
+    }
+
+    private func handlePrimaryActionForFriction(at index: Int) {
+        guard frictionSteps.indices.contains(index) else { return }
+
+        switch frictionSteps[index] {
+        case .operations:
+            switch currentStepStatus.primaryState {
+            case .advance:
+                advanceFromFriction(at: index)
+            case .submit(let enabled):
+                guard enabled else { return }
+                operationsSubmitTrigger += 1
+            case .scan:
+                advanceFromFriction(at: index)
+            }
+
+        case .nfcTag:
+            switch currentStepStatus.primaryState {
+            case .advance:
+                advanceFromFriction(at: index)
+            case .scan(let enabled):
+                guard enabled else { return }
+                nfcScanTrigger += 1
+            case .submit:
+                advanceFromFriction(at: index)
+            }
+
+        case .location:
+            switch currentStepStatus.primaryState {
+            case .advance:
+                advanceFromFriction(at: index)
+            case .submit(let enabled):
+                guard enabled else { return }
+                locationCheckTrigger += 1
+            case .scan:
+                advanceFromFriction(at: index)
+            }
+
+        default:
+            advanceFromFriction(at: index)
+        }
+    }
+
+    private func resetCurrentStepStatus(for step: Step) {
+        switch step {
+        case .friction(let index):
+            guard frictionSteps.indices.contains(index) else {
+                currentStepStatus = .ready
+                return
+            }
+
+            switch frictionSteps[index] {
+            case .wordSearch, .letterMatch, .personalVideo:
+                currentStepStatus = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
+            case .operations:
+                currentStepStatus = UnlockFlowStepStatus(primaryState: .submit(enabled: false))
+            case .nfcTag:
+                currentStepStatus = UnlockFlowStepStatus(primaryState: .scan(enabled: true))
+            case .location:
+                currentStepStatus = UnlockFlowStepStatus(primaryState: .submit(enabled: true))
+            case .intention, .intentionTemplate, .customIntention:
+                currentStepStatus = UnlockFlowStepStatus(primaryState: .advance(enabled: false), intentionText: nil)
+            default:
+                currentStepStatus = .ready
+            }
+        default:
+            currentStepStatus = .ready
         }
     }
 

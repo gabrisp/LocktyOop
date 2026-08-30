@@ -9,14 +9,17 @@ struct DestinationFactory {
         case .routinesList:
             featureFactory.makeRoutinesList()
 
-        case .pausesList:
-            featureFactory.makePausesList()
+        case .frictionsList:
+            featureFactory.makeFrictionsList()
         }
     }
 
     @ViewBuilder
     func sheet(for route: SheetRoute) -> some View {
         switch route {
+        case .focusCreationChoice(let route):
+            featureFactory.makeFocusCreationChoiceSheet(route: route)
+
         case .appClassification(let appID):
             featureFactory.makeClassificationSheet(appID: appID)
 
@@ -46,6 +49,9 @@ struct DestinationFactory {
 
         case .pauseEditor(let route):
             featureFactory.makePauseEditor(route: route)
+
+        case .frictionEditor(let route):
+            featureFactory.makeFrictionEditor(route: route)
 
         case .productivityDetail(let day):
             todaySheet { featureFactory.makeProductivityDetail(day: day) }

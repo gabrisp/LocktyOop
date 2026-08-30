@@ -25,6 +25,7 @@ final class AppContainer {
     let todayViewModel: TodayViewModel
     let routinesViewModel: RoutinesViewModel
     let focusViewModel: FocusViewModel
+    let frictionsViewModel: FrictionsViewModel
     let pausesViewModel: PausesViewModel
     let lifetimeViewModel: LifetimeViewModel
     let systemAccessViewModel: SystemAccessViewModel
@@ -55,6 +56,7 @@ final class AppContainer {
         todayViewModel: TodayViewModel,
         routinesViewModel: RoutinesViewModel,
         focusViewModel: FocusViewModel,
+        frictionsViewModel: FrictionsViewModel,
         pausesViewModel: PausesViewModel,
         lifetimeViewModel: LifetimeViewModel,
         systemAccessViewModel: SystemAccessViewModel,
@@ -83,6 +85,7 @@ final class AppContainer {
         self.todayViewModel = todayViewModel
         self.routinesViewModel = routinesViewModel
         self.focusViewModel = focusViewModel
+        self.frictionsViewModel = frictionsViewModel
         self.pausesViewModel = pausesViewModel
         self.lifetimeViewModel = lifetimeViewModel
         self.systemAccessViewModel = systemAccessViewModel
@@ -169,6 +172,12 @@ final class AppContainer {
         )
         let focusViewModel = FocusViewModel()
         let pauseFlowRepository = AppGroupPauseFlowRepository(appGroupStore: appGroupStore)
+        let frictionRepository = AppGroupFrictionRepository(
+            pauseFlowRepository: pauseFlowRepository,
+            routineRepository: routineRepository,
+            appGroupStore: appGroupStore
+        )
+        let frictionsViewModel = FrictionsViewModel(repository: frictionRepository)
         let pausesViewModel = PausesViewModel(
             ruleRepository: pauseRuleRepository,
             eventRepository: pauseEventRepository,
@@ -192,6 +201,7 @@ final class AppContainer {
             todayViewModel: todayViewModel,
             routinesViewModel: routinesViewModel,
             focusViewModel: focusViewModel,
+            frictionsViewModel: frictionsViewModel,
             pausesViewModel: pausesViewModel,
             lifetimeViewModel: lifetimeViewModel,
             systemAccessViewModel: systemAccessViewModel,
@@ -202,9 +212,12 @@ final class AppContainer {
             routineExecutionRepository: routineExecutionRepository,
             pauseRuleRepository: pauseRuleRepository,
             pauseFlowRepository: pauseFlowRepository,
+            frictionRepository: frictionRepository,
             pauseEventRepository: pauseEventRepository,
             classificationRepository: classificationRepository,
             haptics: haptics,
+            nfcService: nfcService,
+            locationService: locationService,
             editorStore: editorStore,
             usageDataService: usageDataService
         )
@@ -214,7 +227,7 @@ final class AppContainer {
             router: router,
             appGroupStore: appGroupStore,
             pauseEngine: pauseEngine,
-            pauseFlowRepository: pauseFlowRepository,
+            frictionRepository: frictionRepository,
             notificationService: notificationService,
             routineEngine: routineEngine,
             shieldService: shieldService
@@ -240,6 +253,7 @@ final class AppContainer {
             todayViewModel: todayViewModel,
             routinesViewModel: routinesViewModel,
             focusViewModel: focusViewModel,
+            frictionsViewModel: frictionsViewModel,
             pausesViewModel: pausesViewModel,
             lifetimeViewModel: lifetimeViewModel,
             systemAccessViewModel: systemAccessViewModel,

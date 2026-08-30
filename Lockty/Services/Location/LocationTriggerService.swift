@@ -9,6 +9,8 @@ protocol LocationTriggerServicing {
     var authorizationState: LocationAuthorizationState { get }
     func refreshAuthorization() async -> LocationAuthorizationState
     func requestAuthorization() async -> LocationAuthorizationState
+    func currentLocation() async throws -> CLLocation
+    func isInside(_ trigger: LocationTrigger) async throws -> Bool
     func startMonitoring(_ trigger: LocationTrigger) async throws
     func stopMonitoring(_ trigger: LocationTrigger) async throws
 }
@@ -17,6 +19,8 @@ protocol LocationTriggerServicing {
 final class LiveLocationTriggerService: NSObject, CLLocationManagerDelegate, LocationTriggerServicing {
     private let manager = CLLocationManager()
     private(set) var authorizationState: LocationAuthorizationState = .notDetermined
+    private var authorizationContinuation: CheckedContinuation<LocationAuthorizationState, Never>?
+    private var locationContinuation: CheckedContinuation<CLLocation, Error>?
 
     override init() {
         super.init()
@@ -30,8 +34,43 @@ final class LiveLocationTriggerService: NSObject, CLLocationManagerDelegate, Loc
     }
 
     func requestAuthorization() async -> LocationAuthorizationState {
-        manager.requestWhenInUseAuthorization()
-        return await refreshAuthorization()
+        let current = await refreshAuthorization()
+        switch current {
+        case .whenInUse, .always, .denied, .restricted, .unavailable:
+            return current
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                authorizationContinuation = continuation
+                manager.requestWhenInUseAuthorization()
+            }
+        }
+    }
+
+    func currentLocation() async throws -> CLLocation {
+        let state = await refreshAuthorization()
+
+        switch state {
+        case .notDetermined:
+            let updated = await requestAuthorization()
+            guard updated == .whenInUse || updated == .always else {
+                throw LocationTriggerError.denied
+            }
+        case .denied, .restricted, .unavailable:
+            throw LocationTriggerError.denied
+        case .whenInUse, .always:
+            break
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            locationContinuation = continuation
+            manager.requestLocation()
+        }
+    }
+
+    func isInside(_ trigger: LocationTrigger) async throws -> Bool {
+        let location = try await currentLocation()
+        let target = CLLocation(latitude: trigger.latitude, longitude: trigger.longitude)
+        return location.distance(from: target) <= trigger.radiusMeters
     }
 
     func startMonitoring(_ trigger: LocationTrigger) async throws {
@@ -48,6 +87,24 @@ final class LiveLocationTriggerService: NSObject, CLLocationManagerDelegate, Loc
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationState = Self.map(manager.authorizationStatus)
+        authorizationContinuation?.resume(returning: authorizationState)
+        authorizationContinuation = nil
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else {
+            locationContinuation?.resume(throwing: LocationTriggerError.noLocation)
+            locationContinuation = nil
+            return
+        }
+
+        locationContinuation?.resume(returning: location)
+        locationContinuation = nil
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationContinuation?.resume(throwing: error)
+        locationContinuation = nil
     }
 
     private static func map(_ status: CLAuthorizationStatus) -> LocationAuthorizationState {
@@ -64,5 +121,17 @@ final class LiveLocationTriggerService: NSObject, CLLocationManagerDelegate, Loc
 
 enum LocationTriggerError: LocalizedError {
     case unavailable
-    var errorDescription: String? { "Location region monitoring is unavailable." }
+    case denied
+    case noLocation
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            "Location region monitoring is unavailable."
+        case .denied:
+            "Location access is required to check this friction."
+        case .noLocation:
+            "Lockty could not determine the current location."
+        }
+    }
 }

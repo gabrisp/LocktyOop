@@ -2,7 +2,7 @@ import Foundation
 
 enum FocusSection: String, CaseIterable, Identifiable, Hashable {
     case routines
-    case pauses
+    case frictions
 
     var id: String { rawValue }
 
@@ -10,8 +10,8 @@ enum FocusSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .routines:
             "Routines"
-        case .pauses:
-            "Pauses"
+        case .frictions:
+            "Frictions"
         }
     }
 }

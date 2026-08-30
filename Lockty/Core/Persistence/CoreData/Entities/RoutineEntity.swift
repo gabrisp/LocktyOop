@@ -15,6 +15,8 @@ final class RoutineEntity: NSManagedObject {
     @NSManaged var breakPolicyData: Data
     @NSManaged var startAlarmEnabled: Bool
     @NSManaged var familyActivitySelectionData: Data?
+    @NSManaged var pauseFlowID: UUID?
+    @NSManaged var pausePolicyData: Data?
 
     @NSManaged var tasks: Set<RoutineTaskEntity>
     @NSManaged var triggers: Set<RoutineTriggerEntity>

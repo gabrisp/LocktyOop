@@ -8,6 +8,7 @@ struct FeatureFactory {
     let todayViewModel: TodayViewModel
     let routinesViewModel: RoutinesViewModel
     let focusViewModel: FocusViewModel
+    let frictionsViewModel: FrictionsViewModel
     let pausesViewModel: PausesViewModel
     let lifetimeViewModel: LifetimeViewModel
     let systemAccessViewModel: SystemAccessViewModel
@@ -18,9 +19,12 @@ struct FeatureFactory {
     let routineExecutionRepository: RoutineExecutionRepository
     let pauseRuleRepository: PauseRuleRepository
     let pauseFlowRepository: PauseFlowRepository
+    let frictionRepository: FrictionRepository
     let pauseEventRepository: PauseEventRepository
     let classificationRepository: AppClassificationRepository
     let haptics: HapticsProviding
+    let nfcService: NFCServicing
+    let locationService: LocationTriggerServicing
     let editorStore: EditorViewModelStore
     let usageDataService: UsageDataServicing
 
@@ -32,9 +36,9 @@ struct FeatureFactory {
         FocusView(
             viewModel: focusViewModel,
             routinesViewModel: routinesViewModel,
-            pausesViewModel: pausesViewModel,
+            frictionsViewModel: frictionsViewModel,
             router: router,
-            pauseFlowRepository: pauseFlowRepository
+            frictionRepository: frictionRepository
         )
     }
 
@@ -72,10 +76,51 @@ struct FeatureFactory {
         }
     }
 
-    func makePausesList() -> some View {
-        LocktySectionScreen(title: "Pauses") {
-            PausesView(viewModel: pausesViewModel, router: router)
+    func makeFrictionsList() -> some View {
+        LocktySectionScreen(title: "Frictions") {
+            FrictionsView(viewModel: frictionsViewModel, router: router)
         }
+    }
+
+    func makeFocusCreationChoiceSheet(route: FocusCreationChoiceRoute) -> FocusCreationChoiceSheet {
+        FocusCreationChoiceSheet(
+            router: router,
+            makeRoutineEditor: { onReturnToParent in
+                AnyView(
+                    RoutineEditorView(
+                        viewModel: editorStore.routineEditor(
+                            route: RoutineEditorRoute(routineID: nil, draftID: route.routineDraftID),
+                            repository: routineRepository,
+                            selectionStore: selectionStore,
+                            routineEngine: routineEngine,
+                            usageDataService: usageDataService,
+                            pauseFlowRepository: pauseFlowRepository
+                        ),
+                        router: router,
+                        startsEditing: true,
+                        isEmbeddedInParentSheet: true,
+                        onReturnToParent: onReturnToParent,
+                        onCloseEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) }
+                    )
+                )
+            },
+            makeFrictionEditor: { onReturnToParent in
+                AnyView(
+                    FrictionEditorView(
+                        viewModel: editorStore.frictionEditor(
+                            route: FrictionEditorRoute(frictionID: nil, draftID: route.frictionDraftID),
+                            repository: frictionRepository
+                        ),
+                        isEmbeddedInParentSheet: true,
+                        locationService: locationService,
+                        onReturnToParent: onReturnToParent,
+                        onCloseEditor: { editorStore.releaseFrictionEditor(draftID: route.frictionDraftID) }
+                    )
+                )
+            },
+            releaseRoutineEditor: { editorStore.releaseRoutineEditor(draftID: route.routineDraftID) },
+            releaseFrictionEditor: { editorStore.releaseFrictionEditor(draftID: route.frictionDraftID) }
+        )
     }
 
     func makeUnlockFlow(token: ApplicationToken?) -> UnlockFlowView {
@@ -88,14 +133,18 @@ struct FeatureFactory {
         return UnlockFlowView(
             tokens: blockedTokens,
             initialToken: token,
-            defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60)
-        ) { chosenToken, minutes in
+            frictionSteps: activeRoutine?.pausePolicySnapshot.steps ?? [],
+            defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
+            nfcService: nfcService,
+            locationService: locationService
+        ) { chosenToken, minutes, intention in
             Task { @MainActor in
                 await grantAllowance(
                     for: chosenToken,
                     among: blockedTokens,
                     minutes: minutes,
-                    activeRoutine: activeRoutine
+                    activeRoutine: activeRoutine,
+                    intention: intention
                 )
                 router.dismissFullScreen()
             }
@@ -113,7 +162,8 @@ struct FeatureFactory {
         for token: ApplicationToken?,
         among blockedTokens: [ApplicationToken],
         minutes: Int,
-        activeRoutine: ActiveRoutine?
+        activeRoutine: ActiveRoutine?,
+        intention: String?
     ) async {
         let released = token.map { [$0] } ?? blockedTokens
         guard let representative = released.first else { return }
@@ -133,7 +183,7 @@ struct FeatureFactory {
             activeRoutineID: activeRoutine?.routineID,
             source: .app
         )
-        await pauseEngine.allowTemporarily(context, intention: nil)
+        await pauseEngine.allowTemporarily(context, intention: intention)
     }
 
     func makePauseFlowEditor(route: PauseFlowEditorRoute) -> PauseFlowEditorSheet {
@@ -210,6 +260,17 @@ struct FeatureFactory {
             ),
             router: router,
             onCloseEditor: { editorStore.releasePauseEditor(draftID: route.draftID) }
+        )
+    }
+
+    func makeFrictionEditor(route: FrictionEditorRoute) -> FrictionEditorView {
+        FrictionEditorView(
+            viewModel: editorStore.frictionEditor(
+                route: route,
+                repository: frictionRepository
+            ),
+            locationService: locationService,
+            onCloseEditor: { editorStore.releaseFrictionEditor(draftID: route.draftID) }
         )
     }
 

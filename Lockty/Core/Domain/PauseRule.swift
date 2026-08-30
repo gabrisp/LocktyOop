@@ -46,8 +46,17 @@ nonisolated struct PauseRule: Codable, Hashable, Identifiable {
 nonisolated enum PauseStep: Codable, Hashable, Identifiable {
     case countdown(CountdownConfiguration)
     case breathing(BreathingConfiguration)
+    case wordSearch(WordSearchConfiguration)
+    case letterMatch(LetterMatchConfiguration)
+    case operations(OperationsConfiguration)
+    case intentionTemplate(IntentionConfiguration)
+    case customIntention(IntentionConfiguration)
     case intention(IntentionConfiguration)
     case confirmation(ConfirmationConfiguration)
+    case personalVideo(PersonalVideoConfiguration)
+    case personalText(PersonalTextConfiguration)
+    case nfcTag(NFCTagConfiguration)
+    case location(LocationTrigger)
 
     var id: UUID {
         switch self {
@@ -55,9 +64,27 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             configuration.id
         case .breathing(let configuration):
             configuration.id
+        case .wordSearch(let configuration):
+            configuration.id
+        case .letterMatch(let configuration):
+            configuration.id
+        case .operations(let configuration):
+            configuration.id
+        case .intentionTemplate(let configuration):
+            configuration.id
+        case .customIntention(let configuration):
+            configuration.id
         case .intention(let configuration):
             configuration.id
         case .confirmation(let configuration):
+            configuration.id
+        case .personalVideo(let configuration):
+            configuration.id
+        case .personalText(let configuration):
+            configuration.id
+        case .nfcTag(let configuration):
+            configuration.id
+        case .location(let configuration):
             configuration.id
         }
     }
@@ -68,10 +95,28 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             "Countdown"
         case .breathing:
             "Breathe"
+        case .wordSearch:
+            "Word Search"
+        case .letterMatch:
+            "Letter Match"
+        case .operations:
+            "Operations"
+        case .intentionTemplate:
+            "Intention"
+        case .customIntention:
+            "Custom Intention"
         case .intention:
             "Write intention"
         case .confirmation:
             "Confirm"
+        case .personalVideo:
+            "Personal Video"
+        case .personalText:
+            "Personal Text"
+        case .nfcTag:
+            "NFC Tag"
+        case .location:
+            "Location"
         }
     }
 
@@ -81,11 +126,26 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             return "\(Int(configuration.duration)) sec"
         case .breathing(let configuration):
             return "\(configuration.breathCount) breaths"
-        case .intention(let configuration):
+        case .wordSearch(let configuration):
+            return configuration.difficulty.label
+        case .letterMatch(let configuration):
+            return "\(configuration.pairCount) pairs"
+        case .operations(let configuration):
+            return "\(configuration.problemCount) problems"
+        case .intentionTemplate(let configuration), .customIntention(let configuration), .intention(let configuration):
             if let minimumLength = configuration.minimumLength, minimumLength > 0 {
                 return "\(minimumLength)+ chars"
             }
             return "Write briefly"
+        case .personalVideo(let configuration):
+            return configuration.displayName ?? "Selected clip"
+        case .personalText(let configuration):
+            return configuration.phrases.count == 1 ? "1 phrase" : "\(configuration.phrases.count) phrases"
+        case .nfcTag(let configuration):
+            return configuration.displayName ?? "Saved tag"
+        case .location(let configuration):
+            let label = configuration.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return label.isEmpty ? "\(Int(configuration.radiusMeters)) m radius" : label
         case .confirmation:
             return "Deliberate choice"
         }

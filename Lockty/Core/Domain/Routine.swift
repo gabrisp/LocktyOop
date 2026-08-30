@@ -54,6 +54,16 @@ struct Routine: Codable, Hashable, Identifiable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    var frictionID: UUID? {
+        get { pauseFlowID }
+        set { pauseFlowID = newValue }
+    }
+
+    var friction: RoutinePausePolicy {
+        get { pausePolicy }
+        set { pausePolicy = newValue }
+    }
 }
 
 // Preview/test fixtures only.

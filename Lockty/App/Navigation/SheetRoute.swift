@@ -1,6 +1,7 @@
 import Foundation
 
 enum SheetRoute: Hashable, Identifiable {
+    case focusCreationChoice(FocusCreationChoiceRoute)
     case appClassification(AppIdentity.ID)
     case routineBreak(UUID)
     case appPicker(ScreenTimeSelectionScope)
@@ -11,6 +12,7 @@ enum SheetRoute: Hashable, Identifiable {
     case routineEditor(RoutineEditorRoute)
     case pauseEditor(PauseEditorRoute)
     case pauseFlowEditor(PauseFlowEditorRoute)
+    case frictionEditor(FrictionEditorRoute)
     case productivityDetail(Date)
     case controlDetail(Date)
     case detoxDetail(Date)
@@ -23,6 +25,7 @@ enum SheetRoute: Hashable, Identifiable {
 
     var id: String {
         switch self {
+        case .focusCreationChoice(let route): "focus-creation-choice-\(route.draftID.uuidString)"
         case .appClassification(let id): "app-classification-\(id.rawValue)"
         case .routineBreak(let id): "routine-break-\(id.uuidString)"
         case .appPicker(let scope): "app-picker-\(scope.id)"
@@ -33,6 +36,7 @@ enum SheetRoute: Hashable, Identifiable {
         case .routineEditor(let route): "routine-editor-\(route.draftID.uuidString)"
         case .pauseEditor(let route): "pause-editor-\(route.draftID.uuidString)"
         case .pauseFlowEditor(let route): "pause-flow-editor-\(route.draftID.uuidString)"
+        case .frictionEditor(let route): "friction-editor-\(route.draftID.uuidString)"
         case .productivityDetail(let day): "productivity-detail-\(day.timeIntervalSince1970)"
         case .controlDetail(let day): "control-detail-\(day.timeIntervalSince1970)"
         case .detoxDetail(let day): "detox-detail-\(day.timeIntervalSince1970)"

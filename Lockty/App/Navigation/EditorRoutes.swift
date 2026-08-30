@@ -1,5 +1,23 @@
 import Foundation
 
+struct FocusCreationChoiceRoute: Hashable, Identifiable {
+    let draftID: UUID
+    let routineDraftID: UUID
+    let frictionDraftID: UUID
+
+    init(
+        draftID: UUID = UUID(),
+        routineDraftID: UUID = UUID(),
+        frictionDraftID: UUID = UUID()
+    ) {
+        self.draftID = draftID
+        self.routineDraftID = routineDraftID
+        self.frictionDraftID = frictionDraftID
+    }
+
+    var id: UUID { draftID }
+}
+
 struct RoutineEditorRoute: Hashable, Identifiable {
     let routineID: UUID?
     let draftID: UUID
@@ -34,6 +52,18 @@ struct PauseFlowEditorRoute: Hashable, Identifiable {
 
     init(flowID: UUID?, draftID: UUID = UUID()) {
         self.flowID = flowID
+        self.draftID = draftID
+    }
+
+    var id: UUID { draftID }
+}
+
+struct FrictionEditorRoute: Hashable, Identifiable {
+    let frictionID: UUID?
+    let draftID: UUID
+
+    init(frictionID: UUID?, draftID: UUID = UUID()) {
+        self.frictionID = frictionID
         self.draftID = draftID
     }
 

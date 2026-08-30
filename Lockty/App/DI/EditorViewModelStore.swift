@@ -4,6 +4,7 @@ import Foundation
 final class EditorViewModelStore {
     private var routineEditors: [UUID: RoutineEditorViewModel] = [:]
     private var pauseEditors: [UUID: PauseEditorViewModel] = [:]
+    private var frictionEditors: [UUID: FrictionEditorViewModel] = [:]
 
     func routineEditor(
         route: RoutineEditorRoute,
@@ -61,5 +62,26 @@ final class EditorViewModelStore {
 
     func releasePauseEditor(draftID: UUID) {
         pauseEditors.removeValue(forKey: draftID)
+    }
+
+    func frictionEditor(
+        route: FrictionEditorRoute,
+        repository: FrictionRepository
+    ) -> FrictionEditorViewModel {
+        if let existing = frictionEditors[route.draftID] {
+            return existing
+        }
+
+        let created = FrictionEditorViewModel(
+            frictionID: route.frictionID,
+            draftID: route.draftID,
+            repository: repository
+        )
+        frictionEditors[route.draftID] = created
+        return created
+    }
+
+    func releaseFrictionEditor(draftID: UUID) {
+        frictionEditors.removeValue(forKey: draftID)
     }
 }

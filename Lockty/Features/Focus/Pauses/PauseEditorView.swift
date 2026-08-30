@@ -268,6 +268,32 @@ final class PauseEditorViewModel: ObservableObject {
                 return configuration.duration > 0 ? step : nil
             case .breathing(let configuration):
                 return configuration.breathCount > 0 ? step : nil
+            case .wordSearch:
+                return step
+            case .letterMatch(let configuration):
+                return configuration.pairCount > 1 ? step : nil
+            case .operations(let configuration):
+                return configuration.problemCount > 0 && !configuration.allowedOperators.isEmpty ? step : nil
+            case .intentionTemplate(let configuration):
+                let prompt = configuration.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                return prompt.isEmpty ? nil : .intentionTemplate(
+                    IntentionConfiguration(
+                        id: configuration.id,
+                        prompt: prompt,
+                        minimumLength: configuration.minimumLength,
+                        isRequired: true
+                    )
+                )
+            case .customIntention(let configuration):
+                let prompt = configuration.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                return prompt.isEmpty ? nil : .customIntention(
+                    IntentionConfiguration(
+                        id: configuration.id,
+                        prompt: prompt,
+                        minimumLength: configuration.minimumLength,
+                        isRequired: true
+                    )
+                )
             case .intention(let configuration):
                 let prompt = configuration.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
                 return prompt.isEmpty ? nil : .intention(
@@ -281,6 +307,14 @@ final class PauseEditorViewModel: ObservableObject {
             case .confirmation(let configuration):
                 let prompt = configuration.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
                 return .confirmation(ConfirmationConfiguration(id: configuration.id, prompt: prompt.isEmpty ? "Do you still want to continue?" : prompt))
+            case .personalVideo(let configuration):
+                return configuration.videoFileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : step
+            case .personalText(let configuration):
+                return configuration.phrases.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) ? step : nil
+            case .nfcTag(let configuration):
+                return configuration.normalizedIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : step
+            case .location(let configuration):
+                return configuration.radiusMeters > 0 ? step : nil
             }
         }
     }
@@ -680,6 +714,19 @@ private struct PauseStepEditorCard: View {
                     .foregroundStyle(LocktyColors.primaryText)
                     .multilineTextAlignment(.center)
                     .lineLimit(2...3)
+
+            case .wordSearch,
+                 .letterMatch,
+                 .operations,
+                 .intentionTemplate,
+                 .customIntention,
+                 .personalVideo,
+                 .personalText,
+                 .nfcTag,
+                 .location:
+                Text(step.detail)
+                    .font(LocktyTypography.callout)
+                    .foregroundStyle(LocktyColors.secondaryText)
             }
         }
         // Reading mode: sliders and prompt fields are inert, the step still reads.

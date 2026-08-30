@@ -187,7 +187,7 @@ extension View {
 /// Derived, not written down twice: the height the inset reserves and the padding the
 /// bar draws were two separate numbers, and every time one moved the other did not, so
 /// the bar sat above the space kept for it.
-private let locktyDynamicSheetBarTopPadding: CGFloat = 0
+private let locktyDynamicSheetBarTopPadding: CGFloat = LocktySpacing.lg
 private let locktyDynamicSheetBarBottomPadding: CGFloat = 4
 private let locktyDynamicSheetBarButtonSize: CGFloat = 44
 private let locktyDynamicSheetBarHeight: CGFloat =

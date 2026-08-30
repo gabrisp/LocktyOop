@@ -293,6 +293,19 @@ struct PauseFlowStepRow: View {
                 .font(LocktyTypography.body)
                 .foregroundStyle(LocktyColors.primaryText)
                 .lineLimit(2...3)
+
+        case .wordSearch,
+             .letterMatch,
+             .operations,
+             .intentionTemplate,
+             .customIntention,
+             .personalVideo,
+             .personalText,
+             .nfcTag,
+             .location:
+            Text(step.detail)
+                .font(LocktyTypography.body)
+                .foregroundStyle(LocktyColors.secondaryText)
         }
     }
 

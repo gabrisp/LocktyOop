@@ -10,7 +10,10 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
     let id: UUID
     var name: String
     var icon: String?
+    var isEnabled: Bool
     var steps: [PauseStep]
+    var allowanceDuration: TimeInterval
+    var relockAfterAllowance: Bool
     var createdAt: Date
     var updatedAt: Date
 
@@ -18,14 +21,20 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         id: UUID = UUID(),
         name: String,
         icon: String? = nil,
+        isEnabled: Bool = true,
         steps: [PauseStep] = PauseFlow.defaultSteps,
+        allowanceDuration: TimeInterval = 5 * 60,
+        relockAfterAllowance: Bool = true,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
         self.id = id
         self.name = name
         self.icon = icon
+        self.isEnabled = isEnabled
         self.steps = steps
+        self.allowanceDuration = allowanceDuration
+        self.relockAfterAllowance = relockAfterAllowance
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -49,10 +58,10 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
     /// not a question either -- an allowance that never ends is not an allowance.
     var policy: RoutinePausePolicy {
         RoutinePausePolicy(
-            isEnabled: true,
+            isEnabled: isEnabled,
             steps: steps,
-            allowanceDuration: 5 * 60,
-            relockAfterAllowance: true
+            allowanceDuration: allowanceDuration,
+            relockAfterAllowance: relockAfterAllowance
         )
     }
 }

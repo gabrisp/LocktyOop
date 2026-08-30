@@ -107,8 +107,17 @@ struct PauseRuleMapper {
         switch step {
         case .countdown: "countdown"
         case .breathing: "breathing"
+        case .wordSearch: "wordSearch"
+        case .letterMatch: "letterMatch"
+        case .operations: "operations"
+        case .intentionTemplate: "intentionTemplate"
+        case .customIntention: "customIntention"
         case .intention: "intention"
         case .confirmation: "confirmation"
+        case .personalVideo: "personalVideo"
+        case .personalText: "personalText"
+        case .nfcTag: "nfcTag"
+        case .location: "location"
         }
     }
 }

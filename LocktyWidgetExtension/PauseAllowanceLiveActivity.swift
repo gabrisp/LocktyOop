@@ -16,7 +16,7 @@ struct PauseAllowanceLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: context.isStale ? "lock.fill" : "hourglass")
+                    Image(systemName: "hourglass")
                         .font(.system(size: 22, weight: .light))
                         .foregroundStyle(.white)
                 }
@@ -45,17 +45,15 @@ struct PauseAllowanceLiveActivity: Widget {
                     .tint(.white)
                 }
             } compactLeading: {
-                Image(systemName: context.isStale ? "lock.fill" : "hourglass")
+                Image(systemName: "hourglass")
                     .foregroundStyle(.white)
             } compactTrailing: {
-                if !context.isStale {
-                    Text(timerInterval: range(for: context), countsDown: true)
-                        .monospacedDigit()
-                        .frame(maxWidth: 44)
-                        .foregroundStyle(.white)
-                }
+                Text(timerInterval: range(for: context), countsDown: true)
+                    .monospacedDigit()
+                    .frame(maxWidth: 44)
+                    .foregroundStyle(.white)
             } minimal: {
-                Image(systemName: context.isStale ? "lock.fill" : "hourglass")
+                Image(systemName: "hourglass")
                     .foregroundStyle(.white)
             }
         }
@@ -69,41 +67,8 @@ struct PauseAllowanceLiveActivity: Widget {
         return start <= end ? start...end : end...end.addingTimeInterval(1)
     }
 
-    /// What the activity shows once the allowance is spent.
-    ///
-    /// The content is given a stale date of the expiry, so the system re-renders here on
-    /// the second it runs out without the app having to be running. It cannot dismiss
-    /// itself -- only code can end an activity -- but it stops claiming there is time
-    /// left, which is what a countdown frozen at 0:00 was doing.
-    private func expiredView(context: ActivityViewContext<PauseAllowanceActivityAttributes>) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 26, weight: .light))
-                .foregroundStyle(.white)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(context.attributes.appDisplayName)
-                    .font(.subheadline.weight(.light))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text("Se acabó el descanso")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-    }
-
-    @ViewBuilder
     private func lockScreenView(context: ActivityViewContext<PauseAllowanceActivityAttributes>) -> some View {
-        if context.isStale {
-            expiredView(context: context)
-        } else {
-            runningLockScreenView(context: context)
-        }
+        runningLockScreenView(context: context)
     }
 
     private func runningLockScreenView(context: ActivityViewContext<PauseAllowanceActivityAttributes>) -> some View {

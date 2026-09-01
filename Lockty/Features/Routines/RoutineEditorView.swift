@@ -904,6 +904,11 @@ struct RoutineEditorView: View {
         case nil:
             if isNaming {
                 chromeTitleText("Nombre")
+            } else if currentCompactScreen == .reading {
+                // Nothing. The preview under this bar shows the icon and the name at
+                // full size, so a smaller copy of both sitting directly above them was
+                // the same thing said twice.
+                EmptyView()
             } else {
                 HStack(spacing: LocktySpacing.sm) {
                     Image(systemName: viewModel.icon)
@@ -1084,7 +1089,12 @@ struct RoutineEditorView: View {
         isGoingBack = false
         withAnimation(sheetAnimation) {
             isEditing = true
-            isNaming = true
+            // Straight to the form when the routine already exists. The pencil on the
+            // preview means "edit this mode", and landing on the name screen answered a
+            // question nobody asked -- the routine is already named, and its name is the
+            // heading you just pressed the pencil beside. Creating one still starts
+            // there, because then it genuinely has no name yet.
+            isNaming = isCreating
         }
     }
 

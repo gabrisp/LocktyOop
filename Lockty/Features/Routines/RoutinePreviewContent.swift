@@ -61,28 +61,21 @@ struct RoutinePreviewContent: View {
         .animation(.smooth(duration: 0.4), value: viewModel.color)
     }
 
-    /// The icon, an arrow, and a shield: what this routine watches, and what it does
-    /// about it. A single glyph would only say the first half.
+    /// The routine's own icon, and nothing else.
+    ///
+    /// It carried an arrow and a shield beside it. Every routine had the same two, so
+    /// they said the same thing on every screen they appeared on -- which is to say
+    /// nothing about the routine you are looking at.
     private var badge: some View {
-        HStack(spacing: LocktySpacing.md) {
-            Image(systemName: viewModel.icon)
-                .font(.system(size: 24, weight: .regular))
-                .foregroundStyle(accent)
-
-            Image(systemName: "arrow.right")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(LocktyColors.tertiaryText)
-
-            Image(systemName: "shield.fill")
-                .font(.system(size: 24, weight: .regular))
-                .foregroundStyle(accent)
-        }
-        .padding(.horizontal, LocktySpacing.xl)
-        .padding(.vertical, LocktySpacing.md)
-        .overlay {
-            Capsule(style: .continuous)
-                .stroke(LocktyColors.cardStroke, lineWidth: 1)
-        }
+        Image(systemName: viewModel.icon)
+            .font(.system(size: 24, weight: .regular))
+            .foregroundStyle(accent)
+            .padding(.horizontal, LocktySpacing.xl)
+            .padding(.vertical, LocktySpacing.md)
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(LocktyColors.cardStroke, lineWidth: 1)
+            }
     }
 
     /// What state the routine is in, in the fewest words that are still true.

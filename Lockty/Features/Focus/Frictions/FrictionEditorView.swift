@@ -616,21 +616,10 @@ struct FrictionEditorView: View {
     private var editorContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                // Carded like everything else on this sheet. It was the one bare row
-                // among cards, which read as a stray control rather than the first
-                // setting.
-                ToggleRow(
-                    title: "Enabled",
-                    subtitle: "Allow routines to offer this friction while it stays selected.",
-                    isOn: $viewModel.draft.isEnabled
-                )
-                .padding(.horizontal, LocktySpacing.lg)
-                .padding(.vertical, LocktySpacing.lg)
-                .background(
-                    RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.055))
-                )
-
+                // No "Enabled" switch. A friction is available the moment it exists --
+                // what decides whether one runs is a routine choosing it, not a flag on
+                // the friction itself. Nothing ever read the flag, so the switch was a
+                // control that did nothing but suggest a friction could be inert.
                 breatheRow
 
                 stepsSection

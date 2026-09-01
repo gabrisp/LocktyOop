@@ -146,13 +146,12 @@ struct LocktySectionTitle: View {
                     }
                     .buttonStyle(.plain)
                     .tappable()
-                    .popover(isPresented: $isShowingInfo) {
+                    .locktyMenu(isPresented: $isShowingInfo) {
                         Text(info)
                             .font(LocktyTypography.callout)
                             .foregroundStyle(LocktyColors.primaryText)
                             .frame(width: 240, alignment: .leading)
                             .padding(LocktySpacing.md)
-                            .presentationCompactAdaptation(.popover)
                     }
                 }
 

@@ -971,9 +971,8 @@ struct RoutineEditorView: View {
                         .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
                 }
                 .buttonStyle(.locktyInteractive(shape: Circle()))
-                .popover(isPresented: $isShowingIconPicker) {
+                .locktyMenu(isPresented: $isShowingIconPicker) {
                     RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
-                        .presentationCompactAdaptation(.popover)
                 }
 
                 // The colour is picked the same way the icon is, and at the same size:
@@ -989,9 +988,8 @@ struct RoutineEditorView: View {
                         .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
                 }
                 .buttonStyle(.locktyInteractive(shape: Circle()))
-                .popover(isPresented: $isShowingColorPicker) {
+                .locktyMenu(isPresented: $isShowingColorPicker) {
                     RoutineColorPickerPopover(selectedColor: $viewModel.color)
-                        .presentationCompactAdaptation(.popover)
                 }
             }
         }
@@ -2123,7 +2121,7 @@ struct RoutineEditorView: View {
                     }
                     .buttonStyle(.plain)
                     .tappable()
-                    .popover(isPresented: Binding(
+                    .locktyMenu(isPresented: Binding(
                         get: { infoSectionText == info },
                         set: { if !$0 { infoSectionText = nil } }
                     )) {
@@ -2132,7 +2130,6 @@ struct RoutineEditorView: View {
                             .foregroundStyle(LocktyColors.primaryText)
                             .frame(width: 220, alignment: .leading)
                             .padding(LocktySpacing.md)
-                            .presentationCompactAdaptation(.popover)
                     }
                 }
 
@@ -2174,9 +2171,8 @@ private struct RoutineEditorHero: View {
                     }
                     .buttonStyle(.plain)
                     .tappable()
-                    .popover(isPresented: $showIconPicker) {
+                    .locktyMenu(isPresented: $showIconPicker) {
                         RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
-                            .presentationCompactAdaptation(.popover)
                     }
                 } else {
                     iconImage
@@ -2321,7 +2317,7 @@ private struct ScheduleTimeField: View {
         .buttonStyle(.plain)
         .tappable()
         .accessibilityLabel(label)
-        .popover(isPresented: $isShowingPicker, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+        .locktyMenu(isPresented: $isShowingPicker, arrowEdge: .bottom) {
             ScheduleTimePopoverContent(
                 label: label,
                 hour: hourBinding,
@@ -2329,7 +2325,6 @@ private struct ScheduleTimeField: View {
                 minuteOptions: minuteOptions
             )
             .id("schedule-popover-\(label)-\(hour)-\(minute)")
-            .presentationCompactAdaptation(.popover)
         }
     }
 

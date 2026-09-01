@@ -8,19 +8,31 @@ final class AppsLibraryViewModel: ObservableObject {
     private let appGroupRepository: UserAppGroupRepository
     private let autoFocusManager: AutoFocusManager
     private let selectionStore: ScreenTimeSelectionStore
+    private let routineEngine: RoutineEngine
 
     @Published private(set) var appGroups: [AppGroup] = []
     @Published private(set) var groupTokens: [UUID: [ApplicationToken]] = [:]
     @Published private(set) var distractingTokens: [ApplicationToken] = []
+    @Published private(set) var alwaysAllowedTokens: [ApplicationToken] = []
+    /// Whether the Always Allowed folder can be opened at all.
+    ///
+    /// It cannot while a routine is running. This is the one list that overrides every
+    /// block, so editing it mid-routine is a way to walk straight out of a routine you
+    /// committed to -- add the app, and the shield it was holding is gone. Other rule
+    /// kinds do not lock it: they are limits you set for yourself, not a session you are
+    /// currently inside.
+    @Published private(set) var isAlwaysAllowedLocked = false
 
     init(
         appGroupRepository: UserAppGroupRepository,
         autoFocusManager: AutoFocusManager,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        routineEngine: RoutineEngine
     ) {
         self.appGroupRepository = appGroupRepository
         self.autoFocusManager = autoFocusManager
         self.selectionStore = selectionStore
+        self.routineEngine = routineEngine
     }
 
     func load() async {
@@ -32,10 +44,15 @@ final class AppsLibraryViewModel: ObservableObject {
         }
 
         let distractingSelection = autoFocusManager.distractingSelection()
+        let allowedSelection = (try? selectionStore.load(scope: .alwaysAllowed)) ?? FamilyActivitySelection()
+        let locked = !routineEngine.activeRoutines.isEmpty
+
         withAnimation(.smooth(duration: 0.25)) {
             appGroups = groups
             groupTokens = tokenMap
             distractingTokens = distractingSelection.applicationTokens.stablePrefix(distractingSelection.applicationTokens.count)
+            alwaysAllowedTokens = allowedSelection.applicationTokens.stablePrefix(allowedSelection.applicationTokens.count)
+            isAlwaysAllowedLocked = locked
         }
     }
 
@@ -417,11 +434,13 @@ struct DistractingGroupView: View {
 
 struct DistractingAppsSelectionView: View {
     let manager: AutoFocusManager
+    let toastCenter: LocktyToastCenter
     @ObservedObject var router: AppRouter
     @State private var selection: FamilyActivitySelection
 
-    init(manager: AutoFocusManager, router: AppRouter) {
+    init(manager: AutoFocusManager, toastCenter: LocktyToastCenter, router: AppRouter) {
         self.manager = manager
+        self.toastCenter = toastCenter
         self.router = router
         _selection = State(initialValue: manager.distractingSelection())
     }
@@ -432,6 +451,7 @@ struct DistractingAppsSelectionView: View {
             addLabel: "Añadir App",
             selection: $selection,
             rules: .appGroup,
+            toastCenter: toastCenter,
             onClose: {},
             onDone: {}
         )
@@ -635,6 +655,7 @@ extension AppGroupEditorViewModel {
 
 struct AppGroupSelectionView: View {
     @ObservedObject var viewModel: AppGroupEditorViewModel
+    let toastCenter: LocktyToastCenter
     @ObservedObject var router: AppRouter
 
     var body: some View {
@@ -646,6 +667,7 @@ struct AppGroupSelectionView: View {
                 set: { viewModel.replaceSelection($0) }
             ),
             rules: .appGroup,
+            toastCenter: toastCenter,
             onClose: {},
             onDone: {}
         )
@@ -809,6 +831,71 @@ struct AppFolderCard: View {
                     fill: Color.white.opacity(0.035)
                 )
             }
+        }
+    }
+}
+
+/// The apps nothing may block.
+///
+/// Deliberately plain: it is one list and one instruction. Everything else in Focus is
+/// something you configure; this is something you exempt.
+struct AlwaysAllowedGroupView: View {
+    @ObservedObject var viewModel: AppsLibraryViewModel
+    @ObservedObject var router: AppRouter
+
+    var body: some View {
+        LocktySectionScreen(title: "Siempre Permitido") {
+            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                AppFolderCard(
+                    title: "Siempre Permitido",
+                    subtitle: viewModel.alwaysAllowedTokens.count == 1
+                        ? "1 elemento"
+                        : "\(viewModel.alwaysAllowedTokens.count) elementos",
+                    tokens: viewModel.alwaysAllowedTokens
+                )
+                .frame(maxWidth: .infinity)
+
+                Text("Estas apps nunca se bloquean, ni siquiera cuando una regla bloquea toda su categoría.")
+                    .font(LocktyTypography.callout)
+                    .foregroundStyle(LocktyColors.secondaryText)
+
+                Button {
+                    router.presentSheet(.appPicker(.alwaysAllowed))
+                } label: {
+                    HStack(spacing: LocktySpacing.md) {
+                        Text("Apps")
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        Spacer(minLength: 0)
+
+                        Text(viewModel.alwaysAllowedTokens.isEmpty
+                             ? "Ninguna"
+                             : "\(viewModel.alwaysAllowedTokens.count) seleccionadas")
+                            .font(.system(.footnote, design: .default, weight: .regular))
+                            .foregroundStyle(LocktyColors.secondaryText)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(LocktyColors.secondaryText)
+                    }
+                    .padding(.horizontal, LocktySpacing.md)
+                    .padding(.vertical, LocktySpacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.white.opacity(0.055))
+                    )
+                }
+                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)))
+                .tappable()
+            }
+        }
+        .task {
+            await viewModel.load()
+        }
+        .onChange(of: router.sheet) { _, newValue in
+            guard newValue == nil else { return }
+            Task { await viewModel.load() }
         }
     }
 }

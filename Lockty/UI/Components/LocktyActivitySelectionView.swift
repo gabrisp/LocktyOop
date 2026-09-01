@@ -127,7 +127,7 @@ struct LocktyActivitySelectionView: View {
     let rules: LocktyActivitySelectionRules
     let suggestions: [AppIdentity]
     let appGroups: [LocktySelectableAppGroup]
-    var externalOverlay: Binding<LocktyFeedbackOverlayState?>
+    let toastCenter: LocktyToastCenter
     let onClose: () -> Void
     let onDone: () -> Void
 
@@ -143,7 +143,7 @@ struct LocktyActivitySelectionView: View {
         rules: LocktyActivitySelectionRules,
         suggestions: [AppIdentity] = [],
         appGroups: [LocktySelectableAppGroup] = [],
-        externalOverlay: Binding<LocktyFeedbackOverlayState?> = .constant(nil),
+        toastCenter: LocktyToastCenter,
         onClose: @escaping () -> Void,
         onDone: @escaping () -> Void
     ) {
@@ -154,7 +154,7 @@ struct LocktyActivitySelectionView: View {
         self.rules = rules
         self.suggestions = suggestions
         self.appGroups = appGroups
-        self.externalOverlay = externalOverlay
+        self.toastCenter = toastCenter
         self.onClose = onClose
         self.onDone = onDone
     }
@@ -186,14 +186,6 @@ struct LocktyActivitySelectionView: View {
                     .padding(.horizontal, LocktySpacing.lg)
                     .padding(.bottom, LocktySpacing.xxl)
                 }
-                if let activeOverlay {
-                    LocktyCenteredFeedbackOverlay(
-                        state: activeOverlay
-                    )
-                    .transition(.blurReplace.combined(with: .scale(0.96)).combined(with: .opacity))
-                    .zIndex(5)
-                }
-            
             }
         .sheet(isPresented: $isShowingOfficialPicker) {
             LocktyOfficialActivityPickerSheet(
@@ -212,15 +204,6 @@ struct LocktyActivitySelectionView: View {
             }
             .presentationDetents([.large])
             .presentationBackground(.clear)
-        }
-        .task(id: activeOverlay?.id) {
-            guard activeOverlay != nil else { return }
-            try? await Task.sleep(for: .seconds(1.6))
-            guard !Task.isCancelled else { return }
-            withAnimation(.smooth(duration: 0.22)) {
-                self.overlay = nil
-                self.externalOverlay.wrappedValue = nil
-            }
         }
     }
 
@@ -472,21 +455,21 @@ struct LocktyActivitySelectionView: View {
         }
     }
 
+    /// Reported from the island rather than by a panel over the picker.
+    ///
+    /// The card used to throw its own centred overlay across itself, which covered the
+    /// very list the message was about -- you were told the selection was invalid and
+    /// could not see the selection. The island says it above everything without taking
+    /// the screen away.
     private func showOverlay(message: String) {
-        let state = LocktyFeedbackOverlayState(
-            systemImage: "exclamationmark.triangle.fill",
-            title: "Selección no válida",
-            subtitle: message,
-            tint: Color.red.opacity(0.5)
+        toastCenter.show(
+            LocktyToast(
+                leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
+                title: "Selección no válida",
+                message: message,
+                duration: .seconds(2.8)
+            )
         )
-        withAnimation(.smooth(duration: 0.22)) {
-            overlay = state
-            externalOverlay.wrappedValue = state
-        }
-    }
-
-    private var activeOverlay: LocktyFeedbackOverlayState? {
-        externalOverlay.wrappedValue ?? overlay
     }
 
     private func toggleAppGroup(_ groupID: UUID) {

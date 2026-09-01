@@ -199,7 +199,8 @@ private struct RuntimeRepairCoordinator {
             activePauseAllowance: runtimeState.livePauseAllowance,
             pauseRules: pauseRules,
             rules: shieldRules.rules,
-            ruleEnforcement: shieldRules.enforcement
+            ruleEnforcement: shieldRules.enforcement,
+                alwaysAllowedApplications: store.loadAlwaysAllowedApplications()
         )
 
         runtimeState.shieldPolicy = effectivePolicy

@@ -47,7 +47,8 @@ struct FeatureFactory {
             frictionsViewModel: frictionsViewModel,
             appsViewModel: appsViewModel,
             router: router,
-            frictionRepository: frictionRepository
+            frictionRepository: frictionRepository,
+            toastCenter: toastCenter
         )
     }
 
@@ -124,8 +125,12 @@ struct FeatureFactory {
         DistractingGroupView(viewModel: distractingGroupViewModel, router: router)
     }
 
+    func makeAlwaysAllowedGroupView() -> some View {
+        AlwaysAllowedGroupView(viewModel: appsViewModel, router: router)
+    }
+
     func makeDistractingAppsSelection() -> some View {
-        DistractingAppsSelectionView(manager: autoFocusManager, router: router)
+        DistractingAppsSelectionView(manager: autoFocusManager, toastCenter: toastCenter, router: router)
     }
 
     func makeDistractingInterventionPicker() -> some View {
@@ -159,6 +164,7 @@ struct FeatureFactory {
                 repository: appGroupRepository,
                 selectionStore: selectionStore
             ),
+            toastCenter: toastCenter,
             router: router
         )
     }
@@ -178,7 +184,8 @@ struct FeatureFactory {
                             repository: ruleRepository,
                             selectionStore: selectionStore,
                             frictionRepository: frictionRepository,
-                            appGroupRepository: appGroupRepository
+                            appGroupRepository: appGroupRepository,
+                            toastCenter: toastCenter
                         ),
                         makeScheduleRuleEditor: { onReturnToRuleChoice in
                             AnyView(
@@ -190,7 +197,8 @@ struct FeatureFactory {
                                         routineEngine: routineEngine,
                                         usageDataService: usageDataService,
                                         pauseFlowRepository: pauseFlowRepository,
-                                        appGroupRepository: appGroupRepository
+                                        appGroupRepository: appGroupRepository,
+                                        toastCenter: toastCenter
                                     ),
                                     router: router,
                                     startsEditing: true,
@@ -407,7 +415,8 @@ struct FeatureFactory {
                 routineEngine: routineEngine,
                 usageDataService: usageDataService,
                 pauseFlowRepository: pauseFlowRepository,
-                appGroupRepository: appGroupRepository
+                appGroupRepository: appGroupRepository,
+                toastCenter: toastCenter
             ),
             router: router,
             startsEditing: route.startsEditing,
@@ -422,7 +431,8 @@ struct FeatureFactory {
                 repository: ruleRepository,
                 selectionStore: selectionStore,
                 frictionRepository: frictionRepository,
-                appGroupRepository: appGroupRepository
+                appGroupRepository: appGroupRepository,
+                toastCenter: toastCenter
             ),
             makeScheduleRuleEditor: { onReturnToRuleChoice in
                 AnyView(
@@ -438,7 +448,8 @@ struct FeatureFactory {
                             routineEngine: routineEngine,
                             usageDataService: usageDataService,
                             pauseFlowRepository: pauseFlowRepository,
-                            appGroupRepository: appGroupRepository
+                            appGroupRepository: appGroupRepository,
+                            toastCenter: toastCenter
                         ),
                         router: router,
                         startsEditing: route.ruleID == nil,
@@ -486,6 +497,7 @@ struct FeatureFactory {
                 pauseEngine: pauseEngine,
                 usageDataService: usageDataService
             ),
+            toastCenter: toastCenter,
             router: router,
             onCloseEditor: { editorStore.releasePauseEditor(draftID: route.draftID) }
         )
@@ -558,7 +570,10 @@ struct FeatureFactory {
     }
 
     func makeAppPickerSheet(scope: ScreenTimeSelectionScope) -> AppPickerSheet {
-        AppPickerSheet(viewModel: AppPickerViewModel(selectionStore: selectionStore, scope: scope))
+        AppPickerSheet(
+            viewModel: AppPickerViewModel(selectionStore: selectionStore, scope: scope),
+            toastCenter: toastCenter
+        )
     }
 
     func makeActiveRoutine(routineID: UUID) -> ActiveRoutineView {

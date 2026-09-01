@@ -18,7 +18,8 @@ struct ShieldPolicyResolver {
         activePauseAllowance: ActivePauseAllowance?,
         pauseRules: [PauseRule],
         rules: [Rule] = [],
-        ruleEnforcement: RuleEnforcementState = .empty
+        ruleEnforcement: RuleEnforcementState = .empty,
+        alwaysAllowedApplications: Set<AppIdentity.ID> = []
     ) -> ShieldPolicy {
         var blockedApplications = Set<AppIdentity.ID>()
         var blockedDomains = Set<String>()
@@ -61,6 +62,16 @@ struct ShieldPolicyResolver {
         // an active routine stayed shielded and "Continue" appeared to do nothing.
         var exemptApplications = Set<AppIdentity.ID>()
         for allowedAppID in releasedApplications {
+            blockedApplications.remove(allowedAppID)
+            exemptApplications.insert(allowedAppID)
+        }
+
+        // Always Allowed, applied after everything else because it has to win against
+        // everything else. Dropping these from `blockedApplications` is not enough on its
+        // own: the usual way one of them gets caught is a rule blocking a whole category
+        // it happens to sit in, and no app token was ever listed to remove. Carrying them
+        // as exemptions is what reaches the category shield's `except:` list.
+        for allowedAppID in alwaysAllowedApplications {
             blockedApplications.remove(allowedAppID)
             exemptApplications.insert(allowedAppID)
         }

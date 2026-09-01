@@ -215,7 +215,8 @@ final class AppContainer {
         let appsViewModel = AppsLibraryViewModel(
             appGroupRepository: appGroupRepository,
             autoFocusManager: autoFocusManager,
-            selectionStore: selectionStore
+            selectionStore: selectionStore,
+            routineEngine: routineEngine
         )
         let distractingGroupViewModel = DistractingGroupViewModel(
             autoFocusManager: autoFocusManager,

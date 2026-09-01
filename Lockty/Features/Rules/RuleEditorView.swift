@@ -31,6 +31,7 @@ final class RuleEditorViewModel: ObservableObject {
     private let selectionStore: ScreenTimeSelectionStore
     private let frictionRepository: FrictionRepository
     private let appGroupRepository: UserAppGroupRepository
+    let toastCenter: LocktyToastCenter
     private let initialRuleID: UUID?
     private var hasLoaded = false
     private var createdAt: Date
@@ -60,7 +61,8 @@ final class RuleEditorViewModel: ObservableObject {
         repository: RuleRepository,
         selectionStore: ScreenTimeSelectionStore,
         frictionRepository: FrictionRepository,
-        appGroupRepository: UserAppGroupRepository
+        appGroupRepository: UserAppGroupRepository,
+        toastCenter: LocktyToastCenter
     ) {
         self.initialRuleID = ruleID
         self.editingID = ruleID ?? UUID()
@@ -69,6 +71,7 @@ final class RuleEditorViewModel: ObservableObject {
         self.selectionStore = selectionStore
         self.frictionRepository = frictionRepository
         self.appGroupRepository = appGroupRepository
+        self.toastCenter = toastCenter
         createdAt = Date()
     }
 
@@ -236,6 +239,20 @@ final class RuleEditorViewModel: ObservableObject {
             return false
         }
 
+        // A rule that names an app nothing may block is a rule that contradicts itself:
+        // it would save, and then the shield would exempt the very app it was built
+        // around. Refused here rather than silently doing nothing at runtime.
+        let alwaysAllowed = (try? selectionStore.load(scope: .alwaysAllowed))?.applicationTokens ?? []
+        let conflicting = selection.applicationTokens.intersection(alwaysAllowed)
+        if !conflicting.isEmpty {
+            toastCenter.show(
+                .blockedAppIsAlwaysAllowed(
+                    names: conflicting.map { AppIdentity(token: $0).displayName }
+                )
+            )
+            return false
+        }
+
         if breaksAllowed && requiredFrictionID == nil {
             errorMessage = "Choose a friction for this break."
             return false
@@ -300,7 +317,7 @@ final class RuleEditorViewModel: ObservableObject {
 
     private func loadAppGroups() async {
         let loadedGroups = await appGroupRepository.appGroups()
-        let suggestedGroups = ReusableAppGroupDefinition.builtIn.map { definition in
+        let suggestedGroups = ReusableAppGroupDefinition.selectableAsRestriction.map { definition in
             let selection = (try? selectionStore.load(scope: definition.selectionScope)) ?? FamilyActivitySelection()
             return LocktySelectableAppGroup(
                 id: definition.id,
@@ -908,6 +925,7 @@ struct RuleEditorView: View {
                     rules: .routine,
                     suggestions: [],
                     appGroups: viewModel.appGroups,
+                    toastCenter: viewModel.toastCenter,
                     onClose: {},
                     onDone: {}
                 )

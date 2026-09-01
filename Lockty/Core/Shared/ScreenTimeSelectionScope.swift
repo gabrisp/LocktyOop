@@ -7,6 +7,7 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
     case pause(UUID)
     case appGroup(UUID)
     case distracting
+    case alwaysAllowed
 
     var id: String {
         switch self {
@@ -22,6 +23,8 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
             "app-group-\(id.uuidString)"
         case .distracting:
             "distracting"
+        case .alwaysAllowed:
+            "always-allowed"
         }
     }
 

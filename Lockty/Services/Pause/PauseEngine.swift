@@ -85,7 +85,8 @@ final class PauseEngine: ObservableObject {
                 activePauseAllowance: runtime.livePauseAllowance,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,
-                ruleEnforcement: shieldRules.enforcement
+                ruleEnforcement: shieldRules.enforcement,
+                alwaysAllowedApplications: appGroupStore.loadAlwaysAllowedApplications()
             )
 
             if effectivePolicy.blocksNothing {
@@ -149,7 +150,8 @@ final class PauseEngine: ObservableObject {
                 activePauseAllowance: allowance,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,
-                ruleEnforcement: shieldRules.enforcement
+                ruleEnforcement: shieldRules.enforcement,
+                alwaysAllowedApplications: appGroupStore.loadAlwaysAllowedApplications()
             )
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.pendingPause = nil
@@ -328,7 +330,8 @@ final class PauseEngine: ObservableObject {
                 activePauseAllowance: nil,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,
-                ruleEnforcement: shieldRules.enforcement
+                ruleEnforcement: shieldRules.enforcement,
+                alwaysAllowedApplications: appGroupStore.loadAlwaysAllowedApplications()
             )
             if effectivePolicy.blocksNothing {
                 try await shieldService.remove(runtime.shieldPolicy)

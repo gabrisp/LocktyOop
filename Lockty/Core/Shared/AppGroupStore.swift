@@ -1,3 +1,4 @@
+import FamilyControls
 import Foundation
 import OSLog
 
@@ -312,6 +313,18 @@ final class AppGroupStore {
     /// limits, the enforcement record says whether that limit has been hit.
     nonisolated func loadShieldRules() -> (rules: [Rule], enforcement: RuleEnforcementState) {
         (loadStoredRules().filter(\.isEnabled), loadRuleEnforcementState())
+    }
+
+    /// The apps in the Always Allowed group.
+    ///
+    /// Read straight from the selection store rather than being cached in runtime state:
+    /// this is the one list whose job is to override everything, so it must be the
+    /// current one every time the shield is computed, not whatever was true when the
+    /// running routine started.
+    nonisolated func loadAlwaysAllowedApplications() -> Set<AppIdentity.ID> {
+        let selection = (try? ScreenTimeSelectionStore(appGroupStore: self).load(scope: .alwaysAllowed))
+            ?? FamilyActivitySelection()
+        return Set(selection.applicationTokens.map(AppIdentity.ID.init(token:)))
     }
 
     nonisolated func loadRuleEnforcementState() -> RuleEnforcementState {

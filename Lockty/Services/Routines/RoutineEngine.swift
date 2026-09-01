@@ -565,7 +565,8 @@ final class RoutineEngine: ObservableObject {
             activePauseAllowance: allowance,
             pauseRules: pauseRules,
             rules: shieldRules.rules,
-            ruleEnforcement: shieldRules.enforcement
+            ruleEnforcement: shieldRules.enforcement,
+                alwaysAllowedApplications: appGroupStore.loadAlwaysAllowedApplications()
         )
 
         try appGroupStore.updateRuntimeState { runtime in

@@ -38,6 +38,8 @@ final class AppPickerViewModel: ObservableObject {
             "Choose Apps"
         case .distracting:
             "Distracting Apps"
+        case .alwaysAllowed:
+            "Siempre Permitido"
         }
     }
 
@@ -57,6 +59,8 @@ final class AppPickerViewModel: ObservableObject {
             return "Reusable App Groups contain applications only."
         case .distracting:
             return "Distracting is the AutoFocus-managed app group."
+        case .alwaysAllowed:
+            return "Nothing can block these, whatever else is running."
         case .library:
             return nil
         }
@@ -76,6 +80,8 @@ final class AppPickerViewModel: ObservableObject {
             return "Choose the applications this reusable App Group should contain."
         case .distracting:
             return "Choose the applications AutoFocus should treat as Distracting."
+        case .alwaysAllowed:
+            return "Choose the applications no rule may ever block."
         }
     }
 
@@ -95,7 +101,7 @@ final class AppPickerViewModel: ObservableObject {
             .routine
         case .pause:
             .pause
-        case .appGroup, .distracting:
+        case .appGroup, .distracting, .alwaysAllowed:
             .appGroup
         }
     }
@@ -108,7 +114,7 @@ final class AppPickerViewModel: ObservableObject {
             "Añadir App o categoría"
         case .pause:
             "Añadir App"
-        case .appGroup, .distracting:
+        case .appGroup, .distracting, .alwaysAllowed:
             "Añadir App"
         }
     }
@@ -148,7 +154,7 @@ final class AppPickerViewModel: ObservableObject {
         switch scope {
         case .library:
             appsOnlyScope = false
-        case .routine, .rule, .pause, .appGroup, .distracting:
+        case .routine, .rule, .pause, .appGroup, .distracting, .alwaysAllowed:
             appsOnlyScope = true
         }
 
@@ -177,8 +183,8 @@ final class AppPickerViewModel: ObservableObject {
 
 struct AppPickerSheet: View {
     @ObservedObject var viewModel: AppPickerViewModel
+    let toastCenter: LocktyToastCenter
     @Environment(\.dismiss) private var dismiss
-    @State private var errorOverlay: LocktyFeedbackOverlayState?
 
     var body: some View {
         LocktyActivitySelectionView(
@@ -187,21 +193,21 @@ struct AppPickerSheet: View {
             selection: $viewModel.selection,
             rules: viewModel.selectionRules,
             suggestions: [],
-            externalOverlay: $errorOverlay,
+            toastCenter: toastCenter,
             onClose: { dismiss() },
             onDone: {
                 do {
                     try viewModel.persistCurrentSelection()
                     dismiss()
                 } catch {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        errorOverlay = LocktyFeedbackOverlayState(
-                            systemImage: "exclamationmark.triangle.fill",
+                    toastCenter.show(
+                        LocktyToast(
+                            leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
                             title: "No se pudo guardar",
-                            subtitle: error.localizedDescription,
-                            tint: Color.red.opacity(0.5)
+                            message: error.localizedDescription,
+                            duration: .seconds(3.2)
                         )
-                    }
+                    )
                 }
             }
         )

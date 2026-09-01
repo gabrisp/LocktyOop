@@ -35,12 +35,32 @@ extension ReusableAppGroupDefinition {
                 id: UUID(uuidString: "00000000-0000-0000-0000-00000000D157")!,
                 name: "Distrayendo",
                 selectionScope: .distracting
+            ),
+            ReusableAppGroupDefinition(
+                id: ReusableAppGroupDefinition.alwaysAllowedID,
+                name: "Siempre Permitido",
+                selectionScope: .alwaysAllowed
             )
         ]
     }
 
+    /// The group nothing may block.
+    ///
+    /// Fixed rather than generated so the shield, the extensions and the editors all mean
+    /// the same folder without having to be told which one it is.
+    nonisolated static let alwaysAllowedID = UUID(uuidString: "00000000-0000-0000-0000-00000000A11D")!
+
     nonisolated static func selectionScope(for id: UUID) -> ScreenTimeSelectionScope? {
         builtIn.first { $0.id == id }?.selectionScope
+    }
+
+    /// Groups that can be picked as something to *block*.
+    ///
+    /// Always Allowed is not one of them: it is the opposite instruction, and offering it
+    /// in a "choose what to block" list would let someone build a rule that contradicts
+    /// itself.
+    nonisolated static var selectableAsRestriction: [ReusableAppGroupDefinition] {
+        builtIn.filter { $0.id != alwaysAllowedID }
     }
 }
 

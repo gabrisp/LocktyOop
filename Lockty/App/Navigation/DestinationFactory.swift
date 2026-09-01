@@ -18,6 +18,9 @@ struct DestinationFactory {
         case .appsList:
             featureFactory.makeAppsList()
 
+        case .alwaysAllowedGroup:
+            featureFactory.makeAlwaysAllowedGroupView()
+
         case .distractingGroup:
             featureFactory.makeDistractingGroup()
 

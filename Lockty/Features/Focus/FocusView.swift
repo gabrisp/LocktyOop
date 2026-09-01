@@ -7,6 +7,7 @@ struct FocusView: View {
     @ObservedObject var appsViewModel: AppsLibraryViewModel
     @ObservedObject var router: AppRouter
     let frictionRepository: FrictionRepository
+    let toastCenter: LocktyToastCenter
 
     private var gutter: CGFloat { LocktySpacing.lg }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
@@ -135,6 +136,26 @@ struct FocusView: View {
                     tokens: appsViewModel.distractingTokens
                 )
                 .frame(width: appTileWidth)
+            }
+            .buttonStyle(.locktyInteractive(shape: appFolderShape))
+
+            Button {
+                // Refused while a routine is running rather than opened read-only: the
+                // point of the folder is that what is in it cannot be blocked, so editing
+                // it mid-routine is a way out of a routine you committed to.
+                guard !appsViewModel.isAlwaysAllowedLocked else {
+                    toastCenter.show(.alwaysAllowedLocked())
+                    return
+                }
+                router.push(.alwaysAllowedGroup)
+            } label: {
+                AppFolderCard(
+                    title: "Siempre Permitido",
+                    subtitle: folderCountText(appsViewModel.alwaysAllowedTokens.count),
+                    tokens: appsViewModel.alwaysAllowedTokens
+                )
+                .frame(width: appTileWidth)
+                .opacity(appsViewModel.isAlwaysAllowedLocked ? 0.45 : 1)
             }
             .buttonStyle(.locktyInteractive(shape: appFolderShape))
 

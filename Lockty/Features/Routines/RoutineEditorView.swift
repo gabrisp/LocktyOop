@@ -53,6 +53,7 @@ final class RoutineEditorViewModel: ObservableObject {
     private let usageDataService: UsageDataServicing
     private let pauseFlowRepository: PauseFlowRepository
     private let appGroupRepository: UserAppGroupRepository
+    let toastCenter: LocktyToastCenter
     /// What the routine looked like when the editor opened. Everything that decides
     /// whether there is anything to discard is compared against this rather than tracked
     /// by a flag, so undoing an edit by hand counts as no change again.
@@ -111,7 +112,8 @@ final class RoutineEditorViewModel: ObservableObject {
         routineEngine: RoutineEngine,
         usageDataService: UsageDataServicing,
         pauseFlowRepository: PauseFlowRepository,
-        appGroupRepository: UserAppGroupRepository
+        appGroupRepository: UserAppGroupRepository,
+        toastCenter: LocktyToastCenter
     ) {
         initialRoutineID = routineID
         editingID = routineID ?? UUID()
@@ -122,6 +124,7 @@ final class RoutineEditorViewModel: ObservableObject {
         self.usageDataService = usageDataService
         self.pauseFlowRepository = pauseFlowRepository
         self.appGroupRepository = appGroupRepository
+        self.toastCenter = toastCenter
         createdAt = Date()
     }
 
@@ -328,7 +331,7 @@ final class RoutineEditorViewModel: ObservableObject {
 
     private func loadAppGroups() async {
         let loadedGroups = await appGroupRepository.appGroups()
-        let suggestedGroups = ReusableAppGroupDefinition.builtIn.map { definition in
+        let suggestedGroups = ReusableAppGroupDefinition.selectableAsRestriction.map { definition in
             let selection = (try? selectionStore.load(scope: definition.selectionScope)) ?? FamilyActivitySelection()
             return LocktySelectableAppGroup(
                 id: definition.id,
@@ -562,6 +565,7 @@ struct RoutineAppPickerSheet: View {
             ),
             rules: .routine,
             suggestions: viewModel.suggestedApplications,
+            toastCenter: viewModel.toastCenter,
             onClose: { dismiss() },
             onDone: { dismiss() }
         )
@@ -1309,6 +1313,7 @@ struct RoutineEditorView: View {
                     rules: .routine,
                     suggestions: viewModel.suggestedApplications,
                     appGroups: viewModel.appGroups,
+                    toastCenter: viewModel.toastCenter,
                     onClose: {},
                     onDone: {}
                 )

@@ -6,6 +6,7 @@ enum AppRoute: Hashable {
     case frictionsList
     case appsList
     case distractingGroup
+    case alwaysAllowedGroup
     case distractingApps
     case distractingIntervention
     case distractingFriction

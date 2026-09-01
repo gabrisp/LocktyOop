@@ -324,6 +324,7 @@ final class PauseEditorViewModel: ObservableObject {
 
 struct PauseEditorView: View {
     @StateObject private var viewModel: PauseEditorViewModel
+    let toastCenter: LocktyToastCenter
     let router: AppRouter
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -335,11 +336,13 @@ struct PauseEditorView: View {
 
     init(
         viewModel: PauseEditorViewModel,
+        toastCenter: LocktyToastCenter,
         router: AppRouter,
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         _isEditing = State(initialValue: viewModel.isCreating && !viewModel.isEditingBlocked)
+        self.toastCenter = toastCenter
         self.router = router
         self.onCloseEditor = onCloseEditor
     }
@@ -499,7 +502,7 @@ struct PauseEditorView: View {
             }
         }
         .sheet(isPresented: $showAppPicker) {
-            PauseAppPickerSheet(viewModel: viewModel)
+            PauseAppPickerSheet(viewModel: viewModel, toastCenter: toastCenter)
         }
         .alert(
             "Could not save Pause",
@@ -640,6 +643,7 @@ struct PauseEditorView: View {
 
 struct PauseAppPickerSheet: View {
     @ObservedObject var viewModel: PauseEditorViewModel
+    let toastCenter: LocktyToastCenter
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -656,6 +660,7 @@ struct PauseAppPickerSheet: View {
             ),
             rules: .pause,
             suggestions: viewModel.suggestedApplications,
+            toastCenter: toastCenter,
             onClose: { dismiss() },
             onDone: { dismiss() }
         )

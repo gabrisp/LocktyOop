@@ -80,6 +80,27 @@ extension LocktyToast {
         )
     }
 
+    static func alwaysAllowedLocked() -> LocktyToast {
+        LocktyToast(
+            leading: .symbol("lock.fill", LocktyColors.warning),
+            title: "Siempre Permitido",
+            message: "Termina la rutina activa para editarlo"
+        )
+    }
+
+    /// Refused because one of the chosen apps is one nothing may block.
+    static func blockedAppIsAlwaysAllowed(names: [String]) -> LocktyToast {
+        let subject = names.count == 1
+            ? (names.first ?? "Una app")
+            : "\(names.count) apps"
+        return LocktyToast(
+            leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
+            title: subject,
+            message: "Está en Siempre Permitido y no se puede bloquear",
+            duration: .seconds(3.2)
+        )
+    }
+
     static func unlockGranted(token: ApplicationToken?, displayName: String, minutes: Int) -> LocktyToast {
         LocktyToast(
             leading: token.map { .appIcon($0) } ?? .symbol("lock.open.fill", LocktyColors.productive),

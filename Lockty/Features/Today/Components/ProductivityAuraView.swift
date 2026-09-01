@@ -18,12 +18,27 @@ import SwiftUI
 struct ProductivityAuraView: View {
     /// 0 to 100. Nil while the day's score is still unknown.
     let score: Int?
+    /// 0 while the screen is at rest, 1 once it has been scrolled past the collapse
+    /// distance. Everything shrinks by it; only the word above the number goes away.
+    var collapseProgress: CGFloat = 0
 
     /// Climbs to `score` once the view is on screen. Separate from the score itself so
     /// re-rendering for any other reason does not restart the arrival.
     @State private var displayedScore = 0
 
     private let side: CGFloat = 240
+
+    /// Small enough to sit on the toolbar's line, large enough that the number is still
+    /// the thing you read. The rock keeps its shape and its light all the way down --
+    /// collapsing is the same object seen from further away, not a different badge.
+    private var scale: CGFloat {
+        MetricsHeaderGeometry.lerp(1, 0.28, progress: collapseProgress)
+    }
+
+    /// The height the collapsed badge actually occupies, so the screen can reserve it.
+    static func collapsedHeight(side: CGFloat = 240) -> CGFloat {
+        side * 0.28
+    }
 
     /// Green at the top, yellow in the middle, red at the bottom -- green being the end
     /// worth reaching.
@@ -58,6 +73,11 @@ struct ProductivityAuraView: View {
         }
         .frame(width: side, height: side)
         .compositingGroup()
+        .scaleEffect(scale)
+        // Claims the space it draws at rather than the space it was laid out at, so the
+        // content under it rides up as it shrinks instead of leaving a hole.
+        .frame(width: side * scale, height: side * scale)
+        .animation(.smooth(duration: 0.2), value: collapseProgress)
         .task(id: score) {
             await arrive()
         }
@@ -137,6 +157,9 @@ struct ProductivityAuraView: View {
         VStack(spacing: -4) {
             Text("Productivity")
                 .font(.system(.subheadline, design: .default, weight: .semibold))
+                // The only thing that leaves. Shrunk to a third it would be unreadable
+                // anyway, and the number alone is still the whole point.
+                .opacity(1 - Double(MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0, to: 0.5)))
 
             Text("\(displayedScore)")
                 .font(.system(size: 76, weight: .heavy, design: .default))

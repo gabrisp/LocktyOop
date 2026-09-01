@@ -59,7 +59,7 @@ struct RoutinePreviewContent: View {
             .padding(.horizontal, LocktySpacing.xl)
             .padding(.vertical, LocktySpacing.md)
             .overlay {
-                LocktyImperfectShape(squareness: 12, wobble: 0.03)
+                Capsule(style: .continuous)
                     .stroke(LocktyColors.cardStroke, lineWidth: 1)
             }
     }
@@ -134,6 +134,7 @@ struct RoutinePreviewContent: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .fill(Color.white.opacity(0.055))
         )
+        .locktyImperfectBorder(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private func row<Value: View>(

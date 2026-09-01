@@ -11,10 +11,10 @@ struct DayPickerSheet: View {
 
     /// The month on screen. Separate from the selection, because paging through months
     /// to look around should not change which day is chosen.
-    @State private var visibleMonth: Date
-    /// Which way the last move went, so the outgoing month leaves on the side the
-    /// incoming one came from.
-    @State private var travelDirection = 1
+    ///
+    /// Owned by the pager: it is the scroll position, so swiping and the chevrons move
+    /// the same value and cannot disagree about where you are.
+    @State private var visibleMonth: Date?
 
     private let calendar: Calendar
     private let today: Date
@@ -30,7 +30,7 @@ struct DayPickerSheet: View {
 
         today = calendar.startOfDay(for: Date())
         _visibleMonth = State(
-            initialValue: calendar.startOfMonth(for: selectedDay.wrappedValue) ?? Date()
+            initialValue: calendar.startOfMonth(for: selectedDay.wrappedValue)
         )
     }
 
@@ -48,9 +48,13 @@ struct DayPickerSheet: View {
                     .clipped()
             }
             .padding(.horizontal, LocktySpacing.md)
+            // Twice the bottom's: the grabber sits above this one, and the month name is
+            // the first thing on the sheet, so it needs the room to read as a heading
+            // rather than as something pushed up against the edge.
+            .padding(.top, 48)
             // No close button under the grid: picking a day is the answer, and the sheet
             // is dismissed the way every other one is.
-            .padding(.vertical, 24)
+            .padding(.bottom, 24)
         }
         .locktyDynamicSheetSizes([.fit])
     }
@@ -61,7 +65,7 @@ struct DayPickerSheet: View {
     /// name centred between them so it sits over the column of days it belongs to.
     private var monthHeader: some View {
         HStack(spacing: LocktySpacing.md) {
-            monthStepButton(systemImage: "chevron.left", offset: -1)
+            monthStepButton(systemImage: "chevron.left", offset: -1, isDisabled: !canMoveBack)
 
             Text(monthTitle)
                 .font(.system(.title3, design: .default, weight: .semibold))
@@ -93,9 +97,9 @@ struct DayPickerSheet: View {
             move(by: offset)
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(LocktyColors.primaryText)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(LocktyColors.elevatedBackground))
         }
         .buttonStyle(.locktyInteractive(shape: Circle()))
@@ -117,27 +121,48 @@ struct DayPickerSheet: View {
 
     // MARK: - Grid
 
+    /// Every month laid side by side, one page each.
+    ///
+    /// A pager rather than one grid swapped out on a transition: months are a line you
+    /// move along, and being able to drag between them is how a calendar is expected to
+    /// behave. The chevrons write the same scroll position the gesture does, so the two
+    /// can never disagree about which month you are on.
     private var monthGrid: some View {
+        GeometryReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    ForEach(months, id: \.self) { month in
+                        grid(for: month)
+                            .frame(width: proxy.size.width)
+                            .id(month)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $visibleMonth, anchor: .center)
+        }
+        // Every month is padded to the same number of weeks, so this height holds for all
+        // of them. Without it the sheet would grow and shrink mid-drag as a 5-week month
+        // slid past a 6-week one.
+        .frame(height: gridHeight)
+    }
+
+    private func grid(for month: Date) -> some View {
         VStack(spacing: LocktySpacing.xs) {
-            ForEach(weeks, id: \.first) { week in
+            ForEach(Array(weeks(of: month).enumerated()), id: \.offset) { _, week in
                 HStack(spacing: 0) {
-                    ForEach(week, id: \.self) { date in
+                    ForEach(Array(week.enumerated()), id: \.offset) { _, date in
                         dayCell(for: date)
                     }
                 }
             }
         }
-        // Rebuilt as a whole when the month changes, so the transition below has
-        // something to move rather than animating each cell's number in place.
-        .id(visibleMonth)
-        .transition(
-            .asymmetric(
-                insertion: .move(edge: travelDirection >= 0 ? .trailing : .leading)
-                    .combined(with: .opacity),
-                removal: .move(edge: travelDirection >= 0 ? .leading : .trailing)
-                    .combined(with: .opacity)
-            )
-        )
+    }
+
+    /// Six rows of cells plus the gaps between them. Fixed so the pager does not resize.
+    private var gridHeight: CGFloat {
+        CGFloat(Self.weekRows) * 38 + CGFloat(Self.weekRows - 1) * LocktySpacing.xs
     }
 
     @ViewBuilder
@@ -195,27 +220,57 @@ struct DayPickerSheet: View {
     // MARK: - Month arithmetic
 
     private func move(by offset: Int) {
-        guard let next = calendar.date(byAdding: .month, value: offset, to: visibleMonth) else {
-            return
-        }
+        guard let current = resolvedVisibleMonth,
+              let index = months.firstIndex(of: current)
+        else { return }
 
-        travelDirection = offset
+        let target = index + offset
+        guard months.indices.contains(target) else { return }
+
+        // The same value the gesture sets, so a chevron and a swipe are the one movement.
         withAnimation(.smooth(duration: 0.32)) {
-            visibleMonth = next
+            visibleMonth = months[target]
         }
     }
 
     private var canMoveForward: Bool {
-        guard let currentMonth = calendar.startOfMonth(for: today) else { return false }
-        return visibleMonth < currentMonth
+        guard let current = resolvedVisibleMonth, let index = months.firstIndex(of: current) else {
+            return false
+        }
+        return index < months.count - 1
+    }
+
+    private var canMoveBack: Bool {
+        guard let current = resolvedVisibleMonth, let index = months.firstIndex(of: current) else {
+            return false
+        }
+        return index > 0
+    }
+
+    /// The month the pager is on, falling back to the current one before the first layout
+    /// has reported a scroll position.
+    private var resolvedVisibleMonth: Date? {
+        visibleMonth ?? calendar.startOfMonth(for: today)
+    }
+
+    /// The months you can page through: a year back, up to this one.
+    ///
+    /// It stops at the current month because there is no usage recorded for a day that
+    /// has not happened, so paging into the future would only ever show empty grids.
+    private var months: [Date] {
+        guard let thisMonth = calendar.startOfMonth(for: today) else { return [] }
+        return (0...12)
+            .reversed()
+            .compactMap { calendar.date(byAdding: .month, value: -$0, to: thisMonth) }
     }
 
     private var monthTitle: String {
+        guard let month = resolvedVisibleMonth else { return "" }
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.locale = calendar.locale
         formatter.dateFormat = "LLLL yyyy"
-        return formatter.string(from: visibleMonth).capitalized
+        return formatter.string(from: month).capitalized
     }
 
     private var weekdaySymbols: [String] {
@@ -229,9 +284,13 @@ struct DayPickerSheet: View {
     /// The month laid out in weeks, with nil for the cells before the first and after the
     /// last day. Nils rather than the neighbouring month's dates: those days are not part
     /// of this month and tapping one would silently move the whole grid.
-    private var weeks: [[Date?]] {
-        guard let range = calendar.range(of: .day, in: .month, for: visibleMonth),
-              let firstOfMonth = calendar.startOfMonth(for: visibleMonth)
+    /// Always six, so every page is the same height and the pager does not resize as it
+    /// scrolls. A month needing five gets a blank row rather than a shorter grid.
+    static let weekRows = 6
+
+    private func weeks(of month: Date) -> [[Date?]] {
+        guard let range = calendar.range(of: .day, in: .month, for: month),
+              let firstOfMonth = calendar.startOfMonth(for: month)
         else { return [] }
 
         let leadingBlanks = (calendar.component(.weekday, from: firstOfMonth)
@@ -241,7 +300,7 @@ struct DayPickerSheet: View {
         for dayOffset in 0..<range.count {
             cells.append(calendar.date(byAdding: .day, value: dayOffset, to: firstOfMonth))
         }
-        while cells.count % 7 != 0 {
+        while cells.count < Self.weekRows * 7 {
             cells.append(nil)
         }
 

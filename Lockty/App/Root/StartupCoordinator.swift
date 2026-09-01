@@ -148,8 +148,11 @@ final class StartupCoordinator: ObservableObject {
             await pauseEngine.relock(allowance.context)
         }
 
+        // `activeBreaks`, not `activeBreak`: the latter is a lookup taking a routine id
+        // now, and comparing the function itself to nil was quietly always true -- so
+        // this ran on every launch carrying the flag, whether or not a break existed.
         if runtimeState.recoveryFlags.contains(.expiredBreakNeedsFinalization),
-           runtimeState.activeBreak != nil {
+           !runtimeState.activeBreaks.isEmpty {
             await routineEngine.endBreakIfNeeded(reason: .breakExpired)
         }
 

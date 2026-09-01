@@ -41,22 +41,27 @@ nonisolated struct ScreenTimeSelectionRecord: Codable, Identifiable {
     }
 }
 
+/// Derived, and derived off the main actor.
+///
+/// These are read by the shield action and monitor extensions, which have no main actor
+/// to hop to. The type is declared `nonisolated`, but an extension in a module that
+/// defaults to main-actor isolation does not inherit that, so each of these says so.
 extension ScreenTimeSelectionRecord {
-    var blockedApplications: Set<AppIdentity.ID> {
+    nonisolated var blockedApplications: Set<AppIdentity.ID> {
         Set(selection.applicationTokens.map(AppIdentity.ID.init(token:)))
     }
 
-    var blockedDomains: Set<String> {
+    nonisolated var blockedDomains: Set<String> {
         Set(selection.webDomainTokens.compactMap { ManagedSettings.WebDomain(token: $0).domain })
     }
 
-    var applications: [AppIdentity] {
+    nonisolated var applications: [AppIdentity] {
         selection.applicationTokens
             .map(AppIdentity.init(token:))
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
-    func isContained(in policy: ShieldPolicy) -> Bool {
+    nonisolated func isContained(in policy: ShieldPolicy) -> Bool {
         let hasAnySelection = !selection.applicationTokens.isEmpty
             || !selection.categoryTokens.isEmpty
             || !selection.webDomainTokens.isEmpty

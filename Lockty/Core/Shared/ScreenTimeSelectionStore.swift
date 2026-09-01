@@ -3,10 +3,16 @@ import FamilyControls
 import ManagedSettings
 import OSLog
 
-private func selectionLogger() -> Logger {
+private nonisolated func selectionLogger() -> Logger {
     Logger(subsystem: "com.gabrisp.Lockty", category: "selection")
 }
 
+/// Reading a selection is plain file work -- decode a record, hand it back.
+///
+/// The read paths are `nonisolated` because the callers that matter are not on the main
+/// actor and never could be: the shield action extension asking which rule holds an app,
+/// the monitor extension recomputing a policy, the store resolving Always Allowed. Only
+/// the writes stay isolated, since nothing off the main actor writes.
 struct ScreenTimeSelectionStore {
     private let appGroupStore: AppGroupStore
 
@@ -14,7 +20,7 @@ struct ScreenTimeSelectionStore {
         self.appGroupStore = appGroupStore
     }
 
-    func load(scope: ScreenTimeSelectionScope) throws -> FamilyActivitySelection {
+    nonisolated func load(scope: ScreenTimeSelectionScope) throws -> FamilyActivitySelection {
         let selection = records().first(where: { $0.scope == scope })?.selection ?? FamilyActivitySelection()
         selectionLogger().debug("Loaded selection for scope=\(scope.id, privacy: .public) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
         print("Loaded selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
@@ -47,11 +53,11 @@ struct ScreenTimeSelectionStore {
         print("Removed selection scope=\(scope.id)")
     }
 
-    func record(scope: ScreenTimeSelectionScope) -> ScreenTimeSelectionRecord? {
+    nonisolated func record(scope: ScreenTimeSelectionScope) -> ScreenTimeSelectionRecord? {
         records().first(where: { $0.scope == scope })
     }
 
-    func pauseRuleID(matching applicationToken: ApplicationToken) -> UUID? {
+    nonisolated func pauseRuleID(matching applicationToken: ApplicationToken) -> UUID? {
         records().first { record in
             guard case .pause = record.scope else { return false }
             return record.selection.applicationTokens.contains(applicationToken)
@@ -65,7 +71,7 @@ struct ScreenTimeSelectionStore {
     ///
     /// An AppIdentity.ID is derived from its token, so this walks the records rather
     /// than trying to reconstruct a token from the identity -- which is not possible.
-    func applicationTokens(for appIDs: Set<AppIdentity.ID>) -> Set<ApplicationToken> {
+    nonisolated func applicationTokens(for appIDs: Set<AppIdentity.ID>) -> Set<ApplicationToken> {
         guard !appIDs.isEmpty else { return [] }
         var tokens = Set<ApplicationToken>()
         for record in records() {
@@ -76,7 +82,7 @@ struct ScreenTimeSelectionStore {
         return tokens
     }
 
-    func selection(for policy: ShieldPolicy) throws -> FamilyActivitySelection {
+    nonisolated func selection(for policy: ShieldPolicy) throws -> FamilyActivitySelection {
         if !policy.selectionScopes.isEmpty {
             return mergedSelection(scopes: policy.selectionScopes)
         }
@@ -106,7 +112,7 @@ struct ScreenTimeSelectionStore {
         }
     }
 
-    func mergedSelection(for policy: ShieldPolicy) -> FamilyActivitySelection {
+    nonisolated func mergedSelection(for policy: ShieldPolicy) -> FamilyActivitySelection {
         let matchingRecords = records().filter { record in
             record.isContained(in: policy)
         }
@@ -127,7 +133,7 @@ struct ScreenTimeSelectionStore {
         }
     }
 
-    func mergedSelection(scopes: Set<ScreenTimeSelectionScope>) -> FamilyActivitySelection {
+    nonisolated func mergedSelection(scopes: Set<ScreenTimeSelectionScope>) -> FamilyActivitySelection {
         let matchingRecords = records().filter { scopes.contains($0.scope) }
         print("Merging selection for explicit scopes=\(matchingRecords.map { $0.scope.id })")
         return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
@@ -137,7 +143,7 @@ struct ScreenTimeSelectionStore {
         }
     }
 
-    func records() -> [ScreenTimeSelectionRecord] {
+    nonisolated func records() -> [ScreenTimeSelectionRecord] {
         let loadedRecords = appGroupStore.loadSelectionRecords()
         selectionLogger().debug("Loaded selection record count=\(loadedRecords.count)")
         print("Loaded selection record count=\(loadedRecords.count)")

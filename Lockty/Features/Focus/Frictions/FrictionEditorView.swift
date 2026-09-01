@@ -294,10 +294,17 @@ private enum FrictionEditorAssetError: LocalizedError {
     }
 }
 
-private enum FrictionEditorLocalSheet: String, Identifiable {
+private enum FrictionEditorLocalSheet: Identifiable, Equatable {
     case catalog
+    /// One step's settings, on their own screen.
+    case step(UUID)
 
-    var id: String { rawValue }
+    var id: String {
+        switch self {
+        case .catalog: "catalog"
+        case .step(let stepID): "step-\(stepID.uuidString)"
+        }
+    }
 }
 
 private enum FrictionEditorCompactScreen: Hashable {
@@ -459,6 +466,10 @@ struct FrictionEditorView: View {
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
+            case .step(let stepID):
+                stepDetailContent(stepID: stepID)
+                    .geometryGroup()
+                    .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
                 case .editor:
@@ -480,6 +491,8 @@ struct FrictionEditorView: View {
         switch activeSheet {
         case .catalog:
             chromeTitleText("Friction Catalog")
+        case .step(let stepID):
+            chromeTitleText(viewModel.draft.steps.first { $0.id == stepID }?.title ?? "Step")
         case nil:
             chromeTitleText(isNaming ? "Name" : frictionChromeName)
         }
@@ -697,6 +710,70 @@ struct FrictionEditorView: View {
         }
     }
 
+    /// One step's settings, on a screen of their own.
+    ///
+    /// The list is a list: names and what each one is set to. Every step's controls laid
+    /// out inline turned it into a stack of forms, where the shape of the flow -- which
+    /// steps, in what order -- was the hardest thing to see on the screen that exists to
+    /// show it.
+    @ViewBuilder
+    private func stepDetailContent(stepID: UUID) -> some View {
+        if let index = viewModel.draft.steps.firstIndex(where: { $0.id == stepID }) {
+            let step = viewModel.draft.steps[index]
+
+            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                FrictionStepSettings(
+                    step: step,
+                    locationService: locationService,
+                    onChange: { viewModel.update(stepID: stepID, with: $0) }
+                )
+                .padding(LocktySpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.055))
+                )
+
+                Button(role: .destructive) {
+                    viewModel.removeStep(id: stepID)
+                    closeStepDetail()
+                } label: {
+                    HStack(spacing: LocktySpacing.sm) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .medium))
+                        Text("Remove step")
+                            .font(.system(.subheadline, design: .default, weight: .medium))
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(LocktyColors.error)
+                    .padding(.horizontal, LocktySpacing.lg)
+                    .padding(.vertical, LocktySpacing.lg)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.055))
+                    )
+                }
+                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)))
+                .tappable()
+            }
+            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.vertical, LocktySpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func openStepDetail(_ stepID: UUID) {
+        isGoingBack = false
+        withAnimation(sheetAnimation) { activeSheet = .step(stepID) }
+    }
+
+    private func closeStepDetail() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) { activeSheet = nil }
+    }
+
     private var catalogContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
@@ -752,11 +829,9 @@ struct FrictionEditorView: View {
                         index: index,
                         isFirst: index == 0,
                         isLast: index == viewModel.draft.steps.count - 1,
-                        locationService: locationService,
-                        onChange: { viewModel.update(stepID: step.id, with: $0) },
+                        onOpen: { openStepDetail(step.id) },
                         onMoveUp: { viewModel.moveStepUp(id: step.id) },
-                        onMoveDown: { viewModel.moveStepDown(id: step.id) },
-                        onRemove: { viewModel.removeStep(id: step.id) }
+                        onMoveDown: { viewModel.moveStepDown(id: step.id) }
                     )
                 }
             }
@@ -839,74 +914,104 @@ private struct FrictionStepEditorCard: View {
     let index: Int
     let isFirst: Bool
     let isLast: Bool
-    let locationService: LocationTriggerServicing?
-    let onChange: (FrictionStep) -> Void
+    let onOpen: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
-    let onRemove: () -> Void
 
     var body: some View {
         CardView(radius: FrictionEditorView.cardRadius, padding: LocktySpacing.lg) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("STEP \(index + 1)")
-                            .locktyEyebrow()
-                        Text(step.title)
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                    }
+            HStack(alignment: .center, spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("STEP \(index + 1)")
+                        .locktyEyebrow()
 
-                    Spacer(minLength: 0)
+                    Text(step.title)
+                        .font(LocktyTypography.headline)
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
 
-                    HStack(spacing: LocktySpacing.sm) {
-                        Button(action: onMoveUp) {
-                            Image(systemName: "arrow.up")
-                        }
-                        .disabled(isFirst)
-
-                        Button(action: onMoveDown) {
-                            Image(systemName: "arrow.down")
-                        }
-                        .disabled(isLast)
-
-                        Button(role: .destructive, action: onRemove) {
-                            Image(systemName: "trash")
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(LocktyColors.secondaryText)
+                    // What it is set to, in a line. The list's job is the shape of the
+                    // flow; the settings live one tap away.
+                    Text(step.detail)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .lineLimit(1)
                 }
 
-                configurationView
+                Spacer(minLength: 0)
+
+                HStack(spacing: LocktySpacing.sm) {
+                    Button(action: onMoveUp) {
+                        Image(systemName: "arrow.up")
+                    }
+                    .disabled(isFirst)
+
+                    Button(action: onMoveDown) {
+                        Image(systemName: "arrow.down")
+                    }
+                    .disabled(isLast)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(LocktyColors.secondaryText)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
             }
         }
+        .contentShape(RoundedRectangle(cornerRadius: FrictionEditorView.cardRadius, style: .continuous))
+        .onTapGesture(perform: onOpen)
+    }
+}
+
+/// One step's controls, wherever they are shown.
+///
+/// Split out of the card so the list can be a list. The card names the step and says what
+/// it is set to; this is what opens when you tap it.
+private struct FrictionStepSettings: View {
+    let step: FrictionStep
+    let locationService: LocationTriggerServicing?
+    let onChange: (FrictionStep) -> Void
+
+    var body: some View {
+        configurationView
     }
 
     @ViewBuilder
     private var configurationView: some View {
         switch step {
         case .countdown(let configuration):
-            DurationSliderCard(
+            LocktyCountRow(
                 title: "Seconds",
-                value: Double(configuration.duration),
-                range: 1...60
-            ) { onChange(.countdown(CountdownConfiguration(id: configuration.id, duration: $0))) }
+                value: Binding(
+                    get: { Int(configuration.duration) },
+                    set: { onChange(.countdown(CountdownConfiguration(id: configuration.id, duration: TimeInterval($0)))) }
+                ),
+                range: 1...60,
+                suffix: "s"
+            )
 
         case .breathing(let configuration):
-            DurationSliderCard(
+            // Only reachable on a flow saved before the breathe became a setting.
+            LocktyCountRow(
                 title: "Breaths",
-                value: Double(configuration.breathCount),
+                value: Binding(
+                    get: { configuration.breathCount },
+                    set: { onChange(.breathing(BreathingConfiguration(id: configuration.id, breathCount: $0))) }
+                ),
                 range: 1...10
-            ) { onChange(.breathing(BreathingConfiguration(id: configuration.id, breathCount: Int($0)))) }
+            )
 
         case .steps(let configuration):
-            DurationSliderCard(
+            LocktyCountRow(
                 title: "Daily steps",
-                value: Double(configuration.dailyGoal),
+                value: Binding(
+                    get: { configuration.dailyGoal },
+                    set: { onChange(.steps(StepsConfiguration(id: configuration.id, dailyGoal: $0))) }
+                ),
                 range: 1000...25000,
                 step: 500
-            ) { onChange(.steps(StepsConfiguration(id: configuration.id, dailyGoal: Int($0)))) }
+            )
 
         case .wordSearch(let configuration):
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -921,11 +1026,14 @@ private struct FrictionStepEditorCard: View {
             }
 
         case .letterMatch(let configuration):
-            Stepper("Pairs: \(configuration.pairCount)", value: Binding(
-                get: { configuration.pairCount },
-                set: { onChange(.letterMatch(LetterMatchConfiguration(id: configuration.id, pairCount: min(max($0, 2), 6)))) }
-            ), in: 2...6)
-            .foregroundStyle(LocktyColors.primaryText)
+            LocktyCountRow(
+                title: "Pairs",
+                value: Binding(
+                    get: { configuration.pairCount },
+                    set: { onChange(.letterMatch(LetterMatchConfiguration(id: configuration.id, pairCount: $0))) }
+                ),
+                range: 2...6
+            )
 
         case .operations(let configuration):
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
@@ -933,11 +1041,14 @@ private struct FrictionStepEditorCard: View {
                     onChange(.operations(OperationsConfiguration(id: configuration.id, difficulty: newValue, problemCount: configuration.problemCount, allowedOperators: configuration.allowedOperators)))
                 }
 
-                Stepper("Problem count: \(configuration.problemCount)", value: Binding(
-                    get: { configuration.problemCount },
-                    set: { onChange(.operations(OperationsConfiguration(id: configuration.id, difficulty: configuration.difficulty, problemCount: min(max($0, 1), 10), allowedOperators: configuration.allowedOperators))) }
-                ), in: 1...10)
-                .foregroundStyle(LocktyColors.primaryText)
+                LocktyCountRow(
+                    title: "Problem count",
+                    value: Binding(
+                        get: { configuration.problemCount },
+                        set: { onChange(.operations(OperationsConfiguration(id: configuration.id, difficulty: configuration.difficulty, problemCount: $0, allowedOperators: configuration.allowedOperators))) }
+                    ),
+                    range: 1...10
+                )
 
                 operatorToggleRow(configuration: configuration)
             }

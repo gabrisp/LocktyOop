@@ -806,14 +806,12 @@ struct RuleEditorView: View {
 
                 Spacer(minLength: 0)
 
-                Toggle(
-                    "",
+                LocktySwitch(
                     isOn: Binding(
                         get: { viewModel.breaksAllowed },
                         set: { viewModel.setBreaksAllowed($0) }
                     )
                 )
-                .labelsHidden()
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)

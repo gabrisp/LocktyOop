@@ -1723,14 +1723,12 @@ struct RoutineEditorView: View {
 
             Spacer(minLength: 0)
 
-            Toggle(
-                "",
+            LocktySwitch(
                 isOn: Binding(
                     get: { viewModel.breaksAllowed },
                     set: { viewModel.setBreaksAllowed($0) }
                 )
             )
-            .labelsHidden()
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
@@ -1980,14 +1978,12 @@ struct RoutineEditorView: View {
 
             // On when the routine is strict. It used to be bound to a different setting
             // and read inverted next to its own subtitle.
-            Toggle(
-                "",
+            LocktySwitch(
                 isOn: Binding(
                     get: { viewModel.mode == .strict },
                     set: { viewModel.mode = $0 ? .strict : .normal }
                 )
             )
-            .labelsHidden()
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
@@ -2745,9 +2741,8 @@ struct ToggleRow: View {
                 }
             }
             Spacer()
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .disabled(isDisabled)
+            // The app's own control, not the system switch: see LocktySwitch.
+            LocktySwitch(isOn: $isOn, isDisabled: isDisabled)
         }
         .opacity(isDisabled ? 0.48 : 1)
     }

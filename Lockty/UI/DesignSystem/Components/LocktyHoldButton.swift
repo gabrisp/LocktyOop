@@ -33,6 +33,13 @@ struct LocktyHoldButton: View {
             .clipShape(Capsule(style: .continuous))
             .safeGlass(radius: 999, interactive: true)
             .clipShape(Capsule(style: .continuous))
+            // A rim in a lighter cast of the tint, there before anything is pressed.
+            // Glass on a dark screen has almost no edge of its own, so the button had no
+            // shape until you touched it -- this is what says where it is.
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(tint.opacity(0.30), lineWidth: 1)
+            }
             // Running only while the button is being held: the light going round the rim
             // is the button saying it is working on it, which is only true then.
             .locktyBorderBeam(
@@ -90,27 +97,29 @@ struct LocktyHoldButton: View {
                 ForEach(Self.seeds) { seed in
                     let local = seedProgress(seed)
 
-                    if local > 0 {
-                        Circle()
-                            .fill(tint)
-                            .frame(
-                                width: seedDiameter(seed, in: proxy.size, local: local),
-                                height: seedDiameter(seed, in: proxy.size, local: local)
-                            )
-                            .blur(radius: 18)
-                            .opacity(0.42 * local)
-                            .position(
-                                x: proxy.size.width * seed.x,
-                                y: proxy.size.height * seed.y
-                            )
-                    }
+                    Circle()
+                        .fill(tint)
+                        .frame(
+                            width: seedDiameter(seed, in: proxy.size, local: local),
+                            height: seedDiameter(seed, in: proxy.size, local: local)
+                        )
+                        .blur(radius: 18)
+                        // A floor under the press, not a change to it: at rest every
+                        // light sits at the same faint value, which is the imperfect
+                        // scatter that gives the button a shape before it is touched.
+                        // The moment a hold starts, `local` takes over from zero and the
+                        // press behaves exactly as it did.
+                        .opacity(Self.restingOpacity + 0.42 * local)
+                        .position(
+                            x: proxy.size.width * seed.x,
+                            y: proxy.size.height * seed.y
+                        )
                 }
             }
             // Added, not stacked: where two lights overlap the result is brighter than
             // either, which is what makes a crowd of them read as one filling glow.
             .blendMode(.plusLighter)
             .compositingGroup()
-            .opacity(progress == 0 ? 0 : 1)
         }
         .allowsHitTesting(false)
     }
@@ -126,6 +135,10 @@ struct LocktyHoldButton: View {
         let full = size.height * seed.scale
         return full * (0.35 + 0.65 * local)
     }
+
+    /// How lit the scatter is with nothing pressed. Faint enough to be a texture rather
+    /// than a fill -- the button was invisible on a dark screen until it was touched.
+    private static let restingOpacity: Double = 0.07
 
     /// Where the lights are and the order they come up in.
     ///

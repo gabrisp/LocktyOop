@@ -786,22 +786,26 @@ struct AppFolderCard: View {
                 slot {
                     Label(token)
                         .labelStyle(.iconOnly)
-                }
-                // The count sits on the last icon, darkened underneath so it reads over
-                // whatever that icon happens to look like. It used to be a tile of its
-                // own, which spent one of the four slots on a number instead of an app --
-                // and stood in for the very icons it was hiding.
-                .overlay {
-                    if index == visible.count - 1, overflow > 0 {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.black.opacity(0.62))
+                        // Inside the slot, so the scrim is the size of the icon. Outside
+                        // it, the overlay took the slot's frame -- which is
+                        // maxWidth: .infinity, the whole grid cell -- and the darkening
+                        // ran the full width of the column with the icon floating in the
+                        // middle of it.
+                        .overlay {
+                            if index == visible.count - 1, overflow > 0 {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(Color.black.opacity(0.62))
 
-                            Text("+\(overflow)")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
+                                    // Divided by the scale the slot applies, so the
+                                    // number ends up the size it is written at rather
+                                    // than 1.58 times it.
+                                    Text("+\(overflow)")
+                                        .font(.system(size: 17 / iconScale, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
                         }
-                    }
                 }
             }
 

@@ -100,7 +100,7 @@ struct RoutinePreviewContent: View {
 
             divider
 
-            row("These days") {
+            row("On these days") {
                 Text(daysText)
             }
 

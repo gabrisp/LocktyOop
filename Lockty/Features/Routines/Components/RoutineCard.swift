@@ -142,10 +142,6 @@ struct RoutineCard: View {
                     }
                 }
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: RoutineGridMetrics.tileRadius, style: .continuous)
-                    .stroke(accent.opacity(0.16), lineWidth: 1)
-            }
         }
         .buttonStyle(.locktyInteractive)
         .tappable()

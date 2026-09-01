@@ -1293,7 +1293,7 @@ struct RoutineEditorView: View {
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                Text("These days:")
+                Text("On these days:")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
@@ -1348,7 +1348,7 @@ struct RoutineEditorView: View {
         let workweek: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
 
         switch weekdays {
-        case []: return "Nunca"
+        case []: return "Never"
         case weekend: return "Fines de semana"
         case workweek: return "Entre semana"
         case Set(Weekday.orderedWeek): return "Every day"
@@ -2154,7 +2154,7 @@ struct RoutineEditorView: View {
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                Text("These days:")
+                Text("On these days:")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 

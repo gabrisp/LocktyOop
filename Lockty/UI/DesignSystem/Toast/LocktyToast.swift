@@ -83,14 +83,26 @@ extension LocktyToast {
 
     /// A score that moved. The number counts to where it landed and the bar fills to it,
     /// so the toast shows the change rather than just asserting one happened.
+    ///
+    /// Coloured by where the score ended up, not by the fact that it rose. Green on a 30
+    /// would be congratulating a bad day for being slightly less bad -- the bands are
+    /// `DailyScoreTone`'s, the same ones the rock and the cards are judged by.
     static func scoreRose(to score: Int, from previous: Int) -> LocktyToast {
-        LocktyToast(
-            leading: .symbol("chart.line.uptrend.xyaxis", LocktyColors.productive),
+        let tint: Color
+        switch DailyScoreTone.tone(for: Double(score)) {
+        case .weak: tint = LocktyColors.unproductive
+        case .balanced: tint = LocktyColors.warning
+        case .strong: tint = LocktyColors.productive
+        }
+
+        return LocktyToast(
+            leading: .symbol("chart.line.uptrend.xyaxis", tint),
             title: "Productivity",
             message: "Up \(score - previous) points",
             value: score,
             valueSuffix: "%",
             progress: Double(score) / 100,
+            accent: tint,
             duration: .seconds(3.2)
         )
     }

@@ -134,7 +134,8 @@ struct RuleCard: View {
             CardView(
                 radius: RoutineGridMetrics.tileRadius,
                 interactive: true,
-                height: RoutineGridMetrics.tileHeight
+                height: RoutineGridMetrics.tileHeight,
+                tint: accent
             ) {
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                     HStack {
@@ -180,10 +181,6 @@ struct RuleCard: View {
                         Spacer(minLength: 0)
                     }
                 }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: RoutineGridMetrics.tileRadius, style: .continuous)
-                    .stroke(accent.opacity(0.16), lineWidth: 1)
             }
         }
         .buttonStyle(.locktyInteractive)

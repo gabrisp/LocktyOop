@@ -10,7 +10,11 @@ struct LocktyHoldButton: View {
     let title: String
     var systemImage: String?
     /// How long the press has to be held.
-    var duration: Double = 1.1
+    ///
+    /// Long enough to be a decision rather than a tap that took a moment. It is also the
+    /// window the light has to fill in: at a second the scattered points barely got going
+    /// before the action fired, so most of what the button does was never seen.
+    var duration: Double = 1.7
     var tint: Color = LocktyColors.productive
     let action: () -> Void
 

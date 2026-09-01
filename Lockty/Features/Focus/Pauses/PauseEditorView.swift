@@ -6,9 +6,12 @@ import SwiftUI
 
 private let pauseEditorLogger = Logger(subsystem: "com.gabrisp.Lockty", category: "pauses")
 
+/// The steps a pause can be built from.
+///
+/// No breathing: every flow opens on one already, so offering it here was offering to add
+/// a second copy of something you cannot remove. Its length is a setting on the friction.
 enum EditablePauseStep: String, CaseIterable, Identifiable {
     case countdown
-    case breathing
     case intention
     case confirmation
 
@@ -18,8 +21,6 @@ enum EditablePauseStep: String, CaseIterable, Identifiable {
         switch self {
         case .countdown:
             return .countdown(CountdownConfiguration(duration: 10))
-        case .breathing:
-            return .breathing(BreathingConfiguration(breathCount: 3))
         case .intention:
             return .intention(
                 IntentionConfiguration(

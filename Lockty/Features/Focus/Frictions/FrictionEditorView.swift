@@ -315,6 +315,10 @@ struct FrictionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: FrictionEditorLocalSheet?
     @State private var isConfirmingDiscard = false
+    @State private var isShowingBreatheMenu = false
+    /// The form's natural height, so the sheet can be told a number rather than asking a
+    /// scroll view how tall it wishes it were.
+    @State private var editorContentHeight: CGFloat = 0
     @State private var isGoingBack = false
     @State private var isNaming = false
     @FocusState private var isNameFieldFocused: Bool
@@ -585,14 +589,36 @@ struct FrictionEditorView: View {
         .padding(.vertical, LocktySpacing.lg)
     }
 
+    /// The form, sized to itself until it is too tall, and scrolling after that.
+    ///
+    /// A bare ScrollView inside this sheet cannot work: the sheet measures its content to
+    /// decide its own height, and a scroll view reports the height it was *given* rather
+    /// than the height of what is in it. So with enough steps the sheet had nothing to
+    /// size itself from and the scroll view had no viewport to scroll inside -- the
+    /// content simply ran off the bottom.
+    ///
+    /// Measuring the stack and framing the scroll view to `min(content, available)` gives
+    /// the sheet a definite number either way, and leaves the scroll view a real viewport
+    /// exactly when there is more content than room.
     private var editorContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                // Carded like everything else on this sheet. It was the one bare row
+                // among cards, which read as a stray control rather than the first
+                // setting.
                 ToggleRow(
                     title: "Enabled",
                     subtitle: "Allow routines to offer this friction while it stays selected.",
                     isOn: $viewModel.draft.isEnabled
                 )
+                .padding(.horizontal, LocktySpacing.lg)
+                .padding(.vertical, LocktySpacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.055))
+                )
+
+                breatheRow
 
                 stepsSection
 
@@ -605,6 +631,69 @@ struct FrictionEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.lg)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height
+            } action: { newValue in
+                editorContentHeight = newValue
+            }
+        }
+        .frame(height: min(editorContentHeight, availableEditorHeight))
+        .scrollDisabled(editorContentHeight <= availableEditorHeight)
+    }
+
+    /// What the sheet can actually give the form: the window, less the room a sheet never
+    /// occupies, less the bar above the content.
+    private var availableEditorHeight: CGFloat {
+        let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .screen.bounds.height ?? 0
+        return max(window - 110 - 64, 240)
+    }
+
+    /// The breathe every unlock opens on, as one row with its own menu.
+    ///
+    /// Not a step, and deliberately above the step list: it is the only part of the flow
+    /// that is always there, so it is stated once at the top rather than sitting in a
+    /// list of things you chose to add.
+    private var breatheRow: some View {
+        HStack(spacing: LocktySpacing.md) {
+            Image(systemName: "wind")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Breathe")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text("Every unlock starts here")
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(LocktyBreathe.label(viewModel.draft.breatheSeconds))
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.22), value: viewModel.draft.breatheSeconds)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(LocktyColors.tertiaryText)
+        }
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.vertical, LocktySpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                .fill(Color.white.opacity(0.055))
+        )
+        .contentShape(RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous))
+        .onTapGesture { isShowingBreatheMenu = true }
+        .locktyMenu(isPresented: $isShowingBreatheMenu) {
+            LocktyBreatheMenu(seconds: $viewModel.draft.breatheSeconds)
         }
     }
 
@@ -643,24 +732,19 @@ struct FrictionEditorView: View {
 
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            HStack {
-                Text("STEPS")
-                    .locktyEyebrow()
-
-                Spacer(minLength: 0)
-
-                Button("Add Step") {
-                    openCatalog()
-                }
-                .font(LocktyTypography.callout)
-            }
+            Text("STEPS")
+                .locktyEyebrow()
 
             if viewModel.draft.steps.isEmpty {
-                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    Text("Add the first friction step from the catalog.")
-                        .font(LocktyTypography.callout)
-                        .foregroundStyle(LocktyColors.secondaryText)
-                }
+                Text("Add the first friction step from the catalog.")
+                    .font(LocktyTypography.callout)
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(LocktySpacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.055))
+                    )
             } else {
                 ForEach(Array(viewModel.draft.steps.enumerated()), id: \.element.id) { index, step in
                     FrictionStepEditorCard(
@@ -676,8 +760,43 @@ struct FrictionEditorView: View {
                     )
                 }
             }
+
+            addStepCard
         }
     }
+
+    /// Adding a step is the last thing in the list, and looks like the things it adds.
+    ///
+    /// It used to be a bare word floating at the right of the "STEPS" heading, which read
+    /// as a link rather than as the way to grow the list -- and put the control at the
+    /// top, above the steps it appends to the bottom.
+    private var addStepCard: some View {
+        Button(action: openCatalog) {
+            HStack(spacing: LocktySpacing.sm) {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .medium))
+
+                Text("Add step")
+                    .font(.system(.subheadline, design: .default, weight: .medium))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(LocktyColors.primaryText)
+            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.vertical, LocktySpacing.lg)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.055))
+            )
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)))
+        .tappable()
+    }
+
+    /// One radius and one inset for every card on this sheet, so the rows, the step
+    /// cards and the breathe control read as the same kind of object.
+    static let cardRadius: CGFloat = 22
 }
 
 private struct FrictionCatalogCard: View {
@@ -727,7 +846,7 @@ private struct FrictionStepEditorCard: View {
     let onRemove: () -> Void
 
     var body: some View {
-        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
+        CardView(radius: FrictionEditorView.cardRadius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1546,5 +1665,73 @@ private final class FrictionTagRegistrationScanner: NSObject, NFCTagReaderSessio
             normalizedIdentifier: normalized,
             displayName: "Tag \(normalized.uppercased())"
         )
+    }
+}
+
+/// Minutes and seconds, on two sliders.
+///
+/// Two rather than one, because a single slider spanning five seconds to three minutes
+/// gives about a pixel per second at the short end -- where all the useful values are.
+/// Splitting it means the minute slider picks the scale and the second slider is precise
+/// within it.
+private struct LocktyBreatheMenu: View {
+    @Binding var seconds: Int
+
+    private var minutes: Int { seconds / 60 }
+    private var remainder: Int { seconds % 60 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            Text(LocktyBreathe.label(seconds))
+                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                .foregroundStyle(LocktyColors.primaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.22), value: seconds)
+                .frame(maxWidth: .infinity)
+
+            slider(
+                title: "Minutes",
+                value: Double(minutes),
+                range: 0...Double(LocktyBreathe.maximumSeconds / 60)
+            ) { newValue in
+                update(minutes: Int(newValue.rounded()), remainder: remainder)
+            }
+
+            slider(
+                title: "Seconds",
+                value: Double(remainder),
+                range: 0...59
+            ) { newValue in
+                update(minutes: minutes, remainder: Int(newValue.rounded()))
+            }
+        }
+        .padding(LocktySpacing.lg)
+        .frame(width: 260)
+    }
+
+    private func slider(
+        title: String,
+        value: Double,
+        range: ClosedRange<Double>,
+        onChange: @escaping (Double) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.xs) {
+            Text(title)
+                .font(.system(.footnote, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+            DurationSlider(
+                value: Binding(get: { value }, set: onChange),
+                range: range
+            )
+        }
+    }
+
+    /// Clamped on the way in, so the two sliders cannot between them ask for less than
+    /// the minimum or more than the maximum -- dragging minutes to three while seconds
+    /// sit at thirty would otherwise land past the top.
+    private func update(minutes: Int, remainder: Int) {
+        seconds = LocktyBreathe.clamped(minutes * 60 + remainder)
     }
 }

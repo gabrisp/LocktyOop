@@ -11,8 +11,9 @@ struct UnlockFlowView: View {
     let tokens: [ApplicationToken]
     /// Preselected when the flow was opened from a specific app.
     var initialToken: ApplicationToken?
-    /// Everything the friction was configured with, breathing included.
     let configuredSteps: [PauseStep]
+    /// How long the opening breathe runs, from the friction's own setting.
+    let breatheSeconds: Int
     let allowanceRange: ClosedRange<Int>
     let nfcService: NFCServicing?
     let locationService: LocationTriggerServicing?
@@ -40,6 +41,7 @@ struct UnlockFlowView: View {
         tokens: [ApplicationToken],
         initialToken: ApplicationToken? = nil,
         frictionSteps: [PauseStep] = [],
+        breatheSeconds: Int = LocktyBreathe.minimumSeconds,
         allowanceRange: ClosedRange<Int> = 1...15,
         defaultMinutes: Int = 5,
         nfcService: NFCServicing? = nil,
@@ -51,6 +53,7 @@ struct UnlockFlowView: View {
         self.tokens = tokens
         self.initialToken = initialToken
         self.configuredSteps = frictionSteps
+        self.breatheSeconds = LocktyBreathe.clamped(breatheSeconds)
         self.allowanceRange = allowanceRange
         self.nfcService = nfcService
         self.locationService = locationService
@@ -68,26 +71,16 @@ struct UnlockFlowView: View {
 
     /// The steps the flow actually walks through.
     ///
-    /// Breathing is not one of them. The flow already opens on a breathe that cannot be
-    /// removed, so a breathing step added on top was a second, identical screen a few
-    /// taps later. It configures the one at the front instead -- see `restSeconds` --
-    /// and does not appear here.
+    /// Breathing is not among them, and is no longer a step anyone can add: the flow
+    /// always opens on a breathe, so one in the list could be added twice, dragged after
+    /// a puzzle, or left out of a flow that opens with one regardless. Its length is a
+    /// setting on the friction instead. Old flows may still carry the step, which is why
+    /// it is filtered rather than assumed gone.
     private var frictionSteps: [PauseStep] {
         configuredSteps.filter {
             if case .breathing = $0 { return false }
             return true
         }
-    }
-
-    /// The breathing step's settings, when the friction carries one. Nil means the
-    /// opening breathe runs at its own default length.
-    private var breathingConfiguration: BreathingConfiguration? {
-        for step in configuredSteps {
-            if case .breathing(let configuration) = step {
-                return configuration
-            }
-        }
-        return nil
     }
 
     private static let allAppsOptionID = "all"
@@ -147,10 +140,7 @@ struct UnlockFlowView: View {
     private var restSeconds: Int {
         switch step {
         case .rest:
-            // Five seconds unless the friction asked for a number of breaths, in which
-            // case that is what the opening breathe runs for.
-            guard let breathingConfiguration else { return 5 }
-            return max(breathingConfiguration.breathCount * 4, 1)
+            return breatheSeconds
         case .friction(let index):
             guard frictionSteps.indices.contains(index) else { return 0 }
             switch frictionSteps[index] {

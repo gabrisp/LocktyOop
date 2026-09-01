@@ -46,6 +46,9 @@ nonisolated struct Friction: Codable, Hashable, Identifiable {
     var steps: [FrictionStep]
     var allowanceDuration: TimeInterval
     var relockAfterAllowance: Bool
+    /// How long the breathe that opens this friction runs. A setting, not a step -- every
+    /// flow opens on one, so a step could only ever add a second copy of it.
+    var breatheSeconds: Int
     var createdAt: Date
     var updatedAt: Date
 
@@ -56,6 +59,7 @@ nonisolated struct Friction: Codable, Hashable, Identifiable {
         steps: [FrictionStep] = [],
         allowanceDuration: TimeInterval = 5 * 60,
         relockAfterAllowance: Bool = true,
+        breatheSeconds: Int = LocktyBreathe.minimumSeconds,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -65,6 +69,7 @@ nonisolated struct Friction: Codable, Hashable, Identifiable {
         self.steps = steps
         self.allowanceDuration = allowanceDuration
         self.relockAfterAllowance = relockAfterAllowance
+        self.breatheSeconds = LocktyBreathe.clamped(breatheSeconds)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -76,6 +81,7 @@ nonisolated struct Friction: Codable, Hashable, Identifiable {
         steps = flow.steps
         allowanceDuration = flow.allowanceDuration
         relockAfterAllowance = flow.relockAfterAllowance
+        breatheSeconds = flow.breatheSeconds
         createdAt = flow.createdAt
         updatedAt = flow.updatedAt
     }
@@ -89,6 +95,7 @@ nonisolated struct Friction: Codable, Hashable, Identifiable {
             steps: steps,
             allowanceDuration: allowanceDuration,
             relockAfterAllowance: relockAfterAllowance,
+            breatheSeconds: breatheSeconds,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -110,6 +117,7 @@ nonisolated struct FrictionEditorDraft: Codable, Hashable {
     var steps: [FrictionStep]
     var allowanceMinutes: Int
     var relockAfterAllowance: Bool
+    var breatheSeconds: Int
 
     init(
         id: UUID = UUID(),
@@ -117,7 +125,8 @@ nonisolated struct FrictionEditorDraft: Codable, Hashable {
         isEnabled: Bool = true,
         steps: [FrictionStep] = [],
         allowanceMinutes: Int = 5,
-        relockAfterAllowance: Bool = true
+        relockAfterAllowance: Bool = true,
+        breatheSeconds: Int = LocktyBreathe.minimumSeconds
     ) {
         self.id = id
         self.name = name
@@ -125,6 +134,7 @@ nonisolated struct FrictionEditorDraft: Codable, Hashable {
         self.steps = steps
         self.allowanceMinutes = allowanceMinutes
         self.relockAfterAllowance = relockAfterAllowance
+        self.breatheSeconds = LocktyBreathe.clamped(breatheSeconds)
     }
 
     init(friction: Friction) {
@@ -134,6 +144,7 @@ nonisolated struct FrictionEditorDraft: Codable, Hashable {
         steps = friction.steps
         allowanceMinutes = max(Int(friction.allowanceDuration / 60), 1)
         relockAfterAllowance = friction.relockAfterAllowance
+        breatheSeconds = friction.breatheSeconds
     }
 
     func makeFriction(createdAt: Date, updatedAt: Date) -> Friction {
@@ -144,6 +155,7 @@ nonisolated struct FrictionEditorDraft: Codable, Hashable {
             steps: steps,
             allowanceDuration: TimeInterval(max(allowanceMinutes, 1) * 60),
             relockAfterAllowance: relockAfterAllowance,
+            breatheSeconds: breatheSeconds,
             createdAt: createdAt,
             updatedAt: updatedAt
         )

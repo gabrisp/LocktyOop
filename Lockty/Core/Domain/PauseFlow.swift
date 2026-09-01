@@ -14,6 +14,13 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
     var steps: [PauseStep]
     var allowanceDuration: TimeInterval
     var relockAfterAllowance: Bool
+    /// How long the breathe that opens the flow lasts.
+    ///
+    /// A setting, not a step. Every unlock starts on the same breathe, so putting it in
+    /// the step list meant it could be added twice, moved after a puzzle, or left out of
+    /// a flow that would still open with one anyway -- three ways of saying something the
+    /// flow does not let you choose.
+    var breatheSeconds: Int
     var createdAt: Date
     var updatedAt: Date
 
@@ -25,6 +32,7 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         steps: [PauseStep] = PauseFlow.defaultSteps,
         allowanceDuration: TimeInterval = 5 * 60,
         relockAfterAllowance: Bool = true,
+        breatheSeconds: Int = LocktyBreathe.minimumSeconds,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -35,6 +43,7 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
         self.steps = steps
         self.allowanceDuration = allowanceDuration
         self.relockAfterAllowance = relockAfterAllowance
+        self.breatheSeconds = LocktyBreathe.clamped(breatheSeconds)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -61,7 +70,8 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
             isEnabled: isEnabled,
             steps: steps,
             allowanceDuration: allowanceDuration,
-            relockAfterAllowance: relockAfterAllowance
+            relockAfterAllowance: relockAfterAllowance,
+            breatheSeconds: breatheSeconds
         )
     }
 }

@@ -256,6 +256,7 @@ struct FeatureFactory {
             tokens: blockedTokens,
             initialToken: token,
             frictionSteps: activeRoutine?.pausePolicySnapshot.steps ?? [],
+            breatheSeconds: activeRoutine?.pausePolicySnapshot.breatheSeconds ?? LocktyBreathe.minimumSeconds,
             defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
             nfcService: nfcService,
             locationService: locationService,

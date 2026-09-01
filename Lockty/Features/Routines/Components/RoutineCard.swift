@@ -136,7 +136,7 @@ struct RoutineCard: View {
                             .foregroundStyle(LocktyColors.secondaryText)
                             .lineLimit(1)
 
-                        StackedAppTokens(tokens: applicationTokens)
+                        LocktyStackedAppTokens(tokens: applicationTokens)
 
                         Spacer(minLength: 0)
                     }
@@ -183,49 +183,6 @@ private struct RoutineSchedulePill: View {
                 Capsule(style: .continuous)
                     .stroke(accent.opacity(0.34), lineWidth: 1)
             }
-    }
-}
-
-/// Up to three app icons overlapping, with the count of whatever didn't fit carried on a
-/// tile at the end rather than as separate text.
-private struct StackedAppTokens: View {
-    let tokens: [ApplicationToken]
-
-    private let iconSize: CGFloat = 22
-    private let overlap: CGFloat = 7
-
-    private var visible: [ApplicationToken] {
-        Array(tokens.prefix(3))
-    }
-
-    private var overflow: Int {
-        max(0, tokens.count - visible.count)
-    }
-
-    var body: some View {
-        HStack(spacing: -overlap) {
-            ForEach(Array(visible.enumerated()), id: \.element) { index, token in
-                Label(token)
-                    .labelStyle(.iconOnly)
-                    .id(token)
-                    .frame(width: iconSize, height: iconSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .zIndex(Double(visible.count - index))
-            }
-
-            if overflow > 0 {
-                Text("+\(overflow)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .frame(width: iconSize + overlap, height: iconSize, alignment: .trailing)
-                    .padding(.trailing, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(LocktyColors.elevatedBackground)
-                    )
-                    .zIndex(0)
-            }
-        }
     }
 }
 

@@ -726,6 +726,14 @@ struct AppFolderCard: View {
         .frame(width: folderSide)
     }
 
+    /// The geometry every cell of the grid gets, icons and the overflow tile alike.
+    /// Written once so the two cannot drift apart.
+    private func slot<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .scaleEffect(iconScale)
+            .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
+    }
+
     private var folderGrid: some View {
         let visible = Array(tokens.prefix(4))
         let overflow = max(0, tokens.count - 4)
@@ -733,37 +741,61 @@ struct AppFolderCard: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
             ForEach(Array(visible.enumerated()), id: \.offset) { index, token in
                 if index == 3, overflow > 0 {
-                    ZStack(alignment: .center) {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                    // Cut from a real icon's silhouette rather than drawn as a rounded
+                    // rectangle at 38: the icons around it are scaled past their frame,
+                    // so a tile sized to the frame came out visibly smaller than them.
+                    // The stencil inherits their exact geometry instead.
+                    slot {
+                        LocktyTokenPlaceholder(
+                            stencil: visible.first,
+                            fill: Color.white.opacity(0.05)
+                        )
+                    }
+                    // Outside the slot, so the count is not scaled along with the tile.
+                    .overlay {
                         Text("+\(overflow)")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(LocktyColors.primaryText)
                     }
-                    .frame(height: 38)
                 } else {
-                    Label(token)
-                        .labelStyle(.iconOnly)
-                        .scaleEffect(iconScale)
-                        .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
+                    slot {
+                        Label(token)
+                            .labelStyle(.iconOnly)
+                    }
                 }
             }
 
             if visible.isEmpty {
                 ForEach(0..<4, id: \.self) { _ in
-                    placeholderDot
+                    placeholderDot(stencil: nil)
                 }
             } else if visible.count < 4 {
                 ForEach(visible.count..<4, id: \.self) { _ in
-                    placeholderDot
+                    placeholderDot(stencil: visible.first)
                 }
             }
         }
     }
 
-    private var placeholderDot: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(Color.white.opacity(0.035))
-            .frame(height: 38)
+    /// An empty slot in the grid, the size of the icons around it.
+    ///
+    /// Given a stencil it takes an icon's own shape, the same way the overflow tile
+    /// does. With none -- a group with no apps in it at all -- there is nothing to copy,
+    /// but there are no icons to be out of step with either, so a plain square is the
+    /// whole grid and it matches itself.
+    @ViewBuilder
+    private func placeholderDot(stencil: ApplicationToken?) -> some View {
+        if stencil == nil {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.035))
+                .frame(height: 38)
+        } else {
+            slot {
+                LocktyTokenPlaceholder(
+                    stencil: stencil,
+                    fill: Color.white.opacity(0.035)
+                )
+            }
+        }
     }
 }

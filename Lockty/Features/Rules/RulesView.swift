@@ -175,7 +175,7 @@ struct RuleCard: View {
                             .foregroundStyle(LocktyColors.secondaryText)
                             .lineLimit(1)
 
-                        StackedRuleTokens(tokens: applicationTokens)
+                        LocktyStackedAppTokens(tokens: applicationTokens)
 
                         Spacer(minLength: 0)
                     }
@@ -188,39 +188,5 @@ struct RuleCard: View {
         }
         .buttonStyle(.locktyInteractive)
         .tappable()
-    }
-}
-
-private struct StackedRuleTokens: View {
-    let tokens: [ApplicationToken]
-
-    private let iconSize: CGFloat = 22
-    private let overlap: CGFloat = 7
-
-    private var visible: [ApplicationToken] { Array(tokens.prefix(3)) }
-    private var overflow: Int { max(0, tokens.count - visible.count) }
-
-    var body: some View {
-        HStack(spacing: -overlap) {
-            ForEach(Array(visible.enumerated()), id: \.element) { index, token in
-                Label(token)
-                    .labelStyle(.iconOnly)
-                    .frame(width: iconSize, height: iconSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .zIndex(Double(visible.count - index))
-            }
-
-            if overflow > 0 {
-                Text("+\(overflow)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .frame(width: iconSize + overlap, height: iconSize, alignment: .trailing)
-                    .padding(.trailing, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(LocktyColors.elevatedBackground)
-                    )
-            }
-        }
     }
 }

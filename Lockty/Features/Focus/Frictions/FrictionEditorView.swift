@@ -1014,15 +1014,20 @@ private struct FrictionStepSettings: View {
             )
 
         case .wordSearch(let configuration):
-            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+            VStack(alignment: .leading, spacing: 0) {
                 EnumPicker(title: "Difficulty", selection: configuration.difficulty) { newValue in
                     onChange(.wordSearch(WordSearchConfiguration(id: configuration.id, difficulty: newValue, targetWord: configuration.targetWord)))
                 }
-                TextField("Optional target word", text: Binding(
-                    get: { configuration.targetWord ?? "" },
-                    set: { onChange(.wordSearch(WordSearchConfiguration(id: configuration.id, difficulty: configuration.difficulty, targetWord: $0.isEmpty ? nil : $0.uppercased()))) }
-                ))
-                .locktyGlassInputStyle()
+
+                FrictionSettingsDivider()
+
+                FrictionSettingsField(
+                    title: "Target word",
+                    text: Binding(
+                        get: { configuration.targetWord ?? "" },
+                        set: { onChange(.wordSearch(WordSearchConfiguration(id: configuration.id, difficulty: configuration.difficulty, targetWord: $0.isEmpty ? nil : $0.uppercased()))) }
+                    )
+                )
             }
 
         case .letterMatch(let configuration):
@@ -1036,10 +1041,12 @@ private struct FrictionStepSettings: View {
             )
 
         case .operations(let configuration):
-            VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+            VStack(alignment: .leading, spacing: 0) {
                 EnumPicker(title: "Difficulty", selection: configuration.difficulty) { newValue in
                     onChange(.operations(OperationsConfiguration(id: configuration.id, difficulty: newValue, problemCount: configuration.problemCount, allowedOperators: configuration.allowedOperators)))
                 }
+
+                FrictionSettingsDivider()
 
                 LocktyCountRow(
                     title: "Problem count",
@@ -1049,6 +1056,8 @@ private struct FrictionStepSettings: View {
                     ),
                     range: 1...10
                 )
+
+                FrictionSettingsDivider()
 
                 operatorToggleRow(configuration: configuration)
             }
@@ -1063,11 +1072,13 @@ private struct FrictionStepSettings: View {
             intentionFields(configuration: configuration) { onChange(.intention($0)) }
 
         case .confirmation(let configuration):
-            TextField("Prompt", text: Binding(
-                get: { configuration.prompt },
-                set: { onChange(.confirmation(ConfirmationConfiguration(id: configuration.id, prompt: $0))) }
-            ), axis: .vertical)
-            .locktyGlassInputStyle()
+            FrictionSettingsField(
+                title: "Prompt",
+                text: Binding(
+                    get: { configuration.prompt },
+                    set: { onChange(.confirmation(ConfirmationConfiguration(id: configuration.id, prompt: $0))) }
+                )
+            )
 
         case .personalVideo(let configuration):
             PersonalVideoConfigurationView(
@@ -1112,31 +1123,53 @@ private struct FrictionStepSettings: View {
         configuration: IntentionConfiguration,
         onUpdate: @escaping (IntentionConfiguration) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            TextField("Prompt", text: Binding(
-                get: { configuration.prompt },
-                set: { onUpdate(IntentionConfiguration(id: configuration.id, prompt: $0, minimumLength: configuration.minimumLength, isRequired: configuration.isRequired)) }
-            ), axis: .vertical)
-            .locktyGlassInputStyle()
+        VStack(alignment: .leading, spacing: 0) {
+            FrictionSettingsField(
+                title: "Prompt",
+                text: Binding(
+                    get: { configuration.prompt },
+                    set: { onUpdate(IntentionConfiguration(id: configuration.id, prompt: $0, minimumLength: configuration.minimumLength, isRequired: configuration.isRequired)) }
+                )
+            )
 
-            Stepper("Minimum length: \(configuration.minimumLength ?? 0)", value: Binding(
-                get: { configuration.minimumLength ?? 0 },
-                set: { onUpdate(IntentionConfiguration(id: configuration.id, prompt: configuration.prompt, minimumLength: max($0, 0), isRequired: configuration.isRequired)) }
-            ), in: 0...200)
-            .foregroundStyle(LocktyColors.primaryText)
+            FrictionSettingsDivider()
 
-            ToggleRow(
+            LocktyCountRow(
+                title: "Minimum length",
+                value: Binding(
+                    get: { configuration.minimumLength ?? 0 },
+                    set: { onUpdate(IntentionConfiguration(id: configuration.id, prompt: configuration.prompt, minimumLength: $0, isRequired: configuration.isRequired)) }
+                ),
+                range: 0...200,
+                step: 5
+            )
+
+            FrictionSettingsDivider()
+
+            LocktyToggle(
                 title: "Response required",
-                subtitle: "Keep the step blocked until the text passes validation.",
                 isOn: Binding(
                     get: { configuration.isRequired },
                     set: { onUpdate(IntentionConfiguration(id: configuration.id, prompt: configuration.prompt, minimumLength: configuration.minimumLength, isRequired: $0)) }
                 )
             )
+            .frame(minHeight: 44)
         }
     }
 
     private func operatorToggleRow(configuration: OperationsConfiguration) -> some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+            Text("Operators")
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            operatorChips(configuration: configuration)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, LocktySpacing.sm)
+    }
+
+    private func operatorChips(configuration: OperationsConfiguration) -> some View {
         HStack(spacing: LocktySpacing.sm) {
             ForEach(ArithmeticOperator.allCases) { operation in
                 Button {
@@ -1592,36 +1625,72 @@ private struct DurationSliderCard: View {
     }
 }
 
+/// A choice, as a row with a menu -- the same shape as every other setting here.
+///
+/// It used to be a row of full-width buttons under a caption, which took four lines to
+/// say one thing and made a two-option choice look more important than the count above
+/// it. A row states the setting and its value; the options are one tap away.
 private struct EnumPicker<Value: CaseIterable & Identifiable & Hashable & RawRepresentable>: View where Value.RawValue == String {
     let title: String
     let selection: Value
     let onSelect: (Value) -> Void
 
+    @State private var isShowingOptions = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+        HStack(spacing: LocktySpacing.md) {
             Text(title)
-                .font(LocktyTypography.callout)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            Spacer(minLength: LocktySpacing.sm)
+
+            Text(label(for: selection))
+                .font(.system(.subheadline, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
 
-            HStack(spacing: LocktySpacing.sm) {
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(LocktyColors.tertiaryText)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .onTapGesture { isShowingOptions = true }
+        .locktyMenu(isPresented: $isShowingOptions) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(Value.allCases), id: \.id) { option in
                     Button {
                         onSelect(option)
+                        isShowingOptions = false
                     } label: {
-                        Text(String(describing: option.rawValue).capitalized)
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(selection == option ? Color.black : LocktyColors.primaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous)
-                                    .fill(selection == option ? Color.white : LocktyColors.elevatedBackground)
-                            )
+                        HStack(spacing: LocktySpacing.md) {
+                            Text(label(for: option))
+                                .font(.system(.subheadline, design: .default, weight: .regular))
+                                .foregroundStyle(LocktyColors.primaryText)
+
+                            Spacer(minLength: 0)
+
+                            if option == selection {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(LocktyColors.productive)
+                            }
+                        }
+                        .padding(.horizontal, LocktySpacing.lg)
+                        .frame(height: 46)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .tappable()
                 }
             }
+            .padding(.vertical, LocktySpacing.sm)
+            .frame(width: 200)
         }
+    }
+
+    private func label(for value: Value) -> String {
+        String(describing: value.rawValue).capitalized
     }
 }
 
@@ -1844,5 +1913,38 @@ private struct LocktyBreatheMenu: View {
     /// sit at thirty would otherwise land past the top.
     private func update(minutes: Int, remainder: Int) {
         seconds = LocktyBreathe.clamped(minutes * 60 + remainder)
+    }
+}
+
+/// A labelled field, laid out like the rows beside it.
+///
+/// The bare glass text field was the one control on the sheet with no name of its own --
+/// its placeholder had to do that job, and vanished the moment anything was typed.
+private struct FrictionSettingsField: View {
+    let title: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+            Text(title)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            TextField("", text: $text, axis: .vertical)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .lineLimit(1...4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, LocktySpacing.sm)
+    }
+}
+
+/// The rule between two settings. Inset from neither edge, because the card's own padding
+/// is the inset -- a divider that stops short of the text above it reads as a mistake.
+private struct FrictionSettingsDivider: View {
+    var body: some View {
+        Divider()
+            .overlay(LocktyColors.separator.opacity(0.45))
     }
 }

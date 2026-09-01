@@ -192,7 +192,7 @@ struct FocusView: View {
     @ViewBuilder
     private func horizontalRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: RoutineGridMetrics.spacing) {
+            HStack(alignment: .top, spacing: RoutineGridMetrics.spacing) {
                 content()
             }
             .padding(.horizontal, gutter)

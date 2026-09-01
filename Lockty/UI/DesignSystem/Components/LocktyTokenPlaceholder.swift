@@ -93,19 +93,23 @@ struct LocktyStackedAppTokens: View {
                         .labelStyle(.iconOnly)
                         .id(token)
                 }
-                .zIndex(Double(visible.count - index))
-            }
-
-            if overflow > 0 {
-                slot {
-                    LocktyTokenPlaceholder(stencil: visible.first)
-                }
+                // The count goes *on* the last icon rather than after it. A tile of its
+                // own read as one more app, and it cost a slot that could have shown a
+                // real one. Darkened underneath so the number has something to sit on --
+                // white on an arbitrary app icon is legible only by luck.
                 .overlay {
-                    Text("+\(overflow)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(LocktyColors.primaryText)
+                    if overflow > 0, index == visible.count - 1 {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.black.opacity(0.62))
+
+                            Text("+\(overflow)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
                 }
-                .zIndex(0)
+                .zIndex(Double(visible.count - index))
             }
         }
     }

@@ -746,19 +746,27 @@ struct AppFolderCard: View {
                     }
                 }
 
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(LocktyColors.primaryText)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+            // Leading and top, with room for two lines always reserved. Centred and
+            // free-height, a folder whose name wrapped grew taller than the ones beside
+            // it and dragged the whole row out of line -- and its subtitle sat lower than
+            // everyone else's.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .frame(height: 38, alignment: .top)
 
-            Text(subtitle)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
-                .multilineTextAlignment(.center)
-                .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: folderSide)
+        .frame(width: folderSide, alignment: .top)
     }
 
     /// The geometry every cell of the grid gets, icons and the overflow tile alike.
@@ -775,27 +783,24 @@ struct AppFolderCard: View {
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
             ForEach(Array(visible.enumerated()), id: \.offset) { index, token in
-                if index == 3, overflow > 0 {
-                    // Cut from a real icon's silhouette rather than drawn as a rounded
-                    // rectangle at 38: the icons around it are scaled past their frame,
-                    // so a tile sized to the frame came out visibly smaller than them.
-                    // The stencil inherits their exact geometry instead.
-                    slot {
-                        LocktyTokenPlaceholder(
-                            stencil: visible.first,
-                            fill: Color.white.opacity(0.05)
-                        )
-                    }
-                    // Outside the slot, so the count is not scaled along with the tile.
-                    .overlay {
-                        Text("+\(overflow)")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(LocktyColors.primaryText)
-                    }
-                } else {
-                    slot {
-                        Label(token)
-                            .labelStyle(.iconOnly)
+                slot {
+                    Label(token)
+                        .labelStyle(.iconOnly)
+                }
+                // The count sits on the last icon, darkened underneath so it reads over
+                // whatever that icon happens to look like. It used to be a tile of its
+                // own, which spent one of the four slots on a number instead of an app --
+                // and stood in for the very icons it was hiding.
+                .overlay {
+                    if index == visible.count - 1, overflow > 0 {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.black.opacity(0.62))
+
+                            Text("+\(overflow)")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
                     }
                 }
             }
@@ -825,12 +830,14 @@ struct AppFolderCard: View {
                 .fill(Color.white.opacity(0.035))
                 .frame(height: 38)
         } else {
-            slot {
-                LocktyTokenPlaceholder(
-                    stencil: stencil,
-                    fill: Color.white.opacity(0.035)
-                )
-            }
+            // Not run through `slot`: that scales by 1.58 because the real icons are
+            // drawn smaller than their cell and need to grow into it. A placeholder has
+            // no such inset, so the same scale made it burst out of the grid.
+            LocktyTokenPlaceholder(
+                stencil: stencil,
+                fill: Color.white.opacity(0.035)
+            )
+            .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
         }
     }
 }

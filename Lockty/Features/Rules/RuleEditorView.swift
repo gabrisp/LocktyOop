@@ -1,5 +1,6 @@
 import Combine
 import FamilyControls
+import ManagedSettings
 import SwiftUI
 
 @MainActor
@@ -378,6 +379,8 @@ struct RuleEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RuleEditorLocalSheet?
     @State private var isNaming = false
+    /// A new rule goes straight to its form -- there is nothing to preview yet.
+    @State private var isEditing: Bool
     @State private var isShowingKindChoice: Bool
     /// What a discard confirmation, if one is up, is about to throw away.
     @State private var pendingDiscard: LocktyDiscardIntent?
@@ -397,6 +400,7 @@ struct RuleEditorView: View {
         self.onReturnToParent = onReturnToParent
         self.onCloseEditor = onCloseEditor
         _isShowingKindChoice = State(initialValue: viewModel.isCreating)
+        _isEditing = State(initialValue: viewModel.isCreating)
     }
 
     private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
@@ -412,7 +416,7 @@ struct RuleEditorView: View {
         if viewModel.kind == .schedule { return "schedule" }
         if let activeSheet { return activeSheet.id }
         if isNaming { return "naming" }
-        return "editor"
+        return isEditing ? "editor" : "reading"
     }
 
     private var screenTransition: AnyTransition {
@@ -504,13 +508,39 @@ struct RuleEditorView: View {
                 makeScheduleRuleEditor(returnToKindChoice)
                     .geometryGroup()
                     .transition(screenTransition)
-            } else {
+            } else if isEditing {
                 editorScaffold
+                    .geometryGroup()
+                    .transition(screenTransition)
+            } else {
+                readOnlyScaffold
                     .geometryGroup()
                     .transition(screenTransition)
             }
         }
         .geometryGroup()
+    }
+
+    /// The summary, wearing the same bar the form does.
+    private var readOnlyScaffold: some View {
+        RulePreviewContent(
+            viewModel: viewModel,
+            applicationTokens: previewTokens
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .locktyDynamicSheetChrome(id: chromeID) {
+            chromeCenter
+        } leading: {
+            chromeLeading
+        } trailing: {
+            chromeTrailing
+        }
+    }
+
+    private var previewTokens: [ApplicationToken] {
+        let tokens = viewModel.selectionPreview.applicationTokens
+        return tokens.stablePrefix(tokens.count)
     }
 
     private var editorScaffold: some View {
@@ -551,6 +581,11 @@ struct RuleEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if isEditing && !viewModel.isCreating {
+            LocktyDynamicSheetBarButton(action: returnToReading) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else if viewModel.isCreating {
             // Reached by picking a kind on "Create Rule", so there is a step behind this
             // one. A chevron says that; an X claimed the only way out was to abandon the
@@ -582,7 +617,7 @@ struct RuleEditorView: View {
             }
             .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } else {
-            LocktyDynamicSheetBarButton(action: enterNaming) {
+            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
                 Image(systemName: "pencil")
                     .font(.system(size: 15, weight: .medium))
             }
@@ -1275,6 +1310,26 @@ struct RuleEditorView: View {
         withAnimation(sheetAnimation) {
             isShowingKindChoice = true
             viewModel.kind = nil
+        }
+    }
+
+    /// From the summary the pencil opens the form; from the form, the name.
+    private func enterEditingFlow() {
+        isGoingBack = false
+        withAnimation(sheetAnimation) {
+            if isEditing {
+                isNaming = true
+            } else {
+                isEditing = true
+            }
+        }
+    }
+
+    private func returnToReading() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) {
+            isEditing = false
+            isNaming = false
         }
     }
 

@@ -310,6 +310,36 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     /// The flow this routine will use.
+    /// When this routine next starts, from its own schedule. Nil when it has no schedule
+    /// or is already running.
+    var nextScheduledStart: Date? {
+        let schedule = scheduleTrigger
+        guard !schedule.weekdays.isEmpty else { return nil }
+
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: schedule.timeZoneIdentifier) ?? .current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+
+        for offset in 0...7 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else { continue }
+            let weekdayValue = calendar.component(.weekday, from: day)
+            guard let weekday = Weekday(rawValue: weekdayValue), schedule.weekdays.contains(weekday) else {
+                continue
+            }
+
+            var components = calendar.dateComponents([.year, .month, .day], from: day)
+            components.hour = schedule.hour
+            components.minute = schedule.minute
+            components.second = 0
+
+            guard let candidate = calendar.date(from: components), candidate > now else { continue }
+            return candidate
+        }
+
+        return nil
+    }
+
     var selectedPauseFlow: PauseFlow? {
         pauseFlowID.flatMap { id in pauseFlows.first { $0.id == id } }
     }
@@ -1261,6 +1291,11 @@ struct RoutineEditorView: View {
     }
 
     /// The name for a set of days when it happens to be one, and the count when it isn't.
+    /// Shared with the preview screen, which names the same set of days.
+    static func previewPresetName(for weekdays: Set<Weekday>) -> String {
+        presetName(for: weekdays)
+    }
+
     private static func presetName(for weekdays: Set<Weekday>) -> String {
         let weekend: Set<Weekday> = [.saturday, .sunday]
         let workweek: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
@@ -1988,21 +2023,15 @@ struct RoutineEditorView: View {
 
     private var readOnlyContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            sectionHeading("SCHEDULE", systemImage: "calendar")
-
-            readOnlyScheduleCard
-
-            readOnlyDaysCard
-
-            checklistRow
-
-            sectionHeading("RESTRICTIONS", systemImage: "lock.shield")
-
-            appsRow
-
-            readOnlyBreakRow
-
-            strictReadOnlyRow
+            // A summary, not the form with its controls removed. Reading a routine used
+            // to look like editing one that had stopped responding.
+            RoutinePreviewContent(
+                viewModel: viewModel,
+                applicationTokens: previewTokens,
+                activeSince: activeRoutineStartedAt,
+                nextStart: viewModel.nextScheduledStart,
+                onOpenApps: { openChildSheet(.apps) }
+            )
 
             // Start it, or end it if it is the one running. While a different routine
             // is running there is no button at all: starting this one would mean
@@ -2041,6 +2070,12 @@ struct RoutineEditorView: View {
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    /// The apps the routine holds, for the preview's stack.
+    private var previewTokens: [ApplicationToken] {
+        let tokens = viewModel.selectionPreview.applicationTokens
+        return tokens.stablePrefix(tokens.count)
     }
 
     private var readOnlyDaysCard: some View {

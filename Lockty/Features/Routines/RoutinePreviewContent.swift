@@ -16,7 +16,6 @@ struct RoutinePreviewContent: View {
     let activeSince: Date?
     /// The next scheduled start, when there is one and nothing is running.
     let nextStart: Date?
-    let onOpenApps: () -> Void
 
     private var accent: Color {
         LocktyColors.routine(viewModel.color)
@@ -46,19 +45,6 @@ struct RoutinePreviewContent: View {
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.top, LocktySpacing.sm)
         .padding(.bottom, LocktySpacing.md)
-        // The routine's own colour, bloomed behind everything. It is the one thing on
-        // this screen that is purely the routine's -- the rows are all facts, and this is
-        // what makes two routines feel different from one another at a glance.
-        .background(alignment: .top) {
-            Ellipse()
-                .fill(accent)
-                .frame(height: 260)
-                .blur(radius: 90)
-                .opacity(0.26)
-                .offset(y: -60)
-                .allowsHitTesting(false)
-        }
-        .animation(.smooth(duration: 0.4), value: viewModel.color)
     }
 
     /// The routine's own icon, and nothing else.

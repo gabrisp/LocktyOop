@@ -22,11 +22,16 @@ enum TodayRoutineCardPhase: Equatable {
     case upcoming
 }
 
-/// A running routine and the apps it holds shut.
+/// A running routine, the apps it holds shut, and whether it will let any of them out.
+///
+/// The availability belongs to the group rather than to the card: each routine has its
+/// own break policy, its own count and its own cooldown, so one answer for the whole card
+/// showed a wait that belonged to one routine over apps held by another.
 struct TodayActiveRoutineGroup: Identifiable, Equatable {
     var id: UUID { routine.routineID }
     let routine: ActiveRoutine
     let tokens: [ApplicationToken]
+    var availability: BreakAvailability = .available
 }
 
 /// One scheduled run coming up this week.
@@ -133,17 +138,33 @@ final class TodayViewModel: ObservableObject {
     /// Grouped rather than merged into one list: two routines running at once are two
     /// separate reasons a set of apps is shut, and a single undivided row would claim
     /// they were one.
-    var activeRoutineGroups: [TodayActiveRoutineGroup] {
-        routineEngine.activeRoutines
-            .sorted { $0.startedAt < $1.startedAt }
-            .map { routine in
-                let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?
-                    .applicationTokens ?? []
-                return TodayActiveRoutineGroup(
+    ///
+    /// Published rather than computed, because each group's availability has to be asked
+    /// for and that cannot happen inside a getter.
+    @Published private(set) var activeRoutineGroups: [TodayActiveRoutineGroup] = []
+
+    private func refreshActiveRoutineGroups() async {
+        var groups: [TodayActiveRoutineGroup] = []
+
+        for routine in routineEngine.activeRoutines.sorted(by: { $0.startedAt < $1.startedAt }) {
+            let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?
+                .applicationTokens ?? []
+            // Asked per routine: its own limit, its own cooldown, its own strict mode.
+            let availability = await routineEngine.breakAvailability(
+                for: routine.routineID,
+                trigger: .manual,
+                requiresFriction: true
+            )
+            groups.append(
+                TodayActiveRoutineGroup(
                     routine: routine,
-                    tokens: selection.stablePrefix(selection.count)
+                    tokens: selection.stablePrefix(selection.count),
+                    availability: availability
                 )
-            }
+            )
+        }
+
+        activeRoutineGroups = groups
     }
 
     func load(day: Date, force: Bool = false) async {
@@ -265,17 +286,27 @@ final class TodayViewModel: ObservableObject {
     ///
     /// A context is passed when the request names its own routine; without one this
     /// falls back to whatever is running, which is what the badges are coloured against.
-    /// How a badge should be drawn for the current break policy: green while an unlock
-    /// is possible, red with a clock while a cooldown runs, red and silent once there is
-    /// nothing left to grant.
-    var badgeAvailability: LocktyAppLockBadge.Availability {
-        switch breakAvailability {
-        case .available:
-            return .unlockable
-        case .unavailable(let unavailable):
-            guard let retryAt = unavailable.retryAt else { return .exhausted }
-            return .cooldown(until: retryAt)
+    /// How a badge should be drawn for one app: green while an unlock is possible, red
+    /// with a clock while a cooldown runs, red and silent once there is nothing left.
+    ///
+    /// Read from the groups, which already carry each routine's own answer, and the
+    /// strictest among the routines holding this app wins -- an app two routines block is
+    /// not free until both of them would let it go.
+    func badgeAvailability(forApp appID: AppIdentity.ID?) -> LocktyAppLockBadge.Availability {
+        guard let appID else { return .unlockable }
+
+        let holding = activeRoutineGroups.filter {
+            $0.routine.shieldPolicy.blockedApplications.contains(appID)
         }
+        guard !holding.isEmpty else { return .unlockable }
+
+        for group in holding {
+            if case .unavailable(let unavailable) = group.availability {
+                guard let retryAt = unavailable.retryAt else { return .exhausted }
+                return .cooldown(until: retryAt)
+            }
+        }
+        return .unlockable
     }
 
     @discardableResult
@@ -319,6 +350,7 @@ final class TodayViewModel: ObservableObject {
 
     private func refreshRoutineCard() async {
         await unlockAvailability()
+        await refreshActiveRoutineGroups()
 
         if let activeRoutine = routineEngine.activeRoutine() {
             routineCardState = TodayRoutineCardState(

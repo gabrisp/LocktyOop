@@ -15,7 +15,6 @@ struct ActiveModeCard: View {
     var groups: [TodayActiveRoutineGroup] = []
     var activeRoutine: ActiveRoutine?
     var allowance: ActivePauseAllowance?
-    var breakAvailability: BreakAvailability = .available
     let onUnlock: (ApplicationToken) -> Void
     /// The heading's chevron: routines live on Focus, and the card is a window onto them.
     let onOpenSection: () -> Void
@@ -29,11 +28,17 @@ struct ActiveModeCard: View {
         allowance?.releasedApplications ?? []
     }
 
-    /// How the badges are drawn: green while a break can still be taken, red when it
-    /// cannot -- with a clock only when there is a moment to wait for. A limit that has
-    /// been reached has no such moment, so it is red and silent.
-    private var badgeAvailability: LocktyAppLockBadge.Availability {
-        switch breakAvailability {
+    /// How one routine's badges are drawn: green while a break can still be taken, red
+    /// when it cannot -- with a clock only when there is a moment to wait for. A limit
+    /// that has been reached has no such moment.
+    ///
+    /// Per routine, not per card. Each has its own break policy, count and cooldown, so
+    /// one answer for the whole card put another routine's wait over apps it does not
+    /// hold -- and showed a countdown on routines that never allowed breaks at all.
+    private func badgeAvailability(
+        for group: TodayActiveRoutineGroup
+    ) -> LocktyAppLockBadge.Availability {
+        switch group.availability {
         case .available:
             .unlockable
         case .unavailable(let unavailable):
@@ -61,7 +66,12 @@ struct ActiveModeCard: View {
     var body: some View {
         CardView(radius: radius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                // Eight more at the top, which lands this on the same 26 the usage card
+                // gets from its own xl padding. Added here rather than by moving the card
+                // to xl: that would widen the sides too, and the app row deliberately
+                // cancels the horizontal padding to bleed to the card's edges.
                 LocktySectionTitle(headingTitle, onOpen: onOpenSection)
+                    .padding(.top, LocktySpacing.sm)
 
                 if visibleGroups.isEmpty {
                     routineRow(
@@ -122,7 +132,7 @@ struct ActiveModeCard: View {
             HStack(spacing: LocktySpacing.lg) {
                 ForEach(visibleGroups) { group in
                     ForEach(group.tokens, id: \.self) { token in
-                        badge(for: token)
+                        badge(for: token, in: group)
                     }
 
                     if group.id != visibleGroups.last?.id {
@@ -143,7 +153,7 @@ struct ActiveModeCard: View {
 
     /// One app behind a lock. Tapping it opens the unlock flow, or, when an allowance has
     /// already let it out, what is left of that allowance.
-    private func badge(for token: ApplicationToken) -> some View {
+    private func badge(for token: ApplicationToken, in group: TodayActiveRoutineGroup) -> some View {
         let released = releasedIDs.contains(AppIdentity.ID(token: token))
 
         return Button {
@@ -160,7 +170,7 @@ struct ActiveModeCard: View {
                 // An app already out is out however the break policy stands: the
                 // allowance running is the answer, not the cooldown that will apply to
                 // the next request.
-                availability: released ? .unlockable : badgeAvailability,
+                availability: released ? .unlockable : badgeAvailability(for: group),
                 caption: released ? .remainingTime : .action("Desbloquear")
             )
         }

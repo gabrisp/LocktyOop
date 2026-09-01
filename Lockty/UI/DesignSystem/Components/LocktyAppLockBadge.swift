@@ -127,9 +127,13 @@ struct LocktyAppLockBadge: View {
                     .lineLimit(1)
 
             case .exhausted:
-                // Nothing under the badge: there is no time to wait out, so a clock here
-                // would be counting down to something that never arrives.
-                EmptyView()
+                // No clock, because there is no moment to count down to -- but the badge
+                // still has to say why it will not open. A silent red ring left the app
+                // looking merely unlit rather than shut for the day.
+                Text("Bloqueado")
+                    .font(.system(.caption, design: .default, weight: .medium))
+                    .foregroundStyle(LocktyColors.error)
+                    .lineLimit(1)
             }
 
         case .remainingTime:

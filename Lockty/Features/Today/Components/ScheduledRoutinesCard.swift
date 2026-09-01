@@ -31,7 +31,12 @@ struct ScheduledRoutinesCard: View {
     var body: some View {
         CardView(radius: radius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                // Eight more at the top, which lands this on the same 26 the usage card
+                // gets from its own xl padding. Added here rather than by moving the card
+                // to xl: that would widen the sides too, and the app row deliberately
+                // cancels the horizontal padding to bleed to the card's edges.
                 LocktySectionTitle("Programadas", onOpen: onOpenSection)
+                    .padding(.top, LocktySpacing.sm)
 
                 VStack(spacing: 0) {
                     ForEach(visible) { routine in

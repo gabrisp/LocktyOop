@@ -321,7 +321,7 @@ struct TodayView: View {
                 if let pendingUnlock = router.pendingUnlock {
                     UnlockRequestCard(
                         context: pendingUnlock,
-                        availability: viewModel.badgeAvailability
+                        availability: viewModel.badgeAvailability(forApp: pendingUnlock.appID)
                     ) {
                         Task { @MainActor in
                             openUnlockFlow(
@@ -348,7 +348,6 @@ struct TodayView: View {
                         groups: viewModel.activeRoutineGroups,
                         activeRoutine: viewModel.activeRoutine,
                         allowance: viewModel.activePauseAllowance,
-                        breakAvailability: viewModel.breakAvailability,
                         onUnlock: { token in
                             openUnlockFlow(for: token, context: nil)
                         },

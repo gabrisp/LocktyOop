@@ -655,6 +655,8 @@ struct RoutineEditorView: View {
     @State private var pauseFlowEditor: PauseFlowEditorViewModel?
     /// Raised by any attempt to leave with unsaved edits.
     @State private var isConfirmingDiscard = false
+    /// Raised by the back chevron when the form has unsaved edits.
+    @State private var isConfirmingReturn = false
     @FocusState private var isNameFieldFocused: Bool
     @State private var isGoingBack = false
 
@@ -763,6 +765,14 @@ struct RoutineEditorView: View {
             // rather than a sheet that silently refuses to move.
             onAttempt: requestClose
         )
+        .confirmationDialog(
+            "¿Descartar los cambios?",
+            isPresented: $isConfirmingReturn,
+            titleVisibility: .visible
+        ) {
+            Button("Descartar", role: .destructive) { returnToReading() }
+            Button("Seguir editando", role: .cancel) {}
+        }
         .confirmationDialog(
             "¿Descartar los cambios?",
             isPresented: $isConfirmingDiscard,
@@ -953,11 +963,36 @@ struct RoutineEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if isEditing && !isCreating {
+            // Editing an existing routine is a step *into* its preview, so the way out is
+            // back to it. An X here offered to leave the sheet entirely, which is not
+            // what going back from a form means.
+            LocktyDynamicSheetBarButton(action: requestReturnToReading) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else {
             LocktyDynamicSheetBarButton(action: requestClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .medium))
             }
+        }
+    }
+
+    /// Back to the preview, asking first when there is something to lose.
+    private func requestReturnToReading() {
+        guard viewModel.hasChanges else {
+            returnToReading()
+            return
+        }
+        isConfirmingReturn = true
+    }
+
+    private func returnToReading() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) {
+            isEditing = false
+            isNaming = false
         }
     }
 
@@ -1088,13 +1123,15 @@ struct RoutineEditorView: View {
     private func enterEditingFlow() {
         isGoingBack = false
         withAnimation(sheetAnimation) {
-            isEditing = true
-            // Straight to the form when the routine already exists. The pencil on the
-            // preview means "edit this mode", and landing on the name screen answered a
-            // question nobody asked -- the routine is already named, and its name is the
-            // heading you just pressed the pencil beside. Creating one still starts
-            // there, because then it genuinely has no name yet.
-            isNaming = isCreating
+            // The pencil means different things on the two screens, because there are
+            // two different things to edit. From the preview it opens the form: the
+            // routine is already named, and its name is the heading the pencil sits
+            // beside. From the form there is nothing left to open but the name.
+            if isEditing || isCreating {
+                isNaming = true
+            } else {
+                isEditing = true
+            }
         }
     }
 
@@ -2009,7 +2046,11 @@ struct RoutineEditorView: View {
                 strictRow
 
                 LocktyHoldButton(
-                    title: isCreating ? "Mantén para confirmar" : "Mantén para guardar"
+                    title: isCreating ? "Mantén para confirmar" : "Mantén para guardar",
+                    // The routine's own colour, not green. Green would say the same thing
+                    // on every routine, and red is reserved for the one button that undoes
+                    // something -- finishing a running routine.
+                    tint: LocktyColors.routine(viewModel.color)
                 ) {
                     Task {
                         if await viewModel.save() {
@@ -2029,6 +2070,26 @@ struct RoutineEditorView: View {
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
+        // The same bloom the preview has. Editing is not a different place, it is the
+        // same routine with its fields open, and dropping the colour on the way in made
+        // it feel like one.
+        .background(alignment: .top) { routineBloom }
+    }
+
+    /// The routine's colour, behind whichever screen is showing.
+    ///
+    /// One definition for the preview and the form both. It is the one thing on either
+    /// screen that is purely this routine's -- everything else is a fact or a field --
+    /// and it is what makes two routines feel unlike each other at a glance.
+    private var routineBloom: some View {
+        Ellipse()
+            .fill(LocktyColors.routine(viewModel.color))
+            .frame(height: 260)
+            .blur(radius: 90)
+            .opacity(0.26)
+            .offset(y: -60)
+            .allowsHitTesting(false)
+            .animation(.smooth(duration: 0.4), value: viewModel.color)
     }
 
     private var readOnlyContent: some View {
@@ -2039,8 +2100,7 @@ struct RoutineEditorView: View {
                 viewModel: viewModel,
                 applicationTokens: previewTokens,
                 activeSince: activeRoutineStartedAt,
-                nextStart: viewModel.nextScheduledStart,
-                onOpenApps: { openChildSheet(.apps) }
+                nextStart: viewModel.nextScheduledStart
             )
 
             // Start it, or end it if it is the one running. While a different routine
@@ -2080,6 +2140,7 @@ struct RoutineEditorView: View {
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
+        .background(alignment: .top) { routineBloom }
     }
 
     /// The apps the routine holds, for the preview's stack.

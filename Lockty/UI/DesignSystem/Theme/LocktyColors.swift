@@ -8,8 +8,37 @@ private func adaptive(light: UIColor, dark: UIColor) -> Color {
 }
 
 enum LocktyColors {
-    /// Global app background. Lockty currently runs in dark appearance only.
-    static let background = Color.black
+    /// Global app background.
+    ///
+    /// Not white in light mode. Every surface in Lockty is a wash of the foreground over
+    /// this, so on pure white the cards would have to be grey to be visible at all, and
+    /// the screen would read as a stack of grey boxes on paper. A soft grey lets the
+    /// cards be lighter than the page, the way they are darker than it in the dark.
+    static let background = adaptive(
+        light: UIColor(red: 0.945, green: 0.945, blue: 0.955, alpha: 1),
+        dark: .black
+    )
+
+    /// A wash of the foreground over the background, whichever way round that is.
+    ///
+    /// Every card fill, hairline and scrim in the app was written as white at some
+    /// opacity, which is only half a decision: it says "a little of the foreground" but
+    /// spells it as a colour, so in light mode all of it disappeared. This says the
+    /// intent instead.
+    ///
+    /// Light mode gets rather less of it. Black on a light ground reads far stronger than
+    /// white on a dark one at the same alpha, so matching the numbers would make every
+    /// hairline look drawn on with a pen.
+    static func ink(_ opacity: Double) -> Color {
+        adaptive(
+            light: UIColor.black.withAlphaComponent(opacity * 0.62),
+            dark: UIColor.white.withAlphaComponent(opacity)
+        )
+    }
+
+    /// The colour to draw *on* a filled `primaryText` shape -- the label inside a
+    /// selected pill, the glyph inside a stepper button.
+    static let onPrimary = adaptive(light: .white, dark: .black)
     static let elevatedBackground = adaptive(
         light: UIColor.black.withAlphaComponent(0.06),
         dark: UIColor.white.withAlphaComponent(0.08)

@@ -39,7 +39,7 @@ struct HoldDownButton: View {
             .padding(.horizontal, isProminent ? 0 : paddingHorizontal)
             .background {
                 if isProminent {
-                    Capsule().fill(.white)
+                    Capsule().fill(LocktyColors.primaryText)
                 }
             }
             .background {

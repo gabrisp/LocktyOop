@@ -17,7 +17,7 @@ extension View {
 }
 
 struct LocktyScreenBackground: View {
-    private let auraColor = Color.white.opacity(0.03)
+    private let auraColor = LocktyColors.ink(0.03)
 
     var body: some View {
         GeometryReader { proxy in

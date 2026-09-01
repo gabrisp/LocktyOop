@@ -55,11 +55,11 @@ struct LocktyCountRow: View {
     ) -> some View {
         Button(action: action) {
             ZStack {
-                Circle().fill(Color.white)
+                Circle().fill(LocktyColors.primaryText)
 
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(LocktyColors.onPrimary)
             }
             .frame(width: 32, height: 32)
             .contentShape(Circle())

@@ -132,7 +132,7 @@ struct SettingsView: View {
             .padding(.vertical, LocktySpacing.md)
             .background(
                 RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.055))
+                    .fill(LocktyColors.ink(0.055))
             )
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
@@ -157,7 +157,7 @@ struct SettingsView: View {
         .padding(.vertical, LocktySpacing.md)
         .background(
             RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                .fill(Color.white.opacity(0.055))
+                .fill(LocktyColors.ink(0.055))
         )
     }
 }

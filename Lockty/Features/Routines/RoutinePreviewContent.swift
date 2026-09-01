@@ -132,7 +132,7 @@ struct RoutinePreviewContent: View {
         .padding(.horizontal, LocktySpacing.md)
         .background(
             RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .fill(Color.white.opacity(0.055))
+                .fill(LocktyColors.ink(0.055))
         )
         .locktyImperfectBorder(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }

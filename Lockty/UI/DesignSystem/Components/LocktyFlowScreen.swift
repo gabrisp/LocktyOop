@@ -130,10 +130,10 @@ struct LocktyFlowScreen<Content: View>: View {
                     .transition(.blurReplace.combined(with: .opacity))
                     .id(isResting ? "rest" : primaryTitle)
                     .animation(.snappy(duration: 0.25), value: remainingRest)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(LocktyColors.onPrimary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
-                    .background(Capsule(style: .continuous).fill(isResting ? .white.opacity(0.55) : .white))
+                    .background(Capsule(style: .continuous).fill(isResting ? LocktyColors.ink(0.55) : .white))
                     .clipShape(Capsule(style: .continuous))
             }
             .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))

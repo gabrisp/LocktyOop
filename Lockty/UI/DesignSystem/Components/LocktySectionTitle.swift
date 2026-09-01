@@ -120,13 +120,13 @@ struct LocktySectionTitle: View {
                     // rather than pinning a point size to take 2pt off.
                     Text(title)
                         .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.72))
+                        .foregroundStyle(LocktyColors.ink(0.72))
                         .lineLimit(1)
 
                     if onOpen != nil || showsChevron {
                         Image(systemName: "chevron.right")
                             .font(.system(.footnote, design: .default, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.58))
+                            .foregroundStyle(LocktyColors.ink(0.58))
                     }
 
                     inlineAccessory

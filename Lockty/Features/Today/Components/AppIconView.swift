@@ -109,7 +109,7 @@ private struct AppIconChromeModifier: ViewModifier {
             content
                 .clipShape(shape)
                 .overlay {
-                    shape.stroke(.white.opacity(0.10), lineWidth: 0.5)
+                    shape.stroke(LocktyColors.ink(0.10), lineWidth: 0.5)
                 }
         }
     }

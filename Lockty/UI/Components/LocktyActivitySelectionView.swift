@@ -225,10 +225,10 @@ struct LocktyActivitySelectionView: View {
         } label: {
             HStack(spacing: LocktySpacing.lg) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(LocktyColors.ink(0.06))
                     .overlay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.08), lineWidth: 1)
+                            .stroke(LocktyColors.ink(0.08), lineWidth: 1)
                     }
                     .frame(width: 52, height: 52)
                     .overlay {
@@ -278,7 +278,7 @@ struct LocktyActivitySelectionView: View {
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(width: 38, height: 38)
-                    .background(Circle().fill(Color.white.opacity(0.09)))
+                    .background(Circle().fill(LocktyColors.ink(0.09)))
             }
             .buttonStyle(.locktyInteractive(shape: Circle()))
         }
@@ -697,9 +697,9 @@ private struct LocktyOfficialActivityPickerSheet: View {
                             .frame(height: 58)
                             .background(
                                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                    .fill(canSave ? Color.white.opacity(0.55) : Color.white.opacity(0.16))
+                                    .fill(canSave ? LocktyColors.ink(0.55) : LocktyColors.ink(0.16))
                             )
-                            .foregroundStyle(canSave ? .black.opacity(0.72) : .white.opacity(0.28))
+                            .foregroundStyle(canSave ? .black.opacity(0.72) : LocktyColors.ink(0.28))
                     }
                     .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
                     .disabled(!canSave)
@@ -744,7 +744,7 @@ struct LocktyCenteredFeedbackOverlay: View {
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 38, height: 38)
-                    .background(Circle().fill(.white.opacity(0.09)))
+                    .background(Circle().fill(LocktyColors.ink(0.09)))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(state.title)
@@ -753,7 +753,7 @@ struct LocktyCenteredFeedbackOverlay: View {
 
                     Text(state.subtitle)
                         .font(.system(.footnote, design: .default, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(LocktyColors.ink(0.82))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -765,7 +765,7 @@ struct LocktyCenteredFeedbackOverlay: View {
             .safeGlass(radius: 22, tint: state.tint)
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(.white.opacity(0.10), lineWidth: 1)
+                    .stroke(LocktyColors.ink(0.10), lineWidth: 1)
             }
             .shadow(color: state.tint.opacity(0.38), radius: 24, y: 10)
 

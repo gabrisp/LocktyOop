@@ -690,7 +690,7 @@ struct FrictionEditorView: View {
         .padding(.vertical, LocktySpacing.lg)
         .background(
             RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                .fill(Color.white.opacity(0.055))
+                .fill(LocktyColors.ink(0.055))
         )
         .contentShape(RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous))
         .onTapGesture { isShowingBreatheMenu = true }
@@ -720,7 +720,7 @@ struct FrictionEditorView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.055))
+                        .fill(LocktyColors.ink(0.055))
                 )
 
                 Button(role: .destructive) {
@@ -740,7 +740,7 @@ struct FrictionEditorView: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.055))
+                            .fill(LocktyColors.ink(0.055))
                     )
                 }
                 .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)))
@@ -809,7 +809,7 @@ struct FrictionEditorView: View {
                     .padding(LocktySpacing.lg)
                     .background(
                         RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.055))
+                            .fill(LocktyColors.ink(0.055))
                     )
             } else {
                 ForEach(Array(viewModel.draft.steps.enumerated()), id: \.element.id) { index, step in
@@ -851,7 +851,7 @@ struct FrictionEditorView: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.055))
+                    .fill(LocktyColors.ink(0.055))
             )
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)))
@@ -1189,7 +1189,7 @@ private struct FrictionStepSettings: View {
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: LocktyRadius.medium, style: .continuous)
-                                .fill(configuration.allowedOperators.contains(operation) ? Color.white : LocktyColors.elevatedBackground)
+                                .fill(configuration.allowedOperators.contains(operation) ? LocktyColors.primaryText : LocktyColors.elevatedBackground)
                         )
                 }
                 .buttonStyle(.plain)

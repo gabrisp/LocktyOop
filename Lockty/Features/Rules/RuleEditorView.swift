@@ -400,7 +400,7 @@ struct RuleEditorView: View {
     }
 
     private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
-    private var cardFill: Color { Color.white.opacity(0.055) }
+    private var cardFill: Color { LocktyColors.ink(0.055) }
     private var cardRadius: CGFloat { 22 }
 
     private var chromeID: String {
@@ -955,7 +955,7 @@ struct RuleEditorView: View {
 
     private var dividerInset: some View {
         Divider()
-            .overlay(Color.white.opacity(0.10))
+            .overlay(LocktyColors.ink(0.10))
             .padding(.leading, 16)
     }
 
@@ -1050,9 +1050,9 @@ struct RuleEditorView: View {
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(LocktyColors.onPrimary)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.white))
+                    .background(Circle().fill(LocktyColors.primaryText))
                     .contentShape(Circle())
             }
             .buttonStyle(.locktyInteractive(shape: Circle()))
@@ -1076,9 +1076,9 @@ struct RuleEditorView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(LocktyColors.onPrimary)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.white))
+                    .background(Circle().fill(LocktyColors.primaryText))
                     .contentShape(Circle())
             }
             .buttonStyle(.locktyInteractive(shape: Circle()))
@@ -1195,7 +1195,7 @@ struct RuleEditorView: View {
                 .frame(height: 36)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isSelected ? Color.white : Color.white.opacity(0.06))
+                        .fill(isSelected ? LocktyColors.primaryText : LocktyColors.ink(0.06))
                 }
         }
         .buttonStyle(.plain)

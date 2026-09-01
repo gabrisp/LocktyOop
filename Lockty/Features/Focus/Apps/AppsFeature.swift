@@ -696,7 +696,7 @@ struct AddAppFolderCard: View {
     var body: some View {
         VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.045))
+                .fill(LocktyColors.ink(0.045))
                 .frame(width: folderSide, height: folderSide)
                 .overlay {
                     Image(systemName: "plus")
@@ -732,7 +732,7 @@ struct AppFolderCard: View {
     var body: some View {
         VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.045))
+                .fill(LocktyColors.ink(0.045))
                 .frame(width: folderSide, height: folderSide)
                 .overlay {
                     folderGrid
@@ -831,7 +831,7 @@ struct AppFolderCard: View {
     private func placeholderDot(stencil: ApplicationToken?) -> some View {
         if stencil == nil {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.035))
+                .fill(LocktyColors.ink(0.035))
                 .frame(height: 38)
         } else {
             // Not run through `slot`: that scales by 1.58 because the real icons are
@@ -839,7 +839,7 @@ struct AppFolderCard: View {
             // no such inset, so the same scale made it burst out of the grid.
             LocktyTokenPlaceholder(
                 stencil: stencil,
-                fill: Color.white.opacity(0.035)
+                fill: LocktyColors.ink(0.035)
             )
             .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
         }
@@ -894,7 +894,7 @@ struct AlwaysAllowedGroupView: View {
                     .padding(.vertical, LocktySpacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white.opacity(0.055))
+                            .fill(LocktyColors.ink(0.055))
                     )
                 }
                 .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)))

@@ -49,7 +49,7 @@ struct AppUsageListCard: View {
                         .padding(.top, LocktySpacing.xl)
                     } else {
                         Divider()
-                            .overlay(Color.white.opacity(0.12))
+                            .overlay(LocktyColors.ink(0.12))
                             .padding(.top, 18)
                             .padding(.bottom, 26)
 
@@ -113,7 +113,7 @@ struct AppUsageListCard: View {
 
 //            Text("Today")
 //                .font(.system(.callout, design: .default, weight: .regular))
-//                .foregroundStyle(Color.white.opacity(0.56))
+//                .foregroundStyle(LocktyColors.ink(0.56))
 //                .padding(.top, 18)
         }
     }

@@ -470,7 +470,7 @@ struct UnlockWordSearchStepView: View {
         if feedbackTone == .success {
             return LocktyColors.productive.opacity(0.3)
         }
-        return .white.opacity(0.3)
+        return LocktyColors.ink(0.3)
     }
 
     private var activePathGlow: Color {
@@ -480,7 +480,7 @@ struct UnlockWordSearchStepView: View {
         if feedbackTone == .success {
             return LocktyColors.productive.opacity(0.18)
         }
-        return .white.opacity(0.08)
+        return LocktyColors.ink(0.08)
     }
 }
 
@@ -595,7 +595,7 @@ struct UnlockLetterMatchStepView: View {
 
                             Text(endpoint.0.letter)
                                 .font(.system(.headline, design: .rounded, weight: .bold))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(LocktyColors.onPrimary)
                         }
                     }
                     .frame(width: cellSize - 6, height: cellSize - 6)
@@ -855,7 +855,7 @@ struct UnlockOperationsStepView: View {
                 operationsList
 
                 Rectangle()
-                    .fill(.white.opacity(0.08))
+                    .fill(LocktyColors.ink(0.08))
                     .frame(height: 1)
                     .padding(.top, 2)
                     .padding(.bottom, 2)
@@ -1402,7 +1402,7 @@ struct UnlockPersonalVideoStepView: View {
                 )
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        .stroke(LocktyColors.ink(0.18), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

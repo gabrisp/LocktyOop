@@ -1162,7 +1162,7 @@ struct RoutineEditorView: View {
         isNameFieldFocused = false
     }
 
-    private var cardFill: Color { Color.white.opacity(0.055) }
+    private var cardFill: Color { LocktyColors.ink(0.055) }
     private var cardRadius: CGFloat { 22 }
 
     /// The two times in one card, joined down the left by the dotted run between them.
@@ -1181,7 +1181,7 @@ struct RoutineEditorView: View {
             }
 
             Divider()
-                .overlay(Color.white.opacity(0.10))
+                .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 44)
 
             timeRow(
@@ -1201,7 +1201,7 @@ struct RoutineEditorView: View {
             // The run between the two marks, drawn once across both rows rather than
             // half in each, so it lines up whatever the rows end up measuring.
             Rectangle()
-                .fill(Color.white.opacity(0.35))
+                .fill(LocktyColors.ink(0.35))
                 .frame(width: 1)
                 .padding(.leading, 21)
                 .padding(.top, 26)
@@ -1221,7 +1221,7 @@ struct RoutineEditorView: View {
             )
 
             Divider()
-                .overlay(Color.white.opacity(0.10))
+                .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 44)
 
             readOnlyTimeRow(
@@ -1236,7 +1236,7 @@ struct RoutineEditorView: View {
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
         .overlay(alignment: .topLeading) {
             Rectangle()
-                .fill(Color.white.opacity(0.35))
+                .fill(LocktyColors.ink(0.35))
                 .frame(width: 1)
                 .padding(.leading, 21)
                 .padding(.top, 26)
@@ -1253,10 +1253,10 @@ struct RoutineEditorView: View {
     ) -> some View {
         HStack(spacing: 0) {
             Circle()
-                .fill(isStart ? Color.white.opacity(0.75) : .clear)
+                .fill(isStart ? LocktyColors.ink(0.75) : .clear)
                 .overlay {
                     if !isStart {
-                        Circle().stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                        Circle().stroke(LocktyColors.ink(0.55), lineWidth: 1.5)
                     }
                 }
                 .frame(width: 9, height: 9)
@@ -1281,10 +1281,10 @@ struct RoutineEditorView: View {
     ) -> some View {
         HStack(spacing: 0) {
             Circle()
-                .fill(isStart ? Color.white.opacity(0.75) : .clear)
+                .fill(isStart ? LocktyColors.ink(0.75) : .clear)
                 .overlay {
                     if !isStart {
-                        Circle().stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                        Circle().stroke(LocktyColors.ink(0.55), lineWidth: 1.5)
                     }
                 }
                 .frame(width: 9, height: 9)
@@ -1343,7 +1343,7 @@ struct RoutineEditorView: View {
                                 if isOn {
                                     Circle().fill(.white)
                                 } else {
-                                    Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                    Circle().stroke(LocktyColors.ink(0.18), lineWidth: 1)
                                 }
                             }
                     }
@@ -1698,7 +1698,7 @@ struct RoutineEditorView: View {
                             .frame(width: 38, height: 38)
                             .overlay {
                                 Circle()
-                                    .stroke(Color.white.opacity(viewModel.color == routineColor ? 0.95 : 0.2), lineWidth: viewModel.color == routineColor ? 2 : 1)
+                                    .stroke(LocktyColors.primaryText.opacity(viewModel.color == routineColor ? 0.95 : 0.2), lineWidth: viewModel.color == routineColor ? 2 : 1)
                             }
                     }
                     .buttonStyle(.locktyInteractive(shape: Circle()))
@@ -1766,7 +1766,7 @@ struct RoutineEditorView: View {
             )
 
             Divider()
-                .overlay(Color.white.opacity(0.10))
+                .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 16)
 
             breakStepperRow(
@@ -1779,7 +1779,7 @@ struct RoutineEditorView: View {
             )
 
             Divider()
-                .overlay(Color.white.opacity(0.10))
+                .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 16)
 
             breakStepperRow(
@@ -1838,7 +1838,7 @@ struct RoutineEditorView: View {
 
                     if index < viewModel.pauseFlows.count - 1 {
                         Divider()
-                            .overlay(Color.white.opacity(0.10))
+                            .overlay(LocktyColors.ink(0.10))
                             .padding(.leading, 16)
                     }
                 }
@@ -1923,11 +1923,11 @@ struct RoutineEditorView: View {
             Button(action: onDecrement) {
                 ZStack {
                     Circle()
-                        .fill(Color.white)
+                        .fill(LocktyColors.primaryText)
 
                     Image(systemName: "minus")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(LocktyColors.onPrimary)
                 }
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
@@ -1948,11 +1948,11 @@ struct RoutineEditorView: View {
             Button(action: onIncrement) {
                 ZStack {
                     Circle()
-                        .fill(Color.white)
+                        .fill(LocktyColors.primaryText)
 
                     Image(systemName: "plus")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(LocktyColors.onPrimary)
                 }
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
@@ -2193,7 +2193,7 @@ struct RoutineEditorView: View {
                             if isOn {
                                 Circle().fill(.white)
                             } else {
-                                Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                Circle().stroke(LocktyColors.ink(0.18), lineWidth: 1)
                             }
                         }
                 }
@@ -2508,7 +2508,7 @@ private struct RoutineColorPickerPopover: View {
                         .overlay {
                             Circle()
                                 .stroke(
-                                    Color.white.opacity(selectedColor == routineColor ? 0.9 : 0.22),
+                                    LocktyColors.primaryText.opacity(selectedColor == routineColor ? 0.9 : 0.22),
                                     lineWidth: selectedColor == routineColor ? 2 : 1
                                 )
                         }

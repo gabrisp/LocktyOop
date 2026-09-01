@@ -21,7 +21,7 @@ struct LocktySwitch: View {
         .padding(3)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.white.opacity(0.07))
+                .fill(LocktyColors.ink(0.07))
         )
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.48 : 1)
@@ -36,7 +36,7 @@ struct LocktySwitch: View {
         Button(action: action) {
             Text(title)
                 .font(.system(.footnote, design: .default, weight: .semibold))
-                .foregroundStyle(isSelected ? Color.black : LocktyColors.secondaryText)
+                .foregroundStyle(isSelected ? LocktyColors.onPrimary : LocktyColors.secondaryText)
                 .padding(.horizontal, LocktySpacing.md)
                 .padding(.vertical, 6)
                 .background {
@@ -45,7 +45,7 @@ struct LocktySwitch: View {
                         // in as the other fades out -- the selection slides, which is
                         // what says the two are the same choice.
                         Capsule(style: .continuous)
-                            .fill(Color.white)
+                            .fill(LocktyColors.primaryText)
                             .matchedGeometryEffect(id: "lockty.switch", in: selection)
                     }
                 }

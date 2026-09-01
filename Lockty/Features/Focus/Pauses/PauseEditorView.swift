@@ -482,7 +482,12 @@ struct PauseEditorView: View {
             }
             }
         }
-        .interactiveDismissDisabled(isEditing && !isCreating)
+        .locktyInteractiveDismiss(
+            blocked: isEditing && !isCreating,
+            // No discard dialog on this one, so the swipe simply does what it asked for
+            // instead of rubber-banding back with no explanation.
+            onAttempt: close
+        )
         .task {
             await viewModel.load()
         }

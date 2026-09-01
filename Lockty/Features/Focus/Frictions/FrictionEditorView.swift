@@ -377,7 +377,10 @@ struct FrictionEditorView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(viewModel.hasChanges && activeSheet == nil)
+        .locktyInteractiveDismiss(
+            blocked: viewModel.hasChanges && activeSheet == nil,
+            onAttempt: requestClose
+        )
         .task {
             await viewModel.load()
         }

@@ -59,6 +59,9 @@ struct LocktySelectableAppGroup: Identifiable, Hashable {
     let id: UUID
     let name: String
     let itemCount: Int
+    /// The apps inside it, so the group can be drawn as the folder it is everywhere else
+    /// rather than as a row of text.
+    var tokens: [ApplicationToken] = []
 }
 
 private enum LocktyActivitySelectionViolation: Hashable {
@@ -333,8 +336,54 @@ struct LocktyActivitySelectionView: View {
                 .font(.system(.headline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
 
+            // The suggested apps, as tokens you can add with one tap, outside Apple's
+            // picker entirely. This is the fast path -- the picker below is for anything
+            // not on the list -- and the section had been left as a heading over a button
+            // with the row itself gone.
+            if !visibleSuggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: LocktySpacing.lg) {
+                        ForEach(visibleSuggestions, id: \.id) { suggestion in
+                            if let token = suggestion.applicationToken {
+                                Button {
+                                    addSuggestedApp(token)
+                                } label: {
+                                    ZStack {
+                                        AppIconView(
+                                            source: suggestion.iconSource,
+                                            applicationToken: token,
+                                            fallbackSystemImage: suggestion.iconSystemName,
+                                            size: 72,
+                                            chrome: .plain
+                                        )
+                                        .matchedGeometryEffect(
+                                            id: "app-\(token.hashValue)",
+                                            in: selectionNamespace
+                                        )
+
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 25, weight: .medium))
+                                            .foregroundStyle(.white)
+                                            .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
+                                    }
+                                    .frame(width: 84, height: 84)
+                                }
+                                .buttonStyle(.locktyInteractive(brighten: true))
+                                .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, LocktySpacing.xs)
+                    .padding(.vertical, 2)
+                }
+                // The icons are drawn a little outside their own frames, so a scroll view
+                // clipping to its bounds was shaving their edges.
+                .scrollClipDisabled()
+            }
+
             addButton
         }
+        .animation(.smooth(duration: 0.28), value: visibleSuggestions.map(\.id))
     }
 
     private var appGroupsSection: some View {
@@ -343,37 +392,33 @@ struct LocktyActivitySelectionView: View {
                 .font(.system(.headline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
 
-            VStack(spacing: 0) {
+            // The same folders they are on the Focus tab, in a grid. A group is a
+            // picture of the apps inside it, and a list of names with a checkbox on the
+            // end threw all of that away and looked like a settings screen.
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: LocktySpacing.md),
+                    GridItem(.flexible(), spacing: LocktySpacing.md)
+                ],
+                spacing: LocktySpacing.lg
+            ) {
                 ForEach(appGroups) { group in
+                    let isSelected = selectedAppGroupIDs.wrappedValue.contains(group.id)
+
                     Button {
                         toggleAppGroup(group.id)
                     } label: {
-                        HStack(spacing: LocktySpacing.md) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(group.name)
-                                    .font(.system(.body, design: .default, weight: .regular))
-                                    .foregroundStyle(LocktyColors.primaryText)
-
-                                Text(group.itemCount == 1 ? "1 elemento" : "\(group.itemCount) elementos")
-                                    .font(.system(.footnote, design: .default, weight: .regular))
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                            }
-
-                            Spacer(minLength: 0)
-
-                            Image(systemName: selectedAppGroupIDs.wrappedValue.contains(group.id) ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 18, weight: .regular))
-                                .foregroundStyle(selectedAppGroupIDs.wrappedValue.contains(group.id) ? LocktyColors.productive : LocktyColors.secondaryText)
-                        }
-                        .padding(.vertical, 12)
-                        .contentShape(Rectangle())
+                        AppFolderCard(
+                            title: group.name,
+                            subtitle: group.itemCount == 1 ? "1 elemento" : "\(group.itemCount) elementos",
+                            tokens: group.tokens,
+                            // Selected is a border and nothing else -- no tick laid over
+                            // the folder, which would cover the very apps it is showing.
+                            isSelected: isSelected
+                        )
                     }
-                    .buttonStyle(.plain)
-
-                    if group.id != appGroups.last?.id {
-                        Divider()
-                            .overlay(LocktyColors.separator.opacity(0.55))
-                    }
+                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
+                    .tappable()
                 }
             }
             .animation(.smooth(duration: 0.28), value: selectedAppGroupIDs.wrappedValue)

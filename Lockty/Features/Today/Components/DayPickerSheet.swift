@@ -8,7 +8,6 @@ import SwiftUI
 /// between months should be.
 struct DayPickerSheet: View {
     @Binding var selectedDay: Date
-    @Environment(\.dismiss) private var dismiss
 
     /// The month on screen. Separate from the selection, because paging through months
     /// to look around should not change which day is chosen.
@@ -43,37 +42,38 @@ struct DayPickerSheet: View {
                 weekdayHeader
 
                 // Clipped so a month sliding in from off-screen does not paint over the
-                // header and the button while it travels.
+                // header while it travels.
                 monthGrid
                     .frame(maxWidth: .infinity)
                     .clipped()
-
-                PrimaryButton("Cerrar", systemImage: "xmark") {
-                    dismiss()
-                }
             }
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.md)
-            .padding(.bottom, LocktySpacing.lg)
+            // No close button under the grid: picking a day is the answer, and the sheet
+            // is dismissed the way every other one is.
+            .padding(.vertical, 24)
         }
         .locktyDynamicSheetSizes([.fit])
     }
 
     // MARK: - Header
 
+    /// The month between its two arrows: back on the left, forward on the right, and the
+    /// name centred between them so it sits over the column of days it belongs to.
     private var monthHeader: some View {
         HStack(spacing: LocktySpacing.md) {
+            monthStepButton(systemImage: "chevron.left", offset: -1)
+
             Text(monthTitle)
                 .font(.system(.title3, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
                 // The name swaps rather than cross-fading in place, which would read as
                 // the same word flickering when only the month changes.
                 .contentTransition(.numericText())
                 .animation(.snappy(duration: 0.28), value: monthTitle)
+                .frame(maxWidth: .infinity)
 
-            Spacer(minLength: 0)
-
-            monthStepButton(systemImage: "chevron.left", offset: -1)
             monthStepButton(
                 systemImage: "chevron.right",
                 offset: 1,
@@ -159,9 +159,14 @@ struct DayPickerSheet: View {
                     .frame(width: 38, height: 38)
                     .background {
                         if isSelected {
+                            // The day being shown: a filled circle.
                             Circle().fill(LocktyColors.primaryText)
                         } else if isToday {
-                            Circle().stroke(LocktyColors.primaryText.opacity(0.35), lineWidth: 1)
+                            // Today, when it is not the day being shown: the same white,
+                            // but only as a ring. Filled versus outlined is what tells
+                            // the two apart at a glance -- it used to be drawn at 0.35
+                            // opacity, which read as no marker at all.
+                            Circle().stroke(LocktyColors.primaryText.opacity(0.9), lineWidth: 1.5)
                         }
                     }
                     .frame(maxWidth: .infinity)

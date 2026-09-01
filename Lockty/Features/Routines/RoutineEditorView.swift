@@ -333,7 +333,8 @@ final class RoutineEditorViewModel: ObservableObject {
             return LocktySelectableAppGroup(
                 id: definition.id,
                 name: definition.name,
-                itemCount: selection.applicationTokens.count + selection.categoryTokens.count
+                itemCount: selection.applicationTokens.count + selection.categoryTokens.count,
+                tokens: selection.applicationTokens.stablePrefix(selection.applicationTokens.count)
             )
         }
         let suggestedGroupIDs = Set(suggestedGroups.map(\.id))
@@ -342,7 +343,8 @@ final class RoutineEditorViewModel: ObservableObject {
             return LocktySelectableAppGroup(
                 id: group.id,
                 name: group.name,
-                itemCount: selection.applicationTokens.count
+                itemCount: selection.applicationTokens.count,
+                tokens: selection.applicationTokens.stablePrefix(selection.applicationTokens.count)
             )
         }
         let selectableGroups = suggestedGroups + userGroups
@@ -710,7 +712,12 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(viewModel.hasChanges && activeSheet == nil)
+        .locktyInteractiveDismiss(
+            blocked: viewModel.hasChanges && activeSheet == nil,
+            // Swiping down means the same thing the X does, so it gets the same answer
+            // rather than a sheet that silently refuses to move.
+            onAttempt: requestClose
+        )
         .confirmationDialog(
             "¿Descartar los cambios?",
             isPresented: $isConfirmingDiscard,

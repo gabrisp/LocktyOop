@@ -696,6 +696,9 @@ struct AppFolderCard: View {
     let title: String
     let subtitle: String
     let tokens: [ApplicationToken]
+    /// Drawn as a border around the folder. Used where folders are being picked rather
+    /// than opened.
+    var isSelected = false
 
     private let folderSide: CGFloat = 110
     private let iconScale: CGFloat = 1.58
@@ -709,6 +712,12 @@ struct AppFolderCard: View {
                     folderGrid
                         .padding(10)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .overlay {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(LocktyColors.primaryText, lineWidth: 2)
+                    }
                 }
 
             Text(title)

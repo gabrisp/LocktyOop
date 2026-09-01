@@ -975,6 +975,9 @@ struct RoutineEditorView: View {
                         .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
                 }
                 .buttonStyle(.locktyInteractive(shape: Circle()))
+                // The circle is 52pt but the glyph inside it is 18, so without a content
+                // shape the taps that count are only the ones landing on the glyph.
+                .tappable()
                 .locktyMenu(isPresented: $isShowingIconPicker) {
                     RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
                 }
@@ -992,6 +995,7 @@ struct RoutineEditorView: View {
                         .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
                 }
                 .buttonStyle(.locktyInteractive(shape: Circle()))
+                .tappable()
                 .locktyMenu(isPresented: $isShowingColorPicker) {
                     RoutineColorPickerPopover(selectedColor: $viewModel.color)
                 }

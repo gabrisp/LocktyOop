@@ -170,16 +170,26 @@ struct LocktyActivitySelectionView: View {
                         // now, which already carries the way back, and the selection is
                         // written straight through the binding -- there is nothing for a
                         // confirm button to confirm.
-                        suggestionsSection
+                        // Add, then what you have added, then the two shortcuts for
+                        // adding more. The way in comes first because on an empty
+                        // selection it is the only thing there is to do, and what is
+                        // already chosen comes before the suggestions so the list you are
+                        // building does not sit underneath the ways of adding to it.
+                        addButton
                             .padding(.top, LocktySpacing.sm)
-
-                        if !appGroups.isEmpty {
-                            appGroupsSection
-                                .transition(.blurReplace.combined(with: .opacity))
-                        }
 
                         if !selectedItems.isEmpty {
                             selectedItemsSection
+                                .transition(.blurReplace.combined(with: .opacity))
+                        }
+
+                        if !visibleSuggestions.isEmpty {
+                            suggestionsSection
+                                .transition(.blurReplace.combined(with: .opacity))
+                        }
+
+                        if !appGroups.isEmpty {
+                            appGroupsSection
                                 .transition(.blurReplace.combined(with: .opacity))
                         }
                     }
@@ -220,10 +230,10 @@ struct LocktyActivitySelectionView: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(.white.opacity(0.08), lineWidth: 1)
                     }
-                    .frame(width: 68, height: 68)
+                    .frame(width: 52, height: 52)
                     .overlay {
                         Image(systemName: "plus")
-                            .font(.system(size: 30, weight: .regular))
+                            .font(.system(size: 20, weight: .regular))
                             .foregroundStyle(LocktyColors.primaryText)
                     }
 
@@ -320,10 +330,9 @@ struct LocktyActivitySelectionView: View {
                 .foregroundStyle(LocktyColors.primaryText)
 
             // The suggested apps, as tokens you can add with one tap, outside Apple's
-            // picker entirely. This is the fast path -- the picker below is for anything
-            // not on the list -- and the section had been left as a heading over a button
-            // with the row itself gone.
-            if !visibleSuggestions.isEmpty {
+            // picker entirely. The fast path; the button at the top is for anything not
+            // on this list.
+            Group {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: LocktySpacing.lg) {
                         ForEach(visibleSuggestions, id: \.id) { suggestion in
@@ -363,8 +372,6 @@ struct LocktyActivitySelectionView: View {
                 // clipping to its bounds was shaving their edges.
                 .scrollClipDisabled()
             }
-
-            addButton
         }
         .animation(.smooth(duration: 0.28), value: visibleSuggestions.map(\.id))
     }

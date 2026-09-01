@@ -34,21 +34,46 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     /// to the running routine, so it covers everything that routine blocks.
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
         let runtime = try? AppGroupStore().loadRuntimeState()
-        let activeRoutine = runtime?.activeRoutine
+        let allActive = runtime?.activeRoutines ?? []
+
+        // The routines actually holding *this* app shut. With several running at once
+        // only the ones blocking it have any say over its shield; the others are
+        // blocking something else entirely.
+        let appID = application?.token.map(AppIdentity.ID.init(token:))
+        let blocking = appID.map { id in
+            allActive.filter { $0.shieldPolicy.blockedApplications.contains(id) }
+        } ?? []
+        let responsible = blocking.isEmpty ? allActive : blocking
+
         // Strict mode is the only thing that takes the unlock button away. It used to
         // hang on the routine's stored pause policy, so a routine saved without one
         // showed a shield whose only button closed the app -- and the standard
         // wait-then-confirm flow, which the action extension always falls back to, was
         // never reachable.
-        let offersUnlock = activeRoutine.map { routine in
+        //
+        // Every responsible routine has to allow it: one strict routine is enough to
+        // keep the app shut, and offering a button that cannot deliver would be a lie.
+        let offersUnlock = !responsible.isEmpty && responsible.allSatisfy { routine in
             routine.modeSnapshot != .strict || routine.allowsPauseDuringStrictMode
-        } ?? false
+        }
 
-        let subtitle = activeRoutine.map { routine in
-            offersUnlock
-                ? "\(routine.nameSnapshot) is running. Ask Lockty to unlock it, or close the app."
-                : "\(routine.nameSnapshot) is running."
-        } ?? "This app is locked."
+        let subtitle: String
+        switch responsible.count {
+        case 0:
+            subtitle = "This app is locked."
+        case 1:
+            let name = responsible[0].nameSnapshot
+            subtitle = offersUnlock
+                ? "\(name) is running. Ask Lockty to unlock it, or close the app."
+                : "\(name) is running."
+        default:
+            // Named rather than counted: knowing which routines are holding an app is
+            // what tells you whether to wait one out or go and end one.
+            let names = responsible.map(\.nameSnapshot).joined(separator: " and ")
+            subtitle = offersUnlock
+                ? "\(names) are running. Ask Lockty to unlock it, or close the app."
+                : "\(names) are running."
+        }
 
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,

@@ -62,8 +62,13 @@ struct AppGroupFrictionRepository: FrictionRepository {
     private func syncActiveRoutineSnapshotIfNeeded(routineIDs: Set<UUID>, flow: PauseFlow) throws {
         guard !routineIDs.isEmpty else { return }
         try appGroupStore.updateRuntimeState { state in
-            guard let activeRoutine = state.activeRoutine, routineIDs.contains(activeRoutine.routineID) else { return }
-            state.activeRoutine?.pausePolicySnapshot = flow.policy
+            // Every running routine that uses this flow, not just the first: editing a
+            // friction two overlapping routines share has to reach both of them, or one
+            // would go on running the version it snapshotted when it started.
+            for index in state.activeRoutines.indices
+            where routineIDs.contains(state.activeRoutines[index].routineID) {
+                state.activeRoutines[index].pausePolicySnapshot = flow.policy
+            }
         }
     }
 }

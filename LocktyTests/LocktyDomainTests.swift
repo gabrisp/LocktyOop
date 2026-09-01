@@ -274,6 +274,198 @@ struct LocktyDomainTests {
     }
 
     @Test
+    func shieldIsTheUnionOfEveryRunningRoutine() {
+        let deepWork = ActiveRoutine(
+            routineID: UUID(),
+            nameSnapshot: "Deep work",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["instagram", "reddit"],
+                blockedDomains: [],
+                reason: .routine(UUID())
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+        let evening = ActiveRoutine(
+            routineID: UUID(),
+            nameSnapshot: "Evening",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["reddit", "youtube"],
+                blockedDomains: [],
+                reason: .routine(UUID())
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+
+        let policy = ShieldPolicyResolver().resolve(
+            activeRoutines: [deepWork, evening],
+            activeBreaks: [],
+            activePauseAllowance: nil,
+            pauseRules: []
+        )
+
+        #expect(policy.blockedApplications == ["instagram", "reddit", "youtube"])
+    }
+
+    @Test
+    func endingOneRoutineLeavesWhatTheOtherStillBlocks() {
+        let deepWork = ActiveRoutine(
+            routineID: UUID(),
+            nameSnapshot: "Deep work",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["instagram", "reddit"],
+                blockedDomains: [],
+                reason: .routine(UUID())
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+        let evening = ActiveRoutine(
+            routineID: UUID(),
+            nameSnapshot: "Evening",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["reddit", "youtube"],
+                blockedDomains: [],
+                reason: .routine(UUID())
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+
+        // Deep work is over; only Evening is left.
+        let policy = ShieldPolicyResolver().resolve(
+            activeRoutines: [evening],
+            activeBreaks: [],
+            activePauseAllowance: nil,
+            pauseRules: []
+        )
+
+        _ = deepWork
+        // Instagram was only Deep work's, so it comes free. Reddit was both routines',
+        // and Evening never agreed to release it.
+        #expect(policy.blockedApplications.contains("instagram") == false)
+        #expect(policy.blockedApplications.contains("reddit"))
+    }
+
+    @Test
+    func aBreakLiftsOnlyItsOwnRoutine() {
+        let deepWorkID = UUID()
+        let deepWork = ActiveRoutine(
+            routineID: deepWorkID,
+            nameSnapshot: "Deep work",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["instagram", "reddit"],
+                blockedDomains: [],
+                reason: .routine(deepWorkID)
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+        let eveningID = UUID()
+        let evening = ActiveRoutine(
+            routineID: eveningID,
+            nameSnapshot: "Evening",
+            modeSnapshot: .normal,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: ShieldPolicy(
+                blockedApplications: ["reddit"],
+                blockedDomains: [],
+                reason: .routine(eveningID)
+            ),
+            breakPolicySnapshot: .none,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: false
+        )
+
+        let policy = ShieldPolicyResolver().resolve(
+            activeRoutines: [deepWork, evening],
+            activeBreaks: [
+                ActiveBreak(
+                    routineID: deepWorkID,
+                    startedAt: Date(),
+                    endsAt: Date().addingTimeInterval(600),
+                    trigger: .manual
+                )
+            ],
+            activePauseAllowance: nil,
+            pauseRules: []
+        )
+
+        // Deep work is on a break, so what only it blocked is free.
+        #expect(policy.blockedApplications.contains("instagram") == false)
+        // Reddit is not: Evening is still running and never granted anything.
+        #expect(policy.blockedApplications.contains("reddit"))
+    }
+
+    @Test
+    func runtimeStateDecodesAStateWrittenWhenOnlyOneRoutineCouldRun() throws {
+        let legacy = """
+        {
+          "activeRoutine": {
+            "id": "\(UUID().uuidString)",
+            "routineID": "\(UUID().uuidString)",
+            "nameSnapshot": "Deep work",
+            "modeSnapshot": "strict",
+            "startedAt": 0,
+            "trigger": { "manual": {} },
+            "shieldPolicy": {
+              "blockedApplications": ["instagram"],
+              "blockedDomains": [],
+              "reason": { "none": {} }
+            },
+            "breakPolicySnapshot": {
+              "maximumBreaks": 0,
+              "maximumDuration": 0,
+              "minimumInterval": 0,
+              "allowedTriggers": []
+            },
+            "taskCompletions": [],
+            "allowsPauseDuringStrictMode": false
+          },
+          "shieldPolicy": {
+            "blockedApplications": [],
+            "blockedDomains": [],
+            "reason": { "none": {} }
+          },
+          "pendingEvents": [],
+          "recoveryFlags": [],
+          "lastUpdatedAt": 0
+        }
+        """
+
+        let state = try JSONDecoder().decode(RuntimeState.self, from: Data(legacy.utf8))
+
+        // The single routine that was in flight when the app updated is carried over
+        // rather than thrown away, which would have left its shields up with nothing
+        // pointing at them.
+        #expect(state.activeRoutines.count == 1)
+        #expect(state.activeRoutines.first?.nameSnapshot == "Deep work")
+        #expect(state.activeBreaks.isEmpty)
+    }
+
+    @Test
     func strictModeAllowsManualStop() {
         let routine = Routine.mockDeepWork
         let activeRoutine = ActiveRoutine(

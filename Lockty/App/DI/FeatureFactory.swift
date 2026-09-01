@@ -224,11 +224,23 @@ struct FeatureFactory {
     }
 
     func makeUnlockFlow(token: ApplicationToken?) -> UnlockFlowView {
-        let activeRoutine = routineEngine.activeRoutine()
-        let blockedTokens: [ApplicationToken] = activeRoutine.map { routine in
+        // Everything every running routine is holding shut, not just the first one's.
+        // The flow's app picker offers what can be unlocked, and with two routines
+        // running it was offering half of it.
+        let running = routineEngine.activeRoutines
+        let blockedSelection = running.reduce(into: Set<ApplicationToken>()) { result, routine in
             let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?.applicationTokens ?? []
-            return selection.stablePrefix(selection.count)
-        } ?? []
+            result.formUnion(selection)
+        }
+        let blockedTokens = blockedSelection.stablePrefix(blockedSelection.count)
+
+        // The friction to walk is the one belonging to a routine that actually blocks the
+        // app being asked about. Falling back to whichever routine started first would
+        // put up a friction that has nothing to do with the app in hand.
+        let appID = token.map(AppIdentity.ID.init(token:))
+        let activeRoutine = appID
+            .flatMap { id in running.first { $0.shieldPolicy.blockedApplications.contains(id) } }
+            ?? routineEngine.activeRoutine()
 
         return UnlockFlowView(
             tokens: blockedTokens,
@@ -239,7 +251,22 @@ struct FeatureFactory {
             locationService: locationService
         ) { chosenToken, minutes, intention in
             Task { @MainActor in
-                if let activeRoutine {
+                // Checked against every routine holding the chosen app, not just one:
+                // all of them have to agree before it comes out.
+                if let chosenID = chosenToken.map(AppIdentity.ID.init(token:)) {
+                    switch await routineEngine.breakAvailability(
+                        forApp: chosenID,
+                        trigger: .manual,
+                        requiresFriction: true
+                    ) {
+                    case .available:
+                        break
+                    case .unavailable(let unavailable):
+                        router.dismissFullScreen()
+                        router.presentSheet(.breakStatus(unavailable))
+                        return
+                    }
+                } else if let activeRoutine {
                     switch await routineEngine.breakAvailability(
                         for: activeRoutine.routineID,
                         trigger: .manual,

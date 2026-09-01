@@ -102,14 +102,22 @@ final class ShieldActionExtension: ShieldActionDelegate {
     /// stands in for every case it cannot read a policy for.
     private func makeUnlockRequest(for token: ApplicationToken) -> PauseContext {
         let runtime = try? appGroupStore.loadRuntimeState()
-        let activeRoutine = runtime?.activeRoutine
+        let identity = AppIdentity(token: token)
+
+        // The routine to ask about this app is one that is actually blocking it. With
+        // several running, the first in the list may well be holding something else
+        // entirely, and its friction is not the one standing between you and this app.
+        let blocking = (runtime?.activeRoutines ?? []).filter {
+            $0.shieldPolicy.blockedApplications.contains(identity.id)
+        }
+        let activeRoutine = blocking.first ?? runtime?.primaryActiveRoutine
+
         let policy = activeRoutine
             .map(\.pausePolicySnapshot)
             .flatMap { $0.offersPause ? $0 : nil }
             ?? .standard
 
         let application = Application(token: token)
-        let identity = AppIdentity(token: token)
 
         // A limit rule sets the length of the pass it is handing out -- a session cap is
         // exactly "this many minutes at a time", and granting the routine's default

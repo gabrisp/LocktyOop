@@ -507,8 +507,13 @@ struct LiveTodayDataPipeline: TodayDataProviding {
 
     private func makeActiveRoutineChecklist(day: Date, runtimeState: RuntimeState?) -> ActiveRoutineChecklistState? {
         guard Calendar.current.isDateInToday(day) else { return nil }
-        guard let activeRoutine = runtimeState?.activeRoutine else { return nil }
-        guard !activeRoutine.taskCompletions.isEmpty else { return nil }
+        // The first running routine that actually has a checklist. With several routines
+        // overlapping, most of them have no tasks at all, and taking whichever started
+        // first would show an empty card while a routine beside it had a list waiting.
+        guard let activeRoutine = (runtimeState?.activeRoutines ?? [])
+            .sorted(by: { $0.startedAt < $1.startedAt })
+            .first(where: { !$0.taskCompletions.isEmpty })
+        else { return nil }
 
         let sortedItems = activeRoutine.taskCompletions.sorted { $0.orderSnapshot < $1.orderSnapshot }
         let completedCount = sortedItems.filter { $0.completedAt != nil }.count

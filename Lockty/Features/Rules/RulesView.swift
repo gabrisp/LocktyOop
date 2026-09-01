@@ -17,7 +17,7 @@ struct RulesView: View {
                 if let routine = rule.routineBridge {
                     RoutineCard(
                         routine: routine,
-                        isActive: viewModel.activeScheduleRuleID() == rule.id,
+                        isActive: viewModel.activeScheduleRuleIDs().contains(rule.id),
                         applicationTokens: viewModel.tokens(for: rule.id)
                     ) {
                         router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: rule.id)))

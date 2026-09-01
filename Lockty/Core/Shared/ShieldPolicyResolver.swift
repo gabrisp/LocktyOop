@@ -1,9 +1,20 @@
 import Foundation
 
 struct ShieldPolicyResolver {
+    /// The shield as the union of everything that wants something blocked.
+    ///
+    /// Recomputed from scratch every time rather than added to and subtracted from, which
+    /// is what makes a routine ending clean up after itself: it is simply no longer in
+    /// `activeRoutines`, so its apps fall out of the union -- and an app that a *second*
+    /// routine also blocks stays blocked, because that routine is still in it. Nothing
+    /// has to work out which apps belonged to whom.
+    ///
+    /// A break is per routine and lifts only the routine that granted it. Two routines
+    /// blocking the same app means taking a break on one of them changes nothing for that
+    /// app: the other never agreed to let it out.
     func resolve(
-        activeRoutine: ActiveRoutine?,
-        activeBreak: ActiveBreak?,
+        activeRoutines: [ActiveRoutine],
+        activeBreaks: [ActiveBreak],
         activePauseAllowance: ActivePauseAllowance?,
         pauseRules: [PauseRule],
         rules: [Rule] = [],
@@ -14,7 +25,9 @@ struct ShieldPolicyResolver {
         var reasons: [ShieldReason] = []
         var selectionScopes = Set<ScreenTimeSelectionScope>()
 
-        if let activeRoutine, activeBreak == nil {
+        let routineIDsOnBreak = Set(activeBreaks.map(\.routineID))
+
+        for activeRoutine in activeRoutines where !routineIDsOnBreak.contains(activeRoutine.routineID) {
             blockedApplications.formUnion(activeRoutine.shieldPolicy.blockedApplications)
             blockedDomains.formUnion(activeRoutine.shieldPolicy.blockedDomains)
             reasons.append(activeRoutine.shieldPolicy.reason)

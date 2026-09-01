@@ -65,10 +65,13 @@ private struct RuntimeRepairCoordinator {
         }
 
         guard var runtimeState = try? store.loadRuntimeState() else { return }
-        // Never displace a routine the user already has running.
-        guard runtimeState.activeRoutine == nil else { return }
+        // Alongside whatever else is running, not instead of it. This used to bail out
+        // whenever anything was active, so a routine whose window overlapped another's
+        // was dropped at its start and never reconsidered -- it lost its entire window
+        // without a word. Only starting the same routine twice is refused.
+        guard !runtimeState.activeRoutines.contains(where: { $0.routineID == id }) else { return }
 
-        runtimeState.activeRoutine = snapshot.makeActiveRoutine(startedAt: Date())
+        runtimeState.activeRoutines.append(snapshot.makeActiveRoutine(startedAt: Date()))
         try? store.saveRuntimeState(runtimeState)
         print("Started scheduled routine \(snapshot.name) from the monitor extension")
         repairRuntimeState(activityName: activity.rawValue)
@@ -96,18 +99,30 @@ private struct RuntimeRepairCoordinator {
         return UUID(uuidString: String(activity.rawValue.dropFirst(prefix.count)))
     }
 
+    /// Ends one scheduled routine, leaving any others running.
+    ///
+    /// Only this routine and its own break are removed. The shield is then recomputed
+    /// from what is left, which is what frees exactly the apps this routine was holding:
+    /// one that another running routine also blocks stays blocked, because that routine
+    /// is still in the union.
     private func endScheduledRoutine(activityName: String) {
         guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))),
               var runtimeState = try? store.loadRuntimeState(),
-              runtimeState.activeRoutine?.routineID == id
+              runtimeState.activeRoutines.contains(where: { $0.routineID == id })
         else { return }
 
-        runtimeState.activeRoutine = nil
-        runtimeState.activeBreak = nil
-        runtimeState.activePauseAllowance = nil
-        runtimeState.pendingPause = nil
+        runtimeState.activeRoutines.removeAll { $0.routineID == id }
+        runtimeState.activeBreaks.removeAll { $0.routineID == id }
+
+        // The allowance and the request the shield was waiting on belong to the session
+        // as a whole, so they only go once there is no session left to belong to.
+        if runtimeState.activeRoutines.isEmpty {
+            runtimeState.activePauseAllowance = nil
+            runtimeState.pendingPause = nil
+            PauseAllowanceLiveActivityTermination.endAllBlocking()
+        }
+
         try? store.saveRuntimeState(runtimeState)
-        PauseAllowanceLiveActivityTermination.endAllBlocking()
         repairRuntimeState(activityName: activityName)
     }
 
@@ -151,11 +166,14 @@ private struct RuntimeRepairCoordinator {
             PauseAllowanceLiveActivityTermination.endAllBlocking()
         }
 
-        if activityName.hasPrefix("lockty.break."),
-           let activeBreak = runtimeState.activeBreak,
-           activeBreak.endsAt <= Date() {
-            runtimeState.activeBreak = nil
-            print("Break monitor expired breakID=\(activeBreak.id.uuidString) restoring active routine shields")
+        if activityName.hasPrefix("lockty.break.") {
+            // Each expired break is dropped on its own. They belong to different
+            // routines, and clearing them wholesale would put back the blocks of a
+            // routine whose break is still running.
+            for expired in runtimeState.activeBreaks.filter({ $0.endsAt <= Date() }) {
+                runtimeState.activeBreaks.removeAll { $0.id == expired.id }
+                print("Break monitor expired breakID=\(expired.id.uuidString) restoring routine \(expired.routineID.uuidString) shields")
+            }
         }
 
         let pauseRules = store.loadPauseRuleSnapshots()
@@ -176,8 +194,8 @@ private struct RuntimeRepairCoordinator {
         let shieldRules = store.loadShieldRules()
 
         let effectivePolicy = resolver.resolve(
-            activeRoutine: runtimeState.activeRoutine,
-            activeBreak: runtimeState.activeBreak,
+            activeRoutines: runtimeState.activeRoutines,
+            activeBreaks: runtimeState.activeBreaks,
             activePauseAllowance: runtimeState.livePauseAllowance,
             pauseRules: pauseRules,
             rules: shieldRules.rules,

@@ -61,8 +61,10 @@ final class RoutinesViewModel: ObservableObject {
         errorMessage = await routineEngine.start(routine).errorMessage
     }
 
-    func activeRoutineID() -> UUID? {
-        routineEngine.activeRoutine()?.routineID
+    /// Every routine running right now, so each of their cards reads as active rather
+    /// than only whichever one happened to start first.
+    func activeRoutineIDs() -> Set<UUID> {
+        Set(routineEngine.activeRoutines.map(\.routineID))
     }
 
     func delete(id: UUID) async {

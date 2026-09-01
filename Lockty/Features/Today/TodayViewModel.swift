@@ -216,10 +216,25 @@ final class TodayViewModel: ObservableObject {
     }
 
     @discardableResult
-    func unlockAvailability(for context: PauseContext? = nil) async -> BreakAvailability {
-        let routineID = context?.activeRoutineID ?? routineEngine.activeRoutine()?.routineID
+    func unlockAvailability(
+        for context: PauseContext? = nil,
+        appID: AppIdentity.ID? = nil
+    ) async -> BreakAvailability {
+        // An app can be held by more than one running routine, and then every one of them
+        // has to agree before it comes out -- so the app is asked about, not a routine.
+        // Letting the first routine's answer stand would appear to unlock an app the
+        // second one is still blocking, and the shield would go straight back up.
+        if let appID = appID ?? context?.appID {
+            let availability = await routineEngine.breakAvailability(
+                forApp: appID,
+                trigger: .manual,
+                requiresFriction: true
+            )
+            breakAvailability = availability
+            return availability
+        }
 
-        guard let routineID else {
+        guard let routineID = context?.activeRoutineID ?? routineEngine.activeRoutine()?.routineID else {
             breakAvailability = .available
             return .available
         }

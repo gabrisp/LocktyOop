@@ -57,8 +57,10 @@ final class RulesViewModel: ObservableObject {
         applicationTokens[ruleID] ?? []
     }
 
-    func activeScheduleRuleID() -> UUID? {
-        routineEngine.activeRoutine()?.routineID
+    /// Every schedule rule running right now. A set, not one id: routines overlap, so
+    /// asking for "the" active one marked at most one card as running while several were.
+    func activeScheduleRuleIDs() -> Set<UUID> {
+        Set(routineEngine.activeRoutines.map(\.routineID))
     }
 
     func delete(id: UUID) async {

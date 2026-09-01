@@ -20,15 +20,15 @@ final class ActiveRoutineViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// This screen's routine, by id. It used to ask for "the" active routine, which was
+    /// the same thing only while one could run at a time -- with several going it would
+    /// show whichever started first, no matter which one the user opened.
     var activeRoutine: ActiveRoutine? {
-        routineEngine.activeRoutine()
+        routineEngine.activeRoutine(id: routineID)
     }
 
     var activeBreak: ActiveBreak? {
-        if case .onBreak(_, let activeBreak) = routineEngine.state {
-            return activeBreak
-        }
-        return nil
+        routineEngine.activeBreak(for: routineID)
     }
 
     var errorMessage: String? {
@@ -47,15 +47,15 @@ final class ActiveRoutineViewModel: ObservableObject {
 
     func toggleTaskCompletion(_ completion: RoutineTaskCompletion) async {
         guard completion.completedAt == nil else { return }
-        await routineEngine.completeTask(completion.taskID)
+        await routineEngine.completeTask(completion.taskID, routineID: routineID)
     }
 
     func stopRoutine() async {
-        await routineEngine.stop()
+        await routineEngine.stop(routineID: routineID)
     }
 
     func startBreak() async {
-        await routineEngine.startBreak(trigger: .manual)
+        await routineEngine.startBreak(routineID: routineID, trigger: .manual)
     }
 
     func endBreak() async {

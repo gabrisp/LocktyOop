@@ -17,7 +17,7 @@ struct RoutinesView: View {
                 ForEach(viewModel.routines) { routine in
                     RoutineCard(
                         routine: routine,
-                        isActive: viewModel.activeRoutineID() == routine.id,
+                        isActive: viewModel.activeRoutineIDs().contains(routine.id),
                         applicationTokens: viewModel.tokens(for: routine.id),
                         onOpen: {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))

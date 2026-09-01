@@ -89,7 +89,7 @@ struct FocusView: View {
                     if let routine = rule.routineBridge {
                         RoutineCard(
                             routine: routine,
-                            isActive: rulesViewModel.activeScheduleRuleID() == rule.id,
+                            isActive: rulesViewModel.activeScheduleRuleIDs().contains(rule.id),
                             applicationTokens: rulesViewModel.tokens(for: rule.id)
                         ) {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: rule.id)))

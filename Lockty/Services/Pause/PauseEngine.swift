@@ -80,8 +80,8 @@ final class PauseEngine: ObservableObject {
             let pauseRules = await pauseRuleRepository.rules()
             let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
-                activeRoutine: runtime.activeRoutine,
-                activeBreak: runtime.activeBreak,
+                activeRoutines: runtime.activeRoutines,
+                activeBreaks: runtime.activeBreaks,
                 activePauseAllowance: runtime.livePauseAllowance,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,
@@ -144,8 +144,8 @@ final class PauseEngine: ObservableObject {
             let pauseRules = await pauseRuleRepository.rules()
             let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
-                activeRoutine: runtime.activeRoutine,
-                activeBreak: runtime.activeBreak,
+                activeRoutines: runtime.activeRoutines,
+                activeBreaks: runtime.activeBreaks,
                 activePauseAllowance: allowance,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,
@@ -323,8 +323,8 @@ final class PauseEngine: ObservableObject {
             let pauseRules = await pauseRuleRepository.rules()
             let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
-                activeRoutine: runtime.activeRoutine,
-                activeBreak: runtime.activeBreak,
+                activeRoutines: runtime.activeRoutines,
+                activeBreaks: runtime.activeBreaks,
                 activePauseAllowance: nil,
                 pauseRules: pauseRules,
                 rules: shieldRules.rules,

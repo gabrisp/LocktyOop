@@ -136,7 +136,10 @@ final class RoutineEditorViewModel: ObservableObject {
     /// Ends the routine this editor is showing, when it is the one running.
     @discardableResult
     func stopRoutine() async -> Bool {
-        await routineEngine.stop()
+        // This editor is one routine's, so it ends that one. Ending everything would
+        // take down routines the user never opened, which is not what a stop button
+        // inside a single routine can possibly mean.
+        await routineEngine.stop(routineID: editingID)
         if case .failed(let message) = routineEngine.state {
             errorMessage = message
             return false

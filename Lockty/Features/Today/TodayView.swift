@@ -25,7 +25,8 @@ struct TodayView: View {
     @MainActor
     private func openUnlockFlow(for token: ApplicationToken?, context: PauseContext?) {
         Task { @MainActor in
-            switch await viewModel.unlockAvailability(for: context) {
+            let appID = token.map(AppIdentity.ID.init(token:))
+            switch await viewModel.unlockAvailability(for: context, appID: appID) {
             case .available:
                 if context != nil {
                     withAnimation(.smooth(duration: 0.28)) {

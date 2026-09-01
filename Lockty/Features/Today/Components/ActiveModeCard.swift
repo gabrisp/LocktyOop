@@ -9,6 +9,7 @@ struct ActiveModeCard: View {
     var activeRoutine: ActiveRoutine?
     var tokens: [ApplicationToken] = []
     var allowance: ActivePauseAllowance?
+    var breakAvailability: BreakAvailability = .available
     let onUnlock: (ApplicationToken) -> Void
     /// Tapped on an app the allowance has already let out. There is nothing to unlock,
     /// so this shows what is left of it instead of reopening the flow.
@@ -18,6 +19,18 @@ struct ActiveModeCard: View {
 
     private var releasedIDs: Set<AppIdentity.ID> {
         allowance?.releasedApplications ?? []
+    }
+
+    /// How the badges are drawn: green while a break can still be taken, red when it
+    /// cannot -- with a clock only when there is a moment to wait for. A limit that has
+    /// been reached has no such moment, so it is red and silent.
+    private var badgeAvailability: LocktyAppLockBadge.Availability {
+        switch breakAvailability {
+        case .available:
+            .unlockable
+        case .unavailable(let unavailable):
+            unavailable.retryAt.map { .cooldown(until: $0) } ?? .exhausted
+        }
     }
 
     private var subtitleText: String {
@@ -82,6 +95,10 @@ struct ActiveModeCard: View {
                             token: token,
                             unlockedFrom: released ? allowance?.startedAt : nil,
                             unlockedUntil: released ? allowance?.expiresAt : nil,
+                            // An app already out is out however the break policy stands:
+                            // the allowance running is the answer, not the cooldown that
+                            // will apply to the next request.
+                            availability: released ? .unlockable : badgeAvailability,
                             caption: released ? .remainingTime : .action("Desbloquear")
                         )
                     }

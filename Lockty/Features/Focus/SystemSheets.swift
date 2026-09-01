@@ -197,7 +197,9 @@ struct BreakStatusSheet: View {
     var body: some View {
         LocktyDynamicSheet {
             VStack(spacing: LocktySpacing.lg) {
-                Text("Please wait for the next unlock")
+                // Two different answers, and they must not be dressed as one: a
+                // cooldown is a wait with an end, a spent limit is not a wait at all.
+                Text(state.retryAt == nil ? "No unlocks left" : "Please wait for the next unlock")
                     .font(.footnote)
                     .foregroundStyle(LocktyColors.tertiaryText)
                     .multilineTextAlignment(.center)
@@ -221,7 +223,7 @@ struct BreakStatusSheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.md)
+            .padding(.top, LocktySpacing.lg)
             .padding(.bottom, LocktySpacing.lg)
         }
         .locktyDynamicSheetSizes([.fit])

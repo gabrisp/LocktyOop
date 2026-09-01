@@ -10,6 +10,9 @@ import SwiftUI
 /// pause flow -- the shield's button only asks.
 struct UnlockRequestCard: View {
     let context: PauseContext
+    /// Drawn the same way the routine card's badges are, so the two cards never
+    /// contradict each other about whether this app can be let out right now.
+    var availability: LocktyAppLockBadge.Availability = .unlockable
     let onUnlock: () -> Void
 
     /// Drives the arrival glow. It fades once and stays settled; nothing re-triggers it
@@ -97,6 +100,11 @@ struct UnlockRequestCard: View {
     /// The same badge the active mode card uses, so a blocked app looks the same
     /// wherever it is shown.
     private var appIcon: some View {
-        LocktyAppLockBadge(token: token, scale: 1.4)
+        LocktyAppLockBadge(
+            token: token,
+            scale: 1.4,
+            availability: availability,
+            caption: .action("Desbloquear")
+        )
     }
 }

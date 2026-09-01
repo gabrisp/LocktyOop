@@ -19,8 +19,23 @@ struct LocktyAppLockBadge: View {
     var unlockedFrom: Date?
     var unlockedUntil: Date?
     var showsBorder = true
+    /// Whether this app can be unlocked at all right now, which is what colours the ring.
+    var availability: Availability = .unlockable
     /// What sits under the badge. `.none` when the badge is the whole story.
     var caption: Caption = .none
+
+    /// Whether the unlock flow would let you through if you tapped this.
+    ///
+    /// Drawn on the badge rather than discovered by tapping: walking a friction and
+    /// being told at the end that a cooldown is running is the flow doing work the user
+    /// was never allowed to spend.
+    enum Availability: Equatable {
+        case unlockable
+        /// Held off until this moment. There is something to count down to.
+        case cooldown(until: Date)
+        /// No unlocks left at all, so there is no moment to count down to.
+        case exhausted
+    }
 
     enum Caption: Equatable {
         case none
@@ -28,6 +43,29 @@ struct LocktyAppLockBadge: View {
         case action(String)
         /// The time left on the running allowance, counted down live.
         case remainingTime
+    }
+
+    /// The availability as it stands at `date`.
+    ///
+    /// A cooldown that has run out is simply over: the badge is inside a per-second
+    /// TimelineView while one is running, so it turns green on its own the moment the
+    /// wait ends rather than staying red until something else reloads the screen.
+    private func effectiveAvailability(at date: Date) -> Availability {
+        guard case .cooldown(let until) = availability else { return availability }
+        return date >= until ? .unlockable : availability
+    }
+
+    /// Green while the app can be unlocked, red while it cannot. The ring is the only
+    /// thing on the badge that can carry that, and it is already the shape the eye goes
+    /// to first.
+    private func accent(at date: Date) -> Color {
+        effectiveAvailability(at: date) == .unlockable ? LocktyColors.productive : LocktyColors.error
+    }
+
+    /// Whether the badge has a clock of its own to draw, independent of an allowance.
+    private var cooldownDeadline: Date? {
+        guard case .cooldown(let until) = availability else { return nil }
+        return until
     }
 
     private var borderWidth: CGFloat { 2 }
@@ -55,7 +93,7 @@ struct LocktyAppLockBadge: View {
         // TimelineView only while an allowance is running: a locked badge has nothing to
         // animate and shouldn't be redrawing every frame.
         Group {
-            if unlockedUntil != nil {
+            if unlockedUntil != nil || cooldownDeadline != nil {
                 TimelineView(.animation) { context in
                     badge(at: context.date)
                 }
@@ -72,10 +110,27 @@ struct LocktyAppLockBadge: View {
             EmptyView()
 
         case .action(let title):
-            Text(title)
-                .font(.system(.caption, design: .default, weight: .medium))
-                .foregroundStyle(LocktyColors.productive)
-                .lineLimit(1)
+            switch effectiveAvailability(at: date) {
+            case .unlockable:
+                Text(title)
+                    .font(.system(.caption, design: .default, weight: .medium))
+                    .foregroundStyle(LocktyColors.productive)
+                    .lineLimit(1)
+
+            case .cooldown(let until):
+                Text(countdownText(to: until, at: date))
+                    .font(.system(.caption, design: .default, weight: .medium))
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.snappy(duration: 0.25), value: countdownText(to: until, at: date))
+                    .foregroundStyle(LocktyColors.error)
+                    .lineLimit(1)
+
+            case .exhausted:
+                // Nothing under the badge: there is no time to wait out, so a clock here
+                // would be counting down to something that never arrives.
+                EmptyView()
+            }
 
         case .remainingTime:
             Text(remainingTimeText(at: date))
@@ -86,6 +141,12 @@ struct LocktyAppLockBadge: View {
                 .foregroundStyle(LocktyColors.primaryText)
                 .lineLimit(1)
         }
+    }
+
+    /// mm:ss down to a deadline, floored at zero.
+    private func countdownText(to deadline: Date, at date: Date) -> String {
+        let remaining = max(0, Int(deadline.timeIntervalSince(date).rounded(.up)))
+        return String(format: "%d:%02d", remaining / 60, remaining % 60)
     }
 
     /// mm:ss while an allowance is running, and nothing once it has expired.
@@ -122,7 +183,7 @@ struct LocktyAppLockBadge: View {
                         // left of the time.
                         .trim(from: 0, to: locked ? 1 : progress)
                         .stroke(
-                            LocktyColors.productive.opacity(locked ? 0.7 : 0.95),
+                            accent(at: date).opacity(locked ? 0.7 : 0.95),
                             style: StrokeStyle(lineWidth: borderWidth, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))

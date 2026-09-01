@@ -1,3 +1,4 @@
+import ManagedSettings
 import SwiftUI
 import UIKit
 
@@ -13,6 +14,30 @@ struct TodayView: View {
 
     private var state: TodayDayState {
         viewModel.state(for: day)
+    }
+
+    /// The only way this screen opens the friction flow.
+    ///
+    /// Refuses before presenting anything rather than at the end of the flow: a cooldown
+    /// or a spent break limit means the answer is already no, and walking the friction
+    /// first would be asking for work that cannot be accepted. The sheet says which of
+    /// the two it is, and how long is left when there is a wait to sit out.
+    @MainActor
+    private func openUnlockFlow(for token: ApplicationToken?, context: PauseContext?) {
+        Task { @MainActor in
+            switch await viewModel.unlockAvailability(for: context) {
+            case .available:
+                if context != nil {
+                    withAnimation(.smooth(duration: 0.28)) {
+                        router.pendingUnlock = nil
+                    }
+                }
+                router.presentFullScreen(.unlockFlow(token))
+
+            case .unavailable(let unavailable):
+                router.presentSheet(.breakStatus(unavailable))
+            }
+        }
     }
 
     /// What the day button says. "Today" only while today is what is on screen -- a
@@ -274,17 +299,15 @@ struct TodayView: View {
                 // Above everything else: an unlock the shield asked for is the one thing
                 // on this screen that is waiting on an answer.
                 if let pendingUnlock = router.pendingUnlock {
-                    UnlockRequestCard(context: pendingUnlock) {
+                    UnlockRequestCard(
+                        context: pendingUnlock,
+                        availability: viewModel.badgeAvailability
+                    ) {
                         Task { @MainActor in
-                            switch await viewModel.breakAvailability(for: pendingUnlock) {
-                            case .available:
-                                withAnimation(.smooth(duration: 0.28)) {
-                                    router.pendingUnlock = nil
-                                }
-                                router.presentFullScreen(.unlockFlow(pendingUnlock.applicationToken))
-                            case .unavailable(let unavailable):
-                                router.presentSheet(.breakStatus(unavailable))
-                            }
+                            openUnlockFlow(
+                                for: pendingUnlock.applicationToken,
+                                context: pendingUnlock
+                            )
                         }
                     }
                     .transition(.blurReplace.combined(with: .opacity))
@@ -299,8 +322,9 @@ struct TodayView: View {
                         activeRoutine: viewModel.activeRoutine,
                         tokens: viewModel.activeRoutineTokens,
                         allowance: viewModel.activePauseAllowance,
+                        breakAvailability: viewModel.breakAvailability,
                         onUnlock: { token in
-                            router.presentFullScreen(.unlockFlow(token))
+                            openUnlockFlow(for: token, context: nil)
                         },
                         onShowAllowance: { token in
                             guard let allowance = viewModel.activePauseAllowance else { return }

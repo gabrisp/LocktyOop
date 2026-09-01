@@ -33,6 +33,11 @@ final class TodayViewModel: ObservableObject {
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
     @Published private(set) var routineCardState: TodayRoutineCardState?
+    /// Whether a break can be taken at all right now.
+    ///
+    /// Published rather than asked for on tap: the app badges are coloured by it, so it
+    /// has to be known before anything is touched.
+    @Published private(set) var breakAvailability: BreakAvailability = .available
 
     init(
         dataProvider: TodayDataProviding,
@@ -187,15 +192,45 @@ final class TodayViewModel: ObservableObject {
         }
     }
 
-    func breakAvailability(for context: PauseContext) async -> BreakAvailability {
-        guard let activeRoutineID = context.activeRoutineID else {
+    /// The single gate into the friction flow.
+    ///
+    /// Both ways in come through here: the request card the shield puts on Today, and
+    /// tapping a blocked app on the routine card. They used to disagree -- the request
+    /// card asked the break policy and the app badges did not -- so the same cooldown
+    /// stopped one and let the other walk an entire friction before refusing at the end,
+    /// which is the flow taking work it was never going to accept.
+    ///
+    /// A context is passed when the request names its own routine; without one this
+    /// falls back to whatever is running, which is what the badges are coloured against.
+    /// How a badge should be drawn for the current break policy: green while an unlock
+    /// is possible, red with a clock while a cooldown runs, red and silent once there is
+    /// nothing left to grant.
+    var badgeAvailability: LocktyAppLockBadge.Availability {
+        switch breakAvailability {
+        case .available:
+            return .unlockable
+        case .unavailable(let unavailable):
+            guard let retryAt = unavailable.retryAt else { return .exhausted }
+            return .cooldown(until: retryAt)
+        }
+    }
+
+    @discardableResult
+    func unlockAvailability(for context: PauseContext? = nil) async -> BreakAvailability {
+        let routineID = context?.activeRoutineID ?? routineEngine.activeRoutine()?.routineID
+
+        guard let routineID else {
+            breakAvailability = .available
             return .available
         }
-        return await routineEngine.breakAvailability(
-            for: activeRoutineID,
+
+        let availability = await routineEngine.breakAvailability(
+            for: routineID,
             trigger: .manual,
             requiresFriction: true
         )
+        breakAvailability = availability
+        return availability
     }
 
     private func shouldRetry(after loadingState: TodayLoadingState) -> Bool {
@@ -205,6 +240,8 @@ final class TodayViewModel: ObservableObject {
     }
 
     private func refreshRoutineCard() async {
+        await unlockAvailability()
+
         if let activeRoutine = routineEngine.activeRoutine() {
             routineCardState = TodayRoutineCardState(
                 id: activeRoutine.routineID,

@@ -403,7 +403,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Breaks disabled",
-                    message: "Blocked means blocked."
+                    message: "Esta rule no permite breaks."
                 )
             )
         }

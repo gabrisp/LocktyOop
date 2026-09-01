@@ -1608,7 +1608,7 @@ struct RoutineEditorView: View {
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
-                Text(viewModel.breaksAllowed ? "This rule can temporarily bypass its restriction." : "Blocked means blocked.")
+                Text(viewModel.breaksAllowed ? "This rule can temporarily bypass its restriction." : "This rule cannot be bypassed.")
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }

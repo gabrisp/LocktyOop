@@ -39,8 +39,7 @@ struct RoutineDomainsSheet: View {
                         }
                     }
                     .padding(.horizontal, LocktySpacing.md)
-                    .padding(.top, LocktySpacing.sm)
-                    .padding(.bottom, LocktySpacing.md)
+                    .padding(.vertical, 24)
                 }
             }
         }

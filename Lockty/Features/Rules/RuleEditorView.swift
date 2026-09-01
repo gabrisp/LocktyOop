@@ -741,7 +741,7 @@ struct RuleEditorView: View {
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    Text(viewModel.breaksAllowed ? "This rule can open a temporary exception after a friction." : "Blocked means blocked.")
+                    Text(viewModel.breaksAllowed ? "This rule can open a temporary exception after a friction." : "This rule cannot be bypassed.")
                         .font(.system(.footnote, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                 }

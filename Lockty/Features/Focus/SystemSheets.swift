@@ -77,8 +77,7 @@ struct AppClassificationSheet: View {
                 }
             }
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.lg)
+            .padding(.vertical, 24)
         }
         .task {
             await viewModel.load()
@@ -131,8 +130,7 @@ struct RoutineBreakSheet: View {
                 }
             }
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.lg)
+            .padding(.vertical, 24)
         }
         .task {
             viewModel.refresh()
@@ -147,7 +145,6 @@ struct RoutineBreakSheet: View {
 /// that -- the app, the clock, and the way out.
 struct AllowanceTimerSheet: View {
     let route: AllowanceTimerRoute
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         LocktyDynamicSheet {
@@ -162,14 +159,13 @@ struct AllowanceTimerSheet: View {
                     countdown(remaining: route.expiresAt.timeIntervalSince(context.date))
                 }
 
-                PrimaryButton("Cerrar", systemImage: "xmark") {
-                    dismiss()
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.lg)
+            // No close button: a sheet that only reports something is dismissed the way
+            // every other one is, and a button at the bottom only made it look like there
+            // was a decision to take.
+            .padding(.vertical, 24)
         }
         .locktyDynamicSheetSizes([.fit])
     }
@@ -192,7 +188,6 @@ struct AllowanceTimerSheet: View {
 /// heading on the left would only name what the countdown underneath already is.
 struct BreakStatusSheet: View {
     let state: BreakUnavailableState
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         LocktyDynamicSheet {
@@ -217,14 +212,13 @@ struct BreakStatusSheet: View {
                         .multilineTextAlignment(.center)
                 }
 
-                PrimaryButton("Cerrar", systemImage: "xmark") {
-                    dismiss()
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.lg)
-            .padding(.bottom, LocktySpacing.lg)
+            // No close button: a sheet that only reports something is dismissed the way
+            // every other one is, and a button at the bottom only made it look like there
+            // was a decision to take.
+            .padding(.vertical, 24)
         }
         .locktyDynamicSheetSizes([.fit])
     }

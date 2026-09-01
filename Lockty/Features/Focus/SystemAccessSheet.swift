@@ -38,8 +38,7 @@ struct SystemAccessSheet: View {
                 }
             }
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
-            .padding(.bottom, LocktySpacing.lg)
+            .padding(.vertical, 24)
             .task { await viewModel.refresh() }
         }
     }

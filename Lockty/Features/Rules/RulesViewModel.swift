@@ -4,10 +4,12 @@ import Foundation
 import ManagedSettings
 import SwiftUI
 
+@MainActor
 final class RulesViewModel: ObservableObject {
     private let routineEngine: RoutineEngine
     private let repository: RuleRepository
     private let appGroupRepository: UserAppGroupRepository
+    private let scheduleCoordinator: RoutineScheduleCoordinator
     private let selectionStore: ScreenTimeSelectionStore
 
     @Published private(set) var rules: [Rule] = []
@@ -18,22 +20,21 @@ final class RulesViewModel: ObservableObject {
         routineEngine: RoutineEngine,
         repository: RuleRepository,
         appGroupRepository: UserAppGroupRepository,
+        scheduleCoordinator: RoutineScheduleCoordinator,
         selectionStore: ScreenTimeSelectionStore
     ) {
         self.routineEngine = routineEngine
         self.repository = repository
         self.appGroupRepository = appGroupRepository
+        self.scheduleCoordinator = scheduleCoordinator
         self.selectionStore = selectionStore
     }
 
     func load() async {
         do {
             let loaded = try await repository.rules()
-            let groups = await appGroupRepository.appGroups()
             let tokens = loaded.reduce(into: [UUID: [ApplicationToken]]()) { result, rule in
-                let groupScopes = groups
-                    .filter { rule.appGroupIDs.contains($0.id) }
-                    .map { ScreenTimeSelectionScope.appGroup($0.id) }
+                let groupScopes = rule.appGroupIDs.map(ScreenTimeSelectionScope.appGroupScope)
                 let primaryScope: ScreenTimeSelectionScope = rule.kind == .schedule ? .routine(rule.id) : .rule(rule.id)
                 let merged = selectionStore.mergedSelection(scopes: Set([primaryScope] + groupScopes))
                 result[rule.id] = merged.applicationTokens.stablePrefix(merged.applicationTokens.count)
@@ -42,6 +43,11 @@ final class RulesViewModel: ObservableObject {
                 rules = loaded
                 applicationTokens = tokens
             }
+            // Keeps DeviceActivity monitoring in step with whatever was just created,
+            // edited or deleted. This used to hang off RoutinesViewModel, which nothing
+            // reaches any more -- the list of routines lives here now, so the sync does
+            // too, and without it no scheduled routine was ever registered to start.
+            await scheduleCoordinator.sync()
         } catch {
             errorMessage = error.localizedDescription
         }

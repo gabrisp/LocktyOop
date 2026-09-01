@@ -7,6 +7,7 @@ protocol DeviceActivityServicing {
     func schedulePauseRelock(_ allowance: ActivePauseAllowance) async throws
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws
     func syncRoutineSchedules(_ snapshots: [RoutineScheduleSnapshot]) async throws
+    func syncRuleSchedules(_ rules: [Rule]) async throws
     /// Drops every allowance monitor, whatever it was counting.
     func cancelPauseRelocks() async
 }
@@ -21,6 +22,9 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
 
     /// Name of the usage event that ends an allowance.
     static let pauseAllowanceEvent = DeviceActivityEvent.Name("lockty.pause.allowance")
+
+    /// Name of the usage event that spends a daily-usage rule's budget.
+    static let ruleDailyUsageEvent = DeviceActivityEvent.Name("lockty.rule.daily-usage")
 
     /// Ends the allowance in the background, once the released apps have been used for
     /// as long as it granted.
@@ -89,6 +93,59 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
         let start = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: activeBreak.startedAt)
         let end = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: activeBreak.endsAt)
         try center.startMonitoring(name, during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false))
+    }
+
+    /// Registers the daily budget of every `.dailyUsageLimit` rule.
+    ///
+    /// This is the one limit Screen Time can measure for us: a usage threshold over the
+    /// rule's apps, inside a window that spans the day and repeats. When the threshold is
+    /// reached the extension marks the rule as spent and the shield goes up; the next
+    /// day's `intervalDidStart` clears it again.
+    ///
+    /// The other two kinds are deliberately absent. There is no "times opened" event, and
+    /// a threshold measures a whole interval rather than one sitting, so an open count and
+    /// a per-session cap cannot be observed here at all -- they are enforced at the
+    /// shield instead, which sees every trip through it.
+    func syncRuleSchedules(_ rules: [Rule]) async throws {
+        let stale = center.activities.filter { $0.rawValue.hasPrefix("lockty.rule.") }
+        if !stale.isEmpty {
+            center.stopMonitoring(stale)
+        }
+
+        for rule in rules where rule.isEnabled && rule.kind == .dailyUsageLimit {
+            guard let configuration = rule.dailyUsageLimitConfiguration,
+                  configuration.maximumMinutesPerDay > 0
+            else { continue }
+
+            let selection = selectionStore.mergedSelection(scopes: rule.selectionScopes)
+            guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty else {
+                continue
+            }
+
+            let event = DeviceActivityEvent(
+                applications: selection.applicationTokens,
+                categories: selection.categoryTokens,
+                threshold: DateComponents(minute: configuration.maximumMinutesPerDay)
+            )
+
+            // 00:00 to 23:59, repeating: the widest window the API takes, which is what
+            // "per day" means. The budget resets when the interval does.
+            let schedule = DeviceActivitySchedule(
+                intervalStart: DateComponents(hour: 0, minute: 0),
+                intervalEnd: DateComponents(hour: 23, minute: 59),
+                repeats: true
+            )
+
+            do {
+                try center.startMonitoring(
+                    DeviceActivityName("lockty.rule.\(rule.id.uuidString)"),
+                    during: schedule,
+                    events: [Self.ruleDailyUsageEvent: event]
+                )
+            } catch {
+                print("Rule usage monitoring failed for \(rule.name): \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Registers a repeating daily window per scheduled routine so the monitor

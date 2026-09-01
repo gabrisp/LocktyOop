@@ -40,12 +40,7 @@ final class RoutineDetailViewModel: ObservableObject {
 
     func start() async {
         guard let routine else { return }
-        await routineEngine.start(routine)
-        if case .failed(let message) = routineEngine.state {
-            errorMessage = message
-        } else {
-            errorMessage = nil
-        }
+        errorMessage = await routineEngine.start(routine).errorMessage
         await load()
     }
 

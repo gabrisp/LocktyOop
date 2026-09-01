@@ -19,6 +19,31 @@ nonisolated struct AppGroup: Codable, Hashable, Identifiable {
     }
 }
 
+nonisolated struct ReusableAppGroupDefinition: Codable, Hashable, Identifiable {
+    let id: UUID
+    var name: String
+    var selectionScope: ScreenTimeSelectionScope
+}
+
+extension ReusableAppGroupDefinition {
+    /// Built-in reusable groups that are backed by a selection scope, not by a saved
+    /// user AppGroup row. Add new suggested/system groups here instead of teaching the
+    /// shield about one UUID at a time.
+    nonisolated static var builtIn: [ReusableAppGroupDefinition] {
+        [
+            ReusableAppGroupDefinition(
+                id: UUID(uuidString: "00000000-0000-0000-0000-00000000D157")!,
+                name: "Distrayendo",
+                selectionScope: .distracting
+            )
+        ]
+    }
+
+    nonisolated static func selectionScope(for id: UUID) -> ScreenTimeSelectionScope? {
+        builtIn.first { $0.id == id }?.selectionScope
+    }
+}
+
 nonisolated enum AutoFocusInterventionLevel: String, Codable, CaseIterable, Hashable, Identifiable {
     case low
     case medium

@@ -41,6 +41,12 @@ struct DestinationFactory {
     @ViewBuilder
     func sheet(for route: SheetRoute) -> some View {
         switch route {
+        case .allowanceTimer(let route):
+            featureFactory.makeAllowanceTimerSheet(route: route)
+
+        case .dayPicker:
+            featureFactory.makeDayPickerSheet()
+
         case .focusCreationChoice(let route):
             featureFactory.makeFocusCreationChoiceSheet(route: route)
 

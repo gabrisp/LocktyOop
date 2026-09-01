@@ -24,4 +24,8 @@ nonisolated enum ScreenTimeSelectionScope: Codable, Hashable, Identifiable {
             "distracting"
         }
     }
+
+    nonisolated static func appGroupScope(for appGroupID: UUID) -> ScreenTimeSelectionScope {
+        ReusableAppGroupDefinition.selectionScope(for: appGroupID) ?? .appGroup(appGroupID)
+    }
 }

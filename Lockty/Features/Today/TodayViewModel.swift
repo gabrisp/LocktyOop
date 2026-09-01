@@ -9,26 +9,43 @@ private func todayLogger() -> Logger {
     Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time")
 }
 
+struct TodayRoutineCardState: Equatable, Identifiable {
+    let id: UUID
+    var name: String
+    var icon: String?
+    var detailText: String
+    var phase: TodayRoutineCardPhase
+}
+
+enum TodayRoutineCardPhase: Equatable {
+    case active
+    case upcoming
+}
+
 @MainActor
 final class TodayViewModel: ObservableObject {
     private let dataProvider: TodayDataProviding
     private let routineEngine: RoutineEngine
     private let pauseEngine: PauseEngine
+    private let routineRepository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let autoFocusManager: AutoFocusManager
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
+    @Published private(set) var routineCardState: TodayRoutineCardState?
 
     init(
         dataProvider: TodayDataProviding,
         routineEngine: RoutineEngine,
         pauseEngine: PauseEngine,
+        routineRepository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
         autoFocusManager: AutoFocusManager
     ) {
         self.dataProvider = dataProvider
         self.routineEngine = routineEngine
         self.pauseEngine = pauseEngine
+        self.routineRepository = routineRepository
         self.selectionStore = selectionStore
         self.autoFocusManager = autoFocusManager
     }
@@ -62,6 +79,7 @@ final class TodayViewModel: ObservableObject {
     }
 
     func load(day: Date, force: Bool = false) async {
+        await refreshRoutineCard()
         let key = DayKey(date: day)
         if force || days[key] == nil {
             withAnimation(.smooth(duration: 0.24)) {
@@ -99,6 +117,8 @@ final class TodayViewModel: ObservableObject {
                 break
             }
         }
+
+        await refreshRoutineCard()
     }
 
     func state(for day: Date) -> TodayDayState {
@@ -182,5 +202,91 @@ final class TodayViewModel: ObservableObject {
         guard case .unavailable(let message) = loadingState else { return false }
         return message.localizedCaseInsensitiveContains("no screen time usage data")
             || message.localizedCaseInsensitiveContains("not available for the requested date yet")
+    }
+
+    private func refreshRoutineCard() async {
+        if let activeRoutine = routineEngine.activeRoutine() {
+            routineCardState = TodayRoutineCardState(
+                id: activeRoutine.routineID,
+                name: activeRoutine.nameSnapshot,
+                icon: activeRoutine.iconSnapshot,
+                detailText: "Activa ahora",
+                phase: .active
+            )
+            return
+        }
+
+        let routines = (try? await routineRepository.routines()) ?? []
+        let now = Date()
+        let nextRoutine = routines.compactMap { routine -> (Routine, Date, TimeZone)? in
+            let nextStarts = routine.triggers.compactMap { trigger -> (Date, TimeZone)? in
+                guard case .schedule(let schedule) = trigger else { return nil }
+                let timeZone = TimeZone(identifier: schedule.timeZoneIdentifier) ?? .current
+                guard let nextStart = nextStartDate(for: schedule, from: now, timeZone: timeZone) else { return nil }
+                return (nextStart, timeZone)
+            }
+            guard let nearest = nextStarts.min(by: { $0.0 < $1.0 }) else { return nil }
+            return (routine, nearest.0, nearest.1)
+        }
+        .min(by: { $0.1 < $1.1 })
+
+        routineCardState = nextRoutine.map { routine, startDate, timeZone in
+            TodayRoutineCardState(
+                id: routine.id,
+                name: routine.name,
+                icon: routine.icon,
+                detailText: upcomingText(for: startDate, timeZone: timeZone),
+                phase: .upcoming
+            )
+        }
+    }
+
+    private func nextStartDate(for schedule: RoutineSchedule, from reference: Date, timeZone: TimeZone) -> Date? {
+        guard !schedule.weekdays.isEmpty else { return nil }
+
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let startOfReferenceDay = calendar.startOfDay(for: reference)
+
+        for offset in 0...7 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startOfReferenceDay) else { continue }
+            let weekdayValue = calendar.component(.weekday, from: day)
+            guard let weekday = Weekday(rawValue: weekdayValue), schedule.weekdays.contains(weekday) else { continue }
+
+            var components = calendar.dateComponents([.year, .month, .day], from: day)
+            components.hour = schedule.hour
+            components.minute = schedule.minute
+            components.second = 0
+
+            guard let candidate = calendar.date(from: components), candidate > reference else { continue }
+            return candidate
+        }
+
+        return nil
+    }
+
+    private func upcomingText(for date: Date, timeZone: TimeZone) -> String {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = Locale(identifier: "es_ES")
+        timeFormatter.timeZone = timeZone
+        timeFormatter.dateFormat = "HH:mm"
+        let timeText = timeFormatter.string(from: date)
+
+        if calendar.isDateInToday(date) {
+            return "Empieza hoy · \(timeText)"
+        }
+        if calendar.isDateInTomorrow(date) {
+            return "Empieza mañana · \(timeText)"
+        }
+
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = Locale(identifier: "es_ES")
+        weekdayFormatter.timeZone = timeZone
+        weekdayFormatter.dateFormat = "EEEE"
+        let weekdayText = weekdayFormatter.string(from: date)
+        return "Empieza \(weekdayText) · \(timeText)"
     }
 }

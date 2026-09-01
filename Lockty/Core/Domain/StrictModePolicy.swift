@@ -30,7 +30,10 @@ struct StrictModePolicy {
         }
 
         switch action {
-        case .stopRoutine, .editRoutine, .deleteRoutine, .modifyBlockedApplications, .modifyDomains, .changePauseRule:
+        case .stopRoutine:
+            return .allowed
+
+        case .editRoutine, .deleteRoutine, .modifyBlockedApplications, .modifyDomains, .changePauseRule:
             return .denied("This routine is running in Strict Mode.")
 
         case .startBreak:

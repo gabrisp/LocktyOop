@@ -56,7 +56,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     )
 
     static func routine(_ routine: Routine) -> ShieldPolicy {
-        let selectionScopes = Set([ScreenTimeSelectionScope.routine(routine.id)] + routine.appGroupIDs.map(ScreenTimeSelectionScope.appGroup))
+        let selectionScopes = Set([ScreenTimeSelectionScope.routine(routine.id)] + routine.appGroupIDs.map(ScreenTimeSelectionScope.appGroupScope))
         return ShieldPolicy(
             blockedApplications: routine.blockedApplications,
             blockedDomains: routine.blockedDomains,
@@ -69,6 +69,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
 nonisolated enum ShieldReason: Codable, Hashable {
     case none
     case routine(UUID)
+    case rule(UUID)
     case pause(AppIdentity.ID)
     case combined
 }

@@ -67,6 +67,19 @@ struct FeatureFactory {
         BreakStatusSheet(state: state)
     }
 
+    func makeAllowanceTimerSheet(route: AllowanceTimerRoute) -> AllowanceTimerSheet {
+        AllowanceTimerSheet(route: route)
+    }
+
+    func makeDayPickerSheet() -> DayPickerSheet {
+        DayPickerSheet(
+            selectedDay: Binding(
+                get: { router.selectedDay },
+                set: { router.selectedDay = Calendar.current.startOfDay(for: $0) }
+            )
+        )
+    }
+
     func makeSettingsView() -> SettingsView {
         SettingsView()
     }
@@ -162,7 +175,8 @@ struct FeatureFactory {
                             ),
                             repository: ruleRepository,
                             selectionStore: selectionStore,
-                            frictionRepository: frictionRepository
+                            frictionRepository: frictionRepository,
+                            appGroupRepository: appGroupRepository
                         ),
                         makeScheduleRuleEditor: { onReturnToRuleChoice in
                             AnyView(
@@ -173,7 +187,8 @@ struct FeatureFactory {
                                         selectionStore: selectionStore,
                                         routineEngine: routineEngine,
                                         usageDataService: usageDataService,
-                                        pauseFlowRepository: pauseFlowRepository
+                                        pauseFlowRepository: pauseFlowRepository,
+                                        appGroupRepository: appGroupRepository
                                     ),
                                     router: router,
                                     startsEditing: true,
@@ -354,7 +369,8 @@ struct FeatureFactory {
                 selectionStore: selectionStore,
                 routineEngine: routineEngine,
                 usageDataService: usageDataService,
-                pauseFlowRepository: pauseFlowRepository
+                pauseFlowRepository: pauseFlowRepository,
+                appGroupRepository: appGroupRepository
             ),
             router: router,
             startsEditing: route.startsEditing,
@@ -368,7 +384,8 @@ struct FeatureFactory {
                 route: route,
                 repository: ruleRepository,
                 selectionStore: selectionStore,
-                frictionRepository: frictionRepository
+                frictionRepository: frictionRepository,
+                appGroupRepository: appGroupRepository
             ),
             makeScheduleRuleEditor: { onReturnToRuleChoice in
                 AnyView(
@@ -383,7 +400,8 @@ struct FeatureFactory {
                             selectionStore: selectionStore,
                             routineEngine: routineEngine,
                             usageDataService: usageDataService,
-                            pauseFlowRepository: pauseFlowRepository
+                            pauseFlowRepository: pauseFlowRepository,
+                            appGroupRepository: appGroupRepository
                         ),
                         router: router,
                         startsEditing: route.ruleID == nil,

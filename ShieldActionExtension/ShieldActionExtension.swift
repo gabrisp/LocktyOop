@@ -5,6 +5,7 @@ import UserNotifications
 
 final class ShieldActionExtension: ShieldActionDelegate {
     private let appGroupStore = AppGroupStore()
+    private let ruleLookup = RuleShieldLookup()
 
     override func handle(
         action: ShieldAction,
@@ -41,6 +42,17 @@ final class ShieldActionExtension: ShieldActionDelegate {
     ) {
         switch action {
         case .primaryButtonPressed:
+            // A limit rule gets the first word: it is the thing holding this app shut,
+            // and it may have nothing left to give today.
+            if case .exhausted(_, let ruleName) = ruleLookup.decision(for: applicationToken) {
+                // Nothing to unlock, so nothing to open Lockty for. The notification is
+                // the only way to say why, since a shield cannot show a message of its
+                // own past the two buttons.
+                postLimitReachedNotification(ruleName: ruleName, token: applicationToken)
+                completionHandler(.close)
+                return
+            }
+
             let context = makeUnlockRequest(for: applicationToken)
             writePendingPause(context)
 
@@ -99,16 +111,41 @@ final class ShieldActionExtension: ShieldActionDelegate {
         let application = Application(token: token)
         let identity = AppIdentity(token: token)
 
+        // A limit rule sets the length of the pass it is handing out -- a session cap is
+        // exactly "this many minutes at a time", and granting the routine's default
+        // instead would have made the number in the editor mean nothing.
+        var limitRuleID: UUID?
+        var allowanceDuration = policy.allowanceDuration
+        if case .allow(let ruleID, let ruleAllowance) = ruleLookup.decision(for: token) {
+            limitRuleID = ruleID
+            allowanceDuration = ruleAllowance
+        }
+
         return PauseContext(
             pauseRuleID: activeRoutine?.routineID ?? identity.id.rawValue.stableUUID,
             appID: identity.id,
             applicationToken: token,
             displayName: application.localizedDisplayName ?? identity.displayName,
-            allowanceDuration: policy.allowanceDuration,
+            allowanceDuration: allowanceDuration,
             steps: policy.steps,
             activeRoutineID: activeRoutine?.routineID,
+            limitRuleID: limitRuleID,
             source: .shieldAction
         )
+    }
+
+    private func postLimitReachedNotification(ruleName: String, token: ApplicationToken) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(ruleName) reached its limit"
+        content.body = "\(Application(token: token).localizedDisplayName ?? "This app") stays blocked until tomorrow."
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "rule-limit-\(ruleName)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
 
     /// Opens `lockty://unlock?...`.

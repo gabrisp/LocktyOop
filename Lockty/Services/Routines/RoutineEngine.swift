@@ -1,6 +1,30 @@
 import Foundation
 import Combine
 
+/// What came of asking the engine to start a routine.
+///
+/// Returned rather than left behind in `state`, because the two answers pull in opposite
+/// directions: the caller needs the reason it was refused, and the engine needs to go on
+/// reporting the routine that is actually running. Parking a `.failed` in `state` to
+/// carry the message made `activeRoutine()` nil for everything else in the app.
+enum RoutineStartOutcome: Equatable {
+    case started
+    /// Already the running routine. Nothing happened, and nothing needed to.
+    case alreadyRunning
+    /// Something else is running, so this one was refused.
+    case blocked(String)
+    case failed(String)
+
+    var errorMessage: String? {
+        switch self {
+        case .started, .alreadyRunning:
+            nil
+        case .blocked(let message), .failed(let message):
+            message
+        }
+    }
+}
+
 enum RoutineEngineState: Equatable {
     case inactive
     case starting(UUID)
@@ -56,14 +80,43 @@ final class RoutineEngine: ObservableObject {
         }
     }
 
-    func start(_ routine: Routine, trigger: RoutineTrigger = .manual) async {
-        if case .active(let current) = state {
-            if current.routineID == routine.id {
-                return
+    /// Starts a routine, unless something is already running.
+    ///
+    /// Every way of already running is refused here, not just `.active`. A routine on a
+    /// break is still the running routine, and `.starting` is one that is halfway
+    /// through this same function -- both used to fall straight through and overwrite
+    /// `runtime.activeRoutine`, which left the first routine's shields applied with
+    /// nothing pointing at them any more.
+    ///
+    /// The App Group is consulted too. A routine the monitor extension started while the
+    /// app was not running is in the runtime state and *not* in this engine's `state`,
+    /// so a manual start displaced it without ever noticing it was there.
+    @discardableResult
+    func start(_ routine: Routine, trigger: RoutineTrigger = .manual) async -> RoutineStartOutcome {
+        let running: ActiveRoutine?
+        switch state {
+        case .active(let current), .onBreak(let current, _):
+            running = current
+        case .starting(let id):
+            // Already on its way in from an earlier call to this function.
+            guard id != routine.id else { return .alreadyRunning }
+            running = (try? appGroupStore.loadRuntimeState())?.activeRoutine
+        default:
+            running = (try? appGroupStore.loadRuntimeState())?.activeRoutine
+        }
+
+        if let running {
+            guard running.routineID != routine.id else {
+                // Already the one running: make the engine agree with the runtime state
+                // rather than reporting a failure for a routine that is up.
+                if case .onBreak = state {} else { state = .active(running) }
+                return .alreadyRunning
             }
 
-            state = .failed("Another routine is already active.")
-            return
+            // The engine keeps reporting the routine that really is running. Only the
+            // caller is told why this one was refused.
+            state = .active(running)
+            return .blocked("\(running.nameSnapshot) is already running. End it first.")
         }
 
         state = .starting(routine.id)
@@ -92,11 +145,14 @@ final class RoutineEngine: ObservableObject {
 
         do {
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: nil,
                 activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.activeRoutine = activeRoutine
@@ -114,8 +170,10 @@ final class RoutineEngine: ObservableObject {
             )
             state = .active(activeRoutine)
             try? await alarmService.triggerRoutineStartAlarm(for: routine)
+            return .started
         } catch {
             state = .failed(error.localizedDescription)
+            return .failed(error.localizedDescription)
         }
     }
 
@@ -192,13 +250,16 @@ final class RoutineEngine: ObservableObject {
         // Anything a standalone Pause still blocks goes back on top of the cleared state.
         // Its failure is survivable in the right direction: nothing shielded.
         let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
         let residualPolicy = shieldPolicyResolver.resolve(
             activeRoutine: nil,
             activeBreak: nil,
             // Not the live allowance: an allowance only exists to let an app through a
             // routine's shield, and the routine is going.
             activePauseAllowance: nil,
-            pauseRules: pauseRules
+            pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
         )
         if !residualPolicy.blocksNothing {
             do {
@@ -274,11 +335,14 @@ final class RoutineEngine: ObservableObject {
             )
 
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: activeBreak,
                 activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
 
             try appGroupStore.updateRuntimeState { runtime in
@@ -380,16 +444,24 @@ final class RoutineEngine: ObservableObject {
                 )
             }
 
-            if let lastEndedAt = breakHistory.compactMap(\.endedAt).max() {
-                let elapsed = Date().timeIntervalSince(lastEndedAt)
-                guard elapsed >= policy.minimumInterval else {
-                    let remainingSeconds = max(policy.minimumInterval - elapsed, 0)
-                    let remainingMinutes = max(Int(ceil(remainingSeconds / 60)), 1)
+            // A break's endedAt is only written by endBreakIfNeeded, which needs the app
+            // to be running when the break expires. One that ran out in the background --
+            // the monitor extension clears activeBreak and nothing writes the end -- left
+            // a record with no endedAt at all, so `max()` was nil and the cooldown simply
+            // never applied. The break's own duration says when it was over, so an
+            // unfinished record falls back to that rather than being skipped.
+            let lastEnd = breakHistory
+                .map { $0.endedAt ?? $0.startedAt.addingTimeInterval(policy.maximumDuration) }
+                .max()
+
+            if let lastEnd {
+                let retryAt = lastEnd.addingTimeInterval(policy.minimumInterval)
+                guard Date() >= retryAt else {
                     return .unavailable(
                         BreakUnavailableState(
                             title: "Cooldown",
                             message: "Espera para volver a pedir otro break.",
-                            remainingMinutes: remainingMinutes
+                            retryAt: retryAt
                         )
                     )
                 }
@@ -423,11 +495,14 @@ final class RoutineEngine: ObservableObject {
             try await executionRepository.save(execution)
 
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: activeRoutine,
                 activeBreak: nil,
                 activePauseAllowance: try appGroupStore.loadRuntimeState().livePauseAllowance,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.activeBreak = nil

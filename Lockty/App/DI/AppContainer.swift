@@ -170,6 +170,7 @@ final class AppContainer {
             dataProvider: todayPipeline,
             routineEngine: routineEngine,
             pauseEngine: pauseEngine,
+            routineRepository: routineRepository,
             selectionStore: selectionStore,
             autoFocusManager: autoFocusManager
         )
@@ -190,6 +191,7 @@ final class AppContainer {
             routineEngine: routineEngine,
             repository: ruleRepository,
             appGroupRepository: appGroupRepository,
+            scheduleCoordinator: routineScheduleCoordinator,
             selectionStore: selectionStore
         )
         let focusViewModel = FocusViewModel()
@@ -268,7 +270,8 @@ final class AppContainer {
             frictionRepository: frictionRepository,
             notificationService: notificationService,
             routineEngine: routineEngine,
-            shieldService: shieldService
+            shieldService: shieldService,
+            scheduleCoordinator: routineScheduleCoordinator
         )
 
         return AppContainer(

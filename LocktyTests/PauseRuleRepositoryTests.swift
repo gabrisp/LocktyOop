@@ -13,7 +13,7 @@ struct PauseRuleRepositoryTests {
     }
 
     @Test
-    func savesAndFetchesRuleWithOrderedSteps() async {
+    func savesAndFetchesRuleWithOrderedSteps() async throws {
         let repository = makeRepository()
 
         let rule = PauseRule(
@@ -27,7 +27,7 @@ struct PauseRuleRepositoryTests {
             allowanceDuration: 300
         )
 
-        await repository.save(rule)
+        try await repository.save(rule)
         let fetched = await repository.rules()
 
         #expect(fetched.count == 1)
@@ -47,7 +47,7 @@ struct PauseRuleRepositoryTests {
     }
 
     @Test
-    func fetchesRuleByAppID() async {
+    func fetchesRuleByAppID() async throws {
         let repository = makeRepository()
         let rule = PauseRule(
             application: AppIdentity(id: "tiktok", displayName: "TikTok"),
@@ -55,14 +55,14 @@ struct PauseRuleRepositoryTests {
             steps: [.countdown(CountdownConfiguration(duration: 5))],
             allowanceDuration: 120
         )
-        await repository.save(rule)
+        try await repository.save(rule)
 
         let fetched = await repository.rule(for: "tiktok")
         #expect(fetched?.id == rule.id)
     }
 
     @Test
-    func deletesRule() async {
+    func deletesRule() async throws {
         let repository = makeRepository()
         let rule = PauseRule(
             application: AppIdentity(id: "x", displayName: "X"),
@@ -70,8 +70,8 @@ struct PauseRuleRepositoryTests {
             steps: [.countdown(CountdownConfiguration(duration: 5))],
             allowanceDuration: 60
         )
-        await repository.save(rule)
-        await repository.delete(id: rule.id)
+        try await repository.save(rule)
+        try await repository.delete(id: rule.id)
 
         let fetched = await repository.rules()
         #expect(fetched.isEmpty)

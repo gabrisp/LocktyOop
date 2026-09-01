@@ -21,6 +21,8 @@ struct LocktySectionTitle: View {
     /// Draws the heading style and its chevron without taking the tap itself, for cards
     /// that are already a button in their entirety.
     var showsChevron = false
+    /// Uses the larger inline title styling without falling back to the old eyebrow.
+    var usesProminentStyle = false
 
     @State private var isShowingInfo = false
 
@@ -67,6 +69,14 @@ struct LocktySectionTitle: View {
         self.showsChevron = showsChevron
     }
 
+    init(_ title: String, prominent: Bool, showsChevron: Bool = false) {
+        self.title = title
+        self.showsSeparator = false
+        self.accessory = nil
+        self.showsChevron = showsChevron
+        self.usesProminentStyle = prominent
+    }
+
     init<Inline: View>(
         _ title: String,
         info: String? = nil,
@@ -102,7 +112,7 @@ struct LocktySectionTitle: View {
             }
 
             HStack(spacing: LocktySpacing.sm) {
-                if onOpen != nil || showsChevron {
+                if onOpen != nil || showsChevron || usesProminentStyle {
                     // The usage card's heading, verbatim -- it is the one every other
                     // card matches, not the other way round.
                     // subheadline over headline, and footnote over subheadline for the
@@ -113,9 +123,11 @@ struct LocktySectionTitle: View {
                         .foregroundStyle(Color.white.opacity(0.72))
                         .lineLimit(1)
 
-                    Image(systemName: "chevron.right")
-                        .font(.system(.footnote, design: .default, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.58))
+                    if onOpen != nil || showsChevron {
+                        Image(systemName: "chevron.right")
+                            .font(.system(.footnote, design: .default, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.58))
+                    }
 
                     inlineAccessory
                         .padding(.leading, LocktySpacing.xs)

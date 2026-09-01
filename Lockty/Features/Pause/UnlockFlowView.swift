@@ -11,7 +11,8 @@ struct UnlockFlowView: View {
     let tokens: [ApplicationToken]
     /// Preselected when the flow was opened from a specific app.
     var initialToken: ApplicationToken?
-    let frictionSteps: [PauseStep]
+    /// Everything the friction was configured with, breathing included.
+    let configuredSteps: [PauseStep]
     let allowanceRange: ClosedRange<Int>
     let nfcService: NFCServicing?
     let locationService: LocationTriggerServicing?
@@ -47,7 +48,7 @@ struct UnlockFlowView: View {
     ) {
         self.tokens = tokens
         self.initialToken = initialToken
-        self.frictionSteps = frictionSteps
+        self.configuredSteps = frictionSteps
         self.allowanceRange = allowanceRange
         self.nfcService = nfcService
         self.locationService = locationService
@@ -60,6 +61,30 @@ struct UnlockFlowView: View {
         _minutes = State(
             initialValue: min(max(defaultMinutes, allowanceRange.lowerBound), allowanceRange.upperBound)
         )
+    }
+
+    /// The steps the flow actually walks through.
+    ///
+    /// Breathing is not one of them. The flow already opens on a breathe that cannot be
+    /// removed, so a breathing step added on top was a second, identical screen a few
+    /// taps later. It configures the one at the front instead -- see `restSeconds` --
+    /// and does not appear here.
+    private var frictionSteps: [PauseStep] {
+        configuredSteps.filter {
+            if case .breathing = $0 { return false }
+            return true
+        }
+    }
+
+    /// The breathing step's settings, when the friction carries one. Nil means the
+    /// opening breathe runs at its own default length.
+    private var breathingConfiguration: BreathingConfiguration? {
+        for step in configuredSteps {
+            if case .breathing(let configuration) = step {
+                return configuration
+            }
+        }
+        return nil
     }
 
     private static let allAppsOptionID = "all"
@@ -84,17 +109,15 @@ struct UnlockFlowView: View {
     private var title: String {
         switch step {
         case .rest:
-            return "Respira..."
+            // The ring is the whole screen. A word over it only names what it is doing.
+            return ""
         case .app:
             return "Quiero usar..."
-        case .friction(let index):
-            guard frictionSteps.indices.contains(index) else { return "" }
-            switch frictionSteps[index] {
-            case .wordSearch, .letterMatch, .operations:
-                return ""
-            default:
-                return frictionSteps[index].title
-            }
+        case .friction:
+            // No titles over the friction steps either. Each one is already a picture of
+            // what it is asking for, and the word above it only labelled the obvious --
+            // the puzzles had dropped theirs for that reason and the rest had not.
+            return ""
         case .duration:
             return "Durante..."
         }
@@ -121,7 +144,10 @@ struct UnlockFlowView: View {
     private var restSeconds: Int {
         switch step {
         case .rest:
-            return 5
+            // Five seconds unless the friction asked for a number of breaths, in which
+            // case that is what the opening breathe runs for.
+            guard let breathingConfiguration else { return 5 }
+            return max(breathingConfiguration.breathCount * 4, 1)
         case .friction(let index):
             guard frictionSteps.indices.contains(index) else { return 0 }
             switch frictionSteps[index] {
@@ -219,29 +245,21 @@ struct UnlockFlowView: View {
     @ViewBuilder
     private func frictionContent(_ frictionStep: PauseStep) -> some View {
         switch frictionStep {
-        case .countdown(let configuration):
+        case .countdown:
+            // The glyph, and nothing written under it. The seconds are already running
+            // down inside the primary button -- the label here was the configured length
+            // rather than what is left, so it sat there contradicting the live number.
             UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
-                VStack(spacing: LocktySpacing.lg) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 40, weight: .light))
-                        .foregroundStyle(LocktyColors.primaryText)
-                    Text("\(Int(configuration.duration)) seconds")
-                        .font(.system(.title3, design: .rounded, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-                }
-                .frame(maxWidth: .infinity)
+                Image(systemName: "timer")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity)
             }
 
-        case .breathing(let configuration):
-            UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
-                VStack(spacing: LocktySpacing.lg) {
-                    BreathingRest()
-                    Text("\(configuration.breathCount) slow breaths")
-                        .font(.system(.title3, design: .rounded, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-                }
-                .frame(maxWidth: .infinity)
-            }
+        case .breathing:
+            // Filtered out of `frictionSteps`: it is the opening breathe's duration, not
+            // a screen. Unreachable, and here only because the switch is exhaustive.
+            EmptyView()
 
         case .intention(let configuration),
              .intentionTemplate(let configuration),

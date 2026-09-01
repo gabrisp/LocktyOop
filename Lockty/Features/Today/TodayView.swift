@@ -15,6 +15,18 @@ struct TodayView: View {
         viewModel.state(for: day)
     }
 
+    /// What the day button says. "Today" only while today is what is on screen -- a
+    /// button that read "Today" over a different day's numbers would be lying about
+    /// which day you were looking at.
+    private var dayButtonTitle: String {
+        guard !Calendar.current.isDateInToday(day) else { return "Today" }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_ES")
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: day)
+    }
+
     private var collapseProgress: CGFloat {
     //     Sticky header collapse animation paused.
 
@@ -113,7 +125,7 @@ struct TodayView: View {
         // Ending a routine takes its cards off the screen rather than having them
         // disappear between one frame and the next: the mode card and the checklist both
         // belong to the routine that was running.
-        .animation(.smooth(duration: 0.34), value: viewModel.activeRoutine?.id)
+        .animation(.smooth(duration: 0.34), value: viewModel.routineCardState?.id)
         .animation(.smooth(duration: 0.34), value: state.activeRoutineChecklist?.id)
         .onChange(of: collapseProgress, initial: true) { _, newValue in
             router.todayChromeCollapseProgress = newValue
@@ -278,6 +290,34 @@ struct TodayView: View {
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
+                // Top of Today: the running routine comes before everything else. An
+                // unlock request, when there is one, sits even above that because it is
+                // waiting on immediate action.
+                if let routineCardState = viewModel.routineCardState {
+                    ActiveModeCard(
+                        state: routineCardState,
+                        activeRoutine: viewModel.activeRoutine,
+                        tokens: viewModel.activeRoutineTokens,
+                        allowance: viewModel.activePauseAllowance,
+                        onUnlock: { token in
+                            router.presentFullScreen(.unlockFlow(token))
+                        },
+                        onShowAllowance: { token in
+                            guard let allowance = viewModel.activePauseAllowance else { return }
+                            router.presentSheet(
+                                .allowanceTimer(
+                                    AllowanceTimerRoute(
+                                        appID: AppIdentity.ID(token: token),
+                                        token: token,
+                                        expiresAt: allowance.expiresAt
+                                    )
+                                )
+                            )
+                        }
+                    )
+                    .transition(.blurReplace.combined(with: .opacity))
+                }
+
                 if let checklist = state.activeRoutineChecklist {
                     ActiveRoutineChecklistCard(
                         state: checklist,
@@ -295,26 +335,26 @@ struct TodayView: View {
                 // report landed. The real cards are on screen from the first frame; each
                 // individual unknown value inside them blurs itself until it is known.
 
-                DailyPerspectiveStackSection(
-                    perspectives: viewModel.visiblePerspectives(for: day),
-                    onDismiss: { perspective in
-                        viewModel.dismissPerspective(perspective.id, day: day)
-                    }
-                )
-
-                MyDaySection(activities: state.activities)
-
-                DigitalBalanceCard(state: state.timeline) {
-                    router.presentSheet(.digitalBalanceDetail(day))
-                }
+//                DailyPerspectiveStackSection(
+//                    perspectives: viewModel.visiblePerspectives(for: day),
+//                    onDismiss: { perspective in
+//                        viewModel.dismissPerspective(perspective.id, day: day)
+//                    }
+//                )
+//
+//                MyDaySection(activities: state.activities)
+//
+//                DigitalBalanceCard(state: state.timeline) {
+//                    router.presentSheet(.digitalBalanceDetail(day))
+//                }
 
                 VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                    LocktySectionTitle(
-                        "Breakdown",
-                        info: "Headline numbers for the day. Tap any card to see what went into it.",
-                        showsSeparator: false
-                    )
-                    .padding(.top, 16)
+//                    LocktySectionTitle(
+//                        "Breakdown",
+//                        info: "Headline numbers for the day. Tap any card to see what went into it.",
+//                        showsSeparator: false
+//                    )
+//                    .padding(.top, 16)
                     TodayMetricGrid(state: state) { metric in
                         switch metric {
                         case .screenTime: router.presentSheet(.screenTimeDetail(day))
@@ -325,26 +365,6 @@ struct TodayView: View {
                         case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
                         }
                     }
-                }
-
-                // Order on Today: checklist, the running mode, then usage. The mode card
-                // only exists while something is actually running.
-                if let activeRoutine = viewModel.activeRoutine {
-                    ActiveModeCard(
-                        routine: activeRoutine,
-                        tokens: viewModel.activeRoutineTokens,
-                        allowance: viewModel.activePauseAllowance,
-                        onOpenApps: {
-                            router.presentFullScreen(.unlockFlow(nil))
-                        },
-                        onUnlock: { token in
-                            router.presentFullScreen(.unlockFlow(token))
-                        },
-                        onStop: {
-                            Task { await viewModel.stopActiveRoutine(day: day) }
-                        }
-                    )
-                    .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 AppUsageListCard(state: state) { appUsage, classification in
@@ -379,6 +399,16 @@ struct TodayView: View {
         // the content, and the black one was just taken out for the same reason.
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    router.presentSheet(.dayPicker)
+                } label: {
+                    Text(dayButtonTitle)
+                        .font(.system(.subheadline, design: .default, weight: .medium))
+                        .foregroundStyle(LocktyColors.primaryText)
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     // Not wired up yet.

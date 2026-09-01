@@ -21,7 +21,29 @@ struct RoutineScheduleCoordinator {
         self.deviceActivityService = deviceActivityService
     }
 
+    /// Registers the daily budget of every usage-limited rule, and drops the counters of
+    /// rules that are gone.
+    ///
+    /// Separate from the routine sync above only because the two read different stores;
+    /// `sync()` calls both, so nothing has to remember to call this one on its own.
+    func syncRules() async {
+        let rules = appGroupStore.loadStoredRules()
+
+        var enforcement = appGroupStore.loadRuleEnforcementState()
+        enforcement.prune(keeping: Set(rules.map(\.id)))
+        try? appGroupStore.saveRuleEnforcementState(enforcement)
+
+        do {
+            try await deviceActivityService.syncRuleSchedules(rules)
+            print("Synced \(rules.count) rule(s) for background enforcement")
+        } catch {
+            print("Rule schedule sync failed: \(error.localizedDescription)")
+        }
+    }
+
     func sync() async {
+        await syncRules()
+
         guard let routines = try? await repository.routines() else { return }
 
         let snapshots: [RoutineScheduleSnapshot] = routines.compactMap { routine in

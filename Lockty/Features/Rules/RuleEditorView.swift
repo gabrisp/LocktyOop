@@ -21,6 +21,8 @@ final class RuleEditorViewModel: ObservableObject {
     @Published var breakResetPeriod: RuleResetPeriod = .daily
     @Published var requiredFrictionID: UUID?
     @Published var errorMessage: String?
+    @Published private(set) var appGroups: [LocktySelectableAppGroup] = []
+    @Published var selectedAppGroupIDs: Set<UUID> = []
     @Published private(set) var selectionPreview = FamilyActivitySelection()
     @Published private(set) var selectedApplicationCount = 0
     @Published private(set) var frictions: [Friction] = []
@@ -28,6 +30,7 @@ final class RuleEditorViewModel: ObservableObject {
     private let repository: RuleRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let frictionRepository: FrictionRepository
+    private let appGroupRepository: UserAppGroupRepository
     private let initialRuleID: UUID?
     private var hasLoaded = false
     private var createdAt: Date
@@ -48,6 +51,7 @@ final class RuleEditorViewModel: ObservableObject {
         var breakResetPeriod: RuleResetPeriod
         var requiredFrictionID: UUID?
         var selectedApplicationCount: Int
+        var selectedAppGroupIDs: Set<UUID>
     }
 
     init(
@@ -55,7 +59,8 @@ final class RuleEditorViewModel: ObservableObject {
         draftID: UUID,
         repository: RuleRepository,
         selectionStore: ScreenTimeSelectionStore,
-        frictionRepository: FrictionRepository
+        frictionRepository: FrictionRepository,
+        appGroupRepository: UserAppGroupRepository
     ) {
         self.initialRuleID = ruleID
         self.editingID = ruleID ?? UUID()
@@ -63,6 +68,7 @@ final class RuleEditorViewModel: ObservableObject {
         self.repository = repository
         self.selectionStore = selectionStore
         self.frictionRepository = frictionRepository
+        self.appGroupRepository = appGroupRepository
         createdAt = Date()
     }
 
@@ -103,7 +109,8 @@ final class RuleEditorViewModel: ObservableObject {
             minimumBreakIntervalMinutes: minimumBreakIntervalMinutes,
             breakResetPeriod: breakResetPeriod,
             requiredFrictionID: requiredFrictionID,
-            selectedApplicationCount: selectedApplicationCount
+            selectedApplicationCount: selectedApplicationCount,
+            selectedAppGroupIDs: selectedAppGroupIDs
         )
     }
 
@@ -111,6 +118,7 @@ final class RuleEditorViewModel: ObservableObject {
         guard !hasLoaded else { return }
         hasLoaded = true
         await loadFrictions()
+        await loadAppGroups()
 
         guard let initialRuleID else {
             try? selectionStore.remove(scope: draftSelectionScope)
@@ -129,7 +137,7 @@ final class RuleEditorViewModel: ObservableObject {
         name = rule.name
         kind = rule.kind
         isEnabled = rule.isEnabled
-        maximumOpens = rule.openCountLimitConfiguration?.maximumOpens ?? 10
+        maximumOpens = Self.clampedOpenCount(rule.openCountLimitConfiguration?.maximumOpens ?? 10)
         openCountWindowHours = rule.openCountLimitConfiguration?.windowHours ?? 24
         maximumDailyMinutes = rule.dailyUsageLimitConfiguration?.maximumMinutesPerDay ?? 30
         dailyResetPeriod = rule.dailyUsageLimitConfiguration?.resetPeriod ?? .daily
@@ -139,6 +147,7 @@ final class RuleEditorViewModel: ObservableObject {
         minimumBreakIntervalMinutes = max(rule.breakPolicy.cooldownMinutes, 1)
         breakResetPeriod = rule.breakPolicy.resetPeriod
         requiredFrictionID = rule.breakPolicy.requiredFrictionID
+        selectedAppGroupIDs = rule.appGroupIDs.intersection(Set(appGroups.map(\.id)))
         if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
             try? selectionStore.save(selection, scope: draftSelectionScope)
         } else {
@@ -222,8 +231,8 @@ final class RuleEditorViewModel: ObservableObject {
         }
 
         let selection = selectionPreview
-        guard !selection.applicationTokens.isEmpty else {
-            errorMessage = "Select at least one app."
+        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selectedAppGroupIDs.isEmpty else {
+            errorMessage = "Select at least one app or group."
             return false
         }
 
@@ -237,10 +246,11 @@ final class RuleEditorViewModel: ObservableObject {
             name: trimmedName,
             isEnabled: isEnabled,
             kind: kind,
+            appGroupIDs: selectedAppGroupIDs,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             openCountLimitConfiguration: kind == .openCountLimit
                 ? OpenCountLimitRuleConfiguration(
-                    maximumOpens: maximumOpens,
+                    maximumOpens: Self.clampedOpenCount(maximumOpens),
                     windowHours: openCountWindowHours
                 )
                 : nil,
@@ -280,8 +290,39 @@ final class RuleEditorViewModel: ObservableObject {
         }
     }
 
+    static func clampedOpenCount(_ value: Int) -> Int {
+        min(max(value, 1), 10)
+    }
+
     func discardDraft() {
         try? selectionStore.remove(scope: draftSelectionScope)
+    }
+
+    private func loadAppGroups() async {
+        let loadedGroups = await appGroupRepository.appGroups()
+        let suggestedGroups = ReusableAppGroupDefinition.builtIn.map { definition in
+            let selection = (try? selectionStore.load(scope: definition.selectionScope)) ?? FamilyActivitySelection()
+            return LocktySelectableAppGroup(
+                id: definition.id,
+                name: definition.name,
+                itemCount: selection.applicationTokens.count + selection.categoryTokens.count
+            )
+        }
+        let suggestedGroupIDs = Set(suggestedGroups.map(\.id))
+        let userGroups = loadedGroups.filter { !suggestedGroupIDs.contains($0.id) }.map { group in
+            let selection = (try? selectionStore.load(scope: .appGroup(group.id))) ?? FamilyActivitySelection()
+            return LocktySelectableAppGroup(
+                id: group.id,
+                name: group.name,
+                itemCount: selection.applicationTokens.count + selection.categoryTokens.count
+            )
+        }
+        let selectableGroups = suggestedGroups + userGroups
+        let availableIDs = Set(selectableGroups.map(\.id))
+        withAnimation(.smooth(duration: 0.24)) {
+            appGroups = selectableGroups
+            selectedAppGroupIDs = selectedAppGroupIDs.intersection(availableIDs)
+        }
     }
 }
 
@@ -524,10 +565,10 @@ struct RuleEditorView: View {
                 ],
                 spacing: LocktySpacing.md
             ) {
-                kindTile(kind: .schedule, subtitle: "Schedule based routine")
-                kindTile(kind: .openCountLimit, subtitle: "Max opens in a time window")
-                kindTile(kind: .dailyUsageLimit, subtitle: "Max minutes per day")
-                kindTile(kind: .sessionDurationLimit, subtitle: "Max minutes per session")
+                kindTile(kind: .schedule, subtitle: "Scheduled blocking")
+                kindTile(kind: .openCountLimit, subtitle: "App open limit")
+                kindTile(kind: .dailyUsageLimit, subtitle: "Daily time limit")
+                kindTile(kind: .sessionDurationLimit, subtitle: "Session time limit")
             }
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.lg)
@@ -555,7 +596,7 @@ struct RuleEditorView: View {
 
                     Spacer(minLength: 0)
 
-                    Text(kind.title)
+                    Text(displayName(for: kind))
                         .font(LocktyTypography.headline)
                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -579,7 +620,7 @@ struct RuleEditorView: View {
                 .padding(.vertical, LocktySpacing.md)
                 .background(Capsule(style: .continuous).fill(LocktyColors.elevatedBackground))
 
-            Text(viewModel.kind?.title ?? "")
+            Text(viewModel.kind.map(displayName(for:)) ?? "")
                 .font(.system(.subheadline, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -590,22 +631,13 @@ struct RuleEditorView: View {
 
     private var editorContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            sectionHeading("Rule type", systemImage: symbolName(for: viewModel.kind ?? .openCountLimit))
-
-            summaryCard(
-                title: viewModel.kind?.title ?? "Rule",
-                subtitle: conditionSummary
-            )
-
-            sectionHeading("Condition", systemImage: "line.3.horizontal.decrease.circle")
+            sectionHeading(conditionSectionTitle, systemImage: conditionSectionIcon)
 
             conditionCard
 
-            sectionHeading("Apps blocked", systemImage: "lock.shield")
+            sectionHeading("Blocked Apps", systemImage: "lock.shield")
 
             appsRow
-
-            breakRow
 
             LocktyHoldButton(title: viewModel.isCreating ? "Mantén para confirmar" : "Mantén para guardar") {
                 Task {
@@ -628,33 +660,19 @@ struct RuleEditorView: View {
         VStack(spacing: 0) {
             switch viewModel.kind {
             case .openCountLimit:
-                menuRow(
-                    title: "Max opens",
-                    valueText: "\(viewModel.maximumOpens)",
-                    options: Array(1...50),
-                    format: { "\($0)" },
-                    selection: Binding(
+                openCountStepperRow(
+                    title: "App Opens",
+                    subtitle: "Per day",
+                    value: Binding(
                         get: { viewModel.maximumOpens },
-                        set: { viewModel.maximumOpens = $0 }
-                    )
-                )
-
-                dividerInset
-
-                menuRow(
-                    title: "Window",
-                    valueText: "\(viewModel.openCountWindowHours) h",
-                    options: Array(1...24),
-                    format: { "\($0) h" },
-                    selection: Binding(
-                        get: { viewModel.openCountWindowHours },
-                        set: { viewModel.openCountWindowHours = $0 }
+                        set: { viewModel.maximumOpens = RuleEditorViewModel.clampedOpenCount($0) }
                     )
                 )
             case .dailyUsageLimit:
                 menuRow(
-                    title: "Daily usage",
+                    title: "Usage Time",
                     valueText: "\(viewModel.maximumDailyMinutes) min",
+                    subtitle: "Daily",
                     options: Array(stride(from: 5, through: 360, by: 5)),
                     format: { "\($0) min" },
                     selection: Binding(
@@ -662,13 +680,9 @@ struct RuleEditorView: View {
                         set: { viewModel.maximumDailyMinutes = $0 }
                     )
                 )
-
-                dividerInset
-
-                resetPeriodRow(selection: $viewModel.dailyResetPeriod)
             case .sessionDurationLimit:
                 menuRow(
-                    title: "Session limit",
+                    title: "Session Time",
                     valueText: "\(viewModel.maximumSessionMinutes) min",
                     options: Array(1...120),
                     format: { "\($0) min" },
@@ -690,39 +704,11 @@ struct RuleEditorView: View {
         } label: {
             HStack(spacing: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Apps selected")
+                    Text("Apps seleccionadas")
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
-                    Text(viewModel.selectedApplicationCount == 0 ? "Choose apps" : "\(viewModel.selectedApplicationCount) selected")
-                        .font(.system(.footnote, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.secondaryText)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(LocktyColors.secondaryText)
-            }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
-        }
-        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
-    }
-
-    private var breakRow: some View {
-        Button {
-            openChildSheet(.breakSettings)
-        } label: {
-            HStack(spacing: LocktySpacing.md) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Break")
-                        .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
-
-                    Text(breakSummary)
+                    Text(selectionCountText)
                         .font(.system(.footnote, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                 }
@@ -880,22 +866,27 @@ struct RuleEditorView: View {
 
     private var selectionScreen: some View {
         VStack {
-            LocktyActivitySelectionView(
-                title: "Seleccionadas",
-                addLabel: "Añadir App o categoría",
-                selection: Binding(
-                    get: { viewModel.selectionPreview },
-                    set: { newValue in
-                        withAnimation(.smooth(duration: 0.28)) {
-                            viewModel.replaceSelection(newValue)
+                LocktyActivitySelectionView(
+                    title: "Seleccionadas",
+                    addLabel: "Añadir App o categoría",
+                    selection: Binding(
+                        get: { viewModel.selectionPreview },
+                        set: { newValue in
+                            withAnimation(.smooth(duration: 0.28)) {
+                                viewModel.replaceSelection(newValue)
+                            }
                         }
-                    }
-                ),
-                rules: .routine,
-                suggestions: [],
-                onClose: {},
-                onDone: {}
-            )
+                    ),
+                    selectedAppGroupIDs: Binding(
+                        get: { viewModel.selectedAppGroupIDs },
+                        set: { viewModel.selectedAppGroupIDs = $0 }
+                    ),
+                    rules: .routine,
+                    suggestions: [],
+                    appGroups: viewModel.appGroups,
+                    onClose: {},
+                    onDone: {}
+                )
         }
     }
 
@@ -903,14 +894,6 @@ struct RuleEditorView: View {
         Divider()
             .overlay(Color.white.opacity(0.10))
             .padding(.leading, 16)
-    }
-
-    private var breakSummary: String {
-        guard viewModel.breaksAllowed else { return "No breaks allowed" }
-        let breakCount = viewModel.maximumBreaks == 1 ? "1 break" : "\(viewModel.maximumBreaks) breaks"
-        let duration = "\(viewModel.maximumBreakMinutes)m"
-        let friction = viewModel.selectedFriction?.name ?? "Choose friction"
-        return "\(breakCount) · \(duration) · \(friction)"
     }
 
     private var conditionSummary: String {
@@ -926,6 +909,122 @@ struct RuleEditorView: View {
         case .none:
             return "Choose a rule type"
         }
+    }
+
+    private var conditionSectionTitle: String {
+        switch viewModel.kind {
+        case .openCountLimit:
+            return "Open Count"
+        case .dailyUsageLimit:
+            return "Daily Usage"
+        case .sessionDurationLimit:
+            return "Session Duration"
+        case .schedule:
+            return "Schedule"
+        case .none:
+            return "Rule"
+        }
+    }
+
+    private var conditionSectionIcon: String {
+        switch viewModel.kind {
+        case .openCountLimit:
+            return "lock"
+        case .dailyUsageLimit:
+            return "hourglass"
+        case .sessionDurationLimit:
+            return "timer"
+        case .schedule:
+            return "calendar"
+        case .none:
+            return "line.3.horizontal.decrease.circle"
+        }
+    }
+
+    private var selectionCountText: String {
+        RestrictionSummary.appsCategoriesAndGroups(
+            apps: viewModel.selectionPreview.applicationTokens.count,
+            categories: viewModel.selectionPreview.categoryTokens.count,
+            groups: viewModel.selectedAppGroupIDs.count
+        ) ?? "Seleccionar"
+    }
+
+    private func displayName(for kind: RuleKind) -> String {
+        switch kind {
+        case .schedule:
+            return "Schedule"
+        case .openCountLimit:
+            return "Open Count"
+        case .dailyUsageLimit:
+            return "Daily Usage"
+        case .sessionDurationLimit:
+            return "Session Duration"
+        }
+    }
+
+    private func openCountStepperRow(
+        title: String,
+        subtitle: String,
+        value: Binding<Int>
+    ) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(subtitle)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                withAnimation(.smooth(duration: 0.22)) {
+                    value.wrappedValue -= 1
+                }
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.locktyInteractive(shape: Circle()))
+            .tappable()
+            .disabled(value.wrappedValue <= 1)
+            .opacity(value.wrappedValue <= 1 ? 0.35 : 1)
+
+            Text("\(value.wrappedValue)")
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.smooth(duration: 0.24), value: value.wrappedValue)
+                .frame(minWidth: 32)
+                .multilineTextAlignment(.center)
+
+            Button {
+                withAnimation(.smooth(duration: 0.22)) {
+                    value.wrappedValue += 1
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.locktyInteractive(shape: Circle()))
+            .tappable()
+            .disabled(value.wrappedValue >= 10)
+            .opacity(value.wrappedValue >= 10 ? 0.35 : 1)
+        }
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
     }
 
     private func symbolName(for kind: RuleKind) -> String {
@@ -944,32 +1043,41 @@ struct RuleEditorView: View {
     private func menuRow(
         title: String,
         valueText: String,
+        subtitle: String? = nil,
         options: [Int],
         format: @escaping (Int) -> String,
         selection: Binding<Int>
     ) -> some View {
-        Menu {
-            ForEach(options, id: \.self) { option in
-                Button {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        selection.wrappedValue = option
-                    }
-                } label: {
-                    if selection.wrappedValue == option {
-                        Label(format(option), systemImage: "checkmark")
-                    } else {
-                        Text(format(option))
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: LocktySpacing.md) {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
-                Spacer(minLength: 0)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+            }
 
+            Spacer(minLength: 0)
+
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            selection.wrappedValue = option
+                        }
+                    } label: {
+                        if selection.wrappedValue == option {
+                            Label(format(option), systemImage: "checkmark")
+                        } else {
+                            Text(format(option))
+                        }
+                    }
+                }
+            } label: {
                 HStack(spacing: LocktySpacing.xs) {
                     Text(valueText)
                         .font(.system(.subheadline, design: .default, weight: .regular))
@@ -981,12 +1089,12 @@ struct RuleEditorView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(LocktyColors.tertiaryText)
                 }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.vertical, LocktySpacing.md)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
     }
 
     private func resetPeriodRow(selection: Binding<RuleResetPeriod>) -> some View {

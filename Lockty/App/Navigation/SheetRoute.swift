@@ -1,6 +1,19 @@
 import Foundation
+import ManagedSettings
+
+/// An app that a running allowance has already released, and when that runs out.
+///
+/// A snapshot rather than a live lookup: the expiry is fixed the moment the allowance is
+/// granted, so the countdown has everything it needs to tick on its own.
+struct AllowanceTimerRoute: Hashable {
+    let appID: AppIdentity.ID
+    var token: ApplicationToken?
+    var expiresAt: Date
+}
 
 enum SheetRoute: Hashable, Identifiable {
+    case allowanceTimer(AllowanceTimerRoute)
+    case dayPicker
     case focusCreationChoice(FocusCreationChoiceRoute)
     case appClassification(AppIdentity.ID)
     case breakStatus(BreakUnavailableState)
@@ -27,6 +40,8 @@ enum SheetRoute: Hashable, Identifiable {
 
     var id: String {
         switch self {
+        case .allowanceTimer(let route): "allowance-timer-\(route.appID.rawValue)"
+        case .dayPicker: "day-picker"
         case .focusCreationChoice(let route): "focus-creation-choice-\(route.draftID.uuidString)"
         case .appClassification(let id): "app-classification-\(id.rawValue)"
         case .breakStatus(let state): "break-status-\(state.id.uuidString)"

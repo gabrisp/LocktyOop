@@ -78,11 +78,14 @@ final class PauseEngine: ObservableObject {
         do {
             let runtime = try appGroupStore.loadRuntimeState()
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: runtime.activeRoutine,
                 activeBreak: runtime.activeBreak,
                 activePauseAllowance: runtime.livePauseAllowance,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
 
             if effectivePolicy.blocksNothing {
@@ -139,11 +142,14 @@ final class PauseEngine: ObservableObject {
         do {
             let runtime = try appGroupStore.loadRuntimeState()
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: runtime.activeRoutine,
                 activeBreak: runtime.activeBreak,
                 activePauseAllowance: allowance,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
             try appGroupStore.updateRuntimeState { runtime in
                 runtime.pendingPause = nil
@@ -162,6 +168,13 @@ final class PauseEngine: ObservableObject {
                 try await shieldService.remove(runtime.shieldPolicy)
             } else {
                 try await shieldService.apply(effectivePolicy)
+            }
+
+            // Charged here and not in the shield action: the button that asked for this
+            // unlock is not the unlock. A flow the user started and then backed out of
+            // must not cost them one of the day's opens.
+            if let limitRuleID = context.limitRuleID {
+                RuleShieldLookup(appGroupStore: appGroupStore).chargePass(ruleID: limitRuleID)
             }
 
             do {
@@ -308,11 +321,14 @@ final class PauseEngine: ObservableObject {
         do {
             let runtime = try appGroupStore.loadRuntimeState()
             let pauseRules = await pauseRuleRepository.rules()
+            let shieldRules = appGroupStore.loadShieldRules()
             let effectivePolicy = shieldPolicyResolver.resolve(
                 activeRoutine: runtime.activeRoutine,
                 activeBreak: runtime.activeBreak,
                 activePauseAllowance: nil,
-                pauseRules: pauseRules
+                pauseRules: pauseRules,
+                rules: shieldRules.rules,
+                ruleEnforcement: shieldRules.enforcement
             )
             if effectivePolicy.blocksNothing {
                 try await shieldService.remove(runtime.shieldPolicy)

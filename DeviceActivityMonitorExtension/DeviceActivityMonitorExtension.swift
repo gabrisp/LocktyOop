@@ -8,6 +8,8 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         super.intervalDidStart(for: activity)
         // Scheduled routines start here, with the app not running.
         RuntimeRepairCoordinator().startScheduledRoutineIfNeeded(for: activity)
+        // And a daily-usage rule's budget is handed back here: this is the new day.
+        RuntimeRepairCoordinator().resetRuleBudgetIfNeeded(for: activity)
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
@@ -72,6 +74,28 @@ private struct RuntimeRepairCoordinator {
         repairRuntimeState(activityName: activity.rawValue)
     }
 
+    /// A new day for a daily-usage rule: the interval it was budgeted against has just
+    /// restarted, so whatever it spent yesterday stops shielding anything.
+    ///
+    /// The record is cleared rather than left to age out, because the shield has to come
+    /// down here and now -- a stale record that merely *reads* as a different day would
+    /// not be re-applied until something else recomputed the policy.
+    func resetRuleBudgetIfNeeded(for activity: DeviceActivityName) {
+        guard let ruleID = Self.ruleID(from: activity) else { return }
+
+        try? store.updateRuleEnforcementState { state in
+            state.records[ruleID] = nil
+        }
+        print("Rule \(ruleID.uuidString) budget reset for a new day")
+        repairRuntimeState(activityName: activity.rawValue)
+    }
+
+    private static func ruleID(from activity: DeviceActivityName) -> UUID? {
+        let prefix = "lockty.rule."
+        guard activity.rawValue.hasPrefix(prefix) else { return nil }
+        return UUID(uuidString: String(activity.rawValue.dropFirst(prefix.count)))
+    }
+
     private func endScheduledRoutine(activityName: String) {
         guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))),
               var runtimeState = try? store.loadRuntimeState(),
@@ -91,6 +115,18 @@ private struct RuntimeRepairCoordinator {
     /// spent, so it ends now whether or not its wall clock has run out.
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {
         _ = event
+        // A daily-usage rule has spent the minutes it was given. Marking it here is what
+        // puts its apps behind the shield, since repairRuntimeState below recomputes the
+        // policy from exactly this record.
+        if let ruleID = Self.ruleID(from: activity) {
+            try? store.updateRuleEnforcementState { state in
+                state.update(ruleID) { record in
+                    record.usageLimitReachedAt = Date()
+                }
+            }
+            print("Rule \(ruleID.uuidString) reached its daily usage limit")
+        }
+
         if activity.rawValue.hasPrefix("lockty.pause.") {
             try? store.updateRuntimeState { state in
                 state.activePauseAllowance = nil
@@ -137,11 +173,15 @@ private struct RuntimeRepairCoordinator {
                 )
             }
 
+        let shieldRules = store.loadShieldRules()
+
         let effectivePolicy = resolver.resolve(
             activeRoutine: runtimeState.activeRoutine,
             activeBreak: runtimeState.activeBreak,
             activePauseAllowance: runtimeState.livePauseAllowance,
-            pauseRules: pauseRules
+            pauseRules: pauseRules,
+            rules: shieldRules.rules,
+            ruleEnforcement: shieldRules.enforcement
         )
 
         runtimeState.shieldPolicy = effectivePolicy

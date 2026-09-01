@@ -698,7 +698,7 @@ struct AppFolderCard: View {
     let tokens: [ApplicationToken]
 
     private let folderSide: CGFloat = 110
-    private let iconScale: CGFloat = 1.52
+    private let iconScale: CGFloat = 1.58
 
     var body: some View {
         VStack(spacing: 6) {

@@ -12,6 +12,7 @@ final class StartupCoordinator: ObservableObject {
     private let notificationService: NotificationServicing
     private let routineEngine: RoutineEngine
     private let shieldService: ShieldServicing
+    private let scheduleCoordinator: RoutineScheduleCoordinator
     @Published private var hasStarted = false
 
     init(
@@ -22,7 +23,8 @@ final class StartupCoordinator: ObservableObject {
         frictionRepository: FrictionRepository,
         notificationService: NotificationServicing,
         routineEngine: RoutineEngine,
-        shieldService: ShieldServicing
+        shieldService: ShieldServicing,
+        scheduleCoordinator: RoutineScheduleCoordinator
     ) {
         self.session = session
         self.router = router
@@ -32,6 +34,7 @@ final class StartupCoordinator: ObservableObject {
         self.notificationService = notificationService
         self.routineEngine = routineEngine
         self.shieldService = shieldService
+        self.scheduleCoordinator = scheduleCoordinator
     }
 
     func startIfNeeded() async {
@@ -55,6 +58,13 @@ final class StartupCoordinator: ObservableObject {
             present(presentedPause)
 
             consumePendingEvents(from: runtimeState, pauseAlreadyPresented: presentedPause != nil)
+
+            // Registered on every launch, not only when a routine is edited. The
+            // monitoring lives in the system, not in the app, and it is dropped whenever
+            // the app is reinstalled or authorization is re-granted -- re-registering
+            // here means a scheduled routine keeps starting without the user having to
+            // open its editor again.
+            await scheduleCoordinator.sync()
         } catch {
             session.recordStartupError(error.localizedDescription)
             appGroupStore.resetRuntimeStateToSafeDefault()
@@ -72,6 +82,12 @@ final class StartupCoordinator: ObservableObject {
         }
 
         guard let runtimeState = try? appGroupStore.loadRuntimeState() else { return }
+        // The routine engine too, not just the pause engine. A scheduled routine that the
+        // monitor extension started -- or ended -- while the app was in the background is
+        // only in the App Group, so the engine went on reporting whatever it held when it
+        // was last in front: a routine that had already started showed nothing on Today,
+        // and one that had already ended stayed on it.
+        await routineEngine.restore(from: runtimeState)
         await pauseEngine.restore(from: runtimeState)
 
         // Surfaced as a card on Today rather than presented: a cover thrown up over

@@ -5,7 +5,9 @@ struct ShieldPolicyResolver {
         activeRoutine: ActiveRoutine?,
         activeBreak: ActiveBreak?,
         activePauseAllowance: ActivePauseAllowance?,
-        pauseRules: [PauseRule]
+        pauseRules: [PauseRule],
+        rules: [Rule] = [],
+        ruleEnforcement: RuleEnforcementState = .empty
     ) -> ShieldPolicy {
         var blockedApplications = Set<AppIdentity.ID>()
         var blockedDomains = Set<String>()
@@ -17,6 +19,16 @@ struct ShieldPolicyResolver {
             blockedDomains.formUnion(activeRoutine.shieldPolicy.blockedDomains)
             reasons.append(activeRoutine.shieldPolicy.reason)
             selectionScopes.formUnion(activeRoutine.shieldPolicy.selectionScopes)
+        }
+
+        // The rules that are not routines. A schedule rule *is* the active routine above;
+        // the limits carry their own answer to whether they are blocking right now, and
+        // a break does not lift them -- a break belongs to the routine that granted it.
+        for rule in rules where rule.isShielding(given: ruleEnforcement) {
+            blockedApplications.formUnion(rule.blockedApplications)
+            blockedDomains.formUnion(rule.blockedDomains)
+            reasons.append(.rule(rule.id))
+            selectionScopes.formUnion(rule.selectionScopes)
         }
 
         let releasedApplications = activePauseAllowance?.releasedApplications ?? []

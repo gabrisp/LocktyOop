@@ -803,6 +803,18 @@ private struct ResolvedLetterPair: Identifiable {
     }
 }
 
+private struct LetterMatchPathPair: Identifiable {
+    let id: UUID
+    let start: GridPoint
+    let end: GridPoint
+
+    init(pair: LetterMatchPair) {
+        id = pair.id
+        start = GridPoint(row: pair.startIndex / 5, column: pair.startIndex % 5)
+        end = GridPoint(row: pair.endIndex / 5, column: pair.endIndex % 5)
+    }
+}
+
 private struct UnlockSquareBoardContainer<Content: View>: View {
     @ViewBuilder let content: (CGFloat) -> Content
 
@@ -1299,18 +1311,18 @@ struct UnlockPersonalVideoStepView: View {
     @State private var observationToken: NSObjectProtocol?
 
     var body: some View {
-        UnlockStepSurface(tone: surfaceTone, shakeTrigger: 0) {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                Group {
-                    switch phase {
-                    case .missing:
-                        unavailableMessage("The selected video file is missing.")
-                    case .failed(let message):
-                        unavailableMessage(message)
-                    default:
-                        videoPlayer
-                    }
-                }
+        // The video is its own surface. Wrapping it in an UnlockStepSurface put the
+        // step's padding and a second rounded border around a frame that already draws
+        // its own, so the video sat inset inside a card with two strokes around it.
+        // Only the message states, which are text and need the padding, still use it.
+        Group {
+            switch phase {
+            case .missing:
+                messageSurface { unavailableMessage("The selected video file is missing.") }
+            case .failed(let message):
+                messageSurface { unavailableMessage(message) }
+            default:
+                videoPlayer
             }
         }
         .task(id: configuration.id) {
@@ -1324,12 +1336,9 @@ struct UnlockPersonalVideoStepView: View {
         }
     }
 
-    private var surfaceTone: UnlockFeedbackTone {
-        switch phase {
-        case .missing, .failed:
-            .error
-        default:
-            .neutral
+    private func messageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        UnlockStepSurface(tone: .error, shakeTrigger: 0) {
+            content()
         }
     }
 
@@ -1433,7 +1442,7 @@ struct UnlockPersonalVideoStepView: View {
             return
         }
 
-        videoAspectRatio = resolvedAspectRatio(for: url)
+        videoAspectRatio = await resolvedAspectRatio(for: url)
         let player = AVPlayer(url: url)
         player.isMuted = isMuted
         self.player = player
@@ -1478,13 +1487,20 @@ struct UnlockPersonalVideoStepView: View {
         isPlaying = true
     }
 
-    private func resolvedAspectRatio(for url: URL) -> CGFloat {
+    private func resolvedAspectRatio(for url: URL) async -> CGFloat {
         let asset = AVURLAsset(url: url)
-        guard let track = asset.tracks(withMediaType: .video).first else {
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first else {
             return 9 / 16
         }
 
-        let transformedSize = track.naturalSize.applying(track.preferredTransform)
+        guard
+            let naturalSize = try? await track.load(.naturalSize),
+            let preferredTransform = try? await track.load(.preferredTransform)
+        else {
+            return 9 / 16
+        }
+
+        let transformedSize = naturalSize.applying(preferredTransform)
         let width = abs(transformedSize.width)
         let height = abs(transformedSize.height)
         guard width > 0, height > 0 else {
@@ -2033,7 +2049,9 @@ private func hasLetterMatchSolution(
     let blocked = Set(lockedPaths.values.flatMap { $0 })
     let unresolved = pairs
         .filter { lockedPaths[$0.id] == nil }
-        .map(ResolvedLetterPair.init)
+        .map { pair in
+            LetterMatchPathPair(pair: pair)
+        }
         .sorted { lhs, rhs in
             letterMatchDistance(lhs.start, lhs.end) < letterMatchDistance(rhs.start, rhs.end)
         }

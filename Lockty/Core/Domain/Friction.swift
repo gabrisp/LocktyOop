@@ -227,7 +227,7 @@ nonisolated struct FrictionEvent: Codable, Hashable, Identifiable {
 }
 
 extension PauseStep {
-    var frictionKind: FrictionKind? {
+    nonisolated var frictionKind: FrictionKind? {
         switch self {
         case .wordSearch:
             .wordSearch
@@ -252,7 +252,7 @@ extension PauseStep {
         }
     }
 
-    var symbolName: String? {
+    nonisolated var symbolName: String? {
         switch self {
         case .countdown:
             "timer"

@@ -16,11 +16,13 @@ enum LocktyRadius {
 
     /// The corner radius a card of this size should have.
     ///
-    /// Driven by the shorter side, because that is the one the corner has to fit inside
-    /// -- a wide short card and a narrow tall one then end up looking equally round.
+    /// Driven by width, which is the reference dimension the full-width cards were
+    /// designed against. Height still caps the result so a short card cannot end up
+    /// with a corner that doesn't fit inside itself.
     static func card(for size: CGSize) -> CGFloat {
-        let shorterSide = min(size.width, size.height)
-        guard shorterSide > 0 else { return medium }
-        return min(max(shorterSide * cardCornerRatio, small), medium)
+        guard size.width > 0, size.height > 0 else { return medium }
+        let proportionalToWidth = size.width * cardCornerRatio
+        let maximumThatFits = min(size.width, size.height) / 2
+        return min(max(proportionalToWidth, small), medium, maximumThatFits)
     }
 }

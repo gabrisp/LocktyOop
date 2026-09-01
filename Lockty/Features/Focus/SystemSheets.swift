@@ -140,47 +140,104 @@ struct RoutineBreakSheet: View {
     }
 }
 
-struct BreakStatusSheet: View {
-    let state: BreakUnavailableState
+/// The time left on an app that is already open.
+///
+/// Tapping a released app used to reopen the unlock flow, which had nothing to ask: the
+/// app is out, and the only thing worth knowing is how long for. So this shows exactly
+/// that -- the app, the clock, and the way out.
+struct AllowanceTimerSheet: View {
+    let route: AllowanceTimerRoute
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         LocktyDynamicSheet {
-            VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                EditorTopBar(title: state.title, onClose: { dismiss() })
+            VStack(spacing: LocktySpacing.lg) {
+                LocktyAppLockBadge(
+                    token: route.token,
+                    scale: 2.2,
+                    showsBorder: false
+                )
 
-                CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                    VStack(spacing: LocktySpacing.md) {
-                        if let remainingMinutes = state.remainingMinutes {
-                            VStack(spacing: 6) {
-                                Text("\(remainingMinutes)")
-                                    .font(.system(size: 56, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(LocktyColors.primaryText)
-                                    .contentTransition(.numericText())
-                                    .monospacedDigit()
-                                Text(remainingMinutes == 1 ? "minuto" : "minutos")
-                                    .font(LocktyTypography.callout)
-                                    .foregroundStyle(LocktyColors.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-
-                        Text(state.message)
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                    }
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    countdown(remaining: route.expiresAt.timeIntervalSince(context.date))
                 }
 
                 PrimaryButton("Cerrar", systemImage: "xmark") {
                     dismiss()
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, LocktySpacing.md)
-            .padding(.top, LocktySpacing.sm)
+            .padding(.top, LocktySpacing.lg)
             .padding(.bottom, LocktySpacing.lg)
         }
+        .locktyDynamicSheetSizes([.fit])
+    }
+
+    private func countdown(remaining: TimeInterval) -> some View {
+        let clamped = max(remaining, 0)
+        let minutes = Int(clamped) / 60
+        let seconds = Int(clamped) % 60
+
+        return Text(String(format: "%d:%02d", minutes, seconds))
+            .font(.system(size: 64, weight: .semibold, design: .rounded))
+            .foregroundStyle(LocktyColors.primaryText)
+            .monospacedDigit()
+            .contentTransition(.numericText(countsDown: true))
+            .animation(.snappy(duration: 0.3), value: seconds)
+    }
+}
+
+/// The wait, and the way out. There is no title bar: the sheet says one thing, and a
+/// heading on the left would only name what the countdown underneath already is.
+struct BreakStatusSheet: View {
+    let state: BreakUnavailableState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        LocktyDynamicSheet {
+            VStack(spacing: LocktySpacing.lg) {
+                Text("Please wait for the next unlock")
+                    .font(.footnote)
+                    .foregroundStyle(LocktyColors.tertiaryText)
+                    .multilineTextAlignment(.center)
+
+                if let retryAt = state.retryAt {
+                    // Redrawn every second against the retry date, so the digits actually
+                    // run down instead of showing the minute count the sheet opened with.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        countdown(remaining: retryAt.timeIntervalSince(context.date))
+                    }
+                } else {
+                    Text(state.message)
+                        .font(LocktyTypography.body)
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .multilineTextAlignment(.center)
+                }
+
+                PrimaryButton("Cerrar", systemImage: "xmark") {
+                    dismiss()
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.top, LocktySpacing.md)
+            .padding(.bottom, LocktySpacing.lg)
+        }
+        .locktyDynamicSheetSizes([.fit])
+    }
+
+    private func countdown(remaining: TimeInterval) -> some View {
+        let clamped = max(remaining, 0)
+        let minutes = Int(clamped) / 60
+        let seconds = Int(clamped) % 60
+
+        return Text(String(format: "%d:%02d", minutes, seconds))
+            .font(.system(size: 56, weight: .semibold, design: .rounded))
+            .foregroundStyle(LocktyColors.primaryText)
+            .monospacedDigit()
+            .contentTransition(.numericText(countsDown: true))
+            .animation(.snappy(duration: 0.3), value: seconds)
     }
 }
 

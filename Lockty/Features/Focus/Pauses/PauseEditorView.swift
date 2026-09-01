@@ -618,13 +618,12 @@ struct PauseEditorView: View {
                     .buttonStyle(.plain)
                     .tappable()
                     .popover(isPresented: $showNameInfo) {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            Text("You can give this Pause a custom name. Apple only hands apps an anonymous token for your selection, so Lockty can't read the app's real name — a name you set here is what it will be called.")
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 240, alignment: .leading)
-                        }
-                        .presentationCompactAdaptation(.popover)
+                        Text("You can give this Pause a custom name. Apple only hands apps an anonymous token for your selection, so Lockty can't read the app's real name — a name you set here is what it will be called.")
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(width: 240, alignment: .leading)
+                            .padding(LocktySpacing.md)
+                            .presentationCompactAdaptation(.popover)
                     }
                 }
             }

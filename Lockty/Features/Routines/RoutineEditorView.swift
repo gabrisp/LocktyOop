@@ -38,21 +38,21 @@ final class RoutineEditorViewModel: ObservableObject {
     /// The saved pause flow this routine uses. Nil means the default wait-then-confirm.
     @Published var pauseFlowID: UUID?
     @Published private(set) var pauseFlows: [PauseFlow] = []
-    @Published var breakTriggerManual = true
-    @Published var breakTriggerNFC = false
-    @Published var breakTriggerLocation = false
     @Published var blockedDomains: [String] = []
     @Published var pendingDomain = ""
     @Published var errorMessage: String?
     @Published private(set) var selectedApplicationCount = 0
     @Published private(set) var selectionPreview = FamilyActivitySelection()
     @Published private(set) var suggestedApplications: [AppIdentity] = []
+    @Published private(set) var appGroups: [LocktySelectableAppGroup] = []
+    @Published var selectedAppGroupIDs: Set<UUID> = []
 
     private let repository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let routineEngine: RoutineEngine
     private let usageDataService: UsageDataServicing
     private let pauseFlowRepository: PauseFlowRepository
+    private let appGroupRepository: UserAppGroupRepository
     /// What the routine looked like when the editor opened. Everything that decides
     /// whether there is anything to discard is compared against this rather than tracked
     /// by a flag, so undoing an edit by hand counts as no change again.
@@ -70,6 +70,7 @@ final class RoutineEditorViewModel: ObservableObject {
         var pauseFlowID: UUID?
         var allowsPauseDuringStrictMode: Bool
         var selectedApplicationCount: Int
+        var selectedAppGroupIDs: Set<UUID>
     }
 
     private var snapshot: Snapshot {
@@ -84,7 +85,8 @@ final class RoutineEditorViewModel: ObservableObject {
             startAlarmEnabled: startAlarmEnabled,
             pauseFlowID: pauseFlowID,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
-            selectedApplicationCount: selectedApplicationCount
+            selectedApplicationCount: selectedApplicationCount,
+            selectedAppGroupIDs: selectedAppGroupIDs
         )
     }
 
@@ -108,7 +110,8 @@ final class RoutineEditorViewModel: ObservableObject {
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
         usageDataService: UsageDataServicing,
-        pauseFlowRepository: PauseFlowRepository
+        pauseFlowRepository: PauseFlowRepository,
+        appGroupRepository: UserAppGroupRepository
     ) {
         initialRoutineID = routineID
         editingID = routineID ?? UUID()
@@ -118,6 +121,7 @@ final class RoutineEditorViewModel: ObservableObject {
         self.routineEngine = routineEngine
         self.usageDataService = usageDataService
         self.pauseFlowRepository = pauseFlowRepository
+        self.appGroupRepository = appGroupRepository
         createdAt = Date()
     }
 
@@ -130,11 +134,15 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     /// Ends the routine this editor is showing, when it is the one running.
-    func stopRoutine() async {
+    @discardableResult
+    func stopRoutine() async -> Bool {
         await routineEngine.stop()
         if case .failed(let message) = routineEngine.state {
             errorMessage = message
+            return false
         }
+        errorMessage = nil
+        return true
     }
 
     /// Manual start from the routine's own sheet (hold-to-start).
@@ -144,10 +152,7 @@ final class RoutineEditorViewModel: ObservableObject {
               let routine = routines.first(where: { $0.id == initialRoutineID })
         else { return }
 
-        await routineEngine.start(routine)
-        if case .failed(let message) = routineEngine.state {
-            errorMessage = message
-        }
+        errorMessage = await routineEngine.start(routine).errorMessage
     }
 
     var title: String {
@@ -171,7 +176,11 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     var appRestrictionSummary: String {
-        selectedApplicationCount == 0 ? "Choose apps" : "\(selectedApplicationCount) selected"
+        RestrictionSummary.appsCategoriesAndGroups(
+            apps: selectionPreview.applicationTokens.count,
+            categories: selectionPreview.categoryTokens.count,
+            groups: selectedAppGroupIDs.count
+        ) ?? "Choose apps"
     }
 
     var webRestrictionSummary: String {
@@ -229,6 +238,7 @@ final class RoutineEditorViewModel: ObservableObject {
         print("Routine editor load started routineID=\(initialRoutineID?.uuidString ?? "new") draftID=\(draftID.uuidString)")
         await loadSuggestedApplications()
         await loadPauseFlows()
+        await loadAppGroups()
         // A new routine's baseline is its empty form, so typing a name already counts.
         guard let initialRoutineID else {
             try? selectionStore.remove(scope: draftSelectionScope)
@@ -253,14 +263,12 @@ final class RoutineEditorViewModel: ObservableObject {
         if tasks.isEmpty {
             tasks = [EditableRoutineTask()]
         }
+        selectedAppGroupIDs = routine.appGroupIDs.intersection(Set(appGroups.map(\.id)))
         maximumBreaks = routine.breakPolicy.maximumBreaks
         maximumBreakMinutes = max(Int(routine.breakPolicy.maximumDuration / 60), 1)
         minimumBreakIntervalMinutes = max(Int(routine.breakPolicy.minimumInterval / 60), 1)
         startAlarmEnabled = routine.startAlarmEnabled
         pauseFlowID = routine.pauseFlowID
-        breakTriggerManual = routine.breakPolicy.allowedTriggers.contains(.manual)
-        breakTriggerNFC = routine.breakPolicy.allowedTriggers.contains(.nfc)
-        breakTriggerLocation = routine.breakPolicy.allowedTriggers.contains(.location)
         blockedDomains = routine.blockedDomains.sorted()
         if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
             try? selectionStore.save(selection, scope: draftSelectionScope)
@@ -312,6 +320,34 @@ final class RoutineEditorViewModel: ObservableObject {
             print("Routine editor loaded suggested applications count=\(suggestedApplications.count)")
         } catch {
             print("Routine editor failed loading suggested applications: \(error.localizedDescription)")
+        }
+    }
+
+    private func loadAppGroups() async {
+        let loadedGroups = await appGroupRepository.appGroups()
+        let suggestedGroups = ReusableAppGroupDefinition.builtIn.map { definition in
+            let selection = (try? selectionStore.load(scope: definition.selectionScope)) ?? FamilyActivitySelection()
+            return LocktySelectableAppGroup(
+                id: definition.id,
+                name: definition.name,
+                itemCount: selection.applicationTokens.count + selection.categoryTokens.count
+            )
+        }
+        let suggestedGroupIDs = Set(suggestedGroups.map(\.id))
+        let userGroups = loadedGroups.filter { !suggestedGroupIDs.contains($0.id) }.map { group in
+            let selection = (try? selectionStore.load(scope: .appGroup(group.id))) ?? FamilyActivitySelection()
+            return LocktySelectableAppGroup(
+                id: group.id,
+                name: group.name,
+                itemCount: selection.applicationTokens.count
+            )
+        }
+        let selectableGroups = suggestedGroups + userGroups
+
+        let availableIDs = Set(selectableGroups.map(\.id))
+        withAnimation(.smooth(duration: 0.24)) {
+            appGroups = selectableGroups
+            selectedAppGroupIDs = selectedAppGroupIDs.intersection(availableIDs)
         }
     }
 
@@ -393,8 +429,13 @@ final class RoutineEditorViewModel: ObservableObject {
         }
 
         let selection = selectionPreview
-        guard !selection.applicationTokens.isEmpty || !blockedDomains.isEmpty else {
-            errorMessage = "Select at least one app or add at least one domain."
+        guard
+            !selection.applicationTokens.isEmpty
+                || !selection.categoryTokens.isEmpty
+                || !selectedAppGroupIDs.isEmpty
+                || !blockedDomains.isEmpty
+        else {
+            errorMessage = "Select at least one app, category, app group, or add at least one domain."
             print("Routine editor refused save because no app/domain restrictions were configured")
             return false
         }
@@ -407,6 +448,7 @@ final class RoutineEditorViewModel: ObservableObject {
             color: color,
             mode: mode,
             triggers: triggers,
+            appGroupIDs: selectedAppGroupIDs,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             blockedDomains: Set(blockedDomains),
             tasks: tasks,
@@ -425,8 +467,8 @@ final class RoutineEditorViewModel: ObservableObject {
             try selectionStore.save(selection, scope: persistedSelectionScope)
             try? selectionStore.remove(scope: draftSelectionScope)
             try await repository.save(routine)
-            routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(self.blockedDomains.count)")
-            print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) domains=\(blockedDomains.count)")
+            routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) groups=\(self.selectedAppGroupIDs.count) domains=\(self.blockedDomains.count)")
+            print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) groups=\(selectedAppGroupIDs.count) domains=\(blockedDomains.count)")
             return true
         } catch {
             routineEditorLogger.error("Routine editor failed saving id=\(routine.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -450,13 +492,7 @@ final class RoutineEditorViewModel: ObservableObject {
     }
 
     private func makeBreakPolicy() -> BreakPolicy {
-        let triggers = Set([
-            breakTriggerManual ? BreakTrigger.manual : nil,
-            breakTriggerNFC ? BreakTrigger.nfc : nil,
-            breakTriggerLocation ? BreakTrigger.location : nil
-        ].compactMap { $0 })
-
-        guard maximumBreaks > 0, !triggers.isEmpty else {
+        guard maximumBreaks > 0 else {
             return .none
         }
 
@@ -464,7 +500,7 @@ final class RoutineEditorViewModel: ObservableObject {
             maximumBreaks: maximumBreaks,
             maximumDuration: TimeInterval(maximumBreakMinutes * 60),
             minimumInterval: TimeInterval(minimumBreakIntervalMinutes * 60),
-            allowedTriggers: triggers
+            allowedTriggers: [.manual]
         )
     }
 
@@ -482,9 +518,6 @@ final class RoutineEditorViewModel: ObservableObject {
         }
         if minimumBreakIntervalMinutes <= 0 {
             minimumBreakIntervalMinutes = 60
-        }
-        if !breakTriggerManual && !breakTriggerNFC && !breakTriggerLocation {
-            breakTriggerManual = true
         }
     }
 
@@ -534,6 +567,7 @@ struct RoutineAppPickerSheet: View {
 private enum RoutineEditorLocalSheet: String, Identifiable {
     case apps
     case domains
+    case checklist
     case breakSettings
     case color
     /// Writing a new pause without leaving the routine that will use it.
@@ -565,6 +599,7 @@ struct RoutineEditorView: View {
     /// one: same sheet, same height animation, one thing on it at a time.
     @State private var isNaming = false
     @State private var isShowingIconPicker = false
+    @State private var isShowingColorPicker = false
     /// Built when the pause screen is pushed and dropped when it is popped, so each new
     /// pause starts blank rather than carrying the last one's half-written steps.
     @State private var pauseFlowEditor: PauseFlowEditorViewModel?
@@ -756,6 +791,10 @@ struct RoutineEditorView: View {
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
+            case .checklist:
+                checklistScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case .breakSettings:
                 breakSettingsScreen
                     .geometryGroup()
@@ -799,6 +838,8 @@ struct RoutineEditorView: View {
             chromeTitleText("Seleccionadas")
         case .domains:
             chromeTitleText("Websites")
+        case .checklist:
+            chromeTitleText("Checklist")
         case .breakSettings:
             chromeTitleText("Break")
         case .color:
@@ -916,27 +957,25 @@ struct RoutineEditorView: View {
                     RoutineIconPickerSheet(selectedIcon: $viewModel.icon)
                         .presentationCompactAdaptation(.popover)
                 }
-            }
 
-            HStack(spacing: LocktySpacing.sm) {
-                ForEach(RoutineColor.allCases) { routineColor in
-                    Button {
-                        withAnimation(.smooth(duration: 0.2)) {
-                            viewModel.color = routineColor
-                        }
-                    } label: {
-                        Circle()
-                            .fill(LocktyColors.routine(routineColor))
-                            .frame(width: 24, height: 24)
-                            .overlay {
-                                Circle()
-                                    .stroke(Color.white.opacity(viewModel.color == routineColor ? 0.9 : 0.22), lineWidth: viewModel.color == routineColor ? 2 : 1)
-                            }
-                    }
-                    .buttonStyle(.locktyInteractive(shape: Circle()))
+                // The colour is picked the same way the icon is, and at the same size:
+                // a row of swatches laid out under the field made the colour look like a
+                // setting of its own rather than the other half of the routine's badge.
+                Button {
+                    isShowingColorPicker = true
+                } label: {
+                    Circle()
+                        .fill(LocktyColors.routine(viewModel.color))
+                        .frame(width: 24, height: 24)
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(LocktyColors.routine(viewModel.color).opacity(0.24)))
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .popover(isPresented: $isShowingColorPicker) {
+                    RoutineColorPickerPopover(selectedColor: $viewModel.color)
+                        .presentationCompactAdaptation(.popover)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, LocktySpacing.lg)
         .padding(.vertical, LocktySpacing.lg)
@@ -1212,9 +1251,10 @@ struct RoutineEditorView: View {
                 Spacer(minLength: 0)
 
                 Text(
-                    RestrictionSummary.appsAndCategories(
+                    RestrictionSummary.appsCategoriesAndGroups(
                         apps: viewModel.selectionPreview.applicationTokens.count,
-                        categories: viewModel.selectionPreview.categoryTokens.count
+                        categories: viewModel.selectionPreview.categoryTokens.count,
+                        groups: viewModel.selectedAppGroupIDs.count
                     ) ?? "Ninguna"
                 )
                 .font(.system(.subheadline, design: .default, weight: .regular))
@@ -1246,8 +1286,13 @@ struct RoutineEditorView: View {
                             }
                         }
                     ),
+                    selectedAppGroupIDs: Binding(
+                        get: { viewModel.selectedAppGroupIDs },
+                        set: { viewModel.selectedAppGroupIDs = $0 }
+                    ),
                     rules: .routine,
                     suggestions: viewModel.suggestedApplications,
+                    appGroups: viewModel.appGroups,
                     onClose: {},
                     onDone: {}
                 )
@@ -1325,6 +1370,40 @@ struct RoutineEditorView: View {
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
     }
 
+    private var checklistSummary: String {
+        let count = viewModel.trimmedTasksCount
+        return count == 0 ? "Empty" : (count == 1 ? "1 step" : "\(count) steps")
+    }
+
+    private var checklistRow: some View {
+        Button {
+            openChildSheet(.checklist)
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Checklist")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(checklistSummary)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+    }
+
     private var colorRow: some View {
         Button {
             openChildSheet(.color)
@@ -1360,15 +1439,14 @@ struct RoutineEditorView: View {
 
     private var pauseFlowSummary: String {
         guard let flow = viewModel.selectedPauseFlow else { return "Sin pausa" }
-        let stepCount = flow.steps.count
-        return "\(flow.name) · \(stepCount == 1 ? "1 paso" : "\(stepCount) pasos")"
+        return flow.steps.count == 1 ? "1 step" : "\(flow.steps.count) steps"
     }
 
     private var breakSummary: String {
         guard viewModel.breaksAllowed else { return "No breaks allowed" }
         let breakCount = viewModel.maximumBreaks == 1 ? "1 break" : "\(viewModel.maximumBreaks) breaks"
         let duration = "\(viewModel.maximumBreakMinutes)m"
-        let friction = viewModel.selectedPauseFlow?.name ?? "No friction"
+        let friction = viewModel.selectedPauseFlow.map { $0.steps.count == 1 ? "1 step" : "\($0.steps.count) steps" } ?? "No friction"
         return "\(breakCount) · \(duration) · \(friction)"
     }
 
@@ -1437,7 +1515,6 @@ struct RoutineEditorView: View {
 
             if viewModel.breaksAllowed {
                 breakDetailsCard
-                breakTriggersCard
             }
 
             sectionHeading("Friction", systemImage: "sparkles.rectangle.stack")
@@ -1544,76 +1621,41 @@ struct RoutineEditorView: View {
 
     private var breakDetailsCard: some View {
         VStack(spacing: 0) {
-            breakMenuRow(
+            breakStepperRow(
                 title: "Max breaks",
                 valueText: "\(viewModel.maximumBreaks)",
-                options: Array(1...8),
-                format: { "\($0)" },
-                selection: Binding(
-                    get: { viewModel.maximumBreaks },
-                    set: { viewModel.maximumBreaks = $0 }
-                )
+                decrementDisabled: viewModel.maximumBreaks <= 1,
+                incrementDisabled: viewModel.maximumBreaks >= 8,
+                onDecrement: { viewModel.maximumBreaks = max(viewModel.maximumBreaks - 1, 1) },
+                onIncrement: { viewModel.maximumBreaks = min(viewModel.maximumBreaks + 1, 8) }
             )
 
             Divider()
                 .overlay(Color.white.opacity(0.10))
                 .padding(.leading, 16)
 
-            breakMenuRow(
+            breakStepperRow(
                 title: "Break duration",
                 valueText: "\(viewModel.maximumBreakMinutes) min",
-                options: Array(1...15),
-                format: { "\($0) min" },
-                selection: Binding(
-                    get: { viewModel.maximumBreakMinutes },
-                    set: { viewModel.maximumBreakMinutes = $0 }
-                )
+                decrementDisabled: viewModel.maximumBreakMinutes <= 1,
+                incrementDisabled: viewModel.maximumBreakMinutes >= 15,
+                onDecrement: { viewModel.maximumBreakMinutes = max(viewModel.maximumBreakMinutes - 1, 1) },
+                onIncrement: { viewModel.maximumBreakMinutes = min(viewModel.maximumBreakMinutes + 1, 15) }
             )
 
             Divider()
                 .overlay(Color.white.opacity(0.10))
                 .padding(.leading, 16)
 
-            breakMenuRow(
+            breakStepperRow(
                 title: "Cooldown",
                 valueText: "\(viewModel.minimumBreakIntervalMinutes) min",
-                options: Array(stride(from: 5, through: 180, by: 5)),
-                format: { "\($0) min" },
-                selection: Binding(
-                    get: { viewModel.minimumBreakIntervalMinutes },
-                    set: { viewModel.minimumBreakIntervalMinutes = $0 }
-                )
+                decrementDisabled: viewModel.minimumBreakIntervalMinutes <= 5,
+                incrementDisabled: viewModel.minimumBreakIntervalMinutes >= 180,
+                onDecrement: { viewModel.minimumBreakIntervalMinutes = max(viewModel.minimumBreakIntervalMinutes - 5, 5) },
+                onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 180) }
             )
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
-    }
-
-    private var breakTriggersCard: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            Text("Allowed triggers")
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.primaryText)
-
-            HStack(spacing: LocktySpacing.sm) {
-                breakTriggerChip(
-                    title: "Manual",
-                    isSelected: viewModel.breakTriggerManual,
-                    action: { viewModel.breakTriggerManual.toggle() }
-                )
-                breakTriggerChip(
-                    title: "NFC",
-                    isSelected: viewModel.breakTriggerNFC,
-                    action: { viewModel.breakTriggerNFC.toggle() }
-                )
-                breakTriggerChip(
-                    title: "Location",
-                    isSelected: viewModel.breakTriggerLocation,
-                    action: { viewModel.breakTriggerLocation.toggle() }
-                )
-            }
-        }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.vertical, LocktySpacing.md)
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
@@ -1641,7 +1683,7 @@ struct RoutineEditorView: View {
                                     .font(.system(.subheadline, design: .default, weight: .regular))
                                     .foregroundStyle(LocktyColors.primaryText)
 
-                                Text("\(flow.steps.count == 1 ? "1 step" : "\(flow.steps.count) steps") · \(flow.summary)")
+                                Text(flow.steps.count == 1 ? "1 step" : "\(flow.steps.count) steps")
                                     .font(.system(.footnote, design: .default, weight: .regular))
                                     .foregroundStyle(LocktyColors.secondaryText)
                                     .lineLimit(2)
@@ -1670,67 +1712,123 @@ struct RoutineEditorView: View {
         .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
     }
 
-    private func breakMenuRow(
-        title: String,
-        valueText: String,
-        options: [Int],
-        format: @escaping (Int) -> String,
-        selection: Binding<Int>
-    ) -> some View {
-        Menu {
-            ForEach(options, id: \.self) { option in
+    private var checklistScreen: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sectionHeading("Checklist", systemImage: "checklist")
+
+            if isCreating || isEditing {
+                editableChecklistCard
+
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
-                        selection.wrappedValue = option
+                        viewModel.addTask()
                     }
                 } label: {
-                    if selection.wrappedValue == option {
-                        Label(format(option), systemImage: "checkmark")
-                    } else {
-                        Text(format(option))
+                    HStack(spacing: LocktySpacing.sm) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("Add step")
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                        Spacer(minLength: 0)
                     }
-                }
-            }
-        } label: {
-            HStack(spacing: LocktySpacing.md) {
-                Text(title)
-                    .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: LocktySpacing.xs) {
-                    Text(valueText)
-                        .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.secondaryText)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(LocktyColors.tertiaryText)
+                    .padding(.horizontal, LocktySpacing.md)
+                    .frame(height: 52)
+                    .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
                 }
+                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+            } else {
+                readOnlyTasksCard
             }
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.vertical, LocktySpacing.md)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func breakTriggerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private var editableChecklistCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array($viewModel.tasks.enumerated()), id: \.element.id) { index, $task in
+                RoutineTaskEditorRow(
+                    task: $task,
+                    isEditing: true,
+                    onRemove: {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            viewModel.removeTask(id: task.id)
+                        }
+                    }
+                )
+
+                if index < viewModel.tasks.count - 1 {
+                    Divider()
+                        .overlay(LocktyColors.separator.opacity(0.55))
+                }
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+    }
+
+    private func breakStepperRow(
+        title: String,
+        valueText: String,
+        decrementDisabled: Bool,
+        incrementDisabled: Bool,
+        onDecrement: @escaping () -> Void,
+        onIncrement: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: LocktySpacing.md) {
             Text(title)
                 .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(isSelected ? .black : LocktyColors.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isSelected ? Color.white : Color.white.opacity(0.06))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            Spacer(minLength: 0)
+
+            Button(action: onDecrement) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+
+                    Image(systemName: "minus")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.black)
                 }
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.locktyInteractive(shape: Circle()))
+            .tappable()
+            .disabled(decrementDisabled)
+            .opacity(decrementDisabled ? 0.35 : 1)
+
+            Text(valueText)
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .locktyNumericTransition(trigger: valueText)
+                .frame(minWidth: 84)
+                .multilineTextAlignment(.center)
+
+            Button(action: onIncrement) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.locktyInteractive(shape: Circle()))
+            .tappable()
+            .disabled(incrementDisabled)
+            .opacity(incrementDisabled ? 0.35 : 1)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, LocktySpacing.md)
+        .padding(.vertical, LocktySpacing.md)
     }
 
     private var strictRow: some View {
@@ -1813,17 +1911,17 @@ struct RoutineEditorView: View {
         // below the fold to scroll to -- and a scroll view here would report the height
         // it was given rather than the height of what is in it.
         VStack(alignment: .leading, spacing: 18) {
-                sectionHeading("Durante este horario", systemImage: "calendar")
+                sectionHeading("SCHEDULE", systemImage: "calendar")
 
                 scheduleCard
 
                 daysCard
 
-                sectionHeading("Apps bloqueadas", systemImage: "lock.shield")
+                checklistRow
+
+                sectionHeading("RESTRICTIONS", systemImage: "lock.shield")
 
                 appsRow
-
-                colorRow
 
                 breakRow
 
@@ -1854,26 +1952,21 @@ struct RoutineEditorView: View {
 
     private var readOnlyContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            sectionHeading("Durante este horario", systemImage: "calendar")
+            sectionHeading("SCHEDULE", systemImage: "calendar")
 
             readOnlyScheduleCard
 
             readOnlyDaysCard
 
-            sectionHeading("Apps bloqueadas", systemImage: "lock.shield")
+            checklistRow
+
+            sectionHeading("RESTRICTIONS", systemImage: "lock.shield")
 
             appsRow
-
-            readOnlyColorRow
 
             readOnlyBreakRow
 
             strictReadOnlyRow
-
-            if !trimmedReadOnlyTasks.isEmpty {
-                sectionHeading("To Do", systemImage: "checklist")
-                readOnlyTasksCard
-            }
 
             // Start it, or end it if it is the one running. While a different routine
             // is running there is no button at all: starting this one would mean
@@ -1884,16 +1977,17 @@ struct RoutineEditorView: View {
                     systemImage: "stop.circle",
                     tint: LocktyColors.unproductive
                 ) {
-                    // The sheet goes now. Waiting on the teardown before dismissing left
-                    // it sitting there for as long as ManagedSettings took to answer,
-                    // which read as the button having done nothing at all.
-                    withAnimation(.smooth(duration: 0.28)) {
-                        // The card on Today is a request against the routine that was
-                        // running. Ending the routine answers it.
-                        router.pendingUnlock = nil
+                    Task {
+                        let stopped = await viewModel.stopRoutine()
+                        guard stopped else { return }
+
+                        withAnimation(.smooth(duration: 0.28)) {
+                            // The card on Today is a request against the routine that was
+                            // running. Ending the routine answers it.
+                            router.pendingUnlock = nil
+                        }
+                        dismissEditor()
                     }
-                    dismissEditor()
-                    Task { await viewModel.stopRoutine() }
                 }
                 .padding(.top, LocktySpacing.sm)
             } else if viewModel.activeRoutine() == nil {
@@ -2015,13 +2109,12 @@ struct RoutineEditorView: View {
                         get: { infoSectionText == info },
                         set: { if !$0 { infoSectionText = nil } }
                     )) {
-                        CardView(radius: LocktyRadius.medium, padding: LocktySpacing.md) {
-                            Text(info)
-                                .font(LocktyTypography.callout)
-                                .foregroundStyle(LocktyColors.primaryText)
-                                .frame(width: 220, alignment: .leading)
-                        }
-                        .presentationCompactAdaptation(.popover)
+                        Text(info)
+                            .font(LocktyTypography.callout)
+                            .foregroundStyle(LocktyColors.primaryText)
+                            .frame(width: 220, alignment: .leading)
+                            .padding(LocktySpacing.md)
+                            .presentationCompactAdaptation(.popover)
                     }
                 }
 
@@ -2240,69 +2333,81 @@ private struct ScheduleTimeField: View {
     }
 }
 
+/// The colours, and nothing else: a popover carries its own edge, so anything drawn
+/// behind these swatches is a second surface inside the first one.
+private struct RoutineColorPickerPopover: View {
+    @Binding var selectedColor: RoutineColor
+    @Environment(\.dismiss) private var dismiss
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: LocktySpacing.md), count: 3)
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
+            ForEach(RoutineColor.allCases) { routineColor in
+                Button {
+                    selectedColor = routineColor
+                    dismiss()
+                } label: {
+                    Circle()
+                        .fill(LocktyColors.routine(routineColor))
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(selectedColor == routineColor ? 0.9 : 0.22),
+                                    lineWidth: selectedColor == routineColor ? 2 : 1
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .tappable()
+            }
+        }
+        .padding(LocktySpacing.md)
+        .frame(width: 190)
+    }
+}
+
 private struct ScheduleTimePopoverContent: View {
     let label: String
     @Binding var hour: Int
     @Binding var minute: Int
     let minuteOptions: [Int]
 
+    /// Two wheels, and nothing else. The popover already draws its own surface, so the
+    /// rounded black panel behind this was a second one inside it -- and "De"/"A" and
+    /// "Horas"/"Minutos" only repeated the row that opened the popover and the numbers
+    /// that are already on the wheels.
     var body: some View {
-        VStack(spacing: 14) {
-            Text(label)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
-                .id("schedule-title-\(label)")
-
-            HStack(spacing: 0) {
-                timeWheel(title: "Horas") {
-                    Picker("Horas", selection: $hour) {
-                        ForEach(0..<24, id: \.self) { value in
-                            Text(String(format: "%02d", value)).tag(value)
-                        }
-                    }
-                }
-
-                timeWheel(title: "Minutos") {
-                    Picker("Minutos", selection: $minute) {
-                        ForEach(minuteOptions, id: \.self) { value in
-                            Text(String(format: "%02d", value)).tag(value)
-                        }
+        HStack(spacing: 0) {
+            timeWheel {
+                Picker("Horas", selection: $hour) {
+                    ForEach(0..<24, id: \.self) { value in
+                        Text(String(format: "%02d", value)).tag(value)
                     }
                 }
             }
-            .id("schedule-content-\(label)")
+
+            timeWheel {
+                Picker("Minutos", selection: $minute) {
+                    ForEach(minuteOptions, id: \.self) { value in
+                        Text(String(format: "%02d", value)).tag(value)
+                    }
+                }
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .frame(width: 280)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(0.96))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        }
+        .id("schedule-content-\(label)")
+        .padding(.vertical, 8)
+        .frame(width: 260)
     }
 
-    private func timeWheel<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(spacing: 8) {
-            Text(title)
-                .font(.system(.caption, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
-
-            content()
-                .labelsHidden()
-                .pickerStyle(.wheel)
-                .frame(width: 120, height: 152)
-                .clipped()
-                .id("schedule-wheel-\(label)-\(title)")
-        }
-        .frame(maxWidth: .infinity)
+    private func timeWheel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .labelsHidden()
+            .pickerStyle(.wheel)
+            .frame(width: 120, height: 152)
+            .clipped()
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -2315,6 +2420,15 @@ enum RestrictionSummary {
         if categories > 0 { parts.append(categories == 1 ? "1 Category" : "\(categories) Categories") }
         guard !parts.isEmpty else { return nil }
         return parts.joined(separator: " and ") + "."
+    }
+
+    static func appsCategoriesAndGroups(apps: Int, categories: Int, groups: Int) -> String? {
+        var parts: [String] = []
+        if apps > 0 { parts.append(apps == 1 ? "1 App" : "\(apps) Apps") }
+        if categories > 0 { parts.append(categories == 1 ? "1 Category" : "\(categories) Categories") }
+        if groups > 0 { parts.append(groups == 1 ? "1 Group" : "\(groups) Groups") }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ")
     }
 
     static func domains(_ count: Int) -> String? {

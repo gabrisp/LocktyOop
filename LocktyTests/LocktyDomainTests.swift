@@ -103,9 +103,11 @@ struct LocktyDomainTests {
             currentWindow: 2
         )
 
-        #expect(baseline?.baselineAverageDailyUsage == 5 * 60)
-        #expect(baseline?.currentAverageDailyUsage == 9 * 60)
-        #expect(baseline?.deltaPerDay == -4 * 60)
+        // Typed, not left to inference: `5 * 60` on its own is an Int, and comparing an
+        // Int against an Optional<TimeInterval> is false however right the number is.
+        #expect(baseline?.baselineAverageDailyUsage == TimeInterval(5 * 60))
+        #expect(baseline?.currentAverageDailyUsage == TimeInterval(9 * 60))
+        #expect(baseline?.deltaPerDay == TimeInterval(-4 * 60))
     }
 
     @Test
@@ -180,7 +182,99 @@ struct LocktyDomainTests {
     }
 
     @Test
-    func strictModeDeniesManualStop() {
+    func openCountRuleShieldsUntilAPassIsAvailableAgain() {
+        let rule = Rule(
+            name: "Instagram",
+            kind: .openCountLimit,
+            openCountLimitConfiguration: OpenCountLimitRuleConfiguration(maximumOpens: 2, windowHours: 24)
+        )
+
+        var enforcement = RuleEnforcementState()
+        #expect(rule.remainingOpens(given: enforcement) == 2)
+        // The apps stay shielded throughout: the shield is what counts the opens, so it
+        // has to be there even while passes remain.
+        #expect(rule.isShielding(given: enforcement) == true)
+
+        enforcement.update(rule.id) { $0.openCountUsed = 2 }
+        #expect(rule.remainingOpens(given: enforcement) == 0)
+        #expect(rule.isShielding(given: enforcement) == true)
+    }
+
+    @Test
+    func openCountResetsOnTheNextDay() {
+        let rule = Rule(
+            name: "Instagram",
+            kind: .openCountLimit,
+            openCountLimitConfiguration: OpenCountLimitRuleConfiguration(maximumOpens: 3, windowHours: 24)
+        )
+
+        let yesterday = Date().addingTimeInterval(-24 * 60 * 60)
+        var enforcement = RuleEnforcementState()
+        enforcement.update(rule.id, on: yesterday) { $0.openCountUsed = 3 }
+
+        #expect(rule.remainingOpens(given: enforcement, on: yesterday) == 0)
+        // Same stored record, read on a different day: yesterday's count buys nothing.
+        #expect(rule.remainingOpens(given: enforcement) == 3)
+    }
+
+    @Test
+    func dailyUsageRuleOnlyShieldsOnceItsBudgetIsSpent() {
+        let rule = Rule(
+            name: "TikTok",
+            kind: .dailyUsageLimit,
+            dailyUsageLimitConfiguration: DailyUsageLimitRuleConfiguration(
+                maximumMinutesPerDay: 30,
+                resetPeriod: .daily
+            )
+        )
+
+        var enforcement = RuleEnforcementState()
+        #expect(rule.isShielding(given: enforcement) == false)
+
+        enforcement.update(rule.id) { $0.usageLimitReachedAt = Date() }
+        #expect(rule.isShielding(given: enforcement) == true)
+    }
+
+    @Test
+    func sessionRuleGrantsItsConfiguredMinutesPerPass() {
+        let rule = Rule(
+            name: "YouTube",
+            kind: .sessionDurationLimit,
+            sessionDurationLimitConfiguration: SessionDurationLimitRuleConfiguration(
+                maximumMinutesPerSession: 12
+            )
+        )
+
+        #expect(rule.allowanceMinutesPerPass == 12)
+        #expect(rule.remainingOpens(given: RuleEnforcementState()) == nil)
+    }
+
+    @Test
+    func disabledRuleShieldsNothing() {
+        let rule = Rule(
+            name: "Off",
+            isEnabled: false,
+            kind: .sessionDurationLimit,
+            sessionDurationLimitConfiguration: SessionDurationLimitRuleConfiguration(
+                maximumMinutesPerSession: 5
+            )
+        )
+
+        #expect(rule.isShielding(given: RuleEnforcementState()) == false)
+    }
+
+    @Test
+    func scheduleRuleIsLeftToTheRoutineEngine() {
+        let rule = Rule(routine: .mockDeepWork)
+
+        #expect(rule.kind == .schedule)
+        // Its shield comes from the active routine, not from the rule layer -- counting
+        // it in both places would apply the same block twice.
+        #expect(rule.isShielding(given: RuleEnforcementState()) == false)
+    }
+
+    @Test
+    func strictModeAllowsManualStop() {
         let routine = Routine.mockDeepWork
         let activeRoutine = ActiveRoutine(
             routineID: routine.id,
@@ -196,6 +290,29 @@ struct LocktyDomainTests {
 
         let decision = StrictModePolicy().decision(
             for: .stopRoutine,
+            activeRoutine: activeRoutine
+        )
+
+        #expect(decision.isAllowed == true)
+    }
+
+    @Test
+    func strictModeStillDeniesEditing() {
+        let routine = Routine.mockDeepWork
+        let activeRoutine = ActiveRoutine(
+            routineID: routine.id,
+            nameSnapshot: routine.name,
+            modeSnapshot: .strict,
+            startedAt: Date(),
+            trigger: .manual,
+            shieldPolicy: .routine(routine),
+            breakPolicySnapshot: routine.breakPolicy,
+            taskCompletions: [],
+            allowsPauseDuringStrictMode: true
+        )
+
+        let decision = StrictModePolicy().decision(
+            for: .editRoutine,
             activeRoutine: activeRoutine
         )
 

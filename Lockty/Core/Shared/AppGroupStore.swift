@@ -306,6 +306,33 @@ final class AppGroupStore {
         try writeData(data, fileName: "rules.json", legacyDefaultsKey: nil)
     }
 
+    /// The rules the shield has to honour, and what they have spent today.
+    ///
+    /// Read together because they are only meaningful together: a rule says what it
+    /// limits, the enforcement record says whether that limit has been hit.
+    nonisolated func loadShieldRules() -> (rules: [Rule], enforcement: RuleEnforcementState) {
+        (loadStoredRules().filter(\.isEnabled), loadRuleEnforcementState())
+    }
+
+    nonisolated func loadRuleEnforcementState() -> RuleEnforcementState {
+        guard let data = (try? readData(fileName: "rule-enforcement.json", legacyDefaultsKey: nil)) ?? nil,
+              let state = try? decoder.decode(RuleEnforcementState.self, from: data) else {
+            return .empty
+        }
+        return state
+    }
+
+    nonisolated func saveRuleEnforcementState(_ state: RuleEnforcementState) throws {
+        let data = try encoder.encode(state)
+        try writeData(data, fileName: "rule-enforcement.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func updateRuleEnforcementState(_ transform: (inout RuleEnforcementState) -> Void) throws {
+        var state = loadRuleEnforcementState()
+        transform(&state)
+        try saveRuleEnforcementState(state)
+    }
+
     nonisolated private func readData(
         fileName: String,
         legacyDefaultsKey: String?

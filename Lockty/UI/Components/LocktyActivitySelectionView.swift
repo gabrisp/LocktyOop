@@ -37,6 +37,15 @@ struct LocktyActivitySelectionRules: Hashable {
     )
     static let appGroup = LocktyActivitySelectionRules(
         allowsApplications: true,
+        allowsCategories: true,
+        allowsWebDomains: false,
+        maximumApplications: nil,
+        maximumCategories: nil,
+        maximumWebDomains: 0,
+        pickerSeedStrategy: .currentSelection
+    )
+    static let distracting = LocktyActivitySelectionRules(
+        allowsApplications: true,
         allowsCategories: false,
         allowsWebDomains: false,
         maximumApplications: nil,
@@ -44,6 +53,12 @@ struct LocktyActivitySelectionRules: Hashable {
         maximumWebDomains: 0,
         pickerSeedStrategy: .currentSelection
     )
+}
+
+struct LocktySelectableAppGroup: Identifiable, Hashable {
+    let id: UUID
+    let name: String
+    let itemCount: Int
 }
 
 private enum LocktyActivitySelectionViolation: Hashable {
@@ -105,8 +120,10 @@ struct LocktyActivitySelectionView: View {
     let title: String
     let addLabel: String
     @Binding var selection: FamilyActivitySelection
+    var selectedAppGroupIDs: Binding<Set<UUID>>
     let rules: LocktyActivitySelectionRules
     let suggestions: [AppIdentity]
+    let appGroups: [LocktySelectableAppGroup]
     var externalOverlay: Binding<LocktyFeedbackOverlayState?>
     let onClose: () -> Void
     let onDone: () -> Void
@@ -119,8 +136,10 @@ struct LocktyActivitySelectionView: View {
         title: String = "Seleccionadas",
         addLabel: String = "Añadir App o sitio web",
         selection: Binding<FamilyActivitySelection>,
+        selectedAppGroupIDs: Binding<Set<UUID>> = .constant([]),
         rules: LocktyActivitySelectionRules,
         suggestions: [AppIdentity] = [],
+        appGroups: [LocktySelectableAppGroup] = [],
         externalOverlay: Binding<LocktyFeedbackOverlayState?> = .constant(nil),
         onClose: @escaping () -> Void,
         onDone: @escaping () -> Void
@@ -128,8 +147,10 @@ struct LocktyActivitySelectionView: View {
         self.title = title
         self.addLabel = addLabel
         _selection = selection
+        self.selectedAppGroupIDs = selectedAppGroupIDs
         self.rules = rules
         self.suggestions = suggestions
+        self.appGroups = appGroups
         self.externalOverlay = externalOverlay
         self.onClose = onClose
         self.onDone = onDone
@@ -146,13 +167,16 @@ struct LocktyActivitySelectionView: View {
                         // now, which already carries the way back, and the selection is
                         // written straight through the binding -- there is nothing for a
                         // confirm button to confirm.
-                        addButton
+                        suggestionsSection
                             .padding(.top, LocktySpacing.sm)
 
-                        selectedItemsSection
+                        if !appGroups.isEmpty {
+                            appGroupsSection
+                                .transition(.blurReplace.combined(with: .opacity))
+                        }
 
-                        if !visibleSuggestions.isEmpty {
-                            suggestionsSection
+                        if !selectedItems.isEmpty {
+                            selectedItemsSection
                                 .transition(.blurReplace.combined(with: .opacity))
                         }
                     }
@@ -305,45 +329,55 @@ struct LocktyActivitySelectionView: View {
 
     private var suggestionsSection: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            Text("Sugeridas")
+            Text("Sugerencias")
                 .font(.system(.headline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: LocktySpacing.lg) {
-                    ForEach(visibleSuggestions, id: \.id) { suggestion in
-                        if let token = suggestion.applicationToken {
-                            Button {
-                                addSuggestedApp(token)
-                            } label: {
-                                ZStack {
-                                    AppIconView(
-                                        source: suggestion.iconSource,
-                                        applicationToken: token,
-                                        fallbackSystemImage: suggestion.iconSystemName,
-                                        size: 72,
-                                        chrome: .plain
-                                    )
-                                    .matchedGeometryEffect(id: "app-\(token.hashValue)", in: selectionNamespace)
+            addButton
+        }
+    }
 
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 25, weight: .medium))
-                                        .foregroundStyle(.white)
-                                        .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
-                                }
-                                .frame(width: 84, height: 84)
+    private var appGroupsSection: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            Text("Grupos")
+                .font(.system(.headline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            VStack(spacing: 0) {
+                ForEach(appGroups) { group in
+                    Button {
+                        toggleAppGroup(group.id)
+                    } label: {
+                        HStack(spacing: LocktySpacing.md) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(group.name)
+                                    .font(.system(.body, design: .default, weight: .regular))
+                                    .foregroundStyle(LocktyColors.primaryText)
+
+                                Text(group.itemCount == 1 ? "1 elemento" : "\(group.itemCount) elementos")
+                                    .font(.system(.footnote, design: .default, weight: .regular))
+                                    .foregroundStyle(LocktyColors.secondaryText)
                             }
-                            .buttonStyle(.locktyInteractive(brighten: true))
-                            .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: selectedAppGroupIDs.wrappedValue.contains(group.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundStyle(selectedAppGroupIDs.wrappedValue.contains(group.id) ? LocktyColors.productive : LocktyColors.secondaryText)
                         }
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if group.id != appGroups.last?.id {
+                        Divider()
+                            .overlay(LocktyColors.separator.opacity(0.55))
                     }
                 }
-                .padding(.horizontal, LocktySpacing.xs)
-                .padding(.vertical, 2)
             }
-            .scrollClipDisabled()
+            .animation(.smooth(duration: 0.28), value: selectedAppGroupIDs.wrappedValue)
         }
-        .animation(.smooth(duration: 0.28), value: visibleSuggestions.map(\.id))
     }
 
     private var visibleSuggestions: [AppIdentity] {
@@ -408,6 +442,18 @@ struct LocktyActivitySelectionView: View {
 
     private var activeOverlay: LocktyFeedbackOverlayState? {
         externalOverlay.wrappedValue ?? overlay
+    }
+
+    private func toggleAppGroup(_ groupID: UUID) {
+        var next = selectedAppGroupIDs.wrappedValue
+        if next.contains(groupID) {
+            next.remove(groupID)
+        } else {
+            next.insert(groupID)
+        }
+        withAnimation(.smooth(duration: 0.28)) {
+            selectedAppGroupIDs.wrappedValue = next
+        }
     }
 }
 

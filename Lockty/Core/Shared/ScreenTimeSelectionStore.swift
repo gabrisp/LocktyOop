@@ -84,6 +84,8 @@ struct ScreenTimeSelectionStore {
         switch policy.reason {
         case .routine(let routineID):
             return try load(scope: .routine(routineID))
+        case .rule(let ruleID):
+            return try load(scope: .rule(ruleID))
         case .pause(let appID):
             if let matched = records()
                 .filter({ record in

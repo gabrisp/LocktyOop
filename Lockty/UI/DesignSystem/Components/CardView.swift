@@ -103,12 +103,18 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
                     .strokeBorder(primaryBorder, lineWidth: variant.baseLineWidth)
             }
             .compositingGroup()
+            // Added to the background rather than laid over it, which is what makes the
+            // bottom edge read as lit rather than as a lighter grey painted on. The
+            // blend has to sit outside the compositing group: inside it the fill would
+            // be adding to nothing but transparency and the card would look unchanged.
+            .blendMode(.plusLighter)
     }
 
-    /// Bright at the bottom edge and almost flat above it: 0.30 on the last line of the
-    /// card falling away to 0.05, so the glow reads as coming from under the card rather
-    /// than washing up its whole face, while the flat part is what gives the card its
-    /// surface.
+    /// Lit along the bottom edge, fading straight up to almost nothing.
+    ///
+    /// Vertical, with no sideways component at all. The axis used to be tilted
+    /// down-and-right, which lit the bottom-right corner rather than the bottom edge and
+    /// left every card looking as though the light came from somewhere off to one side.
     ///
     /// It spans the entire card. A fixed-height band anchored to the bottom drew a hard
     /// horizontal edge partway up wherever the card was taller than the band, which
@@ -116,21 +122,19 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
     private var aura: LinearGradient {
         LinearGradient(
             // Many closely spaced stops rather than a few: with four the ramp read as a
-            // visible crease part-way down instead of a glow.
+            // visible crease part-way down instead of a glow. The values are lower than
+            // they look because they are added, not drawn over.
             stops: [
-                .init(color: tint.opacity(0.050), location: 0.00),
-                .init(color: tint.opacity(0.055), location: 0.30),
-                .init(color: tint.opacity(0.070), location: 0.52),
-                .init(color: tint.opacity(0.100), location: 0.70),
-                .init(color: tint.opacity(0.140), location: 0.83),
-                .init(color: tint.opacity(0.200), location: 0.92),
-                .init(color: tint.opacity(0.260), location: 0.97),
-                .init(color: tint.opacity(0.300), location: 1.00)
+                .init(color: tint.opacity(0.020), location: 0.00),
+                .init(color: tint.opacity(0.022), location: 0.38),
+                .init(color: tint.opacity(0.030), location: 0.60),
+                .init(color: tint.opacity(0.048), location: 0.75),
+                .init(color: tint.opacity(0.080), location: 0.86),
+                .init(color: tint.opacity(0.130), location: 0.94),
+                .init(color: tint.opacity(0.190), location: 1.00)
             ],
-            // Tilted down-and-right so points on the right sit further along the axis:
-            // the bright end rides higher on that side instead of being level.
-            startPoint: UnitPoint(x: 0.32, y: 0),
-            endPoint: UnitPoint(x: 0.68, y: 1)
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 

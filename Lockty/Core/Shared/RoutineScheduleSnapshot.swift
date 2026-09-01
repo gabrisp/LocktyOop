@@ -49,7 +49,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
 
     /// The ActiveRoutine to write into runtime state when the interval starts.
     func makeActiveRoutine(startedAt: Date) -> ActiveRoutine {
-        let selectionScopes = Set([ScreenTimeSelectionScope.routine(id)] + appGroupIDs.map(ScreenTimeSelectionScope.appGroup))
+        let selectionScopes = Set([ScreenTimeSelectionScope.routine(id)] + appGroupIDs.map(ScreenTimeSelectionScope.appGroupScope))
         return ActiveRoutine(
             routineID: id,
             nameSnapshot: name,

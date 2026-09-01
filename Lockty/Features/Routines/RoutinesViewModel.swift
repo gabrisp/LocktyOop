@@ -41,11 +41,8 @@ final class RoutinesViewModel: ObservableObject {
     func load() async {
         do {
             let loaded = try await repository.routines()
-            let availableGroups = await appGroupRepository.appGroups()
             let tokens = loaded.reduce(into: [UUID: [ApplicationToken]]()) { result, routine in
-                let groupScopes = availableGroups
-                    .filter { routine.appGroupIDs.contains($0.id) }
-                    .map { ScreenTimeSelectionScope.appGroup($0.id) }
+                let groupScopes = routine.appGroupIDs.map(ScreenTimeSelectionScope.appGroupScope)
                 let merged = selectionStore.mergedSelection(scopes: Set([.routine(routine.id)] + groupScopes))
                 result[routine.id] = merged.applicationTokens.stablePrefix(merged.applicationTokens.count)
             }
@@ -61,12 +58,7 @@ final class RoutinesViewModel: ObservableObject {
     }
 
     func start(_ routine: Routine) async {
-        await routineEngine.start(routine)
-        if case .failed(let message) = routineEngine.state {
-            errorMessage = message
-        } else {
-            errorMessage = nil
-        }
+        errorMessage = await routineEngine.start(routine).errorMessage
     }
 
     func activeRoutineID() -> UUID? {

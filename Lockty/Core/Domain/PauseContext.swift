@@ -18,6 +18,11 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
     var steps: [PauseStep]
     var requestedAt: Date
     var activeRoutineID: UUID?
+    /// The limit rule this unlock is being granted against, when one is what put the app
+    /// behind the shield. Carried so whoever grants the allowance can charge it to the
+    /// right counter -- an open count is only spent once the unlock is actually given,
+    /// not when the shield's button is pressed and the flow then abandoned.
+    var limitRuleID: UUID?
     var source: PauseSource
 
     init(
@@ -31,6 +36,7 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         steps: [PauseStep],
         requestedAt: Date = Date(),
         activeRoutineID: UUID? = nil,
+        limitRuleID: UUID? = nil,
         source: PauseSource
     ) {
         self.id = id
@@ -45,6 +51,7 @@ nonisolated struct PauseContext: Codable, Hashable, Identifiable {
         self.steps = steps
         self.requestedAt = requestedAt
         self.activeRoutineID = activeRoutineID
+        self.limitRuleID = limitRuleID
         self.source = source
     }
 }

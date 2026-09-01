@@ -31,18 +31,21 @@ nonisolated struct BreakUnavailableState: Hashable, Identifiable {
     let id: UUID
     var title: String
     var message: String
-    var remainingMinutes: Int?
+    /// When the cooldown lets go. Carried as a date rather than as a count of minutes
+    /// so the sheet can tick down against it in real time instead of showing a number
+    /// that was rounded up once, when the sheet opened, and then stood still.
+    var retryAt: Date?
 
     init(
         id: UUID = UUID(),
         title: String,
         message: String,
-        remainingMinutes: Int? = nil
+        retryAt: Date? = nil
     ) {
         self.id = id
         self.title = title
         self.message = message
-        self.remainingMinutes = remainingMinutes
+        self.retryAt = retryAt
     }
 }
 

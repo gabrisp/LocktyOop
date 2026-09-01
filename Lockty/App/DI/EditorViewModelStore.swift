@@ -12,7 +12,8 @@ final class EditorViewModelStore {
         route: RuleEditorRoute,
         repository: RuleRepository,
         selectionStore: ScreenTimeSelectionStore,
-        frictionRepository: FrictionRepository
+        frictionRepository: FrictionRepository,
+        appGroupRepository: UserAppGroupRepository
     ) -> RuleEditorViewModel {
         if let existing = ruleEditors[route.draftID] {
             return existing
@@ -23,7 +24,8 @@ final class EditorViewModelStore {
             draftID: route.draftID,
             repository: repository,
             selectionStore: selectionStore,
-            frictionRepository: frictionRepository
+            frictionRepository: frictionRepository,
+            appGroupRepository: appGroupRepository
         )
         ruleEditors[route.draftID] = created
         return created
@@ -35,7 +37,8 @@ final class EditorViewModelStore {
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
         usageDataService: UsageDataServicing,
-        pauseFlowRepository: PauseFlowRepository
+        pauseFlowRepository: PauseFlowRepository,
+        appGroupRepository: UserAppGroupRepository
     ) -> RoutineEditorViewModel {
         if let existing = routineEditors[route.draftID] {
             return existing
@@ -48,7 +51,8 @@ final class EditorViewModelStore {
             selectionStore: selectionStore,
             routineEngine: routineEngine,
             usageDataService: usageDataService,
-            pauseFlowRepository: pauseFlowRepository
+            pauseFlowRepository: pauseFlowRepository,
+            appGroupRepository: appGroupRepository
         )
         routineEditors[route.draftID] = created
         return created

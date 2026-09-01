@@ -440,11 +440,13 @@ struct DistractingAppsSelectionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Guardar") {
+                Button {
                     Task {
                         try? await manager.saveDistractingSelection(selection)
                         router.pop()
                     }
+                } label: {
+                    Image(systemName: "checkmark")
                 }
             }
         }
@@ -652,8 +654,10 @@ struct AppGroupSelectionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Guardar") {
+                Button {
                     router.pop()
+                } label: {
+                    Image(systemName: "checkmark")
                 }
             }
         }

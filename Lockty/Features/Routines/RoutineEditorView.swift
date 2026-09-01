@@ -895,6 +895,14 @@ struct RoutineEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if onReturnToParent != nil {
+            // This is the schedule step of "Create Rule", so there is a screen behind it.
+            // requestClose already lands on that screen once the discard is confirmed --
+            // only the glyph was wrong, and it read as "throw all of this away".
+            LocktyDynamicSheetBarButton(action: requestClose) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else {
             LocktyDynamicSheetBarButton(action: requestClose) {
                 Image(systemName: "xmark")

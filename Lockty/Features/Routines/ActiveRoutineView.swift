@@ -83,8 +83,10 @@ struct ActiveRoutineView: View {
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Open") {
+                        Button {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: viewModel.routineID)))
+                        } label: {
+                            Image(systemName: "pencil")
                         }
                     }
                 }

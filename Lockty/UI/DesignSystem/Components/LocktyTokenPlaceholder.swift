@@ -2,50 +2,66 @@ import FamilyControls
 import ManagedSettings
 import SwiftUI
 
-/// Anything that has to sit in a row of app icons and be the same size as them: the
+/// Anything that has to sit in a row of app icons and be exactly the size of one: the
 /// "+N" tile at the end of a stack, an empty slot in a folder, a tinted stand-in.
 ///
 /// FamilyControls draws `Label(token)` at its own size and ignores whatever frame it is
-/// handed, so a placeholder built from a `RoundedRectangle` at some chosen number is only
-/// ever the same size as the icons beside it by coincidence -- and stops being so the
-/// moment anything scales them. This fills a rectangle in whatever colour is wanted and
-/// masks it with a real token, so the placeholder inherits an icon's exact silhouette and
-/// size, whatever the system decided those are.
+/// handed, so a placeholder built from a `RoundedRectangle` at some chosen number is the
+/// same size as the icons beside it only by coincidence -- and stops being so the moment
+/// anything scales them.
 ///
-/// The token is a stencil and nothing else: none of it is drawn, only its shape is used,
-/// so any token to hand will do.
+/// Masking a fill with the token does not work: the system renders that label out of
+/// process, and a layer SwiftUI does not draw itself cannot act as a mask -- the result
+/// is nothing at all. So the token is *measured* instead. A hidden copy is laid out
+/// purely to report the size the system gave it, and the placeholder is drawn at exactly
+/// that size. Being a real layout, every modifier applied around this -- scaleEffect,
+/// frames, clips -- lands on it identically to the way it lands on the icons.
+///
+/// This is the same trick `LocktyAppLockBadge` uses to size its ring.
 struct LocktyTokenPlaceholder: View {
-    /// Any app icon. Only its shape is used, never its picture.
+    /// Any app icon. Only its size is used, never its picture.
     let stencil: ApplicationToken?
     /// What the placeholder is filled with. A flat colour, a tint at low opacity, a
     /// routine's accent -- whatever the row it belongs to calls for.
     var fill: Color = LocktyColors.elevatedBackground
+    /// Used only until the measurement lands, and when there is no token to measure.
+    var fallbackSide: CGFloat = 38
 
-    var body: some View {
-        // The hidden label is what claims the space. A masked Rectangle on its own is
-        // flexible -- a mask changes what is drawn, never what is laid out -- so it would
-        // stretch to whatever it was offered instead of taking an icon's size.
-        icon
-            .opacity(0)
-            .overlay {
-                Rectangle()
-                    .fill(fill)
-                    .mask { icon }
-            }
+    /// The size the system drew the stencil at. Zero until the first layout pass.
+    @State private var measured: CGSize = .zero
+
+    private var side: CGSize {
+        measured.width > 0 && measured.height > 0
+            ? measured
+            : CGSize(width: fallbackSide, height: fallbackSide)
     }
 
-    @ViewBuilder
-    private var icon: some View {
-        if let stencil {
-            Label(stencil)
-                .labelStyle(.iconOnly)
-                .id(stencil)
-        } else {
-            // No app to take a shape from, so a square stands in. Only reached when the
-            // row has nothing in it, which means no overflow tile is drawn either.
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .frame(width: 22, height: 22)
-        }
+    /// The proportion iOS rounds an app icon by, so the tile reads as one of them rather
+    /// than as a rounded rectangle that happens to be the same size.
+    private var cornerRadius: CGFloat {
+        min(side.width, side.height) * 0.2237
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(fill)
+            .frame(width: side.width, height: side.height)
+            .background {
+                // Laid out, never drawn. `hidden()` keeps the view in the layout -- which
+                // is the whole point, since its size is the answer -- while drawing
+                // nothing, so the real icon never shows through the tile in front of it.
+                if let stencil {
+                    Label(stencil)
+                        .labelStyle(.iconOnly)
+                        .id(stencil)
+                        .hidden()
+                        .onGeometryChange(for: CGSize.self) { proxy in
+                            proxy.size
+                        } action: { newValue in
+                            measured = newValue
+                        }
+                }
+            }
     }
 }
 

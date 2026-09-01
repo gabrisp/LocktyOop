@@ -118,8 +118,10 @@ struct PauseDetailView: View {
         .toolbar {
             if let rule = viewModel.rule {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") {
+                    Button {
                         router.presentSheet(.pauseEditor(PauseEditorRoute(pauseID: rule.id)))
+                    } label: {
+                        Image(systemName: "pencil")
                     }
                 }
             }

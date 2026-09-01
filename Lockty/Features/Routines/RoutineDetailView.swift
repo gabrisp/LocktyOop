@@ -215,14 +215,18 @@ struct RoutineDetailView: View {
         .toolbar {
             if let routine = viewModel.routine {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") {
+                    Button {
                         router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
+                    } label: {
+                        Image(systemName: "pencil")
                     }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Start") {
+                Button {
                     Task { await viewModel.start() }
+                } label: {
+                    Image(systemName: "play.fill")
                 }
             }
         }

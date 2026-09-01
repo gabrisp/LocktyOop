@@ -347,6 +347,8 @@ struct RuleEditorView: View {
     @State private var isNaming = false
     @State private var isShowingKindChoice: Bool
     @State private var isConfirmingDiscard = false
+    /// Raised by the back chevron when this step has unsaved edits.
+    @State private var isConfirmingBack = false
     @FocusState private var isNameFieldFocused: Bool
     @State private var isGoingBack = false
 
@@ -406,6 +408,14 @@ struct RuleEditorView: View {
             blocked: viewModel.hasChanges && !isShowingKindChoice && activeSheet == nil,
             onAttempt: requestClose
         )
+        .confirmationDialog(
+            "¿Descartar los cambios?",
+            isPresented: $isConfirmingBack,
+            titleVisibility: .visible
+        ) {
+            Button("Descartar", role: .destructive) { returnToKindChoice() }
+            Button("Seguir editando", role: .cancel) {}
+        }
         .confirmationDialog(
             "¿Descartar los cambios?",
             isPresented: $isConfirmingDiscard,
@@ -504,7 +514,16 @@ struct RuleEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if viewModel.isCreating {
+            // Reached by picking a kind on "Create Rule", so there is a step behind this
+            // one. A chevron says that; an X claimed the only way out was to abandon the
+            // whole thing, when going back one screen is right there.
+            LocktyDynamicSheetBarButton(action: requestReturnToKindChoice) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else {
+            // Opened straight onto an existing rule: nothing behind it but the way out.
             LocktyDynamicSheetBarButton(action: requestClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .medium))
@@ -1197,6 +1216,19 @@ struct RuleEditorView: View {
             isShowingKindChoice = false
             isNaming = false
         }
+    }
+
+    /// Back to the kind choice, asking first when there is something to lose.
+    ///
+    /// Going back a step still throws away what was typed on this one, so it gets the
+    /// same confirmation leaving the sheet does -- the answer just lands on the previous
+    /// screen instead of outside.
+    private func requestReturnToKindChoice() {
+        guard viewModel.hasChanges else {
+            returnToKindChoice()
+            return
+        }
+        isConfirmingBack = true
     }
 
     private func returnToKindChoice() {

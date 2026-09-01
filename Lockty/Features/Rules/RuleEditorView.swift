@@ -311,6 +311,22 @@ final class RuleEditorViewModel: ObservableObject {
         min(max(value, 1), 10)
     }
 
+    /// Names the rule after the kind just chosen.
+    ///
+    /// Only on a new rule with an untouched name: the kind can be picked more than once
+    /// on the way through, and re-generating over a name the user had typed would throw
+    /// their words away. Called after the choice rather than at load, because at load
+    /// there is no kind yet to name it after.
+    func generateNameIfNeeded() async {
+        guard isCreating, name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let kind
+        else { return }
+
+        let existing = (try? await repository.rules())?.map(\.name) ?? []
+        name = LocktyGeneratedName.rule(kind: kind, existing: existing)
+        captureBaseline()
+    }
+
     func discardDraft() {
         try? selectionStore.remove(scope: draftSelectionScope)
     }
@@ -515,7 +531,10 @@ struct RuleEditorView: View {
         case .breakSettings:
             chromeTitleText("Break")
         case nil:
-            chromeTitleText(isNaming ? "Nombre" : (viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New Rule" : viewModel.name))
+            // The generated name, not "New Rule": the rule already has a name by the
+            // time this is on screen, and showing a placeholder over a filled field
+            // would be the header disagreeing with the form under it.
+            chromeTitleText(isNaming ? "Nombre" : (viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Regla" : viewModel.name))
         }
     }
 
@@ -619,6 +638,9 @@ struct RuleEditorView: View {
     private func kindTile(kind: RuleKind, subtitle: String) -> some View {
         Button {
             viewModel.setKind(kind)
+            // Named after the kind the moment it is chosen. There is nothing to name a
+            // rule after before this point, which is why it does not happen at load.
+            Task { await viewModel.generateNameIfNeeded() }
             if kind == .schedule {
                 openSchedule()
             } else {

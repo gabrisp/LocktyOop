@@ -161,8 +161,12 @@ final class RoutineEditorViewModel: ObservableObject {
         errorMessage = await routineEngine.start(routine).errorMessage
     }
 
+    /// The routine's own name, which a new one already has by the time anything is
+    /// shown. "New Routine" was a placeholder standing in front of a filled field.
     var title: String {
-        initialRoutineID == nil ? "New Routine" : "Edit Routine"
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty else { return trimmed }
+        return initialRoutineID == nil ? "Nueva rutina" : "Rutina"
     }
 
     var selectionScope: ScreenTimeSelectionScope {
@@ -245,10 +249,17 @@ final class RoutineEditorViewModel: ObservableObject {
         await loadSuggestedApplications()
         await loadPauseFlows()
         await loadAppGroups()
-        // A new routine's baseline is its empty form, so typing a name already counts.
         guard let initialRoutineID else {
             try? selectionStore.remove(scope: draftSelectionScope)
             refreshSelectionState()
+            // Named before the baseline is taken, so the generated name counts as the
+            // starting point rather than as an unsaved edit -- otherwise closing a
+            // routine you never touched would ask whether to discard changes.
+            let existing = (try? await repository.routines())?.map(\.name) ?? []
+            name = LocktyGeneratedName.routine(
+                startHour: scheduleTrigger.hour,
+                existing: existing
+            )
             captureBaseline()
             return
         }
@@ -878,7 +889,7 @@ struct RoutineEditorView: View {
     private var routineChromeName: String {
         let trimmed = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty else { return trimmed }
-        return isCreating ? "Nueva rutina" : "Rutina"
+        return viewModel.title
     }
 
     private func chromeTitleText(_ title: String) -> some View {

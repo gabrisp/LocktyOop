@@ -282,6 +282,14 @@ struct PauseFlowStepRow: View {
                 DurationSlider(value: binding(configuration).breathCount.doubleProxy, range: 1...10)
             }
 
+        case .steps(let configuration):
+            labelled(
+                "Pasos diarios",
+                value: configuration.dailyGoal.formatted(.number.grouping(.automatic))
+            ) {
+                DurationSlider(value: binding(configuration).dailyGoal.doubleProxy, range: 1000...25000)
+            }
+
         case .intention(let configuration):
             TextField("Pregunta", text: binding(configuration).prompt, axis: .vertical)
                 .font(LocktyTypography.body)
@@ -341,6 +349,10 @@ struct PauseFlowStepRow: View {
 
     private func binding(_ configuration: BreathingConfiguration) -> Binding<BreathingConfiguration> {
         Binding(get: { configuration }, set: { step = .breathing($0) })
+    }
+
+    private func binding(_ configuration: StepsConfiguration) -> Binding<StepsConfiguration> {
+        Binding(get: { configuration }, set: { step = .steps($0) })
     }
 
     private func binding(_ configuration: IntentionConfiguration) -> Binding<IntentionConfiguration> {

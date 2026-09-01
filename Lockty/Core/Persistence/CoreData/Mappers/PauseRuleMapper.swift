@@ -118,6 +118,7 @@ struct PauseRuleMapper {
         case .personalText: "personalText"
         case .nfcTag: "nfcTag"
         case .location: "location"
+        case .steps: "steps"
         }
     }
 }

@@ -34,6 +34,7 @@ nonisolated enum FrictionKind: String, Codable, CaseIterable, Identifiable, Hash
     case personalText
     case nfcTag
     case location
+    case steps
 
     var id: String { rawValue }
 }
@@ -247,6 +248,8 @@ extension PauseStep {
             .nfcTag
         case .location:
             .location
+        case .steps:
+            .steps
         case .countdown, .breathing, .intention, .confirmation:
             nil
         }
@@ -276,6 +279,8 @@ extension PauseStep {
             "wave.3.right.circle"
         case .location:
             "location"
+        case .steps:
+            "figure.walk"
         }
     }
 }

@@ -268,6 +268,8 @@ final class PauseEditorViewModel: ObservableObject {
                 return configuration.duration > 0 ? step : nil
             case .breathing(let configuration):
                 return configuration.breathCount > 0 ? step : nil
+            case .steps(let configuration):
+                return configuration.dailyGoal > 0 ? step : nil
             case .wordSearch:
                 return step
             case .letterMatch(let configuration):
@@ -696,6 +698,19 @@ private struct PauseStepEditorCard: View {
 
                 DurationSlider(value: binding(configuration: configuration).duration, range: 1...60)
 
+            case .steps(let configuration):
+                Text("\(configuration.dailyGoal.formatted(.number.grouping(.automatic))) steps")
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.2), value: configuration.dailyGoal)
+
+                DurationSlider(
+                    value: binding(configuration: configuration).dailyGoal.doubleProxy,
+                    range: 1000...25000
+                )
+
             case .breathing(let configuration):
                 Text("\(configuration.breathCount) breaths")
                     .font(.system(size: 28, weight: .light, design: .rounded))
@@ -743,6 +758,13 @@ private struct PauseStepEditorCard: View {
         Binding(
             get: { configuration },
             set: { step = .countdown($0) }
+        )
+    }
+
+    private func binding(configuration: StepsConfiguration) -> Binding<StepsConfiguration> {
+        Binding(
+            get: { configuration },
+            set: { step = .steps($0) }
         )
     }
 

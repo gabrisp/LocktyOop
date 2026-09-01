@@ -16,6 +16,16 @@ struct TodayView: View {
         viewModel.state(for: day)
     }
 
+    /// The day's productivity, rounded. Nil while it is still unknown, so the rock waits
+    /// rather than animating up to a zero it would then have to correct.
+    private var productivityScore: Int? {
+        guard case .loaded = state.loadingState else { return nil }
+        guard let metric = state.primaryMetrics.metrics.first(where: { $0.kind == .productivity }) else {
+            return nil
+        }
+        return Int(metric.value.rounded())
+    }
+
     /// The only way this screen opens the friction flow.
     ///
     /// Refuses before presenting anything rather than at the end of the flow: a cooldown
@@ -314,6 +324,11 @@ struct TodayView: View {
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
+                // The day's headline, centred and on its own. Everything under it is a
+                // breakdown of this one number.
+                ProductivityAuraView(score: productivityScore)
+                    .frame(maxWidth: .infinity)
+
                 // Top of Today: the running routine comes before everything else. An
                 // unlock request, when there is one, sits even above that because it is
                 // waiting on immediate action.
@@ -436,7 +451,7 @@ struct TodayView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    // Not wired up yet.
+                    router.presentSheet(.settings)
                 } label: {
                     Image(systemName: "gearshape")
                         .fontWeight(.light)

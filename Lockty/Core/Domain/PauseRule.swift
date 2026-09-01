@@ -57,6 +57,7 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
     case personalText(PersonalTextConfiguration)
     case nfcTag(NFCTagConfiguration)
     case location(LocationTrigger)
+    case steps(StepsConfiguration)
 
     var id: UUID {
         switch self {
@@ -85,6 +86,8 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
         case .nfcTag(let configuration):
             configuration.id
         case .location(let configuration):
+            configuration.id
+        case .steps(let configuration):
             configuration.id
         }
     }
@@ -117,6 +120,8 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             "NFC Tag"
         case .location:
             "Location"
+        case .steps:
+            "Steps"
         }
     }
 
@@ -148,7 +153,24 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             return label.isEmpty ? "\(Int(configuration.radiusMeters)) m radius" : label
         case .confirmation:
             return "Deliberate choice"
+        case .steps(let configuration):
+            return "\(configuration.dailyGoal.formatted(.number.grouping(.automatic))) steps"
         }
+    }
+}
+
+/// A step goal that has to be met before the unlock is offered.
+///
+/// The goal is stored, never the count. What has been walked today is read from Health at
+/// the moment the step is shown -- storing it would be a number that goes stale between
+/// one unlock and the next.
+nonisolated struct StepsConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    var dailyGoal: Int
+
+    init(id: UUID = UUID(), dailyGoal: Int = 8000) {
+        self.id = id
+        self.dailyGoal = dailyGoal
     }
 }
 

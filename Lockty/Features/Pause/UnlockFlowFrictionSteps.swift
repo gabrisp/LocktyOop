@@ -2275,3 +2275,223 @@ private extension LetterMatchPair {
         }
     }
 }
+
+private enum UnlockStepsPhase: Equatable {
+    case reading
+    case met(Int)
+    case short(current: Int, goal: Int)
+    case unavailable(String)
+}
+
+/// The step goal, measured against what Health says you have actually walked today.
+///
+/// Read at the moment the step appears rather than stored: a step count is only true for
+/// the minute it was taken in, and a saved one would be answering yesterday's question.
+struct UnlockStepsStepView: View {
+    let configuration: StepsConfiguration
+    let healthService: HealthServicing?
+    @Binding var status: UnlockFlowStepStatus
+
+    @State private var phase: UnlockStepsPhase = .reading
+    /// Counted up to rather than set: the number climbing to what you walked is the
+    /// whole point of showing it, and it is what the confetti lands on.
+    @State private var displayedCount = 0
+    @State private var celebrates = false
+
+    private let haptics = HapticsFactory()
+
+    var body: some View {
+        UnlockStepSurface(tone: surfaceTone, shakeTrigger: 0) {
+            VStack(spacing: LocktySpacing.lg) {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 30, weight: .light))
+                    .foregroundStyle(accent)
+
+                Text(displayedCount.formatted(.number.grouping(.automatic)))
+                    .font(.system(size: 56, weight: .semibold, design: .rounded))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.smooth(duration: 0.9), value: displayedCount)
+
+                shortfallLabel
+            }
+            .frame(maxWidth: .infinity)
+            // The confetti sits over the whole surface rather than over the number, so
+            // the burst reads as coming from the card, not out of the digits.
+            .overlay {
+                if celebrates {
+                    LocktyConfettiEmitter()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .task(id: configuration.id) {
+            await evaluate()
+        }
+    }
+
+    @ViewBuilder
+    private var shortfallLabel: some View {
+        switch phase {
+        case .reading:
+            Text("Leyendo tus pasos...")
+                .font(LocktyTypography.callout)
+                .foregroundStyle(LocktyColors.secondaryText)
+
+        case .met:
+            Text("Has llegado a tu meta de hoy.")
+                .font(LocktyTypography.callout)
+                .foregroundStyle(LocktyColors.productive)
+                .multilineTextAlignment(.center)
+
+        case .short(let current, let goal):
+            // The exact shortfall, not a percentage: what is being asked for is a number
+            // of steps, so the answer is a number of steps.
+            Text("Te faltan un total de \(max(goal - current, 0).formatted(.number.grouping(.automatic))) pasos para poder desbloquear")
+                .font(LocktyTypography.callout)
+                .foregroundStyle(LocktyColors.secondaryText)
+                .multilineTextAlignment(.center)
+
+        case .unavailable(let message):
+            Text(message)
+                .font(LocktyTypography.callout)
+                .foregroundStyle(LocktyColors.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var accent: Color {
+        switch phase {
+        case .met:
+            LocktyColors.productive
+        case .unavailable:
+            LocktyColors.error
+        case .reading, .short:
+            LocktyColors.primaryText
+        }
+    }
+
+    private var surfaceTone: UnlockFeedbackTone {
+        switch phase {
+        case .met:
+            .success
+        case .unavailable:
+            .error
+        case .reading, .short:
+            .neutral
+        }
+    }
+
+    @MainActor
+    private func evaluate() async {
+        status = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
+        phase = .reading
+        displayedCount = 0
+        celebrates = false
+
+        guard let healthService, healthService.isAvailable else {
+            phase = .unavailable("Health no está disponible en este dispositivo.")
+            // Nothing can be measured, so nothing can be demanded. Blocking the unlock on
+            // a reading that cannot exist would make the friction impossible to pass.
+            status = .ready
+            return
+        }
+
+        do {
+            let count = try await healthService.stepCountToday()
+
+            withAnimation(.smooth(duration: 0.9)) {
+                displayedCount = count
+            }
+
+            if count >= configuration.dailyGoal {
+                phase = .met(count)
+                status = .ready
+                // After the count has finished climbing, so the burst marks the number
+                // arriving rather than firing over a zero.
+                try? await Task.sleep(for: .milliseconds(700))
+                guard !Task.isCancelled else { return }
+                withAnimation(.smooth(duration: 0.3)) {
+                    celebrates = true
+                }
+                haptics.impact(.medium, intensity: 1)
+            } else {
+                phase = .short(current: count, goal: configuration.dailyGoal)
+                status = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
+            }
+        } catch {
+            phase = .unavailable(error.localizedDescription)
+            status = .ready
+        }
+    }
+}
+
+/// The burst that marks a met goal.
+///
+/// A CAEmitterLayer rather than a pile of animated SwiftUI views: this is hundreds of
+/// short-lived particles, and the work belongs on the render server rather than in a
+/// layout pass that has to keep up with them.
+private struct LocktyConfettiEmitter: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.layer.addSublayer(makeEmitter())
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        guard let emitter = uiView.layer.sublayers?.first as? CAEmitterLayer else { return }
+        emitter.emitterPosition = CGPoint(x: uiView.bounds.midX, y: -12)
+        emitter.emitterSize = CGSize(width: uiView.bounds.width, height: 1)
+    }
+
+    private func makeEmitter() -> CAEmitterLayer {
+        let emitter = CAEmitterLayer()
+        emitter.emitterShape = .line
+        emitter.birthRate = 1
+        emitter.emitterCells = colors.map(makeCell)
+        // Stops after the burst rather than raining forever: this celebrates a moment.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            emitter.birthRate = 0
+        }
+        return emitter
+    }
+
+    private var colors: [UIColor] {
+        [
+            UIColor(LocktyColors.productive),
+            .systemYellow,
+            .systemTeal,
+            .white
+        ]
+    }
+
+    private func makeCell(color: UIColor) -> CAEmitterCell {
+        let cell = CAEmitterCell()
+        cell.birthRate = 14
+        cell.lifetime = 3.4
+        cell.velocity = 180
+        cell.velocityRange = 70
+        cell.emissionLongitude = .pi
+        cell.emissionRange = .pi / 5
+        cell.spin = 3.4
+        cell.spinRange = 4
+        cell.scale = 0.5
+        cell.scaleRange = 0.25
+        cell.color = color.cgColor
+        cell.contents = Self.particleImage.cgImage
+        return cell
+    }
+
+    /// One small rounded rectangle, drawn once and tinted per cell.
+    private static let particleImage: UIImage = {
+        let size = CGSize(width: 9, height: 14)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 2).fill()
+            _ = context
+        }
+    }()
+}

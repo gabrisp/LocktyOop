@@ -20,6 +20,7 @@ final class AppContainer {
     let alarmService: AlarmServicing
     let nfcService: NFCServicing
     let locationService: LocationTriggerServicing
+    let healthService: HealthServicing
     let notificationService: NotificationServicing
 
     let todayViewModel: TodayViewModel
@@ -53,6 +54,7 @@ final class AppContainer {
         alarmService: AlarmServicing,
         nfcService: NFCServicing,
         locationService: LocationTriggerServicing,
+        healthService: HealthServicing,
         notificationService: NotificationServicing,
         todayViewModel: TodayViewModel,
         rulesViewModel: RulesViewModel,
@@ -83,6 +85,7 @@ final class AppContainer {
         self.alarmService = alarmService
         self.nfcService = nfcService
         self.locationService = locationService
+        self.healthService = healthService
         self.notificationService = notificationService
         self.todayViewModel = todayViewModel
         self.rulesViewModel = rulesViewModel
@@ -157,6 +160,7 @@ final class AppContainer {
         )
         let nfcService = LiveNFCService()
         let locationService = LiveLocationTriggerService()
+        let healthService = LiveHealthService()
         let notificationService = LiveNotificationService()
 
         let todayPipeline = LiveTodayDataPipeline(
@@ -258,6 +262,7 @@ final class AppContainer {
             haptics: haptics,
             nfcService: nfcService,
             locationService: locationService,
+            healthService: healthService,
             editorStore: editorStore,
             usageDataService: usageDataService
         )
@@ -290,6 +295,7 @@ final class AppContainer {
             alarmService: alarmService,
             nfcService: nfcService,
             locationService: locationService,
+            healthService: healthService,
             notificationService: notificationService,
             todayViewModel: todayViewModel,
             rulesViewModel: rulesViewModel,

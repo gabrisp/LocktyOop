@@ -781,6 +781,14 @@ private struct FrictionStepEditorCard: View {
                 range: 1...10
             ) { onChange(.breathing(BreathingConfiguration(id: configuration.id, breathCount: Int($0)))) }
 
+        case .steps(let configuration):
+            DurationSliderCard(
+                title: "Daily steps",
+                value: Double(configuration.dailyGoal),
+                range: 1000...25000,
+                step: 500
+            ) { onChange(.steps(StepsConfiguration(id: configuration.id, dailyGoal: Int($0)))) }
+
         case .wordSearch(let configuration):
             VStack(alignment: .leading, spacing: LocktySpacing.sm) {
                 EnumPicker(title: "Difficulty", selection: configuration.difficulty) { newValue in
@@ -1333,18 +1341,20 @@ private struct DurationSliderCard: View {
     let title: String
     let value: Double
     let range: ClosedRange<Double>
+    /// Rounds the slider's answer. A step goal that lands on 8137 is noise, not a choice.
+    var step: Double = 1
     let onChange: (Double) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text("\(title): \(Int(value))")
+            Text("\(title): \(Int(value).formatted(.number.grouping(.automatic)))")
                 .font(LocktyTypography.callout)
                 .foregroundStyle(LocktyColors.primaryText)
 
             DurationSlider(
                 value: Binding(
                     get: { value },
-                    set: onChange
+                    set: { onChange((($0 / step).rounded()) * step) }
                 ),
                 range: range
             )

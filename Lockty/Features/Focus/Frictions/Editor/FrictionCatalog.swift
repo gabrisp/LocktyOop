@@ -149,6 +149,16 @@ enum FrictionCatalog {
             tint: .green
         ) {
             .location(LocationTrigger(name: "", latitude: 0, longitude: 0, radiusMeters: 150, startsOnEntry: true))
+        },
+        FrictionCatalogItem(
+            kind: .steps,
+            category: .personal,
+            title: "Steps",
+            subtitle: "Only continue once you have walked today's goal.",
+            systemImage: "figure.walk",
+            tint: .orange
+        ) {
+            .steps(StepsConfiguration())
         }
     ]
 

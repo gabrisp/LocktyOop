@@ -66,7 +66,12 @@ struct DestinationFactory {
             featureFactory.makeSystemAccessSheet()
 
         case .settings:
-            featureFactory.makeSettingsView()
+            // Wrapped: it is presented as a sheet, and a navigationTitle with no stack
+            // around it draws nothing at all.
+            NavigationStack {
+                featureFactory.makeSettingsView()
+                    .locktyScreenBackground()
+            }
 
         case .applicationDetails(let id, let day):
             featureFactory.makeApplicationDetails(appID: id, day: day)

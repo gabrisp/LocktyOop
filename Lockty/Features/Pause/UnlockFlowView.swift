@@ -16,6 +16,7 @@ struct UnlockFlowView: View {
     let allowanceRange: ClosedRange<Int>
     let nfcService: NFCServicing?
     let locationService: LocationTriggerServicing?
+    let healthService: HealthServicing?
     let onUnlock: (ApplicationToken?, Int, String?) -> Void
     let onClose: () -> Void
 
@@ -43,6 +44,7 @@ struct UnlockFlowView: View {
         defaultMinutes: Int = 5,
         nfcService: NFCServicing? = nil,
         locationService: LocationTriggerServicing? = nil,
+        healthService: HealthServicing? = nil,
         onUnlock: @escaping (ApplicationToken?, Int, String?) -> Void,
         onClose: @escaping () -> Void
     ) {
@@ -52,6 +54,7 @@ struct UnlockFlowView: View {
         self.allowanceRange = allowanceRange
         self.nfcService = nfcService
         self.locationService = locationService
+        self.healthService = healthService
         self.onUnlock = onUnlock
         self.onClose = onClose
         // Falls back to the first blocked app rather than to nothing: the flow always
@@ -293,6 +296,13 @@ struct UnlockFlowView: View {
                 configuration: configuration,
                 scanTrigger: nfcScanTrigger,
                 nfcService: nfcService,
+                status: $currentStepStatus
+            )
+
+        case .steps(let configuration):
+            UnlockStepsStepView(
+                configuration: configuration,
+                healthService: healthService,
                 status: $currentStepStatus
             )
 

@@ -31,6 +31,7 @@ struct FeatureFactory {
     let haptics: HapticsProviding
     let nfcService: NFCServicing
     let locationService: LocationTriggerServicing
+    let healthService: HealthServicing
     let editorStore: EditorViewModelStore
     let usageDataService: UsageDataServicing
 
@@ -81,7 +82,7 @@ struct FeatureFactory {
     }
 
     func makeSettingsView() -> SettingsView {
-        SettingsView()
+        SettingsView(viewModel: SettingsViewModel(healthService: healthService))
     }
 
     @ViewBuilder
@@ -248,7 +249,8 @@ struct FeatureFactory {
             frictionSteps: activeRoutine?.pausePolicySnapshot.steps ?? [],
             defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
             nfcService: nfcService,
-            locationService: locationService
+            locationService: locationService,
+            healthService: healthService
         ) { chosenToken, minutes, intention in
             Task { @MainActor in
                 // Checked against every routine holding the chosen app, not just one:

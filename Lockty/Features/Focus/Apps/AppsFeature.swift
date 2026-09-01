@@ -756,7 +756,6 @@ struct AppFolderCard: View {
                     .foregroundStyle(LocktyColors.primaryText)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
-                    .frame(height: 38, alignment: .top)
 
                 Text(subtitle)
                     .font(.system(size: 12, weight: .regular))
@@ -764,7 +763,13 @@ struct AppFolderCard: View {
                     .multilineTextAlignment(.leading)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // The height is reserved on the block, not on the title.
+            //
+            // Reserving two lines *inside* the title pushed the subtitle to the bottom of
+            // that reservation, so a one-line name had its count sitting a whole line
+            // below it -- which is the gap that looked wrong. Reserving it out here keeps
+            // the pair together at the top and still leaves every card the same height.
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
         }
         .frame(width: folderSide, alignment: .top)
     }

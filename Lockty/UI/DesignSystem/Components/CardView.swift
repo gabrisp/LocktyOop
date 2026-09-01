@@ -92,12 +92,22 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
     let tint: Color
     let variant: LocktyCardBorderProfile
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isDark: Bool { colorScheme == .dark }
+
     var body: some View {
         // The gradient is the card's entire fill. There is no flat base layer under it
         // any more: now that the gradient spans the whole card the two stacked on top of
         // each other, so the top of the card was being painted twice.
+        //
+        // In light mode the card is an opaque surface sitting *above* the page rather
+        // than a wash of light over it: adding light to a light grey does almost nothing,
+        // so a card built the dark way was invisible. The gradient survives, inverted --
+        // the bottom edge is where the card lifts off the page, and it lifts by being
+        // brighter in the dark and by casting a shadow in the light.
         shape
-            .fill(aura)
+            .fill(isDark ? AnyShapeStyle(aura) : AnyShapeStyle(lightSurface))
             .overlay {
                 shape
                     .strokeBorder(primaryBorder, lineWidth: variant.baseLineWidth)
@@ -107,7 +117,28 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
             // bottom edge read as lit rather than as a lighter grey painted on. The
             // blend has to sit outside the compositing group: inside it the fill would
             // be adding to nothing but transparency and the card would look unchanged.
-            .blendMode(.plusLighter)
+            //
+            // Only in the dark: adding light to a light page washes it out instead of
+            // lifting the card off it.
+            .blendMode(isDark ? .plusLighter : .normal)
+            .shadow(
+                color: isDark ? .clear : Color.black.opacity(0.06),
+                radius: 10,
+                y: 4
+            )
+    }
+
+    /// The light-mode card: white, a touch cooler towards the bottom so it still has the
+    /// same direction of light the dark one does.
+    private var lightSurface: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.white,
+                Color.white.opacity(0.94)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     /// Lit along the bottom edge, fading straight up to almost nothing.
@@ -138,13 +169,18 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
         )
     }
 
+    /// The rim. White over a dark page, a dark hairline over a light one -- the same
+    /// gradient either way, only in whichever colour is not the card's own.
     private var primaryBorder: LinearGradient {
-        LinearGradient(
+        let edge = isDark ? tint : Color.black
+        let scale = isDark ? 1.0 : 0.45
+
+        return LinearGradient(
             stops: [
-                .init(color: tint.opacity(variant.leadingOpacity), location: 0),
-                .init(color: tint.opacity(variant.upperMidOpacity), location: 0.18),
-                .init(color: tint.opacity(variant.lowerMidOpacity), location: 0.62),
-                .init(color: tint.opacity(variant.trailingOpacity), location: 1)
+                .init(color: edge.opacity(variant.leadingOpacity * scale), location: 0),
+                .init(color: edge.opacity(variant.upperMidOpacity * scale), location: 0.18),
+                .init(color: edge.opacity(variant.lowerMidOpacity * scale), location: 0.62),
+                .init(color: edge.opacity(variant.trailingOpacity * scale), location: 1)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

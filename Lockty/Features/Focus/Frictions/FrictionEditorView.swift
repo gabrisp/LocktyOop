@@ -308,6 +308,8 @@ private enum FrictionEditorLocalSheet: Identifiable, Equatable {
 }
 
 private enum FrictionEditorCompactScreen: Hashable {
+    /// The summary. What a friction opens on when it already exists.
+    case reading
     case editor
     case naming
 }
@@ -328,6 +330,8 @@ struct FrictionEditorView: View {
     @State private var editorContentHeight: CGFloat = 0
     @State private var isGoingBack = false
     @State private var isNaming = false
+    /// A new friction opens straight into the form -- there is nothing to preview yet.
+    @State private var isEditing: Bool
     @FocusState private var isNameFieldFocused: Bool
 
     init(
@@ -338,6 +342,7 @@ struct FrictionEditorView: View {
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        _isEditing = State(initialValue: viewModel.isCreating)
         self.isEmbeddedInParentSheet = isEmbeddedInParentSheet
         self.locationService = locationService
         self.onReturnToParent = onReturnToParent
@@ -345,7 +350,8 @@ struct FrictionEditorView: View {
     }
 
     private var currentCompactScreen: FrictionEditorCompactScreen {
-        isNaming ? .naming : .editor
+        if isNaming { return .naming }
+        return isEditing ? .editor : .reading
     }
 
     private var contentID: String {
@@ -353,6 +359,8 @@ struct FrictionEditorView: View {
             return activeSheet.id
         }
         switch currentCompactScreen {
+        case .reading:
+            return "reading"
         case .editor:
             return "editor"
         case .naming:
@@ -472,6 +480,10 @@ struct FrictionEditorView: View {
                     .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
+                case .reading:
+                    readOnlyContent
+                        .geometryGroup()
+                        .transition(screenTransition)
                 case .editor:
                     editorContent
                         .geometryGroup()
@@ -524,12 +536,35 @@ struct FrictionEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if isEditing && !viewModel.isCreating {
+            LocktyDynamicSheetBarButton(action: returnToReading) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else {
             LocktyDynamicSheetBarButton(action: requestClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .medium))
             }
         }
+    }
+
+    private func returnToReading() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) {
+            isEditing = false
+            isNaming = false
+        }
+    }
+
+    /// The summary, plus the way into editing it.
+    private var readOnlyContent: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            FrictionPreviewContent(viewModel: viewModel)
+        }
+        .padding(.bottom, LocktySpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -544,9 +579,22 @@ struct FrictionEditorView: View {
             }
             .disabled(viewModel.draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } else {
-            LocktyDynamicSheetBarButton(action: enterNaming) {
+            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
                 Image(systemName: "pencil")
                     .font(.system(size: 15, weight: .medium))
+            }
+        }
+    }
+
+    /// From the summary the pencil opens the form; from the form there is nothing left to
+    /// open but the name. The same two meanings the routine editor's pencil has.
+    private func enterEditingFlow() {
+        isGoingBack = false
+        withAnimation(sheetAnimation) {
+            if isEditing {
+                isNaming = true
+            } else {
+                isEditing = true
             }
         }
     }

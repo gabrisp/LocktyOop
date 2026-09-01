@@ -128,7 +128,8 @@ struct TodayView: View {
     /// date slider and the shortcut row, so the content must not be pushed down to clear
     /// chrome that isn't there.
     private var topChromeExpandedHeight: CGFloat {
-        0
+        // The badge is pinned, so the scrolling content starts below where it is drawn.
+        ProductivityAuraView.reservedHeight()
 //        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
@@ -155,6 +156,11 @@ struct TodayView: View {
             // neither the base colour nor the aura ever showed.
             LocktyScreenBackground()
                 .ignoresSafeArea()
+
+            // Behind the scrolling content, not above it. Pinned in the chrome layer it
+            // would be drawn on top of everything, and the cards are meant to pass over
+            // it -- that passing-over is the whole effect.
+            productivityBadge
 
             scrollContent
             // No backdrop behind the collapsed chrome: the ring sits on the screen's own
@@ -234,6 +240,17 @@ struct TodayView: View {
         .opacity(topChromeBackdropOpacity)
         .allowsHitTesting(false)
         .ignoresSafeArea(edges: .top)
+    }
+
+    /// The day's headline, in the same place at every scroll offset.
+    private var productivityBadge: some View {
+        ProductivityAuraView(
+            score: productivityScore,
+            collapseProgress: collapseProgress
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, safeAreaTop)
+        .allowsHitTesting(false)
     }
 
     private var topChrome: some View {
@@ -332,11 +349,6 @@ struct TodayView: View {
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }
-
-                // The day's headline, scrolling with everything else: it is the first
-                // thing on the page, not chrome pinned above it.
-                ProductivityAuraView(score: productivityScore)
-                    .frame(maxWidth: .infinity)
 
                 // Top of Today: the running routine comes before everything else. An
                 // unlock request, when there is one, sits even above that because it is

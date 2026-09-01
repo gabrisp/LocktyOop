@@ -18,12 +18,22 @@ import SwiftUI
 struct ProductivityAuraView: View {
     /// 0 to 100. Nil while the day's score is still unknown.
     let score: Int?
+    /// 0 at rest, 1 once the screen has been scrolled past the collapse distance. The
+    /// badge neither moves nor resizes -- it fades where it stands, and the cards pass
+    /// over the top of it.
+    var collapseProgress: CGFloat = 0
 
     /// Climbs to `score` once the view is on screen. Separate from the score itself so
     /// re-rendering for any other reason does not restart the arrival.
     @State private var displayedScore = 0
 
     private let side: CGFloat = 240
+
+    /// The height the badge occupies. Constant, because it never resizes -- the content
+    /// starts below it and scrolls over it from there.
+    static func reservedHeight(side: CGFloat = 240) -> CGFloat {
+        side * 0.82
+    }
 
     /// Green at the top, yellow in the middle, red at the bottom -- green being the end
     /// worth reaching.
@@ -63,6 +73,10 @@ struct ProductivityAuraView: View {
         // was papering over.
         .frame(width: side, height: side * 0.82)
         .compositingGroup()
+        // Fades where it stands rather than following the page down. A headline that
+        // travels with the content competes with what it introduced; losing it off the
+        // top would leave the cards explaining a number no longer on screen.
+        .opacity(1 - Double(collapseProgress))
         .task(id: score) {
             await arrive()
         }

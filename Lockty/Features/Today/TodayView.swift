@@ -128,9 +128,10 @@ struct TodayView: View {
     /// date slider and the shortcut row, so the content must not be pushed down to clear
     /// chrome that isn't there.
     private var topChromeExpandedHeight: CGFloat {
-        // The badge is a section header inside the scroll view now, so it takes its own
-        // room in the flow and nothing has to be reserved above it.
-        0
+        // Interpolated, not fixed: the badge is pinned above the content, so the content
+        // has to start below where it is drawn *and* ride up as it shrinks -- otherwise
+        // it would leave the full-size gap behind.
+        ProductivityAuraView.reservedHeight(collapseProgress: collapseProgress)
 //        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
@@ -289,6 +290,17 @@ struct TodayView: View {
 //            .opacity(1 - shortcutHideProgress)
 //            .offset(y: shortcutRowOffsetY)
 //            .allowsHitTesting(!areShortcutsHidden)
+
+            // The day's headline. Pinned here rather than inside the scroll view,
+            // because what it collapses into is the navigation bar's own line -- and the
+            // offset below is what carries it there. No background of its own: the
+            // screen's ground is already behind it, and a second one would show as a
+            // panel sliding up with it.
+            ProductivityAuraView(
+                score: productivityScore,
+                collapseProgress: collapseProgress
+            )
+            .frame(maxWidth: .infinity)
         }
         // Rides up into the navigation bar as it collapses, so what is left at the end
         // sits on the toolbar's own line, beside Settings, rather than parked under it.
@@ -314,13 +326,10 @@ struct TodayView: View {
 
     private var scrollContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            // A pinned section header rather than an overlay above the scroll view. The
-            // badge travels up with the page like anything else and then stays at the
-            // top, shrinking as it goes -- which is what makes it part of the page rather
-            // than chrome hovering over it. `pinnedViews` is why this stack is lazy.
-            LazyVStack(alignment: .leading, spacing: LocktySpacing.lg, pinnedViews: [.sectionHeaders]) {
-                Section {
-                    VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                Color.clear
+                    .frame(height: topChromeExpandedHeight + LocktySpacing.sm)
+
                 // Above everything else: an unlock the shield asked for is the one thing
                 // on this screen that is waiting on an answer.
                 if let pendingUnlock = router.pendingUnlock {
@@ -444,20 +453,6 @@ struct TodayView: View {
                     .opacity(0.01)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
-                    }
-                } header: {
-                    ProductivityAuraView(
-                        score: productivityScore,
-                        collapseProgress: collapseProgress
-                    )
-                    .frame(maxWidth: .infinity)
-                    // The page shows through behind it once it is pinned, so it carries
-                    // the screen's own ground rather than letting cards slide under it.
-                    .background {
-                        LocktyColors.background
-                            .ignoresSafeArea(edges: .top)
-                    }
-                }
             }
             .padding(.horizontal, LocktySpacing.lg)
             .padding(.top, LocktySpacing.sm)

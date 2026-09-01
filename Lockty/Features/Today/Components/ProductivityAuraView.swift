@@ -28,6 +28,13 @@ struct ProductivityAuraView: View {
 
     private let side: CGFloat = 240
 
+    /// What the badge occupies at a given collapse, so the screen above it can reserve
+    /// exactly that and no more.
+    static func reservedHeight(collapseProgress: CGFloat, side: CGFloat = 240) -> CGFloat {
+        let drawn = side * 0.82
+        return MetricsHeaderGeometry.lerp(drawn, drawn * 0.3, progress: collapseProgress)
+    }
+
     /// Small enough to sit on the toolbar's line, large enough that the number is still
     /// the thing you read. The rock keeps its shape and its light all the way down:
     /// collapsing is the same object seen from further away, not a second badge.

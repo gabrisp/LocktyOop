@@ -41,6 +41,10 @@ struct HomeView: View {
             }
             .tag(AppTab.focus)
         }
+        // The selected tab is the app's own primary, not the AccentColor asset the bar
+        // was falling back to. Nothing else in Lockty is tinted by that accent, so the
+        // bar was the one place a colour from outside the palette showed up.
+        .tint(LocktyColors.primaryText)
 //        .safeAreaInset(edge: .bottom) {
 //            Group {
 //                if let activeRoutine {

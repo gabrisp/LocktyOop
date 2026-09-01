@@ -22,7 +22,10 @@ struct TodayMetricCardLayoutView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            Text(title).font(LocktyTypography.headline).foregroundStyle(LocktyColors.primaryText)
+            // The same heading "Rutina" and "Tiempo de uso" carry. These two were the
+            // only cards still setting their title by hand, in a heavier font and at full
+            // white, so they read as a different kind of card than the ones around them.
+            LocktySectionTitle(title, prominent: true)
             Spacer(minLength: 0)
             Text(value)
                 .font(LocktyTypography.title)

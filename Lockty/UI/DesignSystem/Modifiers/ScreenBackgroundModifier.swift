@@ -17,7 +17,13 @@ extension View {
 }
 
 struct LocktyScreenBackground: View {
-    private let auraColor = LocktyColors.ink(0.03)
+    /// The blooms behind every screen.
+    ///
+    /// Not `ink`: on a light page that is black at 2%, which is a smudge rather than a
+    /// glow -- and the point of these is light, not shade. Light mode gets white blooms
+    /// on the grey ground, which is the same gesture the dark one makes and the only one
+    /// that reads as a light source rather than as dirt.
+    private let auraColor = LocktyColors.screenAura
 
     var body: some View {
         GeometryReader { proxy in

@@ -36,6 +36,13 @@ enum LocktyColors {
         )
     }
 
+    /// The soft blooms behind every screen. White either way: they are light spilling
+    /// onto the page, and light on a grey page is white, not a darker grey.
+    static let screenAura = adaptive(
+        light: UIColor.white.withAlphaComponent(0.75),
+        dark: UIColor.white.withAlphaComponent(0.03)
+    )
+
     /// The colour to draw *on* a filled `primaryText` shape -- the label inside a
     /// selected pill, the glyph inside a stepper button.
     static let onPrimary = adaptive(light: .white, dark: .black)

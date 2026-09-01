@@ -18,9 +18,8 @@ import SwiftUI
 struct ProductivityAuraView: View {
     /// 0 to 100. Nil while the day's score is still unknown.
     let score: Int?
-    /// 0 at rest, 1 once the screen has been scrolled past the collapse distance. The
-    /// badge neither moves nor resizes -- it fades where it stands, and the cards pass
-    /// over the top of it.
+    /// 0 at rest, 1 once the screen has been scrolled past the collapse distance.
+    /// Everything shrinks by it; only the word above the number goes away.
     var collapseProgress: CGFloat = 0
 
     /// Climbs to `score` once the view is on screen. Separate from the score itself so
@@ -29,10 +28,11 @@ struct ProductivityAuraView: View {
 
     private let side: CGFloat = 240
 
-    /// The height the badge occupies. Constant, because it never resizes -- the content
-    /// starts below it and scrolls over it from there.
-    static func reservedHeight(side: CGFloat = 240) -> CGFloat {
-        side * 0.82
+    /// Small enough to sit on the toolbar's line, large enough that the number is still
+    /// the thing you read. The rock keeps its shape and its light all the way down:
+    /// collapsing is the same object seen from further away, not a second badge.
+    private var scale: CGFloat {
+        MetricsHeaderGeometry.lerp(1, 0.3, progress: collapseProgress)
     }
 
     /// Green at the top, yellow in the middle, red at the bottom -- green being the end
@@ -73,10 +73,10 @@ struct ProductivityAuraView: View {
         // was papering over.
         .frame(width: side, height: side * 0.82)
         .compositingGroup()
-        // Fades where it stands rather than following the page down. A headline that
-        // travels with the content competes with what it introduced; losing it off the
-        // top would leave the cards explaining a number no longer on screen.
-        .opacity(1 - Double(collapseProgress))
+        .scaleEffect(scale)
+        // Claims the space it draws at rather than the space it was laid out at, so the
+        // content below rides up as it shrinks instead of leaving a hole behind.
+        .frame(width: side * scale, height: side * 0.82 * scale)
         .task(id: score) {
             await arrive()
         }
@@ -156,6 +156,9 @@ struct ProductivityAuraView: View {
         VStack(spacing: -4) {
             Text("Productivity")
                 .font(.system(.subheadline, design: .default, weight: .semibold))
+                // The only thing that leaves. At a third the size it would be unreadable
+                // anyway, and the number alone is still the whole point.
+                .opacity(1 - Double(MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0, to: 0.5)))
 
             Text("\(displayedScore)")
                 .font(.system(size: 76, weight: .heavy, design: .default))

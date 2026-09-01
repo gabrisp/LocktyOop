@@ -565,7 +565,16 @@ struct RuleEditorView: View {
             // The generated name, not "New Rule": the rule already has a name by the
             // time this is on screen, and showing a placeholder over a filled field
             // would be the header disagreeing with the form under it.
-            chromeTitleText(isNaming ? "Name" : (viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Regla" : viewModel.name))
+            if isNaming {
+                chromeTitleText("Name")
+            } else if !isEditing {
+                // Nothing while reading. The summary under this bar carries the icon and
+                // the name at full size, so a smaller copy directly above them is the
+                // same thing said twice.
+                EmptyView()
+            } else {
+                chromeTitleText(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Rule" : viewModel.name)
+            }
         }
     }
 

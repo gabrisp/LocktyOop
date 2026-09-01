@@ -506,7 +506,15 @@ struct FrictionEditorView: View {
         case .step(let stepID):
             chromeTitleText(viewModel.draft.steps.first { $0.id == stepID }?.title ?? "Step")
         case nil:
-            chromeTitleText(isNaming ? "Name" : frictionChromeName)
+            if isNaming {
+                chromeTitleText("Name")
+            } else if !isEditing {
+                // Nothing while reading: the summary below shows the glyph and the name
+                // at full size, and a smaller copy above them says it twice.
+                EmptyView()
+            } else {
+                chromeTitleText(frictionChromeName)
+            }
         }
     }
 

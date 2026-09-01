@@ -22,6 +22,18 @@ enum TodayRoutineCardPhase: Equatable {
     case upcoming
 }
 
+/// One scheduled run coming up this week.
+struct TodayScheduledRoutine: Identifiable, Equatable {
+    /// The routine plus its start, because the same routine appears once per day it runs.
+    let id: String
+    let routineID: UUID
+    var name: String
+    var icon: String?
+    var startsAt: Date
+    var dayText: String
+    var timeText: String
+}
+
 @MainActor
 final class TodayViewModel: ObservableObject {
     private let dataProvider: TodayDataProviding
@@ -30,9 +42,16 @@ final class TodayViewModel: ObservableObject {
     private let routineRepository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let autoFocusManager: AutoFocusManager
+    private let toastCenter: LocktyToastCenter
+    /// The productivity score the last load reported, so a rise can be noticed. Nil until
+    /// there has been a load to compare against -- the first score of a session is not a
+    /// rise, it is just the score.
+    private var lastAnnouncedScore: Int?
     @Published private(set) var days: [DayKey: TodayDayState] = [:]
     @Published private(set) var dismissedPerspectiveIDsByDay: [DayKey: Set<String>] = [:]
     @Published private(set) var routineCardState: TodayRoutineCardState?
+    /// Every scheduled start between now and a week out, in order.
+    @Published private(set) var upcomingRoutines: [TodayScheduledRoutine] = []
     /// Whether a break can be taken at all right now.
     ///
     /// Published rather than asked for on tap: the app badges are coloured by it, so it
@@ -45,7 +64,8 @@ final class TodayViewModel: ObservableObject {
         pauseEngine: PauseEngine,
         routineRepository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
-        autoFocusManager: AutoFocusManager
+        autoFocusManager: AutoFocusManager,
+        toastCenter: LocktyToastCenter
     ) {
         self.dataProvider = dataProvider
         self.routineEngine = routineEngine
@@ -53,6 +73,26 @@ final class TodayViewModel: ObservableObject {
         self.routineRepository = routineRepository
         self.selectionStore = selectionStore
         self.autoFocusManager = autoFocusManager
+        self.toastCenter = toastCenter
+    }
+
+    /// Announces a productivity score that has gone up since the last time we looked.
+    ///
+    /// Only upwards, and only for today. A score falling is not news worth interrupting
+    /// someone with, and a score for a day being browsed in the past has not "risen" at
+    /// all -- it is simply a different day's number.
+    func announceScoreIfRisen(day: Date) {
+        guard Calendar.current.isDateInToday(day) else { return }
+        guard case .loaded = state(for: day).loadingState else { return }
+        guard let metric = state(for: day).primaryMetrics.metrics
+            .first(where: { $0.kind == .productivity })
+        else { return }
+
+        let score = Int(metric.value.rounded())
+        defer { lastAnnouncedScore = score }
+
+        guard let previous = lastAnnouncedScore, score > previous else { return }
+        toastCenter.show(.scoreRose(to: score, from: previous))
     }
 
     /// Ends the running routine. Strict mode can refuse, which the engine decides.
@@ -270,6 +310,7 @@ final class TodayViewModel: ObservableObject {
 
         let routines = (try? await routineRepository.routines()) ?? []
         let now = Date()
+        upcomingRoutines = makeUpcomingRoutines(from: routines, now: now)
         let nextRoutine = routines.compactMap { routine -> (Routine, Date, TimeZone)? in
             let nextStarts = routine.triggers.compactMap { trigger -> (Date, TimeZone)? in
                 guard case .schedule(let schedule) = trigger else { return nil }
@@ -291,6 +332,80 @@ final class TodayViewModel: ObservableObject {
                 phase: .upcoming
             )
         }
+    }
+
+    /// Every start a scheduled routine has between now and seven days out.
+    ///
+    /// One entry per run, not per routine: a routine that runs Monday, Wednesday and
+    /// Friday is three things coming up, and collapsing it to one line would hide two of
+    /// them. Anything already running is left out -- it is not upcoming, it is on.
+    private func makeUpcomingRoutines(from routines: [Routine], now: Date) -> [TodayScheduledRoutine] {
+        let runningIDs = Set(routineEngine.activeRoutines.map(\.routineID))
+        let horizon = now.addingTimeInterval(7 * 24 * 60 * 60)
+
+        var entries: [TodayScheduledRoutine] = []
+
+        for routine in routines where !runningIDs.contains(routine.id) {
+            for trigger in routine.triggers {
+                guard case .schedule(let schedule) = trigger, !schedule.weekdays.isEmpty else { continue }
+                let timeZone = TimeZone(identifier: schedule.timeZoneIdentifier) ?? .current
+
+                var calendar = Calendar.current
+                calendar.timeZone = timeZone
+                let startOfToday = calendar.startOfDay(for: now)
+
+                for offset in 0...7 {
+                    guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else { continue }
+                    let weekdayValue = calendar.component(.weekday, from: day)
+                    guard let weekday = Weekday(rawValue: weekdayValue), schedule.weekdays.contains(weekday) else {
+                        continue
+                    }
+
+                    var components = calendar.dateComponents([.year, .month, .day], from: day)
+                    components.hour = schedule.hour
+                    components.minute = schedule.minute
+                    components.second = 0
+
+                    guard let start = calendar.date(from: components),
+                          start > now,
+                          start <= horizon
+                    else { continue }
+
+                    entries.append(
+                        TodayScheduledRoutine(
+                            id: "\(routine.id.uuidString)-\(start.timeIntervalSince1970)",
+                            routineID: routine.id,
+                            name: routine.name,
+                            icon: routine.icon,
+                            startsAt: start,
+                            dayText: dayLabel(for: start, calendar: calendar),
+                            timeText: timeLabel(for: start, timeZone: timeZone)
+                        )
+                    )
+                }
+            }
+        }
+
+        return entries.sorted { $0.startsAt < $1.startsAt }
+    }
+
+    private func dayLabel(for date: Date, calendar: Calendar) -> String {
+        if calendar.isDateInToday(date) { return "Hoy" }
+        if calendar.isDateInTomorrow(date) { return "Mañana" }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_ES")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: date).capitalized
+    }
+
+    private func timeLabel(for date: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_ES")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 
     private func nextStartDate(for schedule: RoutineSchedule, from reference: Date, timeZone: TimeZone) -> Date? {

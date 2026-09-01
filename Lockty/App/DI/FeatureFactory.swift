@@ -32,6 +32,7 @@ struct FeatureFactory {
     let nfcService: NFCServicing
     let locationService: LocationTriggerServicing
     let healthService: HealthServicing
+    let toastCenter: LocktyToastCenter
     let editorStore: EditorViewModelStore
     let usageDataService: UsageDataServicing
 
@@ -327,6 +328,13 @@ struct FeatureFactory {
             source: .app
         )
         await pauseEngine.allowTemporarily(context, intention: intention)
+        toastCenter.show(
+            .unlockGranted(
+                token: token,
+                displayName: context.displayName,
+                minutes: minutes
+            )
+        )
         await recordAllowanceBreakIfNeeded(
             activeRoutine: activeRoutine,
             duration: context.allowanceDuration,

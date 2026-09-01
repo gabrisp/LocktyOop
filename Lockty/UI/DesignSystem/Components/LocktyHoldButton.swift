@@ -33,6 +33,14 @@ struct LocktyHoldButton: View {
             .clipShape(Capsule(style: .continuous))
             .safeGlass(radius: 999, interactive: true)
             .clipShape(Capsule(style: .continuous))
+            // Running only while the button is being held: the light going round the rim
+            // is the button saying it is working on it, which is only true then.
+            .locktyBorderBeam(
+                beam: [tint, .white, tint.opacity(0.6)],
+                beamBlur: 12,
+                cornerRadius: 30,
+                isEnabled: isHolding && !isCompleted
+            )
             .scaleEffect(isHolding ? 0.98 : 1)
             .animation(.snappy(duration: 0.2), value: isHolding)
             .contentShape(Capsule(style: .continuous))
@@ -67,36 +75,90 @@ struct LocktyHoldButton: View {
         .foregroundStyle(LocktyColors.primaryText)
     }
 
-    /// The progress *is* the aura: a wash of the tint shown through a blurred circle
-    /// that grows with the press.
+    /// The fill: a scattering of lights that come up one after another and add together.
     ///
-    /// Masking light rather than drawing a shape is what keeps it reading as something
-    /// lit inside the glass. A capsule creeping across the button was a progress bar
-    /// wearing the button's shape, which is a different thing entirely.
+    /// It used to be a single circle growing from the left edge, which is a progress bar
+    /// wearing a blur -- you could read exactly how far along you were from where its
+    /// edge had got to, and it always filled in the same direction at the same rate.
+    /// This lights seeded points across the button in a scattered order instead. Each one
+    /// swells from nothing, they overlap, and because they are added rather than drawn
+    /// over each other the overlaps burn brighter, so the button reads as filling with
+    /// light rather than as a bar being drawn.
     private var aura: some View {
         GeometryReader { proxy in
-            let diameter = auraDiameter(in: proxy.size)
+            ZStack {
+                ForEach(Self.seeds) { seed in
+                    let local = seedProgress(seed)
 
-            tint
-                .opacity(0.55)
-                .mask(alignment: .leading) {
-                    Circle()
-                        .frame(width: diameter, height: diameter)
-                        .blur(radius: 22)
-                        .offset(x: -diameter * 0.25)
-                        .frame(maxHeight: .infinity)
+                    if local > 0 {
+                        Circle()
+                            .fill(tint)
+                            .frame(
+                                width: seedDiameter(seed, in: proxy.size, local: local),
+                                height: seedDiameter(seed, in: proxy.size, local: local)
+                            )
+                            .blur(radius: 18)
+                            .opacity(0.42 * local)
+                            .position(
+                                x: proxy.size.width * seed.x,
+                                y: proxy.size.height * seed.y
+                            )
+                    }
                 }
-                .opacity(progress == 0 ? 0 : 1)
+            }
+            // Added, not stacked: where two lights overlap the result is brighter than
+            // either, which is what makes a crowd of them read as one filling glow.
+            .blendMode(.plusLighter)
+            .compositingGroup()
+            .opacity(progress == 0 ? 0 : 1)
         }
         .allowsHitTesting(false)
     }
 
-    /// Big enough at the end to have washed over the whole button, so completing looks
-    /// like the button filling rather than the circle stopping somewhere short.
-    private func auraDiameter(in size: CGSize) -> CGFloat {
-        let full = size.width * 2.6
-        return 40 + (full - 40) * progress
+    /// How lit one seed is, 0 until the hold passes its threshold and 1 by the end.
+    private func seedProgress(_ seed: AuraSeed) -> CGFloat {
+        guard progress > seed.threshold else { return 0 }
+        let span = max(1 - seed.threshold, 0.001)
+        return min((progress - seed.threshold) / span, 1)
     }
+
+    private func seedDiameter(_ seed: AuraSeed, in size: CGSize, local: CGFloat) -> CGFloat {
+        let full = size.height * seed.scale
+        return full * (0.35 + 0.65 * local)
+    }
+
+    /// Where the lights are and the order they come up in.
+    ///
+    /// Fixed rather than generated per press. Truly random points would jump on every
+    /// frame of the hold, and re-seeding on each press would make the button behave
+    /// differently every time it is used -- the scatter should look arbitrary, not be
+    /// unpredictable. The thresholds are deliberately out of order so they light across
+    /// the button rather than sweeping along it.
+    private struct AuraSeed: Identifiable {
+        let id: Int
+        let x: CGFloat
+        let y: CGFloat
+        let scale: CGFloat
+        let threshold: CGFloat
+    }
+
+    private static let seeds: [AuraSeed] = {
+        let points: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+            (0.14, 0.55, 2.2, 0.00),
+            (0.72, 0.40, 1.9, 0.08),
+            (0.38, 0.62, 2.4, 0.14),
+            (0.90, 0.60, 1.7, 0.22),
+            (0.26, 0.36, 1.8, 0.30),
+            (0.58, 0.70, 2.1, 0.38),
+            (0.05, 0.42, 1.6, 0.46),
+            (0.82, 0.30, 2.0, 0.54),
+            (0.46, 0.30, 1.7, 0.62),
+            (0.66, 0.62, 2.3, 0.70)
+        ]
+        return points.enumerated().map { index, point in
+            AuraSeed(id: index, x: point.0, y: point.1, scale: point.2, threshold: point.3)
+        }
+    }()
 
     private func beginHold() {
         guard !isCompleted else { return }

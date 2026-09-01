@@ -38,6 +38,10 @@ struct RootView: View {
         }
         .locktyScreenBackground()
         .preferredColorScheme(.dark)
+        // Attached once, at the root: the toast lives in its own window above everything,
+        // so it survives sheets and covers the status bar. Attaching it per screen would
+        // build that window several times over.
+        .locktyToasts(container.toastCenter)
         .task {
             await container.startupCoordinator.startIfNeeded()
             await refreshOnboardingAuthorizationState()

@@ -10,6 +10,7 @@ final class RoutinesViewModel: ObservableObject {
     private let appGroupRepository: UserAppGroupRepository
     private let shieldService: ShieldServicing
     private let scheduleCoordinator: RoutineScheduleCoordinator
+    private let toastCenter: LocktyToastCenter
     private let selectionStore: ScreenTimeSelectionStore
     @Published private(set) var routines: [Routine] = []
     /// Resolved once per load rather than read from the card's body: the tokens live in
@@ -24,9 +25,11 @@ final class RoutinesViewModel: ObservableObject {
         appGroupRepository: UserAppGroupRepository,
         shieldService: ShieldServicing,
         scheduleCoordinator: RoutineScheduleCoordinator,
+        toastCenter: LocktyToastCenter,
         selectionStore: ScreenTimeSelectionStore
     ) {
         self.scheduleCoordinator = scheduleCoordinator
+        self.toastCenter = toastCenter
         self.routineEngine = routineEngine
         self.repository = repository
         self.appGroupRepository = appGroupRepository
@@ -58,7 +61,11 @@ final class RoutinesViewModel: ObservableObject {
     }
 
     func start(_ routine: Routine) async {
-        errorMessage = await routineEngine.start(routine).errorMessage
+        let outcome = await routineEngine.start(routine)
+        errorMessage = outcome.errorMessage
+        if outcome == .started {
+            toastCenter.show(.routineStarted(name: routine.name, icon: routine.icon))
+        }
     }
 
     /// Every routine running right now, so each of their cards reads as active rather

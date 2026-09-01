@@ -21,6 +21,7 @@ final class AppContainer {
     let nfcService: NFCServicing
     let locationService: LocationTriggerServicing
     let healthService: HealthServicing
+    let toastCenter: LocktyToastCenter
     let notificationService: NotificationServicing
 
     let todayViewModel: TodayViewModel
@@ -55,6 +56,7 @@ final class AppContainer {
         nfcService: NFCServicing,
         locationService: LocationTriggerServicing,
         healthService: HealthServicing,
+        toastCenter: LocktyToastCenter,
         notificationService: NotificationServicing,
         todayViewModel: TodayViewModel,
         rulesViewModel: RulesViewModel,
@@ -86,6 +88,7 @@ final class AppContainer {
         self.nfcService = nfcService
         self.locationService = locationService
         self.healthService = healthService
+        self.toastCenter = toastCenter
         self.notificationService = notificationService
         self.todayViewModel = todayViewModel
         self.rulesViewModel = rulesViewModel
@@ -161,6 +164,7 @@ final class AppContainer {
         let nfcService = LiveNFCService()
         let locationService = LiveLocationTriggerService()
         let healthService = LiveHealthService()
+        let toastCenter = LocktyToastCenter()
         let notificationService = LiveNotificationService()
 
         let todayPipeline = LiveTodayDataPipeline(
@@ -176,7 +180,8 @@ final class AppContainer {
             pauseEngine: pauseEngine,
             routineRepository: routineRepository,
             selectionStore: selectionStore,
-            autoFocusManager: autoFocusManager
+            autoFocusManager: autoFocusManager,
+            toastCenter: toastCenter
         )
         let routineScheduleCoordinator = RoutineScheduleCoordinator(
             repository: routineRepository,
@@ -189,6 +194,7 @@ final class AppContainer {
             appGroupRepository: appGroupRepository,
             shieldService: shieldService,
             scheduleCoordinator: routineScheduleCoordinator,
+            toastCenter: toastCenter,
             selectionStore: selectionStore
         )
         let rulesViewModel = RulesViewModel(
@@ -263,6 +269,7 @@ final class AppContainer {
             nfcService: nfcService,
             locationService: locationService,
             healthService: healthService,
+            toastCenter: toastCenter,
             editorStore: editorStore,
             usageDataService: usageDataService
         )
@@ -296,6 +303,7 @@ final class AppContainer {
             nfcService: nfcService,
             locationService: locationService,
             healthService: healthService,
+            toastCenter: toastCenter,
             notificationService: notificationService,
             todayViewModel: todayViewModel,
             rulesViewModel: rulesViewModel,

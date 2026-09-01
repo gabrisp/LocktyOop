@@ -156,6 +156,7 @@ struct TodayView: View {
         }
         .task(id: DayKey(date: day)) {
             await viewModel.load(day: day)
+            viewModel.announceScoreIfRisen(day: day)
         }
         .animation(.smooth(duration: 0.32), value: router.pendingUnlock?.id)
         // Ending a routine takes its cards off the screen rather than having them
@@ -332,7 +333,8 @@ struct TodayView: View {
                 // Top of Today: the running routine comes before everything else. An
                 // unlock request, when there is one, sits even above that because it is
                 // waiting on immediate action.
-                if let routineCardState = viewModel.routineCardState {
+                if let routineCardState = viewModel.routineCardState,
+                   routineCardState.phase == .active {
                     ActiveModeCard(
                         state: routineCardState,
                         activeRoutine: viewModel.activeRoutine,
@@ -355,6 +357,16 @@ struct TodayView: View {
                             )
                         }
                     )
+                    .transition(.blurReplace.combined(with: .opacity))
+                }
+
+                // Its own card, not a mode of the one above: nothing here is blocking
+                // anything yet, so it lists when things start rather than which apps are
+                // shut.
+                if !viewModel.upcomingRoutines.isEmpty {
+                    ScheduledRoutinesCard(routines: viewModel.upcomingRoutines) { routineID in
+                        router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routineID)))
+                    }
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 

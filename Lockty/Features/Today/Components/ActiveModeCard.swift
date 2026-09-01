@@ -11,6 +11,8 @@ struct ActiveModeCard: View {
     var allowance: ActivePauseAllowance?
     var breakAvailability: BreakAvailability = .available
     let onUnlock: (ApplicationToken) -> Void
+    /// The heading's chevron: routines live on Focus, and the card is a window onto them.
+    let onOpenSection: () -> Void
     /// Tapped on an app the allowance has already let out. There is nothing to unlock,
     /// so this shows what is left of it instead of reopening the flow.
     var onShowAllowance: ((ApplicationToken) -> Void)?
@@ -42,7 +44,7 @@ struct ActiveModeCard: View {
     var body: some View {
         CardView(radius: radius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                LocktySectionTitle("Rutina", prominent: true)
+                LocktySectionTitle("Rutina", onOpen: onOpenSection)
 
                 HStack(spacing: LocktySpacing.md) {
                     Image(systemName: state.icon?.isEmpty == false ? state.icon! : "repeat")

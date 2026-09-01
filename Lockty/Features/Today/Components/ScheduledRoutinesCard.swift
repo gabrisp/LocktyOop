@@ -10,6 +10,9 @@ import SwiftUI
 struct ScheduledRoutinesCard: View {
     let routines: [TodayScheduledRoutine]
     var onSelect: ((UUID) -> Void)?
+    /// The heading's chevron. Opens the whole list on Focus; tapping one row instead
+    /// opens that routine, which is the more specific answer and so takes precedence.
+    let onOpenSection: () -> Void
 
     private var radius: CGFloat { LocktyRadius.medium }
 
@@ -28,7 +31,7 @@ struct ScheduledRoutinesCard: View {
     var body: some View {
         CardView(radius: radius, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                LocktySectionTitle("Programadas", prominent: true)
+                LocktySectionTitle("Programadas", onOpen: onOpenSection)
 
                 VStack(spacing: 0) {
                     ForEach(visible) { routine in

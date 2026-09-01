@@ -122,19 +122,31 @@ private struct LocktyDynamicSheetSizesModifier: ViewModifier {
     /// underneath it, so the reading after returning was of something laid out to fill
     /// rather than of the content. Handing over a height keeps every screen measurable
     /// and every change height-to-height.
+    /// The height to give the *content*, which is not the height the sheet ends up.
+    ///
+    /// The bar is a safe area inset added on top of whatever this returns, so its own
+    /// height has to come out of the number here. It did not, so a screen asking for
+    /// `.large` produced a sheet of `availableHeight + barHeight` -- taller than a sheet
+    /// can be. The content was pushed up to fit and the bar went off the top edge with
+    /// it, which is the bar appearing to stick out above the sheet.
     private var explicitHeight: CGFloat? {
         guard sizes.count == 1, let only = sizes.first else { return nil }
+
+        let contentHeight: CGFloat
         switch only {
         case .fit: return nil
-        case .small: return availableHeight * 0.33
-        case .medium: return availableHeight * 0.5
-        case .large: return availableHeight
+        case .small: contentHeight = availableHeight * 0.33
+        case .medium: contentHeight = availableHeight * 0.5
+        case .large: contentHeight = availableHeight
         }
+
+        // Never below zero, however small the window reports itself as during a scene
+        // transition -- a negative frame height is a layout the sheet cannot recover from.
+        return max(contentHeight - locktyDynamicSheetBarHeight, 0)
     }
 
-    /// What a sheet can actually be, not what the window is. Asking for the window's
-    /// full height made the content taller than the sheet it produced, so it was pushed
-    /// up and the bar went off the top with it.
+    /// What the finished sheet should measure, not what the window is. Asking for the
+    /// window's full height made the content taller than the sheet it produced.
     private var availableHeight: CGFloat {
          windowHeight - 110
     }

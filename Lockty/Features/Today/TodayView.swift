@@ -26,6 +26,14 @@ struct TodayView: View {
         return Int(metric.value.rounded())
     }
 
+    /// Both routine headings lead to the same place: routines are configured on Focus,
+    /// and these cards are a window onto them rather than a place to manage them.
+    private func openFocus() {
+        withAnimation(.smooth(duration: 0.3)) {
+            router.select(.focus)
+        }
+    }
+
     /// The only way this screen opens the friction flow.
     ///
     /// Refuses before presenting anything rather than at the end of the flow: a cooldown
@@ -344,6 +352,7 @@ struct TodayView: View {
                         onUnlock: { token in
                             openUnlockFlow(for: token, context: nil)
                         },
+                        onOpenSection: { openFocus() },
                         onShowAllowance: { token in
                             guard let allowance = viewModel.activePauseAllowance else { return }
                             router.presentSheet(
@@ -364,9 +373,13 @@ struct TodayView: View {
                 // anything yet, so it lists when things start rather than which apps are
                 // shut.
                 if !viewModel.upcomingRoutines.isEmpty {
-                    ScheduledRoutinesCard(routines: viewModel.upcomingRoutines) { routineID in
-                        router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routineID)))
-                    }
+                    ScheduledRoutinesCard(
+                        routines: viewModel.upcomingRoutines,
+                        onSelect: { routineID in
+                            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routineID)))
+                        },
+                        onOpenSection: { openFocus() }
+                    )
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 

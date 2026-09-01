@@ -21,6 +21,9 @@ struct DestinationFactory {
         case .alwaysAllowedGroup:
             featureFactory.makeAlwaysAllowedGroupView()
 
+        case .settings:
+            featureFactory.makeSettingsView()
+
         case .distractingGroup:
             featureFactory.makeDistractingGroup()
 
@@ -68,13 +71,6 @@ struct DestinationFactory {
         case .systemAccess:
             featureFactory.makeSystemAccessSheet()
 
-        case .settings:
-            // Wrapped: it is presented as a sheet, and a navigationTitle with no stack
-            // around it draws nothing at all.
-            NavigationStack {
-                featureFactory.makeSettingsView()
-                    .locktyScreenBackground()
-            }
 
         case .applicationDetails(let id, let day):
             featureFactory.makeApplicationDetails(appID: id, day: day)

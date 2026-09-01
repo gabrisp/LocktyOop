@@ -20,7 +20,6 @@ enum SheetRoute: Hashable, Identifiable {
     case routineBreak(UUID)
     case appPicker(ScreenTimeSelectionScope)
     case systemAccess
-    case settings
     case applicationDetails(AppIdentity.ID, day: Date?)
     case liveSession
     case ruleEditor(RuleEditorRoute)
@@ -48,7 +47,6 @@ enum SheetRoute: Hashable, Identifiable {
         case .routineBreak(let id): "routine-break-\(id.uuidString)"
         case .appPicker(let scope): "app-picker-\(scope.id)"
         case .systemAccess: "system-access"
-        case .settings: "settings"
         case .applicationDetails(let id, let day): "application-details-\(id.rawValue)-\(day?.timeIntervalSince1970 ?? 0)"
         case .liveSession: "live-session"
         case .ruleEditor(let route): "rule-editor-\(route.draftID.uuidString)"

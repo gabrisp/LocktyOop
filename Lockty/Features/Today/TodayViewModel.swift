@@ -22,6 +22,13 @@ enum TodayRoutineCardPhase: Equatable {
     case upcoming
 }
 
+/// A running routine and the apps it holds shut.
+struct TodayActiveRoutineGroup: Identifiable, Equatable {
+    var id: UUID { routine.routineID }
+    let routine: ActiveRoutine
+    let tokens: [ApplicationToken]
+}
+
 /// One scheduled run coming up this week.
 struct TodayScheduledRoutine: Identifiable, Equatable {
     /// The routine plus its start, because the same routine appears once per day it runs.
@@ -118,9 +125,25 @@ final class TodayViewModel: ObservableObject {
     /// The apps the running routine is holding shut, as tokens so their real icons can
     /// be drawn. The routine's stored ids can't produce a token, only the selection can.
     var activeRoutineTokens: [ApplicationToken] {
-        guard let activeRoutine else { return [] }
-        let selection = (try? selectionStore.load(scope: .routine(activeRoutine.routineID)))?.applicationTokens ?? []
-        return selection.stablePrefix(selection.count)
+        activeRoutineGroups.flatMap(\.tokens)
+    }
+
+    /// Each running routine with the apps it is holding, in the order they started.
+    ///
+    /// Grouped rather than merged into one list: two routines running at once are two
+    /// separate reasons a set of apps is shut, and a single undivided row would claim
+    /// they were one.
+    var activeRoutineGroups: [TodayActiveRoutineGroup] {
+        routineEngine.activeRoutines
+            .sorted { $0.startedAt < $1.startedAt }
+            .map { routine in
+                let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?
+                    .applicationTokens ?? []
+                return TodayActiveRoutineGroup(
+                    routine: routine,
+                    tokens: selection.stablePrefix(selection.count)
+                )
+            }
     }
 
     func load(day: Date, force: Bool = false) async {

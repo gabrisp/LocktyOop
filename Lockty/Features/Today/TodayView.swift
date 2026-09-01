@@ -345,8 +345,8 @@ struct TodayView: View {
                    routineCardState.phase == .active {
                     ActiveModeCard(
                         state: routineCardState,
+                        groups: viewModel.activeRoutineGroups,
                         activeRoutine: viewModel.activeRoutine,
-                        tokens: viewModel.activeRoutineTokens,
                         allowance: viewModel.activePauseAllowance,
                         breakAvailability: viewModel.breakAvailability,
                         onUnlock: { token in
@@ -476,7 +476,7 @@ struct TodayView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    router.presentSheet(.settings)
+                    router.push(.settings)
                 } label: {
                     Image(systemName: "gearshape")
                         .fontWeight(.light)

@@ -189,7 +189,7 @@ final class StartupCoordinator: ObservableObject {
         case .routineStartRequested:
             break
         case .settingsRequested:
-            router.presentSheet(.settings)
+            router.push(.settings)
         }
     }
 }

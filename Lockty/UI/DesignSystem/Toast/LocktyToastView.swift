@@ -82,13 +82,31 @@ struct LocktyToastOverlay: View {
             let topOffset = 11 + max(safeArea.top - 59, 0)
 
             let expandedWidth = size.width - 20
-            let expandedHeight: CGFloat = hasIsland ? 90 : 74
+            let expandedHeight: CGFloat = hasIsland ? 104 : 84
 
             let scaleX = isExpanded ? 1 : (islandWidth / expandedWidth)
             let scaleY = isExpanded ? 1 : (islandHeight / expandedHeight)
 
-            RoundedRectangle(cornerRadius: isExpanded ? 30 : islandHeight / 2, style: .continuous)
+            RoundedRectangle(cornerRadius: isExpanded ? 32 : islandHeight / 2, style: .continuous)
                 .fill(.black)
+                // A rim in the toast's own colour. Thin, and only while open: it is what
+                // stops a black capsule on a dark screen from having no edge at all.
+                .overlay {
+                    RoundedRectangle(cornerRadius: isExpanded ? 32 : islandHeight / 2, style: .continuous)
+                        .stroke(accent.opacity(isExpanded ? 0.32 : 0), lineWidth: 1)
+                }
+                // The aura, behind everything and added to what is under it. It follows
+                // the capsule's own shape rather than being a circle behind it, so the
+                // light reads as coming off the toast.
+                .background {
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .fill(accent)
+                        .blur(radius: 26)
+                        .opacity(isExpanded ? 0.5 : 0)
+                        .blendMode(.plusLighter)
+                        .padding(-6)
+                        .animation(.smooth(duration: 0.4), value: isExpanded)
+                }
                 .overlay {
                     content(hasIsland: hasIsland)
                         .frame(width: expandedWidth, height: expandedHeight)
@@ -122,12 +140,16 @@ struct LocktyToastOverlay: View {
 
     private var isExpanded: Bool { center.isPresented }
 
+    private var accent: Color {
+        center.current?.accent ?? LocktyColors.productive
+    }
+
     @ViewBuilder
     private func content(hasIsland: Bool) -> some View {
         if let toast = center.current {
             HStack(spacing: LocktySpacing.md) {
                 leading(toast.leading)
-                    .frame(width: 44)
+                    .frame(width: 46, height: 46)
 
                 VStack(alignment: .leading, spacing: 3) {
                     if hasIsland {
@@ -136,7 +158,7 @@ struct LocktyToastOverlay: View {
 
                     HStack(alignment: .firstTextBaseline, spacing: LocktySpacing.sm) {
                         Text(toast.title)
-                            .font(.callout.weight(.semibold))
+                            .font(.system(.headline, design: .default, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
 
@@ -144,21 +166,21 @@ struct LocktyToastOverlay: View {
 
                         if let value = toast.value {
                             Text("\(value)\(toast.valueSuffix ?? "")")
-                                .font(.callout.weight(.semibold))
-                                .foregroundStyle(LocktyColors.productive)
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                                .foregroundStyle(toast.accent)
                                 .monospacedDigit()
                                 .contentTransition(.numericText())
                         }
                     }
 
                     Text(toast.message)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.62))
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.68))
                         .lineLimit(1)
 
                     if let progress = toast.progress {
                         progressBar(progress)
-                            .padding(.top, 3)
+                            .padding(.top, 5)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -173,15 +195,28 @@ struct LocktyToastOverlay: View {
         }
     }
 
+    /// The glyph sits in a disc of its own colour rather than floating on the black.
+    /// A bare symbol on an unlit background has nothing holding it, and at this size it
+    /// read as an afterthought next to the type beside it.
     @ViewBuilder
     private func leading(_ leading: LocktyToast.Leading) -> some View {
         switch leading {
         case .symbol(let name, let tint):
             Image(systemName: name)
-                .font(.system(size: 26, weight: .regular))
+                .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(tint)
+                .frame(width: 46, height: 46)
+                .background {
+                    Circle()
+                        .fill(tint.opacity(0.18))
+                        .overlay {
+                            Circle().stroke(tint.opacity(0.3), lineWidth: 1)
+                        }
+                }
 
         case .appIcon(let token):
+            // No disc: the icon is already a filled square with its own colour, and a
+            // halo behind it would just be a second shape around a shape.
             Label(token)
                 .labelStyle(.iconOnly)
                 .id(token)
@@ -197,11 +232,12 @@ struct LocktyToastOverlay: View {
                     .fill(.white.opacity(0.16))
 
                 Capsule()
-                    .fill(LocktyColors.productive)
+                    .fill(accent)
                     .frame(width: proxy.size.width * (isExpanded ? min(max(progress, 0), 1) : 0))
+                    .shadow(color: accent.opacity(0.7), radius: 5)
                     .animation(.smooth(duration: 0.7).delay(0.15), value: isExpanded)
             }
         }
-        .frame(height: 4)
+        .frame(height: 5)
     }
 }

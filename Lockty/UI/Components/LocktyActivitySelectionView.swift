@@ -474,6 +474,7 @@ struct LocktyActivitySelectionView: View {
                 leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
                 title: "Selección no válida",
                 message: message,
+                accent: LocktyColors.error,
                 duration: .seconds(2.8)
             )
         )

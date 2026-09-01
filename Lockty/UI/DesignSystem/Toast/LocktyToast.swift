@@ -18,6 +18,11 @@ struct LocktyToast: Identifiable, Equatable {
     var valueSuffix: String?
     /// 0...1. Draws a bar under the message when present.
     var progress: Double?
+    /// What the whole toast is tinted by: the icon, its halo, the value and the bar.
+    ///
+    /// Carried on the toast rather than derived per part, so a toast cannot end up with a
+    /// red icon over a green bar -- one colour is what makes it read as one report.
+    var accent: Color
     /// How long it stays up.
     var duration: Duration
 
@@ -36,6 +41,7 @@ struct LocktyToast: Identifiable, Equatable {
         value: Int? = nil,
         valueSuffix: String? = nil,
         progress: Double? = nil,
+        accent: Color? = nil,
         duration: Duration = .seconds(2.6)
     ) {
         self.id = id
@@ -45,14 +51,22 @@ struct LocktyToast: Identifiable, Equatable {
         self.value = value
         self.valueSuffix = valueSuffix
         self.progress = progress
+        // Defaults to the symbol's own colour, which is the one the toast was built
+        // around anyway; an app icon has no colour to take, so it falls back to green.
+        self.accent = accent ?? {
+            if case .symbol(_, let tint) = leading { return tint }
+            return LocktyColors.productive
+        }()
         self.duration = duration
     }
 }
 
 extension LocktyToast {
+    /// The routine's own icon, not a generic play glyph: the whole point of choosing one
+    /// is to recognise the routine at a glance, and this is the moment it starts.
     static func routineStarted(name: String, icon: String?) -> LocktyToast {
         LocktyToast(
-            leading: .symbol(icon?.isEmpty == false ? icon! : "repeat", LocktyColors.productive),
+            leading: .symbol(icon?.isEmpty == false ? icon! : "bolt.fill", LocktyColors.productive),
             title: name,
             message: "Modo iniciado"
         )
@@ -60,9 +74,10 @@ extension LocktyToast {
 
     static func routineEnded(name: String) -> LocktyToast {
         LocktyToast(
-            leading: .symbol("stop.circle", LocktyColors.secondaryText),
+            leading: .symbol("checkmark", LocktyColors.productive),
             title: name,
-            message: "Modo finalizado"
+            message: "Modo finalizado",
+            accent: LocktyColors.secondaryText
         )
     }
 
@@ -70,7 +85,7 @@ extension LocktyToast {
     /// so the toast shows the change rather than just asserting one happened.
     static func scoreRose(to score: Int, from previous: Int) -> LocktyToast {
         LocktyToast(
-            leading: .symbol("arrow.up.right", LocktyColors.productive),
+            leading: .symbol("chart.line.uptrend.xyaxis", LocktyColors.productive),
             title: "Productivity",
             message: "Ha subido \(score - previous) puntos",
             value: score,
@@ -84,7 +99,8 @@ extension LocktyToast {
         LocktyToast(
             leading: .symbol("lock.fill", LocktyColors.warning),
             title: "Siempre Permitido",
-            message: "Termina la rutina activa para editarlo"
+            message: "Termina la rutina activa para editarlo",
+            accent: LocktyColors.warning
         )
     }
 
@@ -97,6 +113,7 @@ extension LocktyToast {
             leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
             title: subject,
             message: "Está en Siempre Permitido y no se puede bloquear",
+            accent: LocktyColors.error,
             duration: .seconds(3.2)
         )
     }
@@ -105,7 +122,8 @@ extension LocktyToast {
         LocktyToast(
             leading: token.map { .appIcon($0) } ?? .symbol("lock.open.fill", LocktyColors.productive),
             title: displayName,
-            message: minutes == 1 ? "Desbloqueado 1 minuto" : "Desbloqueado \(minutes) minutos"
+            message: minutes == 1 ? "Desbloqueado 1 minuto" : "Desbloqueado \(minutes) minutos",
+            accent: LocktyColors.productive
         )
     }
 }

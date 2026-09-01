@@ -205,6 +205,7 @@ struct AppPickerSheet: View {
                             leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
                             title: "No se pudo guardar",
                             message: error.localizedDescription,
+                            accent: LocktyColors.error,
                             duration: .seconds(3.2)
                         )
                     )

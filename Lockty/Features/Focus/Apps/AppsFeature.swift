@@ -584,46 +584,100 @@ struct AppGroupEditorView: View {
     @ObservedObject var router: AppRouter
     let onCloseEditor: () -> Void
 
+    /// Less rounded than the cards on Today. These are rows in a form, and a form of
+    /// pills reads as a set of unrelated objects rather than as one thing being filled in.
+    private var cardRadius: CGFloat { 20 }
+
+    private var trimmedName: String {
+        viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         LocktySectionScreen(title: viewModel.title) {
-            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            VStack(spacing: LocktySpacing.lg) {
+                // Centred, and the first thing on the screen: a group is a folder, and
+                // this is the folder being made. It was left-aligned in a column of
+                // form rows, where it read as one more field rather than as the result.
                 AppFolderCard(
-                    title: viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New group" : viewModel.name,
+                    title: trimmedName.isEmpty ? "New group" : trimmedName,
                     subtitle: viewModel.selectedCount == 1 ? "1 item" : "\(viewModel.selectedCount) items",
                     tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
                 )
                 .frame(maxWidth: .infinity)
+                .padding(.top, LocktySpacing.sm)
+                .padding(.bottom, LocktySpacing.sm)
 
-                CardView {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                VStack(spacing: 0) {
+                    HStack(spacing: LocktySpacing.md) {
                         Text("Name")
-                            .font(LocktyTypography.callout)
-                            .foregroundStyle(LocktyColors.secondaryText)
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        Spacer(minLength: LocktySpacing.sm)
+
                         TextField("Socials", text: $viewModel.name)
                             .textInputAutocapitalization(.words)
-                            .foregroundStyle(LocktyColors.primaryText)
-                    }
-                }
-
-                CardView {
-                    VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-                        Text("Apps")
-                            .font(LocktyTypography.body)
-                            .foregroundStyle(LocktyColors.primaryText)
-
-                        Text(viewModel.selectedCount == 1 ? "1 app" : "\(viewModel.selectedCount) apps")
-                            .font(LocktyTypography.callout)
+                            .multilineTextAlignment(.trailing)
+                            .font(.system(.subheadline, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.secondaryText)
                     }
-                }
+                    .frame(minHeight: 52)
 
-                PrimaryButton(viewModel.isCreating ? "Save group" : "Save changes", systemImage: "checkmark") {
+                    Divider()
+                        .overlay(LocktyColors.separator.opacity(0.45))
+
+                    // The row that was a dead end. It showed the count and led nowhere,
+                    // so the only way to put apps in a group was to already know the
+                    // picker existed somewhere else.
+                    Button {
+                        router.push(
+                            .appGroupSelection(
+                                AppGroupEditorRoute(
+                                    appGroupID: viewModel.isCreating ? nil : viewModel.editingID,
+                                    draftID: viewModel.draftID
+                                )
+                            )
+                        )
+                    } label: {
+                        HStack(spacing: LocktySpacing.md) {
+                            Text("Apps")
+                                .font(.system(.subheadline, design: .default, weight: .regular))
+                                .foregroundStyle(LocktyColors.primaryText)
+
+                            Spacer(minLength: LocktySpacing.sm)
+
+                            Text(viewModel.selectedCount == 0
+                                 ? "Choose"
+                                 : (viewModel.selectedCount == 1 ? "1 app" : "\(viewModel.selectedCount) apps"))
+                                .font(.system(.subheadline, design: .default, weight: .regular))
+                                .foregroundStyle(LocktyColors.secondaryText)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(LocktyColors.secondaryText)
+                        }
+                        .frame(minHeight: 52)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .tappable()
+                }
+                .padding(.horizontal, LocktySpacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                        .fill(LocktyColors.ink(0.055))
+                )
+
+                LocktyHoldButton(
+                    title: viewModel.isCreating ? "Hold to create" : "Hold to save"
+                ) {
                     Task {
                         if await viewModel.save() {
                             router.pop()
                         }
                     }
                 }
+                .padding(.top, LocktySpacing.sm)
             }
         }
         .task {
@@ -791,26 +845,32 @@ struct AppFolderCard: View {
                 slot {
                     Label(token)
                         .labelStyle(.iconOnly)
-                        // Inside the slot, so the scrim is the size of the icon. Outside
-                        // it, the overlay took the slot's frame -- which is
-                        // maxWidth: .infinity, the whole grid cell -- and the darkening
-                        // ran the full width of the column with the icon floating in the
-                        // middle of it.
-                        .overlay {
-                            if index == visible.count - 1, overflow > 0 {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .fill(Color.black.opacity(0.62))
+                }
+                // Sized to the cell, not to the label.
+                //
+                // Neither of the obvious places works. Outside the slot the overlay takes
+                // the slot's frame, which is maxWidth: .infinity -- the whole column.
+                // Inside it, it takes the label's *layout* bounds, and FamilyControls
+                // draws the icon at its own size within those, which is why the slot has
+                // to scale it up in the first place; the scrim inherited the box rather
+                // than the picture. Masking with the token cannot help either: the system
+                // renders that label out of process, so it is no more usable as a mask
+                // than it is as a measurement.
+                //
+                // The one number that is actually known is the cell: 38pt, square, which
+                // is what the scaling exists to make the icon fill.
+                .overlay {
+                    if index == visible.count - 1, overflow > 0 {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .fill(Color.black.opacity(0.62))
 
-                                    // Divided by the scale the slot applies, so the
-                                    // number ends up the size it is written at rather
-                                    // than 1.58 times it.
-                                    Text("+\(overflow)")
-                                        .font(.system(size: 17 / iconScale, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
+                            Text("+\(overflow)")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
+                        .frame(width: 38, height: 38)
+                    }
                 }
             }
 

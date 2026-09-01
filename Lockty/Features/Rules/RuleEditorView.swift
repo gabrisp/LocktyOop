@@ -379,9 +379,8 @@ struct RuleEditorView: View {
     @State private var activeSheet: RuleEditorLocalSheet?
     @State private var isNaming = false
     @State private var isShowingKindChoice: Bool
-    @State private var isConfirmingDiscard = false
-    /// Raised by the back chevron when this step has unsaved edits.
-    @State private var isConfirmingBack = false
+    /// What a discard confirmation, if one is up, is about to throw away.
+    @State private var pendingDiscard: LocktyDiscardIntent?
     @FocusState private var isNameFieldFocused: Bool
     @State private var isGoingBack = false
 
@@ -443,19 +442,21 @@ struct RuleEditorView: View {
         )
         .confirmationDialog(
             "Discard changes?",
-            isPresented: $isConfirmingBack,
-            titleVisibility: .visible
-        ) {
-            Button("Discard", role: .destructive) { returnToKindChoice() }
-            Button("Keep editing", role: .cancel) {}
-        }
-        .confirmationDialog(
-            "Discard changes?",
-            isPresented: $isConfirmingDiscard,
-            titleVisibility: .visible
-        ) {
-            Button("Discard", role: .destructive) { returnToParentOrDismiss() }
-            Button("Keep editing", role: .cancel) {}
+            isPresented: Binding(
+                get: { pendingDiscard != nil },
+                set: { if !$0 { pendingDiscard = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDiscard
+        ) { intent in
+            Button("Discard", role: .destructive) {
+                pendingDiscard = nil
+                switch intent {
+                case .leave: returnToParentOrDismiss()
+                case .back: returnToKindChoice()
+                }
+            }
+            Button("Keep editing", role: .cancel) { pendingDiscard = nil }
         }
         .task {
             await viewModel.load()
@@ -1266,7 +1267,7 @@ struct RuleEditorView: View {
             returnToKindChoice()
             return
         }
-        isConfirmingBack = true
+        pendingDiscard = .back
     }
 
     private func returnToKindChoice() {
@@ -1313,6 +1314,6 @@ struct RuleEditorView: View {
             returnToParentOrDismiss()
             return
         }
-        isConfirmingDiscard = true
+        pendingDiscard = .leave
     }
 }

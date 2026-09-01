@@ -632,6 +632,25 @@ private enum RoutineEditorCompactScreen: Hashable {
     case naming
 }
 
+/// What a discard confirmation is about to throw away.
+///
+/// One dialog, told what it is asking about, rather than two dialogs on the same view.
+/// SwiftUI attaches each `confirmationDialog` to the view itself, and two of them fight
+/// over the same presentation slot -- raising one while the other is attached crashes.
+enum LocktyDiscardIntent: Identifiable {
+    /// Leave the sheet entirely.
+    case leave
+    /// Step back to the screen behind this one.
+    case back
+
+    var id: String {
+        switch self {
+        case .leave: "leave"
+        case .back: "back"
+        }
+    }
+}
+
 struct RoutineEditorView: View {
     @StateObject private var viewModel: RoutineEditorViewModel
     let router: AppRouter
@@ -653,10 +672,8 @@ struct RoutineEditorView: View {
     /// Built when the pause screen is pushed and dropped when it is popped, so each new
     /// pause starts blank rather than carrying the last one's half-written steps.
     @State private var pauseFlowEditor: PauseFlowEditorViewModel?
-    /// Raised by any attempt to leave with unsaved edits.
-    @State private var isConfirmingDiscard = false
-    /// Raised by the back chevron when the form has unsaved edits.
-    @State private var isConfirmingReturn = false
+    /// What a discard confirmation, if one is up, is about to throw away.
+    @State private var pendingDiscard: LocktyDiscardIntent?
     @FocusState private var isNameFieldFocused: Bool
     @State private var isGoingBack = false
 
@@ -714,7 +731,7 @@ struct RoutineEditorView: View {
             returnToParentOrDismiss()
             return
         }
-        isConfirmingDiscard = true
+        pendingDiscard = .leave
     }
 
     /// What the bar is showing, which is not the same as which screen is showing.
@@ -767,19 +784,21 @@ struct RoutineEditorView: View {
         )
         .confirmationDialog(
             "Discard changes?",
-            isPresented: $isConfirmingReturn,
-            titleVisibility: .visible
-        ) {
-            Button("Discard", role: .destructive) { returnToReading() }
-            Button("Keep editing", role: .cancel) {}
-        }
-        .confirmationDialog(
-            "Discard changes?",
-            isPresented: $isConfirmingDiscard,
-            titleVisibility: .visible
-        ) {
-            Button("Discard", role: .destructive) { returnToParentOrDismiss() }
-            Button("Keep editing", role: .cancel) {}
+            isPresented: Binding(
+                get: { pendingDiscard != nil },
+                set: { if !$0 { pendingDiscard = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDiscard
+        ) { intent in
+            Button("Discard", role: .destructive) {
+                pendingDiscard = nil
+                switch intent {
+                case .leave: returnToParentOrDismiss()
+                case .back: returnToReading()
+                }
+            }
+            Button("Keep editing", role: .cancel) { pendingDiscard = nil }
         }
         .task {
             await viewModel.load()
@@ -985,7 +1004,7 @@ struct RoutineEditorView: View {
             returnToReading()
             return
         }
-        isConfirmingReturn = true
+        pendingDiscard = .back
     }
 
     private func returnToReading() {

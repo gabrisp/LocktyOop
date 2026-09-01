@@ -128,10 +128,7 @@ struct TodayView: View {
     /// date slider and the shortcut row, so the content must not be pushed down to clear
     /// chrome that isn't there.
     private var topChromeExpandedHeight: CGFloat {
-        // The badge is pinned, so the scrolling content has to start below where it is
-        // drawn -- and follow it up as it shrinks, which is why this is interpolated
-        // rather than fixed.
-        MetricsHeaderGeometry.lerp(240, ProductivityAuraView.collapsedHeight(), progress: collapseProgress)
+        0
 //        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight
@@ -290,16 +287,6 @@ struct TodayView: View {
 //            .opacity(1 - shortcutHideProgress)
 //            .offset(y: shortcutRowOffsetY)
 //            .allowsHitTesting(!areShortcutsHidden)
-
-            // The day's headline, pinned. It shrinks into the toolbar's own line rather
-            // than scrolling away, because it is the one number the whole screen is a
-            // breakdown of -- losing it off the top would leave the cards explaining
-            // something no longer on screen.
-            ProductivityAuraView(
-                score: productivityScore,
-                collapseProgress: collapseProgress
-            )
-            .frame(maxWidth: .infinity)
         }
         // Rides up into the navigation bar as it collapses, so what is left at the end
         // sits on the toolbar's own line, beside Settings, rather than parked under it.
@@ -345,6 +332,11 @@ struct TodayView: View {
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }
+
+                // The day's headline, scrolling with everything else: it is the first
+                // thing on the page, not chrome pinned above it.
+                ProductivityAuraView(score: productivityScore)
+                    .frame(maxWidth: .infinity)
 
                 // Top of Today: the running routine comes before everything else. An
                 // unlock request, when there is one, sits even above that because it is

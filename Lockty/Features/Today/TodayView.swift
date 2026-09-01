@@ -66,7 +66,7 @@ struct TodayView: View {
         guard !Calendar.current.isDateInToday(day) else { return "Today" }
 
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "d MMM"
         return formatter.string(from: day)
     }

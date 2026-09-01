@@ -39,7 +39,7 @@ final class AppPickerViewModel: ObservableObject {
         case .distracting:
             "Distracting Apps"
         case .alwaysAllowed:
-            "Siempre Permitido"
+            "Always Allowed"
         }
     }
 
@@ -109,13 +109,13 @@ final class AppPickerViewModel: ObservableObject {
     var addLabel: String {
         switch scope {
         case .library:
-            "Añadir App o sitio web"
+            "Add app or website"
         case .routine, .rule:
-            "Añadir App o categoría"
+            "Add app or category"
         case .pause:
-            "Añadir App"
+            "Add app"
         case .appGroup, .distracting, .alwaysAllowed:
-            "Añadir App"
+            "Add app"
         }
     }
 
@@ -188,7 +188,7 @@ struct AppPickerSheet: View {
 
     var body: some View {
         LocktyActivitySelectionView(
-            title: "Seleccionadas",
+            title: "Selected",
             addLabel: viewModel.addLabel,
             selection: $viewModel.selection,
             rules: viewModel.selectionRules,
@@ -203,7 +203,7 @@ struct AppPickerSheet: View {
                     toastCenter.show(
                         LocktyToast(
                             leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
-                            title: "No se pudo guardar",
+                            title: "Could not save",
                             message: error.localizedDescription,
                             accent: LocktyColors.error,
                             duration: .seconds(3.2)

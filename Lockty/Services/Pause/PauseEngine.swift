@@ -286,8 +286,8 @@ final class PauseEngine: ObservableObject {
         guard remaining > 0 else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Se acabó el descanso"
-        content.body = "\(allowance.context.displayName) vuelve a estar bloqueada."
+        content.title = "Break is over"
+        content.body = "\(allowance.context.displayName) is blocked again."
         content.sound = .default
         content.interruptionLevel = .timeSensitive
 

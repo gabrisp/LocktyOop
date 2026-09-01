@@ -68,7 +68,7 @@ extension LocktyToast {
         LocktyToast(
             leading: .symbol(icon?.isEmpty == false ? icon! : "bolt.fill", LocktyColors.productive),
             title: name,
-            message: "Modo iniciado"
+            message: "Mode started"
         )
     }
 
@@ -76,7 +76,7 @@ extension LocktyToast {
         LocktyToast(
             leading: .symbol("checkmark", LocktyColors.productive),
             title: name,
-            message: "Modo finalizado",
+            message: "Mode finished",
             accent: LocktyColors.secondaryText
         )
     }
@@ -87,7 +87,7 @@ extension LocktyToast {
         LocktyToast(
             leading: .symbol("chart.line.uptrend.xyaxis", LocktyColors.productive),
             title: "Productivity",
-            message: "Ha subido \(score - previous) puntos",
+            message: "Up \(score - previous) points",
             value: score,
             valueSuffix: "%",
             progress: Double(score) / 100,
@@ -98,8 +98,8 @@ extension LocktyToast {
     static func alwaysAllowedLocked() -> LocktyToast {
         LocktyToast(
             leading: .symbol("lock.fill", LocktyColors.warning),
-            title: "Siempre Permitido",
-            message: "Termina la rutina activa para editarlo",
+            title: "Always Allowed",
+            message: "End the running routine to edit this",
             accent: LocktyColors.warning
         )
     }
@@ -112,7 +112,7 @@ extension LocktyToast {
         return LocktyToast(
             leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
             title: subject,
-            message: "Está en Siempre Permitido y no se puede bloquear",
+            message: "It is in Always Allowed and cannot be blocked",
             accent: LocktyColors.error,
             duration: .seconds(3.2)
         )
@@ -122,7 +122,7 @@ extension LocktyToast {
         LocktyToast(
             leading: token.map { .appIcon($0) } ?? .symbol("lock.open.fill", LocktyColors.productive),
             title: displayName,
-            message: minutes == 1 ? "Desbloqueado 1 minuto" : "Desbloqueado \(minutes) minutos",
+            message: minutes == 1 ? "Unlocked for 1 minute" : "Unlocked for \(minutes) minutes",
             accent: LocktyColors.productive
         )
     }

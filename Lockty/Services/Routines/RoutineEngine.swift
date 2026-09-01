@@ -383,7 +383,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Rule inactive",
-                    message: "Esta rule ya no esta activa."
+                    message: "This rule is no longer active."
                 )
             )
         }
@@ -393,7 +393,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Strict mode",
-                    message: strictDecision.reason ?? "Esta routine no permite breaks ahora."
+                    message: strictDecision.reason ?? "This routine does not allow breaks right now."
                 )
             )
         }
@@ -403,7 +403,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Breaks disabled",
-                    message: "Esta rule no permite breaks."
+                    message: "This rule does not allow breaks."
                 )
             )
         }
@@ -412,7 +412,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Break unavailable",
-                    message: "Este trigger no esta permitido en esta rule."
+                    message: "This trigger is not allowed on this rule."
                 )
             )
         }
@@ -421,7 +421,7 @@ final class RoutineEngine: ObservableObject {
             return .unavailable(
                 BreakUnavailableState(
                     title: "Friction required",
-                    message: "Selecciona una friction dentro de Break."
+                    message: "Choose a friction inside Break."
                 )
             )
         }
@@ -432,7 +432,7 @@ final class RoutineEngine: ObservableObject {
                 return .unavailable(
                     BreakUnavailableState(
                         title: "Break limit reached",
-                        message: "Has alcanzado el maximo de breaks."
+                        message: "You have reached the break limit."
                     )
                 )
             }
@@ -453,7 +453,7 @@ final class RoutineEngine: ObservableObject {
                     return .unavailable(
                         BreakUnavailableState(
                             title: "Cooldown",
-                            message: "Espera para volver a pedir otro break.",
+                            message: "Wait before asking for another break.",
                             retryAt: retryAt
                         )
                     )

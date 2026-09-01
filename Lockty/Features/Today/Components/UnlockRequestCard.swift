@@ -41,7 +41,7 @@ struct UnlockRequestCard: View {
                     appIcon
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("¿Desbloquear esta app?")
+                        Text("Unlock this app?")
                             .font(.system(.headline, design: .default, weight: .semibold))
                             .foregroundStyle(LocktyColors.primaryText)
                             .lineLimit(1)
@@ -57,7 +57,7 @@ struct UnlockRequestCard: View {
 
                 Button(action: onUnlock) {
                     Label {
-                        Text("Desbloquear")
+                        Text("Unlock")
                             .font(.system(.headline, design: .default, weight: .regular))
                     } icon: {
                         Image(systemName: "lock.open")
@@ -104,7 +104,7 @@ struct UnlockRequestCard: View {
             token: token,
             scale: 1.4,
             availability: availability,
-            caption: .action("Desbloquear")
+            caption: .action("Unlock")
         )
     }
 }

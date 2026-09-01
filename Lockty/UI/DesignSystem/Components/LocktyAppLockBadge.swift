@@ -39,7 +39,7 @@ struct LocktyAppLockBadge: View {
 
     enum Caption: Equatable {
         case none
-        /// A call to action, e.g. "Desbloquear ahora".
+        /// A call to action, e.g. "Unlock now".
         case action(String)
         /// The time left on the running allowance, counted down live.
         case remainingTime
@@ -130,7 +130,7 @@ struct LocktyAppLockBadge: View {
                 // No clock, because there is no moment to count down to -- but the badge
                 // still has to say why it will not open. A silent red ring left the app
                 // looking merely unlit rather than shut for the day.
-                Text("Bloqueado")
+                Text("Blocked")
                     .font(.system(.caption, design: .default, weight: .medium))
                     .foregroundStyle(LocktyColors.error)
                     .lineLimit(1)

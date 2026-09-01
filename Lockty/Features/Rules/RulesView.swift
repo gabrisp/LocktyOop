@@ -170,7 +170,7 @@ struct RuleCard: View {
                         .lineLimit(1)
 
                     HStack(spacing: LocktySpacing.xs) {
-                        Text("Bloquear")
+                        Text("Block")
                             .font(.system(.caption, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.secondaryText)
                             .lineLimit(1)

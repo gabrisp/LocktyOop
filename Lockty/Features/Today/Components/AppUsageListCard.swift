@@ -111,7 +111,7 @@ struct AppUsageListCard: View {
                 .locktyPlaceholder(isPlaceholder)
                 .padding(.top, 4)
 
-//            Text("Hoy")
+//            Text("Today")
 //                .font(.system(.callout, design: .default, weight: .regular))
 //                .foregroundStyle(Color.white.opacity(0.56))
 //                .padding(.top, 18)

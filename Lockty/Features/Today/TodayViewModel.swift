@@ -357,7 +357,7 @@ final class TodayViewModel: ObservableObject {
                 id: activeRoutine.routineID,
                 name: activeRoutine.nameSnapshot,
                 icon: activeRoutine.iconSnapshot,
-                detailText: "Activa ahora",
+                detailText: "Running now",
                 phase: .active
             )
             return
@@ -445,11 +445,11 @@ final class TodayViewModel: ObservableObject {
     }
 
     private func dayLabel(for date: Date, calendar: Calendar) -> String {
-        if calendar.isDateInToday(date) { return "Hoy" }
-        if calendar.isDateInTomorrow(date) { return "Mañana" }
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInTomorrow(date) { return "Tomorrow" }
 
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "EEEE"
         return formatter.string(from: date).capitalized
@@ -457,7 +457,7 @@ final class TodayViewModel: ObservableObject {
 
     private func timeLabel(for date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.timeZone = timeZone
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
@@ -492,23 +492,23 @@ final class TodayViewModel: ObservableObject {
         calendar.timeZone = timeZone
 
         let timeFormatter = DateFormatter()
-        timeFormatter.locale = Locale(identifier: "es_ES")
+        timeFormatter.locale = Locale(identifier: "en_US")
         timeFormatter.timeZone = timeZone
         timeFormatter.dateFormat = "HH:mm"
         let timeText = timeFormatter.string(from: date)
 
         if calendar.isDateInToday(date) {
-            return "Empieza hoy · \(timeText)"
+            return "Starts today · \(timeText)"
         }
         if calendar.isDateInTomorrow(date) {
-            return "Empieza mañana · \(timeText)"
+            return "Starts tomorrow · \(timeText)"
         }
 
         let weekdayFormatter = DateFormatter()
-        weekdayFormatter.locale = Locale(identifier: "es_ES")
+        weekdayFormatter.locale = Locale(identifier: "en_US")
         weekdayFormatter.timeZone = timeZone
         weekdayFormatter.dateFormat = "EEEE"
         let weekdayText = weekdayFormatter.string(from: date)
-        return "Empieza \(weekdayText) · \(timeText)"
+        return "Starts \(weekdayText) · \(timeText)"
     }
 }

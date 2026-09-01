@@ -53,7 +53,7 @@ nonisolated struct PauseFlow: Codable, Hashable, Identifiable {
     /// The policy a routine applies when it uses this flow.
     ///
     /// A flow says what you go through, not how long you get: the duration is chosen at
-    /// the moment of unlocking, in the flow's own "Durante..." step. The value here is
+    /// the moment of unlocking, in the flow's own "For..." step. The value here is
     /// only the fallback for a request that arrives without one. Relocking afterwards is
     /// not a question either -- an allowance that never ends is not an allowance.
     var policy: RoutinePausePolicy {

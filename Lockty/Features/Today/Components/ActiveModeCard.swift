@@ -50,13 +50,13 @@ struct ActiveModeCard: View {
         let count = group.tokens.isEmpty
             ? group.routine.shieldPolicy.blockedApplications.count
             : group.tokens.count
-        return count == 1 ? "1 App bloqueada" : "\(count) Apps bloqueadas"
+        return count == 1 ? "1 App blocked" : "\(count) Apps blocked"
     }
 
     /// The title says how many are running, so a second routine starting is visible in
     /// the heading rather than only in the list under it.
     private var headingTitle: String {
-        visibleGroups.count > 1 ? "\(visibleGroups.count) Rutinas" : "Rutina"
+        visibleGroups.count > 1 ? "\(visibleGroups.count) Routines" : "Routine"
     }
 
     private var visibleGroups: [TodayActiveRoutineGroup] {
@@ -171,7 +171,7 @@ struct ActiveModeCard: View {
                 // allowance running is the answer, not the cooldown that will apply to
                 // the next request.
                 availability: released ? .unlockable : badgeAvailability(for: group),
-                caption: released ? .remainingTime : .action("Desbloquear")
+                caption: released ? .remainingTime : .action("Unlock")
             )
         }
         .buttonStyle(.locktyInteractive(brighten: true))

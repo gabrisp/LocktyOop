@@ -327,7 +327,7 @@ struct FeatureFactory {
             appID: identity.id,
             applicationToken: representative,
             releasedApplications: releasedIDs,
-            displayName: token == nil ? "Todas las apps" : identity.displayName,
+            displayName: token == nil ? "All apps" : identity.displayName,
             allowanceDuration: TimeInterval(minutes * 60),
             // No steps: the wait already happened in the flow itself. This grants the
             // allowance it settled on.

@@ -25,7 +25,7 @@ final class PauseFlowEditorViewModel: ObservableObject {
     }
 
     var isCreating: Bool { initialFlowID == nil }
-    var title: String { isCreating ? "Nueva pausa" : "Editar pausa" }
+    var title: String { isCreating ? "New pause" : "Editar pausa" }
 
     /// Identity of what is on screen, so the sheet knows when to crossfade and re-measure.
     var contentID: String {
@@ -63,7 +63,7 @@ final class PauseFlowEditorViewModel: ObservableObject {
             return nil
         }
         guard !steps.isEmpty else {
-            errorMessage = "Añade al menos un paso."
+            errorMessage = "Add at least one step."
             return nil
         }
 
@@ -131,7 +131,7 @@ struct PauseFlowEditorContent: View {
 
             stepsSection
 
-            LocktyHoldButton(title: viewModel.isCreating ? "Mantén para crear" : "Mantén para guardar") {
+            LocktyHoldButton(title: viewModel.isCreating ? "Hold to create" : "Hold to save") {
                 Task {
                     if let flow = await viewModel.save() { onSaved(flow) }
                 }
@@ -142,7 +142,7 @@ struct PauseFlowEditorContent: View {
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .alert(
-            "No se pudo guardar",
+            "Could not save",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -155,7 +155,7 @@ struct PauseFlowEditorContent: View {
     }
 
     private var nameField: some View {
-        TextField("Nombre", text: $viewModel.name)
+        TextField("Name", text: $viewModel.name)
             .font(.system(.subheadline, design: .default, weight: .regular))
             .foregroundStyle(LocktyColors.primaryText)
             .padding(.horizontal, LocktySpacing.md)
@@ -197,7 +197,7 @@ struct PauseFlowEditorContent: View {
                     }
                 }
             } label: {
-                Label("Añadir paso", systemImage: "plus")
+                Label("Add step", systemImage: "plus")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(maxWidth: .infinity)
@@ -255,7 +255,7 @@ struct PauseFlowStepRow: View {
                     .transition(.blurReplace.combined(with: .opacity))
 
                 Button(role: .destructive, action: onRemove) {
-                    Label("Quitar paso", systemImage: "xmark")
+                    Label("Remove step", systemImage: "xmark")
                         .font(LocktyTypography.caption)
                         .foregroundStyle(LocktyColors.secondaryText)
                 }
@@ -273,31 +273,31 @@ struct PauseFlowStepRow: View {
     private var settings: some View {
         switch step {
         case .countdown(let configuration):
-            labelled("Segundos", value: "\(Int(configuration.duration))") {
+            labelled("Seconds", value: "\(Int(configuration.duration))") {
                 DurationSlider(value: binding(configuration).duration, range: 1...60)
             }
 
         case .breathing(let configuration):
-            labelled("Respiraciones", value: "\(configuration.breathCount)") {
+            labelled("Breaths", value: "\(configuration.breathCount)") {
                 DurationSlider(value: binding(configuration).breathCount.doubleProxy, range: 1...10)
             }
 
         case .steps(let configuration):
             labelled(
-                "Pasos diarios",
+                "Daily steps",
                 value: configuration.dailyGoal.formatted(.number.grouping(.automatic))
             ) {
                 DurationSlider(value: binding(configuration).dailyGoal.doubleProxy, range: 1000...25000)
             }
 
         case .intention(let configuration):
-            TextField("Pregunta", text: binding(configuration).prompt, axis: .vertical)
+            TextField("Question", text: binding(configuration).prompt, axis: .vertical)
                 .font(LocktyTypography.body)
                 .foregroundStyle(LocktyColors.primaryText)
                 .lineLimit(2...4)
 
         case .confirmation(let configuration):
-            TextField("Pregunta", text: binding(configuration).prompt, axis: .vertical)
+            TextField("Question", text: binding(configuration).prompt, axis: .vertical)
                 .font(LocktyTypography.body)
                 .foregroundStyle(LocktyColors.primaryText)
                 .lineLimit(2...3)

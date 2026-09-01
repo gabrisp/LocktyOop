@@ -33,12 +33,12 @@ extension ReusableAppGroupDefinition {
         [
             ReusableAppGroupDefinition(
                 id: UUID(uuidString: "00000000-0000-0000-0000-00000000D157")!,
-                name: "Distrayendo",
+                name: "Distracting",
                 selectionScope: .distracting
             ),
             ReusableAppGroupDefinition(
                 id: ReusableAppGroupDefinition.alwaysAllowedID,
-                name: "Siempre Permitido",
+                name: "Always Allowed",
                 selectionScope: .alwaysAllowed
             )
         ]

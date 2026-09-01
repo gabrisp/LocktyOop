@@ -59,7 +59,7 @@ struct RoutinePreviewContent: View {
             .padding(.horizontal, LocktySpacing.xl)
             .padding(.vertical, LocktySpacing.md)
             .overlay {
-                Capsule(style: .continuous)
+                LocktyImperfectShape(squareness: 12, wobble: 0.03)
                     .stroke(LocktyColors.cardStroke, lineWidth: 1)
             }
     }
@@ -67,42 +67,46 @@ struct RoutinePreviewContent: View {
     /// What state the routine is in, in the fewest words that are still true.
     private var subtitleLine: String {
         if activeSince != nil {
-            return "Programación · Activa ahora"
+            return "Schedule · Running now"
         }
-        guard let nextStart else { return "Programación" }
-        return "Programación · \(startsInText(nextStart))"
+        guard let nextStart else { return "Schedule" }
+        return "Schedule · \(startsInText(nextStart))"
     }
 
     private func startsInText(_ date: Date) -> String {
         let seconds = max(date.timeIntervalSinceNow, 0)
         let days = Int(seconds / 86_400)
-        if days >= 1 { return "Empieza en \(days) d" }
+        if days >= 1 {
+            return days == 1 ? "Starts in 1 day" : "Starts in \(days) days"
+        }
 
         let hours = Int(seconds / 3_600)
-        if hours >= 1 { return "Empieza en \(hours) h" }
+        if hours >= 1 {
+            return hours == 1 ? "Starts in 1 hour" : "Starts in \(hours) hours"
+        }
 
         let minutes = max(Int(seconds / 60), 1)
-        return "Empieza en \(minutes) min"
+        return minutes == 1 ? "Starts in 1 minute" : "Starts in \(minutes) minutes"
     }
 
     // MARK: - Rows
 
     private var summaryCard: some View {
         VStack(spacing: 0) {
-            row("Durante este horario") {
+            row("During these hours") {
                 Text(scheduleText)
                     .monospacedDigit()
             }
 
             divider
 
-            row("Estos días") {
+            row("These days") {
                 Text(daysText)
             }
 
             divider
 
-            row("Bloquear") {
+            row("Block") {
                 HStack(spacing: LocktySpacing.sm) {
                     if !applicationTokens.isEmpty {
                         LocktyStackedAppTokens(tokens: applicationTokens)
@@ -115,14 +119,14 @@ struct RoutinePreviewContent: View {
 
             // The friction is the whole answer to "how hard is it to get out of this",
             // so it belongs beside the schedule rather than only inside the editor.
-            row("Fricción") {
+            row("Friction") {
                 Text(frictionText)
             }
 
             divider
 
-            row("Desbloqueos permitidos") {
-                Text(viewModel.breaksAllowed ? "Sí" : "No")
+            row("Unlocks allowed") {
+                Text(viewModel.breaksAllowed ? "Yes" : "No")
             }
         }
         .padding(.horizontal, LocktySpacing.md)
@@ -175,12 +179,12 @@ struct RoutinePreviewContent: View {
         let categories = viewModel.selectionPreview.categoryTokens.count
 
         if count == 0 && categories > 0 {
-            return categories == 1 ? "1 Categoría" : "\(categories) Categorías"
+            return categories == 1 ? "1 Category" : "\(categories) Categories"
         }
         return count == 1 ? "1 App" : "\(count) Apps"
     }
 
     private var frictionText: String {
-        viewModel.selectedPauseFlow?.name ?? "Ninguna"
+        viewModel.selectedPauseFlow?.name ?? "None"
     }
 }

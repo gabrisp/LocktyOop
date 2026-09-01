@@ -166,7 +166,7 @@ final class RoutineEditorViewModel: ObservableObject {
     var title: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty else { return trimmed }
-        return initialRoutineID == nil ? "Nueva rutina" : "Rutina"
+        return initialRoutineID == nil ? "New routine" : "Routine"
     }
 
     var selectionScope: ScreenTimeSelectionScope {
@@ -594,8 +594,8 @@ struct RoutineAppPickerSheet: View {
 
     var body: some View {
         LocktyActivitySelectionView(
-            title: "Seleccionadas",
-            addLabel: "Añadir App o categoría",
+            title: "Selected",
+            addLabel: "Add app or category",
             selection: Binding(
                 get: { viewModel.selectionPreview },
                 set: { newValue in
@@ -766,20 +766,20 @@ struct RoutineEditorView: View {
             onAttempt: requestClose
         )
         .confirmationDialog(
-            "¿Descartar los cambios?",
+            "Discard changes?",
             isPresented: $isConfirmingReturn,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { returnToReading() }
-            Button("Seguir editando", role: .cancel) {}
+            Button("Discard", role: .destructive) { returnToReading() }
+            Button("Keep editing", role: .cancel) {}
         }
         .confirmationDialog(
-            "¿Descartar los cambios?",
+            "Discard changes?",
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { returnToParentOrDismiss() }
-            Button("Seguir editando", role: .cancel) {}
+            Button("Discard", role: .destructive) { returnToParentOrDismiss() }
+            Button("Keep editing", role: .cancel) {}
         }
         .task {
             await viewModel.load()
@@ -900,7 +900,7 @@ struct RoutineEditorView: View {
     private var centerChrome: some View {
         switch activeSheet {
         case .apps:
-            chromeTitleText("Seleccionadas")
+            chromeTitleText("Selected")
         case .domains:
             chromeTitleText("Websites")
         case .checklist:
@@ -913,7 +913,7 @@ struct RoutineEditorView: View {
             chromeTitleText(pauseFlowEditor?.title ?? "New friction")
         case nil:
             if isNaming {
-                chromeTitleText("Nombre")
+                chromeTitleText("Name")
             } else if currentCompactScreen == .reading {
                 // Nothing. The preview under this bar shows the icon and the name at
                 // full size, so a smaller copy of both sitting directly above them was
@@ -1036,7 +1036,7 @@ struct RoutineEditorView: View {
     private var namingContent: some View {
         VStack(spacing: LocktySpacing.lg) {
             HStack(spacing: LocktySpacing.sm) {
-                TextField("Nombre", text: $viewModel.name)
+                TextField("Name", text: $viewModel.name)
                     .focused($isNameFieldFocused)
                     .font(LocktyTypography.body)
                     .foregroundStyle(LocktyColors.primaryText)
@@ -1293,7 +1293,7 @@ struct RoutineEditorView: View {
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                Text("Estos días:")
+                Text("These days:")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
@@ -1351,8 +1351,8 @@ struct RoutineEditorView: View {
         case []: return "Nunca"
         case weekend: return "Fines de semana"
         case workweek: return "Entre semana"
-        case Set(Weekday.orderedWeek): return "Todos los días"
-        default: return weekdays.count == 1 ? "1 día" : "\(weekdays.count) días"
+        case Set(Weekday.orderedWeek): return "Every day"
+        default: return weekdays.count == 1 ? "1 day" : "\(weekdays.count) days"
         }
     }
 
@@ -1372,7 +1372,7 @@ struct RoutineEditorView: View {
                         apps: viewModel.selectionPreview.applicationTokens.count,
                         categories: viewModel.selectionPreview.categoryTokens.count,
                         groups: viewModel.selectedAppGroupIDs.count
-                    ) ?? "Ninguna"
+                    ) ?? "None"
                 )
                 .font(.system(.subheadline, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
@@ -1393,8 +1393,8 @@ struct RoutineEditorView: View {
         VStack {
             if isCreating || isEditing {
                 LocktyActivitySelectionView(
-                    title: "Seleccionadas",
-                    addLabel: "Añadir App o categoría",
+                    title: "Selected",
+                    addLabel: "Add app or category",
                     selection: Binding(
                         get: { viewModel.selectionPreview },
                         set: { newValue in
@@ -1416,7 +1416,7 @@ struct RoutineEditorView: View {
                 )
             } else {
                 LocktyReadOnlyActivitySelectionView(
-                    title: "Seleccionadas",
+                    title: "Selected",
                     selection: viewModel.selectionPreview
                 )
             }
@@ -1953,7 +1953,7 @@ struct RoutineEditorView: View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: LocktySpacing.sm) {
-                    Text("Modo estricto")
+                    Text("Strict mode")
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -1997,11 +1997,11 @@ struct RoutineEditorView: View {
     private var strictReadOnlyRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Modo estricto")
+                Text("Strict mode")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
-                Text(viewModel.mode == .strict ? "Activado" : "Desactivado")
+                Text(viewModel.mode == .strict ? "On" : "Desactivado")
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
@@ -2046,7 +2046,7 @@ struct RoutineEditorView: View {
                 strictRow
 
                 LocktyHoldButton(
-                    title: isCreating ? "Mantén para confirmar" : "Mantén para guardar",
+                    title: isCreating ? "Hold to confirm" : "Hold to save",
                     // The routine's own colour, not green. Green would say the same thing
                     // on every routine, and red is reserved for the one button that undoes
                     // something -- finishing a running routine.
@@ -2108,7 +2108,7 @@ struct RoutineEditorView: View {
             // stopping that one, which is not a decision this button should make.
             if isRoutineActive {
                 LocktyHoldButton(
-                    title: "Mantén para finalizar",
+                    title: "Hold to finish",
                     systemImage: "stop.circle",
                     tint: LocktyColors.unproductive
                 ) {
@@ -2126,7 +2126,7 @@ struct RoutineEditorView: View {
                 }
                 .padding(.top, LocktySpacing.sm)
             } else if viewModel.activeRoutine() == nil {
-                LocktyHoldButton(title: "Mantén para empezar", systemImage: "play.fill") {
+                LocktyHoldButton(title: "Hold to start", systemImage: "play.fill") {
                     Task {
                         await startRoutine()
                         dismissEditor()
@@ -2154,7 +2154,7 @@ struct RoutineEditorView: View {
 
         return VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                Text("Estos días:")
+                Text("These days:")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 

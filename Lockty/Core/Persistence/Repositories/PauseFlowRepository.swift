@@ -34,7 +34,7 @@ struct AppGroupPauseFlowRepository: PauseFlowRepository {
         defaults.set(true, forKey: Keys.didSeedDefault)
 
         guard appGroupStore.loadPauseFlows().isEmpty else { return }
-        try? await save(PauseFlow(name: "Espera y confirma", icon: "hourglass"))
+        try? await save(PauseFlow(name: "Wait and confirm", icon: "hourglass"))
     }
 
     func flows() async -> [PauseFlow] {

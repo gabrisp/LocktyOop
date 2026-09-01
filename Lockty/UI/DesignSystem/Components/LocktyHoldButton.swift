@@ -66,7 +66,7 @@ struct LocktyHoldButton: View {
             }
             .sensoryFeedback(.success, trigger: isCompleted) { _, new in new }
             .accessibilityLabel(title)
-            .accessibilityHint("Mantén pulsado")
+            .accessibilityHint("Press and hold")
     }
 
     private var content: some View {

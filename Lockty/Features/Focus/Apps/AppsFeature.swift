@@ -259,7 +259,7 @@ struct AppsListView: View {
                 router.push(.distractingGroup)
             } label: {
                 AppFolderCard(
-                    title: "Distrayendo",
+                    title: "Distracting",
                     subtitle: folderCountText(viewModel.distractingTokens.count),
                     tokens: viewModel.distractingTokens
                 )
@@ -295,7 +295,7 @@ struct AppsListView: View {
     }
 
     private func folderCountText(_ count: Int) -> String {
-        count == 1 ? "1 elemento" : "\(count) elementos"
+        count == 1 ? "1 item" : "\(count) items"
     }
 }
 
@@ -307,8 +307,8 @@ struct DistractingGroupView: View {
         LocktySectionScreen(title: "Distracting") {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 AppFolderCard(
-                    title: "Distrayendo",
-                    subtitle: viewModel.distractingTokens.isEmpty ? "0 elementos" : "\(viewModel.distractingTokens.count) elementos",
+                    title: "Distracting",
+                    subtitle: viewModel.distractingTokens.isEmpty ? "0 items" : "\(viewModel.distractingTokens.count) items",
                     tokens: viewModel.distractingTokens
                 )
                 .frame(maxWidth: .infinity)
@@ -448,7 +448,7 @@ struct DistractingAppsSelectionView: View {
     var body: some View {
         LocktyActivitySelectionView(
             title: "Distracting",
-            addLabel: "Añadir App",
+            addLabel: "Add app",
             selection: $selection,
             rules: .appGroup,
             toastCenter: toastCenter,
@@ -588,8 +588,8 @@ struct AppGroupEditorView: View {
         LocktySectionScreen(title: viewModel.title) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 AppFolderCard(
-                    title: viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Nuevo grupo" : viewModel.name,
-                    subtitle: viewModel.selectedCount == 1 ? "1 elemento" : "\(viewModel.selectedCount) elementos",
+                    title: viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New group" : viewModel.name,
+                    subtitle: viewModel.selectedCount == 1 ? "1 item" : "\(viewModel.selectedCount) items",
                     tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
                 )
                 .frame(maxWidth: .infinity)
@@ -617,7 +617,7 @@ struct AppGroupEditorView: View {
                     }
                 }
 
-                PrimaryButton(viewModel.isCreating ? "Guardar grupo" : "Guardar cambios", systemImage: "checkmark") {
+                PrimaryButton(viewModel.isCreating ? "Save group" : "Save changes", systemImage: "checkmark") {
                     Task {
                         if await viewModel.save() {
                             router.pop()
@@ -660,8 +660,8 @@ struct AppGroupSelectionView: View {
 
     var body: some View {
         LocktyActivitySelectionView(
-            title: "Seleccionadas",
-            addLabel: "Añadir App",
+            title: "Selected",
+            addLabel: "Add app",
             selection: Binding(
                 get: { viewModel.selectionPreview },
                 set: { viewModel.replaceSelection($0) }
@@ -704,7 +704,7 @@ struct AddAppFolderCard: View {
                         .foregroundStyle(LocktyColors.primaryText)
                 }
 
-            Text("Nuevo grupo")
+            Text("New group")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
                 .multilineTextAlignment(.center)
@@ -844,18 +844,18 @@ struct AlwaysAllowedGroupView: View {
     @ObservedObject var router: AppRouter
 
     var body: some View {
-        LocktySectionScreen(title: "Siempre Permitido") {
+        LocktySectionScreen(title: "Always Allowed") {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 AppFolderCard(
-                    title: "Siempre Permitido",
+                    title: "Always Allowed",
                     subtitle: viewModel.alwaysAllowedTokens.count == 1
-                        ? "1 elemento"
-                        : "\(viewModel.alwaysAllowedTokens.count) elementos",
+                        ? "1 item"
+                        : "\(viewModel.alwaysAllowedTokens.count) items",
                     tokens: viewModel.alwaysAllowedTokens
                 )
                 .frame(maxWidth: .infinity)
 
-                Text("Estas apps nunca se bloquean, ni siquiera cuando una regla bloquea toda su categoría.")
+                Text("These apps are never blocked, not even when a rule blocks their whole category.")
                     .font(LocktyTypography.callout)
                     .foregroundStyle(LocktyColors.secondaryText)
 
@@ -870,8 +870,8 @@ struct AlwaysAllowedGroupView: View {
                         Spacer(minLength: 0)
 
                         Text(viewModel.alwaysAllowedTokens.isEmpty
-                             ? "Ninguna"
-                             : "\(viewModel.alwaysAllowedTokens.count) seleccionadas")
+                             ? "None"
+                             : "\(viewModel.alwaysAllowedTokens.count) selected")
                             .font(.system(.footnote, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.secondaryText)
 

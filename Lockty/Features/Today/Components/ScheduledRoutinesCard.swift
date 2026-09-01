@@ -35,7 +35,7 @@ struct ScheduledRoutinesCard: View {
                 // gets from its own xl padding. Added here rather than by moving the card
                 // to xl: that would widen the sides too, and the app row deliberately
                 // cancels the horizontal padding to bleed to the card's edges.
-                LocktySectionTitle("Programadas", onOpen: onOpenSection)
+                LocktySectionTitle("Scheduled", onOpen: onOpenSection)
                     .padding(.top, LocktySpacing.sm)
 
                 VStack(spacing: 0) {
@@ -50,7 +50,7 @@ struct ScheduledRoutinesCard: View {
                 }
 
                 if overflow > 0 {
-                    Text(overflow == 1 ? "1 más esta semana" : "\(overflow) más esta semana")
+                    Text(overflow == 1 ? "1 more this week" : "\(overflow) more this week")
                         .font(.system(.footnote, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.tertiaryText)
                 }

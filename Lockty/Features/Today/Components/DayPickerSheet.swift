@@ -23,7 +23,7 @@ struct DayPickerSheet: View {
         _selectedDay = selectedDay
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: "es_ES")
+        calendar.locale = Locale(identifier: "en_US")
         // Monday first, as the rest of the app's schedule UI reads.
         calendar.firstWeekday = 2
         self.calendar = calendar
@@ -139,7 +139,11 @@ struct DayPickerSheet: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
+            // .viewAligned, not .paging: paging snaps by the viewport's width and knows
+            // nothing about the ids, so it fought `scrollPosition` -- a month could come
+            // to rest between two pages, and a chevron writing the id landed off centre.
+            // View alignment snaps to the pages themselves, which is what the id means.
+            .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $visibleMonth, anchor: .center)
         }
         // Every month is padded to the same number of weeks, so this height holds for all

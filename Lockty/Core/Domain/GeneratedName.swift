@@ -9,15 +9,15 @@ enum LocktyGeneratedName {
     /// A routine named after when it runs.
     ///
     /// The hour is the most useful thing known at the moment a routine is created --
-    /// "Rutina 3" tells you nothing later, and "Mañana" tells you what it is for.
+    /// "Routine 3" tells you nothing later, and "Morning" tells you what it is for.
     nonisolated static func routine(startHour: Int, existing: [String]) -> String {
         let base: String
         switch startHour {
-        case 5..<12: base = "Mañana"
-        case 12..<15: base = "Mediodía"
-        case 15..<20: base = "Tarde"
-        case 20..<24: base = "Noche"
-        default: base = "Madrugada"
+        case 5..<12: base = "Morning"
+        case 12..<15: base = "Midday"
+        case 15..<20: base = "Afternoon"
+        case 20..<24: base = "Evening"
+        default: base = "Late night"
         }
         return unique(base, among: existing)
     }
@@ -26,17 +26,17 @@ enum LocktyGeneratedName {
     nonisolated static func rule(kind: RuleKind, existing: [String]) -> String {
         let base: String
         switch kind {
-        case .schedule: base = "Horario"
-        case .openCountLimit: base = "Aperturas"
-        case .dailyUsageLimit: base = "Uso diario"
-        case .sessionDurationLimit: base = "Sesión"
+        case .schedule: base = "Schedule"
+        case .openCountLimit: base = "Opens"
+        case .dailyUsageLimit: base = "Daily use"
+        case .sessionDurationLimit: base = "Session"
         }
         return unique(base, among: existing)
     }
 
     /// The base, or the base with the first free number after it.
     ///
-    /// Numbered only when it has to be. A first routine called "Mañana 1" implies a
+    /// Numbered only when it has to be. A first routine called "Morning 2" implies a
     /// second one that does not exist; the number earns its place when there is
     /// something to tell apart.
     nonisolated static func unique(_ base: String, among existing: [String]) -> String {

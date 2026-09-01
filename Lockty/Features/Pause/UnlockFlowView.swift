@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Choosing what to unlock and for how long.
 ///
-/// The duration is the flow: it opens on "Durante..." with the app already decided. The
+/// The duration is the flow: it opens on "For..." with the app already decided. The
 /// app picker is not a step you walk through, it is what the chip in the top right
 /// opens -- so changing your mind costs one tap and agreeing costs none.
 struct UnlockFlowView: View {
@@ -115,23 +115,23 @@ struct UnlockFlowView: View {
             // The ring is the whole screen. A word over it only names what it is doing.
             return ""
         case .app:
-            return "Quiero usar..."
+            return "I want to use..."
         case .friction:
             // No titles over the friction steps either. Each one is already a picture of
             // what it is asking for, and the word above it only labelled the obvious --
             // the puzzles had dropped theirs for that reason and the rest had not.
             return ""
         case .duration:
-            return "Durante..."
+            return "For..."
         }
     }
 
     private var primaryTitle: String {
         switch step {
         case .app:
-            "Listo"
+            "Done"
         case .duration:
-            "Desbloquear"
+            "Unlock"
         case .friction:
             currentStepStatus.primaryState.title
         default:
@@ -196,7 +196,7 @@ struct UnlockFlowView: View {
             title: title,
             stepID: step,
             primaryTitle: primaryTitle,
-            secondaryTitle: "Déjalo",
+            secondaryTitle: "Leave it",
             isPrimaryEnabled: isPrimaryEnabled,
             restSeconds: restSeconds,
             accessoryToken: step == .app ? nil : selectedToken,
@@ -233,7 +233,7 @@ struct UnlockFlowView: View {
 
             case .duration:
                 LocktyWheelPicker(items: Array(allowanceRange), selection: $minutes) { value in
-                    Text(value == 1 ? "1 minuto" : "\(value) minutos")
+                    Text(value == 1 ? "1 minute" : "\(value) minutes")
                         .font(.system(.title3, design: .default, weight: value == minutes ? .semibold : .regular))
                         .foregroundStyle(LocktyColors.primaryText)
                         .frame(maxWidth: .infinity)
@@ -412,7 +412,7 @@ struct UnlockFlowView: View {
                             .fill(LocktyColors.elevatedBackground)
                     )
 
-                Text("Todas las apps")
+                Text("All apps")
                     .font(.system(.title3, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .lineLimit(1)

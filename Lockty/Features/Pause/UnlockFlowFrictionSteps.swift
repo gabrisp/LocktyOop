@@ -2336,12 +2336,12 @@ struct UnlockStepsStepView: View {
     private var shortfallLabel: some View {
         switch phase {
         case .reading:
-            Text("Leyendo tus pasos...")
+            Text("Reading your steps...")
                 .font(LocktyTypography.callout)
                 .foregroundStyle(LocktyColors.secondaryText)
 
         case .met:
-            Text("Has llegado a tu meta de hoy.")
+            Text("You have reached today's goal.")
                 .font(LocktyTypography.callout)
                 .foregroundStyle(LocktyColors.productive)
                 .multilineTextAlignment(.center)
@@ -2349,7 +2349,7 @@ struct UnlockStepsStepView: View {
         case .short(let current, let goal):
             // The exact shortfall, not a percentage: what is being asked for is a number
             // of steps, so the answer is a number of steps.
-            Text("Te faltan un total de \(max(goal - current, 0).formatted(.number.grouping(.automatic))) pasos para poder desbloquear")
+            Text("You are \(max(goal - current, 0).formatted(.number.grouping(.automatic))) steps short of unlocking")
                 .font(LocktyTypography.callout)
                 .foregroundStyle(LocktyColors.secondaryText)
                 .multilineTextAlignment(.center)
@@ -2392,7 +2392,7 @@ struct UnlockStepsStepView: View {
         celebrates = false
 
         guard let healthService, healthService.isAvailable else {
-            phase = .unavailable("Health no está disponible en este dispositivo.")
+            phase = .unavailable("Health is not available on this device.")
             // Nothing can be measured, so nothing can be demanded. Blocking the unlock on
             // a reading that cannot exist would make the friction impossible to pass.
             status = .ready

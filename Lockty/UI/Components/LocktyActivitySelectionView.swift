@@ -75,17 +75,17 @@ private enum LocktyActivitySelectionViolation: Hashable {
     var message: String {
         switch self {
         case .applicationsNotAllowed:
-            "Aquí no se pueden seleccionar apps."
+            "Apps can't be selected here."
         case .categoriesNotAllowed:
-            "Aquí no se pueden seleccionar categorías."
+            "Categories can't be selected here."
         case .websitesNotAllowed:
-            "Aquí no se pueden seleccionar sitios web."
+            "Websites can't be selected here."
         case .tooManyApps(let max):
-            max == 1 ? "Solo se puede seleccionar 1 app." : "Solo se pueden seleccionar \(max) apps."
+            max == 1 ? "Only 1 app can be selected." : "Only \(max) apps can be selected."
         case .tooManyCategories(let max):
-            max == 1 ? "Solo se puede seleccionar 1 categoría." : "Solo se pueden seleccionar \(max) categorías."
+            max == 1 ? "Only 1 category can be selected." : "Only \(max) categories can be selected."
         case .tooManyWebsites(let max):
-            max == 1 ? "Solo se puede seleccionar 1 sitio web." : "Solo se pueden seleccionar \(max) sitios web."
+            max == 1 ? "Only 1 website can be selected." : "Only \(max) websites can be selected."
         }
     }
 }
@@ -136,8 +136,8 @@ struct LocktyActivitySelectionView: View {
     @State private var overlay: LocktyFeedbackOverlayState?
 
     init(
-        title: String = "Seleccionadas",
-        addLabel: String = "Añadir App o sitio web",
+        title: String = "Selected",
+        addLabel: String = "Add app or website",
         selection: Binding<FamilyActivitySelection>,
         selectedAppGroupIDs: Binding<Set<UUID>> = .constant([]),
         rules: LocktyActivitySelectionRules,
@@ -325,7 +325,7 @@ struct LocktyActivitySelectionView: View {
 
     private var suggestionsSection: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            Text("Sugerencias")
+            Text("Suggestions")
                 .font(.system(.headline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
 
@@ -378,7 +378,7 @@ struct LocktyActivitySelectionView: View {
 
     private var appGroupsSection: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            Text("Grupos")
+            Text("Groups")
                 .font(.system(.headline, design: .default, weight: .semibold))
                 .foregroundStyle(LocktyColors.primaryText)
 
@@ -400,7 +400,7 @@ struct LocktyActivitySelectionView: View {
                     } label: {
                         AppFolderCard(
                             title: group.name,
-                            subtitle: group.itemCount == 1 ? "1 elemento" : "\(group.itemCount) elementos",
+                            subtitle: group.itemCount == 1 ? "1 item" : "\(group.itemCount) items",
                             tokens: group.tokens,
                             // Selected is a border and nothing else -- no tick laid over
                             // the folder, which would cover the very apps it is showing.
@@ -472,7 +472,7 @@ struct LocktyActivitySelectionView: View {
         toastCenter.show(
             LocktyToast(
                 leading: .symbol("exclamationmark.triangle.fill", LocktyColors.error),
-                title: "Selección no válida",
+                title: "Invalid selection",
                 message: message,
                 accent: LocktyColors.error,
                 duration: .seconds(2.8)
@@ -498,7 +498,7 @@ struct LocktyReadOnlyActivitySelectionView: View {
     let selection: FamilyActivitySelection
 
     init(
-        title: String = "Seleccionadas",
+        title: String = "Selected",
         selection: FamilyActivitySelection
     ) {
         self.title = title
@@ -691,7 +691,7 @@ private struct LocktyOfficialActivityPickerSheet: View {
                         }
                         dismiss()
                     } label: {
-                        Text("Guardar")
+                        Text("Save")
                             .font(.system(.body, design: .default, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .frame(height: 58)
@@ -868,7 +868,7 @@ private extension FamilyActivitySelection {
         if !categoryTokens.isEmpty || !webDomainTokens.isEmpty {
             var parts: [String] = []
             if categoryTokens.count > 0 {
-                parts.append(categoryTokens.count == 1 ? "1 categoría" : "\(categoryTokens.count) categorías")
+                parts.append(categoryTokens.count == 1 ? "1 category" : "\(categoryTokens.count) categories")
             }
             if applicationTokens.count > 0 {
                 parts.append(applicationTokens.count == 1 ? "1 app" : "\(applicationTokens.count) apps")

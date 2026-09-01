@@ -131,7 +131,7 @@ struct FocusView: View {
                 router.push(.distractingGroup)
             } label: {
                 AppFolderCard(
-                    title: "Distrayendo",
+                    title: "Distracting",
                     subtitle: folderCountText(appsViewModel.distractingTokens.count),
                     tokens: appsViewModel.distractingTokens
                 )
@@ -150,7 +150,7 @@ struct FocusView: View {
                 router.push(.alwaysAllowedGroup)
             } label: {
                 AppFolderCard(
-                    title: "Siempre Permitido",
+                    title: "Always Allowed",
                     subtitle: folderCountText(appsViewModel.alwaysAllowedTokens.count),
                     tokens: appsViewModel.alwaysAllowedTokens
                 )
@@ -186,7 +186,7 @@ struct FocusView: View {
     }
 
     private func folderCountText(_ count: Int) -> String {
-        count == 1 ? "1 elemento" : "\(count) elementos"
+        count == 1 ? "1 item" : "\(count) items"
     }
 
     @ViewBuilder

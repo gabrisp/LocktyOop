@@ -392,12 +392,12 @@ struct FrictionEditorView: View {
             }
         }
         .confirmationDialog(
-            "¿Descartar los cambios?",
+            "Discard changes?",
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { returnToParentOrDismiss() }
-            Button("Seguir editando", role: .cancel) {}
+            Button("Discard", role: .destructive) { returnToParentOrDismiss() }
+            Button("Keep editing", role: .cancel) {}
         }
         .alert(
             "Could not save friction",
@@ -477,7 +477,7 @@ struct FrictionEditorView: View {
         case .catalog:
             chromeTitleText("Friction Catalog")
         case nil:
-            chromeTitleText(isNaming ? "Nombre" : frictionChromeName)
+            chromeTitleText(isNaming ? "Name" : frictionChromeName)
         }
     }
 
@@ -490,7 +490,7 @@ struct FrictionEditorView: View {
     private var frictionChromeName: String {
         let trimmed = viewModel.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
-            return viewModel.isCreating ? "Nueva friction" : "Friction"
+            return viewModel.isCreating ? "New friction" : "Friction"
         }
         return trimmed
     }
@@ -573,7 +573,7 @@ struct FrictionEditorView: View {
 
     private var namingContent: some View {
         VStack(spacing: LocktySpacing.lg) {
-            TextField("Nombre", text: $viewModel.draft.name)
+            TextField("Name", text: $viewModel.draft.name)
                 .focused($isNameFieldFocused)
                 .font(LocktyTypography.body)
                 .foregroundStyle(LocktyColors.primaryText)
@@ -597,7 +597,7 @@ struct FrictionEditorView: View {
                 stepsSection
 
                 LocktyHoldButton(
-                    title: viewModel.isCreating ? "Mantén para confirmar" : "Mantén para guardar"
+                    title: viewModel.isCreating ? "Hold to confirm" : "Hold to save"
                 ) {
                     saveAndClose()
                 }
@@ -974,7 +974,7 @@ private struct PersonalVideoConfigurationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            TextField("Nombre del video", text: Binding(
+            TextField("Video name", text: Binding(
                 get: { configuration.displayName ?? "" },
                 set: {
                     onUpdate(
@@ -1101,7 +1101,7 @@ private struct NFCTagConfigurationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            TextField("Nombre de la etiqueta", text: Binding(
+            TextField("Tag name", text: Binding(
                 get: { configuration.displayName ?? "" },
                 set: {
                     onUpdate(
@@ -1207,7 +1207,7 @@ private struct LocationFrictionConfigurationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.sm) {
-            TextField("Nombre del lugar", text: Binding(
+            TextField("Place name", text: Binding(
                 get: { configuration.name },
                 set: {
                     onUpdate(
@@ -1232,7 +1232,7 @@ private struct LocationFrictionConfigurationView: View {
                 HStack(spacing: LocktySpacing.sm) {
                     Image(systemName: "location.circle")
                         .font(.system(size: 17, weight: .medium))
-                    Text(isResolvingLocation ? "Guardando ubicación..." : "Usar ubicación actual")
+                    Text(isResolvingLocation ? "Saving location..." : "Use current location")
                         .font(LocktyTypography.callout)
                     Spacer(minLength: 0)
                     if isResolvingLocation {
@@ -1435,7 +1435,7 @@ private enum FrictionTagRegistrationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "NFC no está disponible en este dispositivo."
+            "NFC is not available on this device."
         case .unsupported:
             "No se pudo leer la identidad de esta etiqueta NFC."
         }

@@ -78,6 +78,15 @@ private struct LocktyMenuPanel<Content: View>: View {
     var body: some View {
         content
             .opacity(isVisible ? 1 : 0)
+            // A hand-drawn edge around the whole panel. The popover's own surface is a
+            // perfect rounded rectangle like every other system surface; this is what
+            // makes a Lockty menu look like Lockty rather than like a context menu.
+            .overlay {
+                LocktyImperfectShape()
+                    .stroke(LocktyColors.cardStroke, lineWidth: 1)
+                    .opacity(isVisible ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
             .task {
                 try? await Task.sleep(for: .milliseconds(100))
                 withAnimation(.snappy(duration: 0.3, extraBounce: 0)) {

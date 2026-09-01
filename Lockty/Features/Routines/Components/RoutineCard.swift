@@ -26,7 +26,7 @@ struct RoutineCard: View {
     /// "starts in 27 d" is noise, so past three days it shows the window instead.
     private var pillText: String? {
         if isActive {
-            return "Activa"
+            return "Active"
         }
 
         guard let schedule else { return nil }
@@ -38,8 +38,8 @@ struct RoutineCard: View {
         guard let days = daysUntilNextStart(of: schedule) else { return window }
         switch days {
         case 0: return "Empieza hoy"
-        case 1: return "Empieza mañana"
-        case 2: return "Empieza en 2 d"
+        case 1: return "Starts tomorrow"
+        case 2: return "Starts in 2 d"
         default: return window
         }
     }
@@ -131,7 +131,7 @@ struct RoutineCard: View {
                         .lineLimit(1)
 
                     HStack(spacing: LocktySpacing.xs) {
-                        Text("Bloquear")
+                        Text("Block")
                             .font(.system(.caption, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.secondaryText)
                             .lineLimit(1)

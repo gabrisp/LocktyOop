@@ -648,8 +648,8 @@ struct PauseAppPickerSheet: View {
 
     var body: some View {
         LocktyActivitySelectionView(
-            title: "Seleccionadas",
-            addLabel: "Añadir App",
+            title: "Selected",
+            addLabel: "Add app",
             selection: Binding(
                 get: { viewModel.selectionPreview },
                 set: { newValue in

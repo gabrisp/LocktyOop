@@ -442,20 +442,20 @@ struct RuleEditorView: View {
             onAttempt: requestClose
         )
         .confirmationDialog(
-            "¿Descartar los cambios?",
+            "Discard changes?",
             isPresented: $isConfirmingBack,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { returnToKindChoice() }
-            Button("Seguir editando", role: .cancel) {}
+            Button("Discard", role: .destructive) { returnToKindChoice() }
+            Button("Keep editing", role: .cancel) {}
         }
         .confirmationDialog(
-            "¿Descartar los cambios?",
+            "Discard changes?",
             isPresented: $isConfirmingDiscard,
             titleVisibility: .visible
         ) {
-            Button("Descartar", role: .destructive) { returnToParentOrDismiss() }
-            Button("Seguir editando", role: .cancel) {}
+            Button("Discard", role: .destructive) { returnToParentOrDismiss() }
+            Button("Keep editing", role: .cancel) {}
         }
         .task {
             await viewModel.load()
@@ -527,14 +527,14 @@ struct RuleEditorView: View {
     private var chromeCenter: some View {
         switch activeSheet {
         case .apps:
-            chromeTitleText("Seleccionadas")
+            chromeTitleText("Selected")
         case .breakSettings:
             chromeTitleText("Break")
         case nil:
             // The generated name, not "New Rule": the rule already has a name by the
             // time this is on screen, and showing a placeholder over a filled field
             // would be the header disagreeing with the form under it.
-            chromeTitleText(isNaming ? "Nombre" : (viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Regla" : viewModel.name))
+            chromeTitleText(isNaming ? "Name" : (viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Regla" : viewModel.name))
         }
     }
 
@@ -675,7 +675,7 @@ struct RuleEditorView: View {
 
     private var namingContent: some View {
         VStack(spacing: LocktySpacing.lg) {
-            TextField("Nombre", text: $viewModel.name)
+            TextField("Name", text: $viewModel.name)
                 .focused($isNameFieldFocused)
                 .font(LocktyTypography.body)
                 .foregroundStyle(LocktyColors.primaryText)
@@ -702,7 +702,7 @@ struct RuleEditorView: View {
 
             appsRow
 
-            LocktyHoldButton(title: viewModel.isCreating ? "Mantén para confirmar" : "Mantén para guardar") {
+            LocktyHoldButton(title: viewModel.isCreating ? "Hold to confirm" : "Hold to save") {
                 Task {
                     if await viewModel.save() {
                         dismissEditor()
@@ -930,8 +930,8 @@ struct RuleEditorView: View {
     private var selectionScreen: some View {
         VStack {
                 LocktyActivitySelectionView(
-                    title: "Seleccionadas",
-                    addLabel: "Añadir App o categoría",
+                    title: "Selected",
+                    addLabel: "Add app or category",
                     selection: Binding(
                         get: { viewModel.selectionPreview },
                         set: { newValue in
@@ -1010,7 +1010,7 @@ struct RuleEditorView: View {
             apps: viewModel.selectionPreview.applicationTokens.count,
             categories: viewModel.selectionPreview.categoryTokens.count,
             groups: viewModel.selectedAppGroupIDs.count
-        ) ?? "Seleccionar"
+        ) ?? "Choose"
     }
 
     private func displayName(for kind: RuleKind) -> String {

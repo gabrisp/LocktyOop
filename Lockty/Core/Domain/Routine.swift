@@ -15,6 +15,32 @@ struct Routine: Codable, Hashable, Identifiable {
     /// The furthest ahead of itself a routine may warn.
     static let maximumStartAlarmLeadMinutes = 5
 
+    /// Repairs the one combination a routine cannot mean.
+    ///
+    /// A friction is the thing you go through *to take a break*, so a routine carrying
+    /// one while allowing no breaks describes something that cannot happen: the shield
+    /// refuses on `maximumBreaks == 0` before the friction is ever reached, and the
+    /// routine reads as "Blocked" with a friction sitting in it.
+    ///
+    /// Applied on the way in rather than as a migration, so every routine saved while
+    /// the editor let the two settings drift apart is right the moment it is read --
+    /// from Core Data, from the App Group, from anywhere.
+    static func reconciledBreakPolicy(
+        _ policy: BreakPolicy,
+        pauseFlowID: UUID?,
+        pausePolicy: RoutinePausePolicy
+    ) -> BreakPolicy {
+        let hasFriction = pauseFlowID != nil || pausePolicy.offersPause
+        guard hasFriction, policy.maximumBreaks <= 0 else { return policy }
+
+        return BreakPolicy(
+            maximumBreaks: 2,
+            maximumDuration: policy.maximumDuration > 0 ? policy.maximumDuration : 5 * 60,
+            minimumInterval: policy.minimumInterval > 0 ? policy.minimumInterval : 60 * 60,
+            allowedTriggers: policy.allowedTriggers.isEmpty ? [.manual] : policy.allowedTriggers
+        )
+    }
+
     let id: UUID
     var name: String
     var icon: String?
@@ -83,7 +109,11 @@ struct Routine: Codable, Hashable, Identifiable {
         self.tasks = tasks
         self.startAlarmEnabled = startAlarmEnabled
         self.startAlarmLeadMinutes = min(max(startAlarmLeadMinutes, 0), Self.maximumStartAlarmLeadMinutes)
-        self.breakPolicy = breakPolicy
+        self.breakPolicy = Self.reconciledBreakPolicy(
+            breakPolicy,
+            pauseFlowID: pauseFlowID,
+            pausePolicy: pausePolicy
+        )
         self.pauseFlowID = pauseFlowID
         self.pausePolicy = pausePolicy
         self.allowsPauseDuringStrictMode = allowsPauseDuringStrictMode
@@ -115,9 +145,14 @@ struct Routine: Codable, Hashable, Identifiable {
             max(try container.decodeIfPresent(Int.self, forKey: .startAlarmLeadMinutes) ?? 0, 0),
             Self.maximumStartAlarmLeadMinutes
         )
-        breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
+        let decodedBreakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
         pauseFlowID = try container.decodeIfPresent(UUID.self, forKey: .pauseFlowID)
         pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off
+        breakPolicy = Self.reconciledBreakPolicy(
+            decodedBreakPolicy,
+            pauseFlowID: pauseFlowID,
+            pausePolicy: pausePolicy
+        )
         allowsPauseDuringStrictMode = try container.decodeIfPresent(Bool.self, forKey: .allowsPauseDuringStrictMode) ?? true
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)

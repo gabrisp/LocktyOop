@@ -233,6 +233,45 @@ private struct LocktyLongPressModifier: ViewModifier {
 
     @State private var isPressed = false
     @State private var hapticTrigger = 0
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// The shape does not fill the row. It sits a little inside it vertically -- so it
+    /// reads as something laid *on* the row rather than as the row's own edge -- and a
+    /// little outside it horizontally, so the words it lights have air around them
+    /// instead of being touched by the corners.
+    private var verticalInset: CGFloat { 4 }
+    private var horizontalOutset: CGFloat { 8 }
+
+    @ViewBuilder
+    private var heldSurface: some View {
+        if let shape {
+            let tint = LocktyPressTint.color(for: colorScheme)
+
+            shape
+                .fill(tint.opacity(isPressed ? 0.09 : 0))
+                .blendMode(LocktyPressTint.blendMode(for: colorScheme))
+                .overlay {
+                    shape
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: tint.opacity(isPressed ? 0.13 : 0), location: 0),
+                                    .init(color: tint.opacity(isPressed ? 0.05 : 0), location: 0.35),
+                                    .init(color: .clear, location: 0.72),
+                                    .init(color: .clear, location: 1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blendMode(LocktyPressTint.secondaryBlendMode(for: colorScheme))
+                }
+                .padding(.vertical, verticalInset)
+                .padding(.horizontal, -horizontalOutset)
+                .allowsHitTesting(false)
+                .animation(.smooth(duration: 0.18), value: isPressed)
+        }
+    }
 
     func body(content: Content) -> some View {
         content
@@ -246,11 +285,7 @@ private struct LocktyLongPressModifier: ViewModifier {
             .saturation(shape == nil && isPressed ? 1.1 : 1)
             .scaleEffect(shape == nil && isPressed ? 0.99 : 1)
             .animation(.smooth(duration: 0.18), value: isPressed)
-            .locktyInteractiveSurface(
-                enabled: shape != nil,
-                shape: shape ?? AnyShape(Rectangle())
-            )
-            .environment(\.locktySurfacePressed, isPressed)
+            .overlay { heldSurface }
             .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: minimumDuration) {
                 hapticTrigger += 1

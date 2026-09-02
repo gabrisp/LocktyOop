@@ -727,6 +727,9 @@ struct RoutineEditorView: View {
     @State private var pendingDiscard: LocktyDiscardIntent?
     @FocusState private var isNameFieldFocused: Bool
     @State private var isGoingBack = false
+    /// The form's natural height, so the sheet can be told a number rather than asking a
+    /// scroll view how tall it wishes it were.
+    @State private var editorContentHeight: CGFloat = 0
 
     init(
         viewModel: RoutineEditorViewModel,
@@ -2258,10 +2261,16 @@ struct RoutineEditorView: View {
         // Built to the design, not assembled from the app's other pieces. A List would
         // impose its own row insets, separators and background, and the design has none
         // of those -- what it has is two cards under each heading.
-        // No scroll view. The sheet is as tall as this is, so there is never anything
-        // below the fold to scroll to -- and a scroll view here would report the height
-        // it was given rather than the height of what is in it.
-        VStack(alignment: .leading, spacing: 18) {
+        //
+        // Measured, then scrolled only if it has to be. The form used to have no scroll
+        // view at all, on the reasoning that the sheet is as tall as the form -- which
+        // held until the form grew past the screen, and then the rows at the bottom
+        // simply could not be reached. A plain scroll view is not the answer either: it
+        // reports the height it was *given* rather than the height of what is in it, so
+        // the sheet would open full height for a two-row form. This is what the friction
+        // editor does, for the same reason.
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
                 sectionHeading("SCHEDULE", systemImage: "calendar")
 
                 scheduleCard
@@ -2300,15 +2309,30 @@ struct RoutineEditorView: View {
                 }
                 .padding(.top, LocktySpacing.sm)
             }
-        .padding(.horizontal, LocktySpacing.screenInset)
-        .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, LocktySpacing.screenInset)
+            .padding(.top, LocktySpacing.md)
+            .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height
+            } action: { newValue in
+                editorContentHeight = newValue
+            }
+        }
+        .frame(height: min(editorContentHeight, availableEditorHeight))
+        .scrollDisabled(editorContentHeight <= availableEditorHeight)
         // The same bloom the preview has. Editing is not a different place, it is the
         // same routine with its fields open, and dropping the colour on the way in made
         // it feel like one.
         .background(alignment: .top) { routineBloom }
+    }
+
+    /// What the sheet can actually give the form: the window, less the room a sheet never
+    /// occupies, less the bar above the content.
+    private var availableEditorHeight: CGFloat {
+        let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .screen.bounds.height ?? 0
+        return max(window - 110 - 64, 240)
     }
 
     /// The routine's colour, behind whichever screen is showing.

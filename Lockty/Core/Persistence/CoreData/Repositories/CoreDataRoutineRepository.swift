@@ -19,7 +19,9 @@ final class CoreDataRoutineRepository: RoutineRepository {
     func routines() async throws -> [Routine] {
         guard let context = controller.viewContext else { throw RoutineRepositoryError.unavailable }
         let request = RoutineEntity.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \RoutineEntity.createdAt, ascending: true)]
+        // Newest first. A routine you have just made is the one you are about to look
+        // for, and it was landing at the bottom of a list that only grows.
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \RoutineEntity.createdAt, ascending: false)]
         let entities = try context.fetch(request)
         print("Loaded routines from Core Data count=\(entities.count)")
 

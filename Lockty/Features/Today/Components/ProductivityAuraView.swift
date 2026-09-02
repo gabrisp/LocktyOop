@@ -16,15 +16,20 @@ import SwiftUI
 /// Drawn inside a `compositingGroup` so all of it composites as one object. Without it
 /// each layer blends against the screen separately and the edge shows through its halo.
 struct ProductivityAuraView: View {
-    /// 0 to 100. Nil while the day's score is still unknown.
-    let score: Int?
+    /// What sits inside the rock, and what colour it is lit.
+    let title: String
+    /// The figure itself. Nil while it is still unknown, which draws the rock unlit.
+    let value: Double?
+    let tint: Color
+    /// How the figure reads. A score is a number; a duration is not.
+    var format: (Double) -> String = { "\(Int($0))" }
     /// 0 at rest, 1 once the screen has been scrolled past the collapse distance.
     /// Everything shrinks by it; only the word above the number goes away.
     var collapseProgress: CGFloat = 0
 
-    /// Climbs to `score` once the view is on screen. Separate from the score itself so
+    /// Climbs to `value` once the view is on screen. Separate from the value itself so
     /// re-rendering for any other reason does not restart the arrival.
-    @State private var displayedScore = 0
+    @State private var displayedValue: Double = 0
 
     private let side: CGFloat = 240
 
@@ -56,22 +61,14 @@ struct ProductivityAuraView: View {
     /// every other score in the app is judged by, and a second set here would have the
     /// rock disagreeing with the cards under it about the same number.
     private var accent: Color {
-        guard let score else { return LocktyColors.secondaryText }
-        switch DailyScoreTone.tone(for: Double(score)) {
-        case .weak:
-            return LocktyColors.unproductive
-        case .balanced:
-            return LocktyColors.warning
-        case .strong:
-            return LocktyColors.productive
-        }
+        value == nil ? LocktyColors.secondaryText : tint
     }
 
     /// How far the count has travelled. The light is tied to this rather than to a timer
     /// of its own, so it comes up with the digits instead of after them.
     private var arrival: Double {
-        guard let score, score > 0 else { return score == nil ? 0 : 1 }
-        return min(Double(displayedScore) / Double(score), 1)
+        guard let value, value > 0 else { return value == nil ? 0 : 1 }
+        return min(displayedValue / value, 1)
     }
 
     var body: some View {
@@ -91,7 +88,7 @@ struct ProductivityAuraView: View {
         // Claims the space it draws at rather than the space it was laid out at, so the
         // content below rides up as it shrinks instead of leaving a hole behind.
         .frame(width: side * scale, height: side * Self.drawnHeightRatio * scale)
-        .task(id: score) {
+        .task(id: value) {
             await arrive()
         }
     }
@@ -166,19 +163,34 @@ struct ProductivityAuraView: View {
             }
     }
 
+    /// The number shrinks as it lengthens. "88" and "3 h 41 m" are the same badge, and
+    /// one type size cannot carry both -- at 76 the duration runs off the rock, and at a
+    /// size the duration fits, the score looks like a caption.
+    private var valueFontSize: CGFloat {
+        let text = format(displayedValue)
+        switch text.count {
+        case ...3: return 76
+        case 4...5: return 58
+        case 6...7: return 44
+        default: return 36
+        }
+    }
+
     private var labelContent: some View {
         VStack(spacing: -4) {
-            Text("Productivity")
+            Text(title)
                 .font(.system(.subheadline, design: .default, weight: .semibold))
                 // The only thing that leaves. At a third the size it would be unreadable
                 // anyway, and the number alone is still the whole point.
                 .opacity(1 - Double(MetricsHeaderGeometry.rangedProgress(collapseProgress, from: 0, to: 0.5)))
 
-            Text("\(displayedScore)")
-                .font(.system(size: 76, weight: .heavy, design: .default))
+            Text(format(displayedValue))
+                .font(.system(size: valueFontSize, weight: .heavy, design: .default))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
-                .animation(.smooth(duration: 1.1), value: displayedScore)
+                .animation(.smooth(duration: 1.1), value: displayedValue)
         }
     }
 
@@ -186,12 +198,12 @@ struct ProductivityAuraView: View {
 
     @MainActor
     private func arrive() async {
-        guard let score else {
-            displayedScore = 0
+        guard let value else {
+            displayedValue = 0
             return
         }
 
-        displayedScore = 0
+        displayedValue = 0
 
         // One turn, so the zero is on screen before the climb starts. Setting both in the
         // same pass gives SwiftUI nothing to animate between and the number simply
@@ -200,8 +212,58 @@ struct ProductivityAuraView: View {
         guard !Task.isCancelled else { return }
 
         withAnimation(.smooth(duration: 1.1)) {
-            displayedScore = score
+            displayedValue = value
         }
+    }
+}
+
+extension ProductivityAuraView {
+    /// The badge as the productivity score, which is what it was built for.
+    ///
+    /// Kept as its own entry point rather than left to every call site: the thresholds
+    /// are `DailyScoreTone`'s, the same bands every other score in the app is judged by,
+    /// and a second set written out at a call site would have the rock disagreeing with
+    /// the cards under it about the same number.
+    static func productivity(score: Int?, collapseProgress: CGFloat = 0) -> ProductivityAuraView {
+        ProductivityAuraView(
+            title: "Productivity",
+            value: score.map(Double.init),
+            tint: {
+                guard let score else { return LocktyColors.secondaryText }
+                switch DailyScoreTone.tone(for: Double(score)) {
+                case .weak: return LocktyColors.unproductive
+                case .balanced: return LocktyColors.warning
+                case .strong: return LocktyColors.productive
+                }
+            }(),
+            format: { "\(Int($0))" },
+            collapseProgress: collapseProgress
+        )
+    }
+
+    /// The badge as the day's screen time.
+    ///
+    /// Lit by how the day compares with the fortnight behind it rather than by an
+    /// absolute threshold: four hours is a heavy day for one person and a light one for
+    /// another, and a fixed line would tell most people the same thing every day.
+    static func screenTime(
+        usage: TimeInterval?,
+        baseline: TimeInterval?,
+        collapseProgress: CGFloat = 0
+    ) -> ProductivityAuraView {
+        ProductivityAuraView(
+            title: "Screen time",
+            value: usage,
+            tint: {
+                guard let usage, let baseline, baseline > 0 else { return LocktyColors.neutral }
+                let ratio = usage / baseline
+                if ratio <= 0.85 { return LocktyColors.productive }
+                if ratio <= 1.1 { return LocktyColors.warning }
+                return LocktyColors.unproductive
+            }(),
+            format: { LocktyDurationFormatter.abbreviated($0) },
+            collapseProgress: collapseProgress
+        )
     }
 }
 

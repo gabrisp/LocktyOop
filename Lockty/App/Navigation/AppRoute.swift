@@ -11,4 +11,8 @@ enum AppRoute: Hashable {
     case distractingApps
     case distractingIntervention
     case distractingFriction
+    /// The day's screen time in full: the badge again, the values behind it, and what
+    /// they add up to. Pushed rather than presented -- it is a place you go and come
+    /// back from, not something asking to be answered.
+    case screenTimeInsights(day: Date)
 }

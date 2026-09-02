@@ -504,6 +504,10 @@ struct FeatureFactory {
         )
     }
 
+    func makeScreenTimeInsights(day: Date) -> ScreenTimeInsightsView {
+        ScreenTimeInsightsView(day: day, viewModel: todayViewModel)
+    }
+
     func makeProductivityDetail(day: Date) -> ProductivityDetailView {
         ProductivityDetailView(day: day, viewModel: todayViewModel)
     }

@@ -237,15 +237,23 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     dayStart: dayStart,
                     totalUsage: summary.totalUsage
                 ),
-                appUsages: summary.applications.map { usage in
-                    AppUsageState(
-                        app: usage.app,
-                        durationText: LocktyDurationFormatter.abbreviated(usage.duration),
-                        duration: usage.duration,
-                        classification: usage.classification,
-                        comparisonText: nil
+                appUsages: {
+                    let counts = Dictionary(
+                        (snapshot?.applications ?? []).map { ($0.app.id, ($0.pickups, $0.notifications)) },
+                        uniquingKeysWith: { first, _ in first }
                     )
-                }
+                    return summary.applications.map { usage in
+                        AppUsageState(
+                            app: usage.app,
+                            durationText: LocktyDurationFormatter.abbreviated(usage.duration),
+                            duration: usage.duration,
+                            classification: usage.classification,
+                            comparisonText: nil,
+                            opens: counts[usage.app.id]?.0 ?? 0,
+                            notifications: counts[usage.app.id]?.1 ?? 0
+                        )
+                    }
+                }()
             )
         } catch {
             print("Today pipeline falling back to partial unavailable state for \(DayKey(date: dayStart).id): \(error.localizedDescription)")

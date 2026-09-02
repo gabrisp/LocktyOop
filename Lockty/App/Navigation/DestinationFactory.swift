@@ -36,6 +36,9 @@ struct DestinationFactory {
         case .distractingFriction:
             featureFactory.makeDistractingFrictionPicker()
 
+        case .screenTimeInsights(let day):
+            featureFactory.makeScreenTimeInsights(day: day)
+
         }
     }
 

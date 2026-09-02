@@ -29,6 +29,15 @@ struct TodayView: View {
         return Int(metric.value.rounded())
     }
 
+    /// The fortnight the day is being judged against, derived from the same reduction
+    /// figure the pulse card shows: today's usage plus how much less it was than usual is
+    /// what usual was. Nil when there is not enough history to say, which leaves the rock
+    /// uncoloured rather than guessing.
+    private var screenTimeBaseline: TimeInterval? {
+        guard let reduction = state.hourlyActivity.reductionVersusBaseline else { return nil }
+        return state.hourlyActivity.totalUsage + reduction
+    }
+
     /// Both routine headings lead to the same place: routines are configured on Focus,
     /// and these cards are a window onto them rather than a place to manage them.
     private func openFocus() {
@@ -299,11 +308,21 @@ struct TodayView: View {
             // offset below is what carries it there. No background of its own: the
             // screen's ground is already behind it, and a second one would show as a
             // panel sliding up with it.
-            ProductivityAuraView(
-                score: productivityScore,
-                collapseProgress: collapseProgress
-            )
-            .frame(maxWidth: .infinity)
+            // Screen time rather than the productivity score. The score is a judgement
+            // the app made; the time is the fact it was made from, and it is the thing
+            // people open this app to look at. Productivity has not gone anywhere -- it
+            // is one of the values on the screen this opens.
+            Button {
+                router.push(.screenTimeInsights(day: day))
+            } label: {
+                ProductivityAuraView.screenTime(
+                    usage: state.hourlyActivity.totalUsage,
+                    baseline: screenTimeBaseline,
+                    collapseProgress: collapseProgress
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.locktyInteractive(brighten: true))
         }
         // Rides up into the navigation bar as it collapses, so what is left at the end
         // sits on the toolbar's own line, beside Settings, rather than parked under it.

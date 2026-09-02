@@ -119,6 +119,30 @@ struct AppUsageState: Codable, Hashable, Identifiable {
     var duration: TimeInterval
     var classification: AppClassification
     var comparisonText: String?
+    /// How many times it was opened and how many times it interrupted, both for this day.
+    ///
+    /// Carried alongside the duration because "two hours" and "two hours across forty
+    /// openings" are different days, and the second one is the one worth saying out loud.
+    var opens: Int
+    var notifications: Int
+
+    init(
+        app: AppIdentity,
+        durationText: String,
+        duration: TimeInterval,
+        classification: AppClassification,
+        comparisonText: String? = nil,
+        opens: Int = 0,
+        notifications: Int = 0
+    ) {
+        self.app = app
+        self.durationText = durationText
+        self.duration = duration
+        self.classification = classification
+        self.comparisonText = comparisonText
+        self.opens = opens
+        self.notifications = notifications
+    }
 }
 
 struct ActiveRoutineChecklistState: Equatable, Identifiable {

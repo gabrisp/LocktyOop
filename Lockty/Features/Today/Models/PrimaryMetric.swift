@@ -16,6 +16,17 @@ enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
         }
     }
 
+    /// A glyph for the places that show the three side by side and have no room to
+    /// spell them out. Productivity is a leaf rather than a chart: it is about what the
+    /// time went to, not how much of it there was.
+    var systemImage: String {
+        switch self {
+        case .productivity: "leaf.fill"
+        case .control: "hand.raised.fill"
+        case .detox: "moon.zzz.fill"
+        }
+    }
+
     var collapsedTextWidth: CGFloat {
         switch self {
         case .productivity:

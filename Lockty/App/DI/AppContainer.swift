@@ -278,7 +278,8 @@ final class AppContainer {
             toastCenter: toastCenter,
             editorStore: editorStore,
             usageDataService: usageDataService,
-            quickTimerViewModel: quickTimerViewModel
+            quickTimerViewModel: quickTimerViewModel,
+            settingsViewModel: SettingsViewModel(healthService: healthService, appGroupStore: appGroupStore)
         )
         let destinationFactory = DestinationFactory(featureFactory: featureFactory)
         let startupCoordinator = StartupCoordinator(

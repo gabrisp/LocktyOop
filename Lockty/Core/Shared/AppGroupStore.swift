@@ -346,6 +346,21 @@ final class AppGroupStore {
         try saveRuleEnforcementState(state)
     }
 
+    /// What the block screen should say. Read by the shield extension, which cannot
+    /// reach anything else the app stores.
+    nonisolated func loadShieldScreenPreferences() -> ShieldScreenPreferences {
+        guard let data = (try? readData(fileName: "shield-screen.json", legacyDefaultsKey: nil)) ?? nil,
+              let preferences = try? decoder.decode(ShieldScreenPreferences.self, from: data) else {
+            return .default
+        }
+        return preferences
+    }
+
+    nonisolated func saveShieldScreenPreferences(_ preferences: ShieldScreenPreferences) throws {
+        let data = try encoder.encode(preferences)
+        try writeData(data, fileName: "shield-screen.json", legacyDefaultsKey: nil)
+    }
+
     nonisolated private func readData(
         fileName: String,
         legacyDefaultsKey: String?

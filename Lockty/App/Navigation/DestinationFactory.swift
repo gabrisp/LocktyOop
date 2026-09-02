@@ -39,6 +39,9 @@ struct DestinationFactory {
         case .screenTimeInsights(let day):
             featureFactory.makeScreenTimeInsights(day: day)
 
+        case .blockScreens:
+            featureFactory.makeBlockScreenSettings()
+
         }
     }
 

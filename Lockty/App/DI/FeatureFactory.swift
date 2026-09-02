@@ -36,6 +36,9 @@ struct FeatureFactory {
     let editorStore: EditorViewModelStore
     let usageDataService: UsageDataServicing
     let quickTimerViewModel: QuickTimerViewModel
+    /// One instance, because two screens edit the same stored preferences and a second
+    /// copy would show a stale style the moment the first one changed it.
+    let settingsViewModel: SettingsViewModel
 
     func makeTodayView(day: Date) -> TodayView {
         TodayView(day: day, viewModel: todayViewModel, router: router)
@@ -86,7 +89,15 @@ struct FeatureFactory {
     }
 
     func makeSettingsView() -> SettingsView {
-        SettingsView(viewModel: SettingsViewModel(healthService: healthService))
+        SettingsView(
+            viewModel: settingsViewModel,
+            access: systemAccessViewModel,
+            router: router
+        )
+    }
+
+    func makeBlockScreenSettings() -> BlockScreenSettingsView {
+        BlockScreenSettingsView(viewModel: settingsViewModel)
     }
 
     @ViewBuilder

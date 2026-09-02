@@ -15,4 +15,6 @@ enum AppRoute: Hashable {
     /// they add up to. Pushed rather than presented -- it is a place you go and come
     /// back from, not something asking to be answered.
     case screenTimeInsights(day: Date)
+    /// What the shield says when it stops you.
+    case blockScreens
 }

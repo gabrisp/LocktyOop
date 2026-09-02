@@ -186,7 +186,8 @@ final class AppContainer {
         let routineScheduleCoordinator = RoutineScheduleCoordinator(
             repository: routineRepository,
             appGroupStore: appGroupStore,
-            deviceActivityService: deviceActivityService
+            deviceActivityService: deviceActivityService,
+            alarmService: alarmService
         )
         let routinesViewModel = RoutinesViewModel(
             routineEngine: routineEngine,

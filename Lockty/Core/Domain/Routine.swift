@@ -12,6 +12,9 @@ nonisolated enum RoutineColor: String, Codable, CaseIterable, Hashable, Identifi
 }
 
 struct Routine: Codable, Hashable, Identifiable {
+    /// The furthest ahead of itself a routine may warn.
+    static let maximumStartAlarmLeadMinutes = 5
+
     let id: UUID
     var name: String
     var icon: String?
@@ -27,6 +30,12 @@ struct Routine: Codable, Hashable, Identifiable {
     var strictGuards: StrictModeGuards
     var tasks: [RoutineTask]
     var startAlarmEnabled: Bool
+    /// How many minutes before the routine starts the alarm goes off, 0 through 5.
+    ///
+    /// Capped at five on purpose. An alarm is a warning, and a warning half an hour early
+    /// is a reminder you will have forgotten by the time it matters; five minutes is
+    /// about the distance between "finish this sentence" and "you are already late".
+    var startAlarmLeadMinutes: Int
     var breakPolicy: BreakPolicy
     /// The saved flow this routine uses, if it has been given one. The policy below is
     /// the resolved copy: the flow can be edited or deleted afterwards, and the routine
@@ -52,6 +61,7 @@ struct Routine: Codable, Hashable, Identifiable {
         strictGuards: StrictModeGuards = StrictModeGuards(),
         tasks: [RoutineTask],
         startAlarmEnabled: Bool = false,
+        startAlarmLeadMinutes: Int = 0,
         breakPolicy: BreakPolicy,
         pauseFlowID: UUID? = nil,
         pausePolicy: RoutinePausePolicy = .off,
@@ -72,6 +82,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.strictGuards = strictGuards
         self.tasks = tasks
         self.startAlarmEnabled = startAlarmEnabled
+        self.startAlarmLeadMinutes = min(max(startAlarmLeadMinutes, 0), Self.maximumStartAlarmLeadMinutes)
         self.breakPolicy = breakPolicy
         self.pauseFlowID = pauseFlowID
         self.pausePolicy = pausePolicy
@@ -100,6 +111,10 @@ struct Routine: Codable, Hashable, Identifiable {
         strictGuards = try container.decodeIfPresent(StrictModeGuards.self, forKey: .strictGuards) ?? .legacy
         tasks = try container.decode([RoutineTask].self, forKey: .tasks)
         startAlarmEnabled = try container.decodeIfPresent(Bool.self, forKey: .startAlarmEnabled) ?? false
+        startAlarmLeadMinutes = min(
+            max(try container.decodeIfPresent(Int.self, forKey: .startAlarmLeadMinutes) ?? 0, 0),
+            Self.maximumStartAlarmLeadMinutes
+        )
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
         pauseFlowID = try container.decodeIfPresent(UUID.self, forKey: .pauseFlowID)
         pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off

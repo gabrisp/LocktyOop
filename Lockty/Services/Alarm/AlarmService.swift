@@ -11,6 +11,13 @@ protocol AlarmServicing {
     func authorizationState() async -> AlarmAuthorizationState
     func requestAuthorization() async -> AlarmAuthorizationState
     func triggerRoutineStartAlarm(for routine: Routine) async throws
+    /// Sets the alarm that goes off before the routine does.
+    ///
+    /// Separate from the one above, which fires as a routine actually starts. This one is
+    /// booked ahead against the clock, because the whole point is to arrive before
+    /// anything has happened -- including before the app has been opened that day.
+    func scheduleRoutineStartAlarm(for routine: Routine, firingAt date: Date) async throws
+    func cancelRoutineStartAlarm(routineID: UUID) async
 }
 
 enum AlarmAuthorizationState: String, Codable, Hashable {
@@ -48,6 +55,62 @@ struct LiveAlarmService: AlarmServicing {
         }
         #endif
         return .unsupported
+    }
+
+    /// One alarm per routine, keyed by the routine's own id.
+    ///
+    /// Deriving the alarm id from the routine means rescheduling replaces rather than
+    /// stacks: a routine whose time is edited five times would otherwise carry five
+    /// alarms, four of them for times it no longer starts.
+    private func alarmID(for routineID: UUID) -> UUID { routineID }
+
+    func scheduleRoutineStartAlarm(for routine: Routine, firingAt date: Date) async throws {
+        await cancelRoutineStartAlarm(routineID: routine.id)
+
+        guard routine.startAlarmEnabled, routine.startAlarmLeadMinutes > 0 else { return }
+        guard date > Date() else { return }
+
+        #if canImport(AlarmKit)
+        if #available(iOS 26.1, *) {
+            guard AlarmManager.shared.authorizationState == .authorized else {
+                print("Routine start alarm not scheduled: AlarmKit unauthorized, routine id=\(routine.id.uuidString)")
+                return
+            }
+
+            let lead = routine.startAlarmLeadMinutes
+            let name = routine.name.isEmpty ? "Lockty" : routine.name
+            let attributes = AlarmAttributes<RoutineStartAlarmMetadata>(
+                presentation: AlarmPresentation(
+                    alert: .init(title: LocalizedStringResource(stringLiteral: "\(name) starts in \(lead) min"))
+                ),
+                metadata: RoutineStartAlarmMetadata(routineID: routine.id, routineName: routine.name),
+                tintColor: .orange
+            )
+
+            let configuration = AlarmManager.AlarmConfiguration<RoutineStartAlarmMetadata>(
+                schedule: .fixed(date),
+                attributes: attributes,
+                sound: .default
+            )
+
+            _ = try await AlarmManager.shared.schedule(
+                id: alarmID(for: routine.id),
+                configuration: configuration
+            )
+            print("Scheduled routine start alarm routine=\(routine.id.uuidString) at \(date) lead=\(lead)m")
+            return
+        }
+        #endif
+
+        print("Routine start alarms unsupported on this OS for routine id=\(routine.id.uuidString)")
+    }
+
+    func cancelRoutineStartAlarm(routineID: UUID) async {
+        #if canImport(AlarmKit)
+        if #available(iOS 26.0, *) {
+            try? AlarmManager.shared.cancel(id: alarmID(for: routineID))
+        }
+        #endif
     }
 
     func triggerRoutineStartAlarm(for routine: Routine) async throws {

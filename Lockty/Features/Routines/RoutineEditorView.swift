@@ -35,6 +35,8 @@ final class RoutineEditorViewModel: ObservableObject {
     @Published var maximumBreakMinutes = 10
     @Published var minimumBreakIntervalMinutes = 30
     @Published var startAlarmEnabled = false
+    /// Minutes of warning before the routine begins, 0 through 5.
+    @Published var startAlarmLeadMinutes = 5
     /// The saved pause flow this routine uses. Nil means the default wait-then-confirm.
     @Published var pauseFlowID: UUID?
     @Published private(set) var pauseFlows: [PauseFlow] = []
@@ -75,6 +77,7 @@ final class RoutineEditorViewModel: ObservableObject {
         var contentRestrictions: ContentRestrictions
         var strictGuards: StrictModeGuards
         var startAlarmEnabled: Bool
+        var startAlarmLeadMinutes: Int
         var pauseFlowID: UUID?
         var allowsPauseDuringStrictMode: Bool
         var selectedApplicationCount: Int
@@ -93,6 +96,7 @@ final class RoutineEditorViewModel: ObservableObject {
             contentRestrictions: contentRestrictions,
             strictGuards: strictGuards,
             startAlarmEnabled: startAlarmEnabled,
+            startAlarmLeadMinutes: startAlarmLeadMinutes,
             pauseFlowID: pauseFlowID,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
             selectedApplicationCount: selectedApplicationCount,
@@ -294,6 +298,7 @@ final class RoutineEditorViewModel: ObservableObject {
         maximumBreakMinutes = max(Int(routine.breakPolicy.maximumDuration / 60), 1)
         minimumBreakIntervalMinutes = max(Int(routine.breakPolicy.minimumInterval / 60), 1)
         startAlarmEnabled = routine.startAlarmEnabled
+        startAlarmLeadMinutes = routine.startAlarmLeadMinutes == 0 ? 5 : routine.startAlarmLeadMinutes
         pauseFlowID = routine.pauseFlowID
         blockedDomains = routine.blockedDomains.sorted()
         contentRestrictions = routine.contentRestrictions
@@ -516,6 +521,7 @@ final class RoutineEditorViewModel: ObservableObject {
             strictGuards: strictGuards,
             tasks: tasks,
             startAlarmEnabled: startAlarmEnabled,
+            startAlarmLeadMinutes: startAlarmEnabled ? startAlarmLeadMinutes : 0,
             breakPolicy: breakPolicy,
             pauseFlowID: pauseFlowID,
             // Resolved at save time: the flow can be edited or deleted afterwards and
@@ -1996,6 +2002,58 @@ struct RoutineEditorView: View {
         }
     }
 
+    /// The warning before the routine, and how much of one.
+    ///
+    /// A routine that starts on its own is the one thing in the app that happens *to*
+    /// you, and an alarm is the difference between that and being ambushed by it. Capped
+    /// at five minutes: a warning half an hour early is a reminder you will have
+    /// forgotten by the time it matters.
+    private var alarmCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Alarm before it starts")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(alarmSummary)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                LocktySwitch(isOn: $viewModel.startAlarmEnabled)
+            }
+            .padding(.vertical, LocktySpacing.md)
+            .frame(minHeight: 56)
+
+            if viewModel.startAlarmEnabled {
+                Divider()
+                    .overlay(LocktyColors.separator.opacity(0.45))
+
+                LocktyCountRow(
+                    title: "Warning",
+                    value: $viewModel.startAlarmLeadMinutes,
+                    range: 1...Routine.maximumStartAlarmLeadMinutes,
+                    suffix: "min",
+                    circleSize: 36,
+                    valueMinWidth: 84
+                )
+                .transition(.blurReplace.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, LocktySpacing.cardInset)
+        .locktyCardBackground(cornerRadius: cardRadius)
+        .animation(.smooth(duration: 0.26), value: viewModel.startAlarmEnabled)
+    }
+
+    private var alarmSummary: String {
+        guard viewModel.startAlarmEnabled else { return "No warning. It simply starts." }
+        let minutes = viewModel.startAlarmLeadMinutes
+        return minutes == 1 ? "Rings 1 minute before." : "Rings \(minutes) minutes before."
+    }
+
     private var strictRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
@@ -2189,6 +2247,8 @@ struct RoutineEditorView: View {
                 scheduleCard
 
                 daysCard
+
+                alarmCard
 
                 checklistRow
 

@@ -213,13 +213,62 @@ struct DailyPulseCard: View {
                 .fill(LocktyColors.ink(0.06))
                 .frame(height: plotHeight)
 
-            Capsule(style: .continuous)
-                .fill(isFocused ? tint(for: metric) : tint(for: metric).opacity(0.55))
-                .frame(height: barHeight)
+            // On the reduction tab the bar is an hour of screen time, and an hour is not
+            // one thing: the same forty minutes is a different day depending on what it
+            // went to. The capsule becomes a mask over the split, so the shape stays a
+            // bar and the colour inside it says what the hour was.
+            if metric == .reduction, state.hours[hour].classifiedTotal > 0 {
+                classifiedFill(state.hours[hour], height: barHeight, isFocused: isFocused)
+            } else {
+                Capsule(style: .continuous)
+                    .fill(isFocused ? tint(for: metric) : tint(for: metric).opacity(0.55))
+                    .frame(height: barHeight)
+            }
         }
         .frame(width: 7)
         .frame(maxWidth: .infinity)
         .animation(.snappy(duration: 0.3), value: barHeight)
+    }
+
+    /// One bar, cut into its parts.
+    ///
+    /// Productive at the bottom, then neutral, then unproductive on top -- so the red
+    /// caps line up across the day at the tops of the bars and can be read as a row
+    /// rather than hunted for inside each one.
+    private func classifiedFill(
+        _ hour: HourlyActivityState.Hour,
+        height: CGFloat,
+        isFocused: Bool
+    ) -> some View {
+        let total = hour.classifiedTotal
+        let opacity = isFocused ? 1.0 : 0.62
+
+        return VStack(spacing: 0) {
+            piece(hour.unproductive, of: total, height: height, color: LocktyColors.unproductive)
+            piece(hour.neutral, of: total, height: height, color: LocktyColors.neutral)
+            piece(hour.productive, of: total, height: height, color: LocktyColors.productive)
+        }
+        .frame(height: height)
+        .opacity(opacity)
+        // Masked, not clipped to a rectangle: the bar keeps its rounded ends and the
+        // pieces inside follow them instead of being cut off square at the top.
+        .mask {
+            Capsule(style: .continuous)
+                .frame(height: height)
+        }
+        .animation(.snappy(duration: 0.3), value: height)
+    }
+
+    @ViewBuilder
+    private func piece(
+        _ value: TimeInterval,
+        of total: TimeInterval,
+        height: CGFloat,
+        color: Color
+    ) -> some View {
+        if value > 0, total > 0 {
+            color.frame(height: height * CGFloat(value / total))
+        }
     }
 
     private func gridlines(height: CGFloat) -> some View {
@@ -291,6 +340,17 @@ struct DailyPulseCard: View {
                 .foregroundStyle(LocktyColors.primaryText)
                 .monospacedDigit()
                 .contentTransition(.numericText())
+
+            // Only on the reduction tab, and only when the hour has a split worth
+            // showing. Under a count of unlocks it would be answering a question nobody
+            // asked.
+            if metric == .reduction, state.hours[hour].classifiedTotal > 0 {
+                HStack(spacing: LocktySpacing.sm) {
+                    splitLabel(state.hours[hour].unproductive, color: LocktyColors.unproductive)
+                    splitLabel(state.hours[hour].productive, color: LocktyColors.productive)
+                }
+                .padding(.top, 2)
+            }
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.sm)
@@ -301,6 +361,23 @@ struct DailyPulseCard: View {
         .locktyImperfectBorder(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .fixedSize()
         .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func splitLabel(_ value: TimeInterval, color: Color) -> some View {
+        if value > 0 {
+            HStack(spacing: 3) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 6, height: 6)
+
+                Text(LocktyDurationFormatter.abbreviated(value))
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundStyle(color)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+        }
     }
 
     /// Keeps the tooltip on the card. Following the finger exactly walks it off both ends

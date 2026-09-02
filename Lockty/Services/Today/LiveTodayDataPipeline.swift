@@ -235,7 +235,10 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 hourlyActivity: makeHourlyActivity(
                     snapshot: snapshot,
                     dayStart: dayStart,
-                    totalUsage: summary.totalUsage
+                    totalUsage: summary.totalUsage,
+                    classifications: Dictionary(
+                        uniqueKeysWithValues: summary.applications.map { ($0.app.id, $0.classification) }
+                    )
                 ),
                 appUsages: {
                     let counts = Dictionary(
@@ -282,12 +285,16 @@ struct LiveTodayDataPipeline: TodayDataProviding {
     private func makeHourlyActivity(
         snapshot: ScreenTimeReportSnapshot?,
         dayStart: Date,
-        totalUsage: TimeInterval
+        totalUsage: TimeInterval,
+        classifications: [AppIdentity.ID: AppClassification]
     ) -> HourlyActivityState {
         let calendar = Calendar.current
         var usage = [TimeInterval](repeating: 0, count: 24)
         var unlocks = [Int](repeating: 0, count: 24)
         var notifications = [Int](repeating: 0, count: 24)
+        var productive = [TimeInterval](repeating: 0, count: 24)
+        var neutral = [TimeInterval](repeating: 0, count: 24)
+        var unproductive = [TimeInterval](repeating: 0, count: 24)
 
         for segment in snapshot?.activitySegments ?? [] {
             let hour = calendar.component(.hour, from: segment.dateInterval.start)
@@ -295,6 +302,14 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             usage[hour] += segment.totalActivityDuration
             unlocks[hour] += segment.pickups
             notifications[hour] += segment.notifications
+
+            for (appID, duration) in segment.applicationDurations {
+                switch classifications[appID] ?? .neutral {
+                case .productive: productive[hour] += duration
+                case .neutral: neutral[hour] += duration
+                case .unproductive: unproductive[hour] += duration
+                }
+            }
         }
 
         return HourlyActivityState(
@@ -303,7 +318,10 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     hour: $0,
                     usage: usage[$0],
                     unlocks: unlocks[$0],
-                    notifications: notifications[$0]
+                    notifications: notifications[$0],
+                    productive: productive[$0],
+                    neutral: neutral[$0],
+                    unproductive: unproductive[$0]
                 )
             },
             reductionVersusBaseline: reductionVersusBaseline(dayStart: dayStart, totalUsage: totalUsage)

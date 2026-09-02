@@ -67,6 +67,8 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
 
                 firstSegmentDate = min(firstSegmentDate ?? segment.dateInterval.start, segment.dateInterval.start)
                 var applicationDurations: [AppIdentity.ID: TimeInterval] = [:]
+                var segmentPickups = 0
+                var segmentNotifications = 0
 
                 for await category in segment.categories {
                     for await applicationActivity in category.applications {
@@ -88,6 +90,8 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
                             )
                         }
                         applicationDurations[appIdentity.id, default: 0] += applicationActivity.totalActivityDuration
+                        segmentPickups += applicationActivity.numberOfPickups
+                        segmentNotifications += applicationActivity.numberOfNotifications
                         var aggregate = applications[appIdentity.id, default: ScreenTimeApplicationSnapshot(
                             app: appIdentity,
                             totalActivityDuration: 0,
@@ -114,7 +118,9 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
                         totalPickupsWithoutApplicationActivity: segment.totalPickupsWithoutApplicationActivity,
                         longestActivity: segment.longestActivity,
                         firstPickup: segment.firstPickup,
-                        applicationDurations: applicationDurations
+                        applicationDurations: applicationDurations,
+                        pickups: segmentPickups + segment.totalPickupsWithoutApplicationActivity,
+                        notifications: segmentNotifications
                     )
                 )
             }

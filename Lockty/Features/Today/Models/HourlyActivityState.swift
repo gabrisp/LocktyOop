@@ -14,8 +14,41 @@ struct HourlyActivityState: Equatable {
         var usage: TimeInterval
         var unlocks: Int
         var notifications: Int
+        /// The hour's usage split by what the apps in it are called.
+        ///
+        /// Carried per hour rather than derived later because the split only exists in
+        /// the segment: once an hour is a single duration, the question of what that hour
+        /// was spent on has already been thrown away.
+        var productive: TimeInterval
+        var neutral: TimeInterval
+        var unproductive: TimeInterval
 
         var id: Int { hour }
+
+        init(
+            hour: Int,
+            usage: TimeInterval,
+            unlocks: Int,
+            notifications: Int,
+            productive: TimeInterval = 0,
+            neutral: TimeInterval = 0,
+            unproductive: TimeInterval = 0
+        ) {
+            self.hour = hour
+            self.usage = usage
+            self.unlocks = unlocks
+            self.notifications = notifications
+            self.productive = productive
+            self.neutral = neutral
+            self.unproductive = unproductive
+        }
+
+        /// What the three add up to, which is not always the hour's own total: Screen
+        /// Time reports a segment total that can exceed the apps inside it. The bar is
+        /// drawn against this so its pieces always fill it exactly.
+        var classifiedTotal: TimeInterval {
+            productive + neutral + unproductive
+        }
     }
 
     var hours: [Hour]

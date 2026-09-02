@@ -284,7 +284,8 @@ final class AppContainer {
             notificationService: notificationService,
             routineEngine: routineEngine,
             shieldService: shieldService,
-            scheduleCoordinator: routineScheduleCoordinator
+            scheduleCoordinator: routineScheduleCoordinator,
+            toastCenter: toastCenter
         )
 
         return AppContainer(

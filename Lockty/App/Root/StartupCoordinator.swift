@@ -13,6 +13,7 @@ final class StartupCoordinator: ObservableObject {
     private let routineEngine: RoutineEngine
     private let shieldService: ShieldServicing
     private let scheduleCoordinator: RoutineScheduleCoordinator
+    private let toastCenter: LocktyToastCenter
     @Published private var hasStarted = false
 
     init(
@@ -24,7 +25,8 @@ final class StartupCoordinator: ObservableObject {
         notificationService: NotificationServicing,
         routineEngine: RoutineEngine,
         shieldService: ShieldServicing,
-        scheduleCoordinator: RoutineScheduleCoordinator
+        scheduleCoordinator: RoutineScheduleCoordinator,
+        toastCenter: LocktyToastCenter
     ) {
         self.session = session
         self.router = router
@@ -35,6 +37,7 @@ final class StartupCoordinator: ObservableObject {
         self.routineEngine = routineEngine
         self.shieldService = shieldService
         self.scheduleCoordinator = scheduleCoordinator
+        self.toastCenter = toastCenter
     }
 
     func startIfNeeded() async {
@@ -110,22 +113,55 @@ final class StartupCoordinator: ObservableObject {
         _ = await notificationService.requestAuthorization()
     }
 
-    /// Puts the unlock request on screen, on the screen that shows it.
+    /// Puts the unlock request on screen.
     ///
-    /// The shield opens Lockty straight into whatever tab it was left on, and the card
-    /// lives on Today -- so arriving from a blocked app could land on Routines with the
-    /// request nowhere in sight.
+    /// Out of the island rather than as a card on Today. A card only exists on one tab,
+    /// so arriving from a blocked app could land on Routines with the request nowhere in
+    /// sight; the island is above every tab and is where the app already says everything
+    /// else. Tapping it opens the friction flow.
+    ///
+    /// And it is only shown when there is something to ask. If the app cannot be let out
+    /// right now -- no unlocks left, a cooldown still running, a routine that allows none
+    /// at all -- the request is dropped rather than opened into a flow that would refuse
+    /// at the end of it.
     private func present(_ presentedPause: PendingPauseContext?) {
         guard let presentedPause else {
             router.pendingUnlock = nil
             return
         }
 
+        let context = presentedPause.context
+        clearUnlockNotification(for: context.pauseRuleID)
+
+        Task { @MainActor in
+            let availability = await routineEngine.breakAvailability(
+                forApp: context.appID,
+                trigger: .manual,
+                requiresFriction: true
+            )
+
+            guard case .unavailable(let unavailable) = availability else {
+                router.pendingUnlock = context
+                toastCenter.show(.unlockRequested(context: context) { [weak self] in
+                    self?.openUnlockRequest(context)
+                })
+                return
+            }
+
+            // Said, not silently swallowed: the shield was just tapped, and nothing at
+            // all happening reads as the app having failed to open rather than as the
+            // answer being no.
+            router.pendingUnlock = nil
+            toastCenter.show(.unlockRefused(context: context, state: unavailable))
+        }
+    }
+
+    /// Opens the flow the toast was asking about, on the tab that runs it.
+    private func openUnlockRequest(_ context: PauseContext) {
         withAnimation(.smooth(duration: 0.3)) {
             router.select(.today)
-            router.pendingUnlock = presentedPause.context
+            router.pendingUnlock = context
         }
-        clearUnlockNotification(for: presentedPause.context.pauseRuleID)
     }
 
     /// The shield posts a notification alongside opening the app, because it cannot tell
@@ -182,10 +218,7 @@ final class StartupCoordinator: ObservableObject {
         switch event.payload {
         case .pauseRequested(let context):
             guard !pauseAlreadyPresented else { return }
-            withAnimation(.smooth(duration: 0.3)) {
-                router.select(.today)
-                router.pendingUnlock = context
-            }
+            present(PendingPauseContext(context: context, expiresAt: Date().addingTimeInterval(600), idempotencyKey: context.id.uuidString))
         case .routineStartRequested:
             break
         case .settingsRequested:

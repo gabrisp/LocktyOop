@@ -82,24 +82,27 @@ struct LocktyToastOverlay: View {
             let topOffset = 11 + max(safeArea.top - 59, 0)
 
             let expandedWidth = size.width - 20
-            let expandedHeight: CGFloat = hasIsland ? 104 : 84
+            // Taller than a line of text needs, because the one toast that matters is a
+            // question: it carries an app icon, a name, what is being asked and what
+            // tapping it will do. At 104 that last line had nowhere to go.
+            let expandedHeight: CGFloat = hasIsland ? 132 : 112
 
             let scaleX = isExpanded ? 1 : (islandWidth / expandedWidth)
             let scaleY = isExpanded ? 1 : (islandHeight / expandedHeight)
 
-            RoundedRectangle(cornerRadius: isExpanded ? 32 : islandHeight / 2, style: .continuous)
+            RoundedRectangle(cornerRadius: isExpanded ? 38 : islandHeight / 2, style: .continuous)
                 .fill(.black)
                 // A rim in the toast's own colour. Thin, and only while open: it is what
                 // stops a black capsule on a dark screen from having no edge at all.
                 .overlay {
-                    RoundedRectangle(cornerRadius: isExpanded ? 32 : islandHeight / 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: isExpanded ? 38 : islandHeight / 2, style: .continuous)
                         .stroke(accent.opacity(isExpanded ? 0.32 : 0), lineWidth: 1)
                 }
                 // The aura, behind everything and added to what is under it. It follows
                 // the capsule's own shape rather than being a circle behind it, so the
                 // light reads as coming off the toast.
                 .background {
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    RoundedRectangle(cornerRadius: 38, style: .continuous)
                         .fill(accent)
                         .blur(radius: 26)
                         .opacity(isExpanded ? 0.5 : 0)
@@ -126,6 +129,14 @@ struct LocktyToastOverlay: View {
                 }
                 .geometryGroup()
                 .contentShape(.rect)
+                // Answered by tapping it. The toast goes either way: a question that has
+                // been acted on is no longer a question, and the flow it opens is where
+                // the rest of the conversation happens.
+                .onTapGesture {
+                    guard let action = center.current?.action else { return }
+                    center.dismiss()
+                    action()
+                }
                 .gesture(
                     DragGesture().onEnded { value in
                         guard value.translation.height < 0 else { return }
@@ -149,7 +160,7 @@ struct LocktyToastOverlay: View {
         if let toast = center.current {
             HStack(spacing: LocktySpacing.md) {
                 leading(toast.leading)
-                    .frame(width: 46, height: 46)
+                    .frame(width: 54, height: 54)
 
                 VStack(alignment: .leading, spacing: 3) {
                     if hasIsland {
@@ -182,6 +193,19 @@ struct LocktyToastOverlay: View {
                         progressBar(progress)
                             .padding(.top, 5)
                     }
+
+                    // Only a question has one. A report says what happened and needs no
+                    // instruction under it.
+                    if let actionTitle = toast.actionTitle {
+                        HStack(spacing: 4) {
+                            Text(actionTitle)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .font(.system(.footnote, design: .default, weight: .semibold))
+                        .foregroundStyle(toast.accent)
+                        .padding(.top, 3)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, hasIsland ? 12 : 0)
@@ -203,9 +227,9 @@ struct LocktyToastOverlay: View {
         switch leading {
         case .symbol(let name, let tint):
             Image(systemName: name)
-                .font(.system(size: 21, weight: .semibold))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 46, height: 46)
+                .frame(width: 54, height: 54)
                 .background {
                     Circle()
                         .fill(tint.opacity(0.18))

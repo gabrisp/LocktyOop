@@ -3,10 +3,13 @@ import SwiftUI
 
 /// Something the app wants to say, shown out of the Dynamic Island.
 ///
-/// Deliberately not an alert or a banner in the scroll view: these are all reports about
-/// something that just happened elsewhere -- a routine starting, a score moving, an
-/// unlock being granted -- and none of them is a question. They should be seen and then
-/// be gone, without taking the screen away from whatever is on it.
+/// Mostly reports about something that just happened elsewhere -- a routine starting, a
+/// score moving, an unlock being granted -- which should be seen and then be gone,
+/// without taking the screen away from whatever is on it. Deliberately not an alert or a
+/// banner in the scroll view.
+///
+/// One of them is a question: the shield asking to be let past. That one carries an
+/// `action`, stays up longer, and is dismissed by being answered.
 struct LocktyToast: Identifiable, Equatable {
     let id: String
     var leading: Leading
@@ -18,6 +21,14 @@ struct LocktyToast: Identifiable, Equatable {
     var valueSuffix: String?
     /// 0...1. Draws a bar under the message when present.
     var progress: Double?
+    /// What tapping it does, when it is a question rather than a report.
+    ///
+    /// Compared by `id` alone rather than by the closure, which cannot be compared at
+    /// all -- two toasts with the same id are the same toast whatever they were built to
+    /// do.
+    var action: (@MainActor () -> Void)?
+    /// What the tap would do, shown as a hint under the message. Nil for a report.
+    var actionTitle: String?
     /// What the whole toast is tinted by: the icon, its halo, the value and the bar.
     ///
     /// Carried on the toast rather than derived per part, so a toast cannot end up with a
@@ -42,7 +53,9 @@ struct LocktyToast: Identifiable, Equatable {
         valueSuffix: String? = nil,
         progress: Double? = nil,
         accent: Color? = nil,
-        duration: Duration = .seconds(2.6)
+        duration: Duration = .seconds(2.6),
+        action: (@MainActor () -> Void)? = nil,
+        actionTitle: String? = nil
     ) {
         self.id = id
         self.leading = leading
@@ -51,6 +64,8 @@ struct LocktyToast: Identifiable, Equatable {
         self.value = value
         self.valueSuffix = valueSuffix
         self.progress = progress
+        self.action = action
+        self.actionTitle = actionTitle
         // Defaults to the symbol's own colour, which is the one the toast was built
         // around anyway; an app icon has no colour to take, so it falls back to green.
         self.accent = accent ?? {
@@ -58,6 +73,16 @@ struct LocktyToast: Identifiable, Equatable {
             return LocktyColors.productive
         }()
         self.duration = duration
+    }
+
+    // By id, because a closure has no equality. Two toasts sharing an id are the same
+    // toast; the action is what it does, not what it is.
+    static func == (lhs: LocktyToast, rhs: LocktyToast) -> Bool {
+        lhs.id == rhs.id
+            && lhs.title == rhs.title
+            && lhs.message == rhs.message
+            && lhs.value == rhs.value
+            && lhs.progress == rhs.progress
     }
 }
 
@@ -127,6 +152,44 @@ extension LocktyToast {
             message: "It is in Always Allowed and cannot be blocked",
             accent: LocktyColors.error,
             duration: .seconds(3.2)
+        )
+    }
+
+    /// The shield asking to be let past. The one toast that is a question.
+    ///
+    /// Longer on screen than a report, because a report only has to be noticed and this
+    /// has to be answered -- and the answer is a tap on the toast itself.
+    static func unlockRequested(
+        context: PauseContext,
+        action: @escaping @MainActor () -> Void
+    ) -> LocktyToast {
+        LocktyToast(
+            id: "unlock-request-\(context.id.uuidString)",
+            leading: context.applicationToken.map { .appIcon($0) } ?? .symbol("lock.fill", LocktyColors.warning),
+            title: context.displayName,
+            message: "Wants to be unlocked",
+            accent: LocktyColors.warning,
+            duration: .seconds(6),
+            action: action,
+            actionTitle: "Start friction"
+        )
+    }
+
+    /// The same request, refused before it was opened.
+    ///
+    /// Shown rather than swallowed: the shield was just tapped, and nothing happening at
+    /// all reads as the app having failed to open rather than as the answer being no.
+    static func unlockRefused(
+        context: PauseContext,
+        state: BreakUnavailableState
+    ) -> LocktyToast {
+        LocktyToast(
+            id: "unlock-refused-\(context.id.uuidString)",
+            leading: context.applicationToken.map { .appIcon($0) } ?? .symbol("lock.fill", LocktyColors.error),
+            title: state.title,
+            message: state.message,
+            accent: LocktyColors.error,
+            duration: .seconds(3.4)
         )
     }
 

@@ -792,6 +792,22 @@ struct AppFolderCard: View {
     /// out of process -- so this is the midpoint of the two that were tried.
     private let overflowSide: CGFloat = 33
 
+    /// The shape every tile in the grid is cut to: the icons, the "+N" scrim over the
+    /// last of them, and the empty slots.
+    ///
+    /// Rounder than an app icon's own corner, on purpose. The point is not to reproduce
+    /// the icon -- it is to make four pictures drawn by four different designers, at four
+    /// slightly different insets inside their own bounds, read as one grid of four tiles.
+    /// Cutting them all to the same square is what does that, and the scrim then lands on
+    /// exactly the shape it is shading.
+    ///
+    /// The fraction has to be generous. An icon carries its corner at its own full size,
+    /// and cutting it down to 33 keeps the radius while shrinking everything around it,
+    /// so a faithful-looking 0.34 came out squarer than the icons it replaced.
+    private var tileShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: overflowSide * 0.42, style: .continuous)
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -855,6 +871,15 @@ struct AppFolderCard: View {
                     Label(token)
                         .labelStyle(.iconOnly)
                 }
+                // Cut to the same square the scrim uses. FamilyControls draws each icon
+                // out of process at whatever inset it likes inside the bounds it is
+                // given, so four of them side by side were four different sizes with
+                // four different corners -- and the "+N" over the last one could not
+                // help but sit either inside or outside the picture it was shading.
+                .mask {
+                    tileShape
+                        .frame(width: overflowSide, height: overflowSide)
+                }
                 // Sized to the icon, which is smaller than everything around it.
                 //
                 // Neither of the obvious places works. Outside the slot the overlay takes
@@ -872,7 +897,7 @@ struct AppFolderCard: View {
                 .overlay {
                     if index == visible.count - 1, overflow > 0 {
                         ZStack {
-                            RoundedRectangle(cornerRadius: overflowSide * 0.28, style: .continuous)
+                            tileShape
                                 .fill(Color.black.opacity(0.62))
 
                             Text("+\(overflow)")
@@ -905,9 +930,10 @@ struct AppFolderCard: View {
     @ViewBuilder
     private func placeholderDot(stencil: ApplicationToken?) -> some View {
         if stencil == nil {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            tileShape
                 .fill(LocktyColors.ink(0.035))
-                .frame(height: 38)
+                .frame(width: overflowSide, height: overflowSide)
+                .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
         } else {
             // Not run through `slot`: that scales by 1.58 because the real icons are
             // drawn smaller than their cell and need to grow into it. A placeholder has
@@ -916,6 +942,10 @@ struct AppFolderCard: View {
                 stencil: stencil,
                 fill: LocktyColors.ink(0.035)
             )
+            .mask {
+                tileShape
+                    .frame(width: overflowSide, height: overflowSide)
+            }
             .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
         }
     }

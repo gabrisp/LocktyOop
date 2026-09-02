@@ -1598,14 +1598,14 @@ struct RoutineEditorView: View {
     }
 
     private var pauseFlowSummary: String {
-        guard let flow = viewModel.selectedPauseFlow else { return "Sin pausa" }
+        guard let flow = viewModel.selectedPauseFlow else { return "No friction" }
         return flow.steps.count == 1 ? "1 step" : "\(flow.steps.count) steps"
     }
 
     private var breakSummary: String {
         guard viewModel.breaksAllowed else { return "No breaks allowed" }
         let breakCount = if viewModel.maximumBreaks == BreakPolicy.unlimitedBreaks {
-            "Unlimited breaks"
+            "∞ breaks"
         } else if viewModel.maximumBreaks == 1 {
             "1 break"
         } else {
@@ -1793,7 +1793,7 @@ struct RoutineEditorView: View {
                     get: { viewModel.maximumBreaks },
                     set: { viewModel.maximumBreaks = $0 }
                 ),
-                values: [BreakPolicy.unlimitedBreaks] + Array(1...8),
+                values: [BreakPolicy.unlimitedBreaks] + Array(1...10),
                 format: BreakPolicy.label(forMaximumBreaks:),
                 circleSize: 36,
                 valueMinWidth: 84

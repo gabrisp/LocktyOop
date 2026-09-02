@@ -869,7 +869,7 @@ struct RuleEditorView: View {
                         valueText: BreakPolicy.label(forMaximumBreaks: viewModel.maximumBreaks),
                         // Unlimited first, since it is the loosest of them and the list
                         // tightens downwards.
-                        options: [BreakPolicy.unlimitedBreaks] + Array(1...8),
+                        options: [BreakPolicy.unlimitedBreaks] + Array(1...10),
                         format: BreakPolicy.label(forMaximumBreaks:),
                         selection: Binding(
                             get: { viewModel.maximumBreaks },

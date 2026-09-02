@@ -204,7 +204,7 @@ struct DayPickerSheet: View {
                     .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
             .tappable()
             .disabled(isFuture)
             .opacity(isFuture ? 0.25 : 1)

@@ -1211,7 +1211,7 @@ struct RuleEditorView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)

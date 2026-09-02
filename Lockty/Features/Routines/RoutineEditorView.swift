@@ -1893,7 +1893,7 @@ struct RoutineEditorView: View {
                         .padding(.vertical, LocktySpacing.md)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
 
                     if index < viewModel.pauseFlows.count - 1 {
                         Divider()
@@ -2582,7 +2582,7 @@ private struct ScheduleTimeField: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         .tappable()
         .accessibilityLabel(label)
         .locktyMenu(isPresented: $isShowingPicker, arrowEdge: .bottom) {
@@ -2640,7 +2640,7 @@ private struct RoutineColorPickerPopover: View {
                                 )
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.locktyInteractive(shape: Circle()))
                 .tappable()
             }
         }

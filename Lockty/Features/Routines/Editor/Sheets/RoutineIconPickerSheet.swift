@@ -26,7 +26,7 @@ struct RoutineIconPickerSheet: View {
                             )
                             .clipShape(Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.locktyInteractive(shape: Circle()))
                     .tappable()
                 }
             }

@@ -981,7 +981,7 @@ struct UnlockOperationsStepView: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         .disabled(isChecking || !canActivateOperation(at: index))
     }
 

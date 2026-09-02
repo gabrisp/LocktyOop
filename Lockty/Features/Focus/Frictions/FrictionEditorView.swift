@@ -1705,33 +1705,18 @@ private struct EnumPicker<Value: CaseIterable & Identifiable & Hashable & RawRep
         .locktyMenu(isPresented: $isShowingOptions) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(Value.allCases), id: \.id) { option in
-                    Button {
+                    LocktyMenuItem(
+                        title: label(for: option),
+                        isSelected: option == selection
+                    ) {
                         onSelect(option)
                         isShowingOptions = false
-                    } label: {
-                        HStack(spacing: LocktySpacing.md) {
-                            Text(label(for: option))
-                                .font(.system(.subheadline, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.primaryText)
-
-                            Spacer(minLength: 0)
-
-                            if option == selection {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(LocktyColors.productive)
-                            }
-                        }
-                        .padding(.horizontal, LocktySpacing.lg)
-                        .frame(height: 46)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .tappable()
                 }
             }
             .padding(.vertical, LocktySpacing.sm)
-            .frame(width: 200)
+            .padding(.horizontal, LocktySpacing.xs)
+            .frame(width: 210)
         }
     }
 

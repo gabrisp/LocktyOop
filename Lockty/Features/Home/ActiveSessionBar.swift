@@ -42,7 +42,7 @@ struct ActiveSessionBar: View {
             .frame(height: 56)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         .tappable()
         .safeGlass(radius: 28, interactive: true)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))

@@ -235,12 +235,9 @@ private struct LocktyLongPressModifier: ViewModifier {
     @State private var hapticTrigger = 0
     @Environment(\.colorScheme) private var colorScheme
 
-    /// The shape does not fill the row. It sits a little inside it vertically -- so it
-    /// reads as something laid *on* the row rather than as the row's own edge -- and a
-    /// little outside it horizontally, so the words it lights have air around them
-    /// instead of being touched by the corners.
-    private var verticalInset: CGFloat { 4 }
-    private var horizontalOutset: CGFloat { 8 }
+    /// The shape is drawn a little wider than the row on every side, so what it lights
+    /// has air around it rather than being touched by the corners.
+    private var outset: CGFloat { 4 }
 
     @ViewBuilder
     private var heldSurface: some View {
@@ -266,8 +263,7 @@ private struct LocktyLongPressModifier: ViewModifier {
                         )
                         .blendMode(LocktyPressTint.secondaryBlendMode(for: colorScheme))
                 }
-                .padding(.vertical, verticalInset)
-                .padding(.horizontal, -horizontalOutset)
+                .padding(-outset)
                 .allowsHitTesting(false)
                 .animation(.smooth(duration: 0.18), value: isPressed)
         }

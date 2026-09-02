@@ -1,81 +1,143 @@
 import Foundation
 
-/// What the block screen says when it stops you.
+/// Which packs the block screen draws from, and the line the person wrote for themselves.
 ///
-/// The shield is the only part of Lockty most people see on a bad day, and it is the same
-/// three lines every time -- which is exactly when a message stops being read. These are
-/// different things to say at that moment, not different jokes: what it costs, what you
-/// meant to do instead, or nothing at all.
-///
-/// Deliberately not a shop of quote packs. A shield that reads you a celebrity aphorism
-/// is entertainment at the moment you are trying not to be entertained, and it teaches
-/// people to open blocked apps to see what it will say next.
-nonisolated enum ShieldScreenStyle: String, Codable, CaseIterable, Identifiable, Sendable {
-    /// What is running and what you can do about it. The default, and the only one that
-    /// answers "why can I not open this".
-    case plain
-    /// The same, plus what this app has already taken today.
-    case cost
-    /// The same, plus the reason you gave when you set the routine up.
-    case intention
-    /// The name of the app and nothing else. For people who find any message an argument
-    /// worth having.
-    case quiet
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .plain: "Plain"
-        case .cost: "What it costs"
-        case .intention: "Your reason"
-        case .quiet: "Quiet"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .plain:
-            "Says which routine is running and what you can do."
-        case .cost:
-            "Adds how long you have already spent in this app today."
-        case .intention:
-            "Adds the reason you wrote when you set the routine up."
-        case .quiet:
-            "Just the app's name and the buttons. No message at all."
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .plain: "shield.lefthalf.filled"
-        case .cost: "hourglass"
-        case .intention: "quote.opening"
-        case .quiet: "moon"
-        }
-    }
-
-    static let `default` = ShieldScreenStyle.plain
-}
-
-/// The parts of the block screen the person chose, kept together so the extension reads
-/// one value rather than four keys.
+/// A set rather than one choice: several packs on at once is what keeps the shield from
+/// becoming a thing you have read. When more than one is enabled a pack is picked at
+/// random each time the shield is drawn, and then a line from inside it.
 nonisolated struct ShieldScreenPreferences: Codable, Hashable, Sendable {
-    var style: ShieldScreenStyle
-    /// The line the `.intention` style shows. Empty falls back to `.plain`, since a
-    /// blank reason is not a reason.
+    var enabledPackIDs: Set<String>
+    /// The line the "Your reason" pack shows. Empty means that pack has nothing to say
+    /// and is skipped, since a blank reason is not a reason.
     var intention: String
 
-    init(style: ShieldScreenStyle = .default, intention: String = "") {
-        self.style = style
+    init(
+        enabledPackIDs: Set<String> = [ShieldScreenCatalog.defaultPackID],
+        intention: String = ""
+    ) {
+        self.enabledPackIDs = enabledPackIDs
         self.intention = intention
     }
 
     static let `default` = ShieldScreenPreferences()
 
+    // Tolerant on the way in, and on two counts. A file written before packs existed
+    // carries a single `style` string, which maps onto the pack of the same name; one
+    // written before any of this carries neither, and falls back to the default rather
+    // than leaving the shield with nothing to say.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        style = try container.decodeIfPresent(ShieldScreenStyle.self, forKey: .style) ?? .default
         intention = try container.decodeIfPresent(String.self, forKey: .intention) ?? ""
+
+        if let ids = try container.decodeIfPresent(Set<String>.self, forKey: .enabledPackIDs), !ids.isEmpty {
+            enabledPackIDs = ids
+        } else if let legacyStyle = try container.decodeIfPresent(String.self, forKey: .style) {
+            enabledPackIDs = [Self.packID(forLegacyStyle: legacyStyle)]
+        } else {
+            enabledPackIDs = [ShieldScreenCatalog.defaultPackID]
+        }
+    }
+
+    // Written by hand as well, so the legacy `style` key is not carried forward: it is
+    // read once on the way in and never written again.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(enabledPackIDs, forKey: .enabledPackIDs)
+        try container.encode(intention, forKey: .intention)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case enabledPackIDs
+        case intention
+        case style
+    }
+
+    private static func packID(forLegacyStyle style: String) -> String {
+        switch style {
+        case "cost": "cost"
+        case "intention": "intention"
+        case "quiet": "quiet"
+        default: ShieldScreenCatalog.defaultPackID
+        }
+    }
+
+    /// Enabling nothing is not an option the list offers, so the default stands in.
+    var resolvedPackIDs: Set<String> {
+        enabledPackIDs.isEmpty ? [ShieldScreenCatalog.defaultPackID] : enabledPackIDs
+    }
+
+    var isSilent: Bool { resolvedPackIDs.contains("quiet") }
+
+    func isEnabled(_ pack: ShieldScreenPack) -> Bool {
+        resolvedPackIDs.contains(pack.id)
+    }
+
+    /// Turning one on or off, with the two rules the list has.
+    ///
+    /// Quiet is exclusive -- "say nothing" and "say this" cannot both be true -- and the
+    /// last one cannot be turned off, because a shield with no pack has no message and
+    /// the screen would silently become Quiet without saying so.
+    mutating func toggle(_ pack: ShieldScreenPack) {
+        var ids = resolvedPackIDs
+
+        if pack.source == .silence {
+            enabledPackIDs = ids.contains(pack.id) ? [ShieldScreenCatalog.defaultPackID] : [pack.id]
+            return
+        }
+
+        ids.remove("quiet")
+
+        if ids.contains(pack.id) {
+            ids.remove(pack.id)
+            if ids.isEmpty { ids = [ShieldScreenCatalog.defaultPackID] }
+        } else {
+            ids.insert(pack.id)
+        }
+
+        enabledPackIDs = ids
+    }
+
+    /// The line to show, given what the day can supply.
+    ///
+    /// `cost` and `intention` are asked for what they have and dropped when they have
+    /// nothing: a pack that would print "0 min here today" or an empty quotation is worse
+    /// than one that quietly stands aside and lets another speak.
+    func message(cost: String?, randomSource: () -> Double = { Double.random(in: 0..<1) }) -> String? {
+        guard !isSilent else { return nil }
+
+        let trimmedIntention = intention.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidates: [String] = ShieldScreenCatalog.packs
+            .filter { resolvedPackIDs.contains($0.id) }
+            .compactMap { pack in
+                switch pack.source {
+                case .silence:
+                    return nil
+                case .cost:
+                    return cost.map { "\($0) here today." }
+                case .intention:
+                    return trimmedIntention.isEmpty ? nil : "\u{201C}\(trimmedIntention)\u{201D}"
+                case .messages:
+                    guard !pack.messages.isEmpty else { return nil }
+                    let index = min(Int(randomSource() * Double(pack.messages.count)), pack.messages.count - 1)
+                    return pack.messages[index]
+                }
+            }
+
+        guard !candidates.isEmpty else {
+            return ShieldScreenCatalog.pack(id: ShieldScreenCatalog.defaultPackID)?.messages.first
+        }
+
+        let index = min(Int(randomSource() * Double(candidates.count)), candidates.count - 1)
+        return candidates[index]
+    }
+
+    /// What the Settings row says without opening the screen.
+    var summary: String {
+        if isSilent { return "Quiet" }
+        let count = resolvedPackIDs.count
+        guard count > 1 else {
+            return ShieldScreenCatalog.pack(id: resolvedPackIDs.first ?? "")?.title ?? "Default"
+        }
+        return "\(count) packs"
     }
 }

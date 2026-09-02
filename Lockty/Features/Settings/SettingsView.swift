@@ -24,8 +24,8 @@ final class SettingsViewModel: ObservableObject {
     /// Written through on every change rather than on leaving the screen. The shield
     /// extension reads this file whenever a blocked app is opened, which can be before
     /// the person has gone anywhere.
-    func setShieldStyle(_ style: ShieldScreenStyle) {
-        shieldScreen.style = style
+    func toggleShieldPack(_ pack: ShieldScreenPack) {
+        shieldScreen.toggle(pack)
         persistShieldScreen()
     }
 
@@ -43,7 +43,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     /// What the Personalize row says the shield is set to, without opening it.
-    var shieldScreenSummary: String { shieldScreen.style.title }
+    var shieldScreenSummary: String { shieldScreen.summary }
 
     func connectHealth() async {
         guard !isRequestingHealth else { return }

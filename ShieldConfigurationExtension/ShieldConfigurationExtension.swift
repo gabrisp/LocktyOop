@@ -58,6 +58,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         }
 
         let preferences = AppGroupStore().loadShieldScreenPreferences()
+        let packMessage = preferences.message(cost: todaysUsage(of: application))
 
         let subtitle: String
         switch responsible.count {
@@ -80,19 +81,17 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1),
-            icon: UIImage(systemName: preferences.style == .quiet ? "moon.fill" : "lock.fill"),
+            icon: UIImage(systemName: preferences.isSilent ? "moon.fill" : "lock.fill"),
+            // The pack's line is the headline when there is one, with the routine's own
+            // sentence under it. The pack is what you chose to read; the sentence is why
+            // the app will not open, and dropping it would leave someone staring at a
+            // haiku with no idea what to do about it.
             title: ShieldConfiguration.Label(
-                text: preferences.style == .quiet
-                    ? resourceName
-                    : "\(resourceName) was blocked by Lockty",
+                text: packMessage ?? resourceName,
                 color: .white
             ),
             subtitle: ShieldConfiguration.Label(
-                text: message(
-                    base: subtitle,
-                    preferences: preferences,
-                    application: application
-                ),
+                text: packMessage == nil ? subtitle : "\(resourceName) · \(subtitle)",
                 color: UIColor.white.withAlphaComponent(0.68)
             ),
             primaryButtonLabel: offersUnlock
@@ -103,35 +102,6 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 ? ShieldConfiguration.Label(text: "Close", color: UIColor.white.withAlphaComponent(0.85))
                 : nil
         )
-    }
-
-    /// The subtitle, in whichever voice was chosen.
-    ///
-    /// Every style but `.quiet` keeps the base sentence and adds to it: what is running
-    /// and what you can do about it is the one thing the shield has to say, and a style
-    /// that replaced it would leave someone staring at a locked app with no idea why.
-    private func message(
-        base: String,
-        preferences: ShieldScreenPreferences,
-        application: Application?
-    ) -> String {
-        switch preferences.style {
-        case .plain:
-            return base
-
-        case .quiet:
-            return ""
-
-        case .intention:
-            let intention = preferences.intention.trimmingCharacters(in: .whitespacesAndNewlines)
-            // A blank reason is not a reason, so it falls back rather than showing an
-            // empty line where the point of the style was supposed to be.
-            return intention.isEmpty ? base : "\(base)\n\n\u{201C}\(intention)\u{201D}"
-
-        case .cost:
-            guard let spent = todaysUsage(of: application) else { return base }
-            return "\(base)\n\n\(spent) here today."
-        }
     }
 
     /// How long this app has been used today, from the cached report snapshot.

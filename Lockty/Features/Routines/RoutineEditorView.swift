@@ -39,6 +39,9 @@ final class RoutineEditorViewModel: ObservableObject {
     @Published var pauseFlowID: UUID?
     @Published private(set) var pauseFlows: [PauseFlow] = []
     @Published var blockedDomains: [String] = []
+    /// Adult content, purchases, installing apps. Edited on the selection screen with
+    /// everything else this routine shuts.
+    @Published var contentRestrictions: ContentRestrictions = .none
     @Published var pendingDomain = ""
     @Published var errorMessage: String?
     @Published private(set) var selectedApplicationCount = 0
@@ -67,6 +70,7 @@ final class RoutineEditorViewModel: ObservableObject {
         var triggers: [RoutineTrigger]
         var tasks: [EditableRoutineTask]
         var blockedDomains: [String]
+        var contentRestrictions: ContentRestrictions
         var startAlarmEnabled: Bool
         var pauseFlowID: UUID?
         var allowsPauseDuringStrictMode: Bool
@@ -83,6 +87,7 @@ final class RoutineEditorViewModel: ObservableObject {
             triggers: triggers,
             tasks: tasks,
             blockedDomains: blockedDomains,
+            contentRestrictions: contentRestrictions,
             startAlarmEnabled: startAlarmEnabled,
             pauseFlowID: pauseFlowID,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
@@ -287,6 +292,7 @@ final class RoutineEditorViewModel: ObservableObject {
         startAlarmEnabled = routine.startAlarmEnabled
         pauseFlowID = routine.pauseFlowID
         blockedDomains = routine.blockedDomains.sorted()
+        contentRestrictions = routine.contentRestrictions
         if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
             try? selectionStore.save(selection, scope: draftSelectionScope)
         } else {
@@ -483,8 +489,9 @@ final class RoutineEditorViewModel: ObservableObject {
                 || !selection.categoryTokens.isEmpty
                 || !selectedAppGroupIDs.isEmpty
                 || !blockedDomains.isEmpty
+                || !contentRestrictions.isEmpty
         else {
-            errorMessage = "Select at least one app, category, app group, or add at least one domain."
+            errorMessage = "Select at least one app, category, app group, website, or restriction."
             print("Routine editor refused save because no app/domain restrictions were configured")
             return false
         }
@@ -500,6 +507,7 @@ final class RoutineEditorViewModel: ObservableObject {
             appGroupIDs: selectedAppGroupIDs,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             blockedDomains: Set(blockedDomains),
+            contentRestrictions: contentRestrictions,
             tasks: tasks,
             startAlarmEnabled: startAlarmEnabled,
             breakPolicy: breakPolicy,
@@ -603,6 +611,14 @@ struct RoutineAppPickerSheet: View {
                         viewModel.replaceSelection(newValue)
                     }
                 }
+            ),
+            blockedDomains: Binding(
+                get: { viewModel.blockedDomains },
+                set: { viewModel.blockedDomains = $0 }
+            ),
+            contentRestrictions: Binding(
+                get: { viewModel.contentRestrictions },
+                set: { viewModel.contentRestrictions = $0 }
             ),
             rules: .routine,
             suggestions: viewModel.suggestedApplications,
@@ -1425,6 +1441,14 @@ struct RoutineEditorView: View {
                         get: { viewModel.selectedAppGroupIDs },
                         set: { viewModel.selectedAppGroupIDs = $0 }
                     ),
+                    blockedDomains: Binding(
+                        get: { viewModel.blockedDomains },
+                        set: { viewModel.blockedDomains = $0 }
+                    ),
+                    contentRestrictions: Binding(
+                        get: { viewModel.contentRestrictions },
+                        set: { viewModel.contentRestrictions = $0 }
+                    ),
                     rules: .routine,
                     suggestions: viewModel.suggestedApplications,
                     appGroups: viewModel.appGroups,
@@ -1676,7 +1700,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -1709,7 +1733,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -1877,7 +1901,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -2081,7 +2105,7 @@ struct RoutineEditorView: View {
             }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         // The same bloom the preview has. Editing is not a different place, it is the
@@ -2155,7 +2179,7 @@ struct RoutineEditorView: View {
         // and this block used to add a second one, so a routine at rest was inset twice
         // as far as the same routine open for editing.
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(alignment: .top) { routineBloom }

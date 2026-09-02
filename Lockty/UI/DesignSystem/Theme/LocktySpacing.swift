@@ -25,4 +25,12 @@ enum LocktySpacing {
     /// sheet, laid out to different margins. A single number, a hair over the narrower of
     /// the two, since 16 had the hold button running close to the edge.
     static let screenInset: CGFloat = 18
+
+    /// A sheet's bottom margin, given its top one.
+    ///
+    /// Half, always. A sheet is anchored at the bottom of the screen and its content is
+    /// read downwards, so the same number at both ends leaves the foot of it looking
+    /// loose -- there is nothing under the last row but the edge of the sheet, where at
+    /// the top there is a bar to clear.
+    static func sheetBottom(forTop top: CGFloat) -> CGFloat { top / 2 }
 }

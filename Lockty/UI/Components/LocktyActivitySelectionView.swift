@@ -14,16 +14,25 @@ struct LocktyActivitySelectionRules: Hashable {
     var maximumApplications: Int? = nil
     var maximumCategories: Int? = nil
     var maximumWebDomains: Int? = nil
+    /// Whether sites can be typed in as well as picked. Apple's picker only offers
+    /// domains it already knows about, which is most of them and never the one you want.
+    var allowsManualWebsites: Bool = false
+    /// Whether the device-level switches -- adult content, purchases, installing apps --
+    /// belong on this screen. They are a routine's business and nothing else's: a group
+    /// is a list of apps, and a pause is one app.
+    var allowsContentRestrictions: Bool = false
     var pickerSeedStrategy: PickerSeedStrategy = .currentSelection
 
     static let library = LocktyActivitySelectionRules()
     static let routine = LocktyActivitySelectionRules(
         allowsApplications: true,
         allowsCategories: true,
-        allowsWebDomains: false,
+        allowsWebDomains: true,
         maximumApplications: nil,
         maximumCategories: nil,
-        maximumWebDomains: 0,
+        maximumWebDomains: nil,
+        allowsManualWebsites: true,
+        allowsContentRestrictions: true,
         pickerSeedStrategy: .currentSelection
     )
     static let pause = LocktyActivitySelectionRules(
@@ -35,12 +44,16 @@ struct LocktyActivitySelectionRules: Hashable {
         maximumWebDomains: 0,
         pickerSeedStrategy: .empty
     )
+    // A group is a list of apps and nothing else. A category in one would mean the group
+    // silently grew every time Apple filed a new app under it, and every screen that
+    // draws a group draws the apps inside it -- there is no picture of a category to
+    // draw. Anything else picked here is dropped rather than saved.
     static let appGroup = LocktyActivitySelectionRules(
         allowsApplications: true,
-        allowsCategories: true,
+        allowsCategories: false,
         allowsWebDomains: false,
         maximumApplications: nil,
-        maximumCategories: nil,
+        maximumCategories: 0,
         maximumWebDomains: 0,
         pickerSeedStrategy: .currentSelection
     )
@@ -124,6 +137,10 @@ struct LocktyActivitySelectionView: View {
     let addLabel: String
     @Binding var selection: FamilyActivitySelection
     var selectedAppGroupIDs: Binding<Set<UUID>>
+    /// Sites typed in by hand, kept sorted. Separate from the selection's own web tokens:
+    /// those come from Apple's picker and are opaque, these are strings we can show.
+    var blockedDomains: Binding<[String]>
+    var contentRestrictions: Binding<ContentRestrictions>
     let rules: LocktyActivitySelectionRules
     let suggestions: [AppIdentity]
     let appGroups: [LocktySelectableAppGroup]
@@ -134,12 +151,16 @@ struct LocktyActivitySelectionView: View {
     @Namespace private var selectionNamespace
     @State private var isShowingOfficialPicker = false
     @State private var overlay: LocktyFeedbackOverlayState?
+    @State private var pendingDomain = ""
+    @FocusState private var isDomainFieldFocused: Bool
 
     init(
         title: String = "Selected",
         addLabel: String = "Add app or website",
         selection: Binding<FamilyActivitySelection>,
         selectedAppGroupIDs: Binding<Set<UUID>> = .constant([]),
+        blockedDomains: Binding<[String]> = .constant([]),
+        contentRestrictions: Binding<ContentRestrictions> = .constant(.none),
         rules: LocktyActivitySelectionRules,
         suggestions: [AppIdentity] = [],
         appGroups: [LocktySelectableAppGroup] = [],
@@ -151,6 +172,8 @@ struct LocktyActivitySelectionView: View {
         self.addLabel = addLabel
         _selection = selection
         self.selectedAppGroupIDs = selectedAppGroupIDs
+        self.blockedDomains = blockedDomains
+        self.contentRestrictions = contentRestrictions
         self.rules = rules
         self.suggestions = suggestions
         self.appGroups = appGroups
@@ -192,9 +215,20 @@ struct LocktyActivitySelectionView: View {
                             appGroupsSection
                                 .transition(.blurReplace.combined(with: .opacity))
                         }
+
+                        // Last, both of them: everything above is a thing you pick, and
+                        // these two are typed and switched. They are also the least used,
+                        // and a routine is usually finished by the time it gets here.
+                        if rules.allowsContentRestrictions {
+                            contentRestrictionsSection
+                        }
+
+                        if rules.allowsManualWebsites {
+                            websitesSection
+                        }
                     }
                     .padding(.horizontal, LocktySpacing.lg)
-                    .padding(.bottom, LocktySpacing.xxl)
+                    .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.xxl))
                 }
             }
         .sheet(isPresented: $isShowingOfficialPicker) {
@@ -415,6 +449,209 @@ struct LocktyActivitySelectionView: View {
         }
     }
 
+    /// The three switches that are not a list of anything.
+    ///
+    /// They belong on this screen rather than in the routine's own form because they are
+    /// the same question everything else here asks -- what does this routine shut? -- and
+    /// because they are what closes the doors a blocked app leaves open: shielding an app
+    /// achieves little if it can be reinstalled from the App Store a minute later.
+    private var contentRestrictionsSection: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            Text("Other")
+                .font(.system(.headline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            VStack(spacing: 0) {
+                restrictionRow(
+                    systemImage: "eye.slash",
+                    title: "Adult content",
+                    subtitle: "Filters adult websites while this runs.",
+                    isOn: contentRestrictions.blocksAdultWebContent
+                )
+
+                restrictionDivider
+
+                restrictionRow(
+                    systemImage: "creditcard",
+                    title: "Purchases",
+                    subtitle: "Blocks App Store and in-app purchases.",
+                    isOn: contentRestrictions.blocksITunesPurchases
+                )
+
+                restrictionDivider
+
+                restrictionRow(
+                    systemImage: "square.and.arrow.down",
+                    title: "Installing apps",
+                    subtitle: "Stops new apps being installed.",
+                    isOn: contentRestrictions.blocksAppInstallation
+                )
+            }
+            .padding(.horizontal, LocktySpacing.cardInset)
+            .locktyCardBackground(cornerRadius: 26)
+        }
+    }
+
+    private func restrictionRow(
+        systemImage: String,
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(subtitle)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: LocktySpacing.sm)
+
+            LocktySwitch(isOn: isOn)
+        }
+        .padding(.vertical, LocktySpacing.md)
+        .frame(minHeight: 56)
+    }
+
+    private var restrictionDivider: some View {
+        Divider().overlay(LocktyColors.separator.opacity(0.45))
+    }
+
+    /// Sites, typed in.
+    ///
+    /// Apple's picker offers web domains too, but only ones it already has a token for,
+    /// which is never the one you came to block. A field and a button is the whole
+    /// feature; what is worth care is that a domain you have already added, or one that
+    /// is not a domain at all, says so instead of quietly doing nothing.
+    private var websitesSection: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            Text("Websites")
+                .font(.system(.headline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.primaryText)
+
+            HStack(spacing: LocktySpacing.sm) {
+                TextField("google.com", text: $pendingDomain)
+                    .focused($isDomainFieldFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .submitLabel(.done)
+                    .onSubmit(addPendingDomain)
+                    .font(.system(.body, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .padding(.horizontal, LocktySpacing.cardInset)
+                    .frame(height: 52)
+                    .locktyCardBackground(cornerRadius: 26)
+
+                Button(action: addPendingDomain) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(canAddPendingDomain ? LocktyColors.primaryText : LocktyColors.secondaryText)
+                        .frame(width: 52, height: 52)
+                        .locktyCardBackground(cornerRadius: 26)
+                }
+                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 26, style: .continuous)))
+                .disabled(!canAddPendingDomain)
+            }
+
+            if !blockedDomains.wrappedValue.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(blockedDomains.wrappedValue.enumerated()), id: \.element) { index, domain in
+                        if index > 0 { restrictionDivider }
+
+                        HStack(spacing: LocktySpacing.md) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(LocktyColors.secondaryText)
+
+                            Text(domain)
+                                .font(.system(.subheadline, design: .default, weight: .regular))
+                                .foregroundStyle(LocktyColors.primaryText)
+                                .lineLimit(1)
+
+                            Spacer(minLength: LocktySpacing.sm)
+
+                            Button {
+                                withAnimation(.smooth(duration: 0.24)) {
+                                    blockedDomains.wrappedValue.removeAll { $0 == domain }
+                                }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(LocktyColors.secondaryText)
+                                    .frame(width: 28, height: 28)
+                            }
+                            .buttonStyle(.locktyRow)
+                        }
+                        .frame(minHeight: 52)
+                    }
+                }
+                .padding(.horizontal, LocktySpacing.cardInset)
+                .locktyCardBackground(cornerRadius: 26)
+                .transition(.blurReplace.combined(with: .opacity))
+            }
+        }
+        .animation(.smooth(duration: 0.28), value: blockedDomains.wrappedValue)
+    }
+
+    private var canAddPendingDomain: Bool {
+        normalizedPendingDomain != nil
+    }
+
+    /// What the field would add, or nil if it is not a domain.
+    ///
+    /// Lenient about what people actually type -- a pasted URL keeps its scheme and its
+    /// trailing slash -- and strict about the result, since a string with a space in it
+    /// would sit in the list forever blocking nothing.
+    private var normalizedPendingDomain: String? {
+        let trimmed = pendingDomain
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        guard !trimmed.isEmpty, trimmed.contains("."), !trimmed.contains(" ") else { return nil }
+        return trimmed
+    }
+
+    private func addPendingDomain() {
+        guard let domain = normalizedPendingDomain else {
+            showOverlay(message: "Type an address like google.com.")
+            return
+        }
+
+        guard !blockedDomains.wrappedValue.contains(domain) else {
+            pendingDomain = ""
+            toastCenter.show(
+                LocktyToast(
+                    leading: .symbol("globe", LocktyColors.warning),
+                    title: domain,
+                    message: "Already on the list",
+                    accent: LocktyColors.warning
+                )
+            )
+            return
+        }
+
+        withAnimation(.smooth(duration: 0.28)) {
+            blockedDomains.wrappedValue.append(domain)
+            blockedDomains.wrappedValue.sort()
+        }
+        pendingDomain = ""
+        isDomainFieldFocused = false
+    }
+
     private var visibleSuggestions: [AppIdentity] {
         var seen = Set<AppIdentity.ID>()
         return suggestions.filter { suggestion in
@@ -524,7 +761,7 @@ struct LocktyReadOnlyActivitySelectionView: View {
                     }
                 }
                 .padding(.horizontal, LocktySpacing.lg)
-                .padding(.bottom, LocktySpacing.xxl)
+                .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.xxl))
             }
         }
     }

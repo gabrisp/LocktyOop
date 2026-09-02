@@ -21,6 +21,8 @@ struct Routine: Codable, Hashable, Identifiable {
     var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
+    /// The device-level switches this routine throws while it runs.
+    var contentRestrictions: ContentRestrictions
     var tasks: [RoutineTask]
     var startAlarmEnabled: Bool
     var breakPolicy: BreakPolicy
@@ -44,6 +46,7 @@ struct Routine: Codable, Hashable, Identifiable {
         appGroupIDs: Set<UUID> = [],
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
+        contentRestrictions: ContentRestrictions = .none,
         tasks: [RoutineTask],
         startAlarmEnabled: Bool = false,
         breakPolicy: BreakPolicy,
@@ -62,6 +65,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.appGroupIDs = appGroupIDs
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
+        self.contentRestrictions = contentRestrictions
         self.tasks = tasks
         self.startAlarmEnabled = startAlarmEnabled
         self.breakPolicy = breakPolicy
@@ -70,6 +74,31 @@ struct Routine: Codable, Hashable, Identifiable {
         self.allowsPauseDuringStrictMode = allowsPauseDuringStrictMode
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    // Written by hand for one key: routines saved before `contentRestrictions` existed
+    // have no entry for it, and the synthesized decoder throws `keyNotFound` on every
+    // one of them -- which reads as the routine library having emptied itself.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        color = try container.decode(RoutineColor.self, forKey: .color)
+        mode = try container.decode(RoutineMode.self, forKey: .mode)
+        triggers = try container.decode([RoutineTrigger].self, forKey: .triggers)
+        appGroupIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .appGroupIDs) ?? []
+        blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
+        blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
+        contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
+        tasks = try container.decode([RoutineTask].self, forKey: .tasks)
+        startAlarmEnabled = try container.decodeIfPresent(Bool.self, forKey: .startAlarmEnabled) ?? false
+        breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
+        pauseFlowID = try container.decodeIfPresent(UUID.self, forKey: .pauseFlowID)
+        pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off
+        allowsPauseDuringStrictMode = try container.decodeIfPresent(Bool.self, forKey: .allowsPauseDuringStrictMode) ?? true
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 
     var frictionID: UUID? {

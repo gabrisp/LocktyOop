@@ -13,19 +13,23 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     /// category). The shield service needs to know which app to subtract, and which
     /// token to pass as the category exception, so it travels with the policy.
     var exemptApplications: Set<AppIdentity.ID>
+    /// The device-level switches the routines behind this policy asked for.
+    var contentRestrictions: ContentRestrictions
 
     init(
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
         reason: ShieldReason,
         selectionScopes: Set<ScreenTimeSelectionScope> = [],
-        exemptApplications: Set<AppIdentity.ID> = []
+        exemptApplications: Set<AppIdentity.ID> = [],
+        contentRestrictions: ContentRestrictions = .none
     ) {
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
         self.reason = reason
         self.selectionScopes = selectionScopes
         self.exemptApplications = exemptApplications
+        self.contentRestrictions = contentRestrictions
     }
 
     // Written by hand so a runtime state persisted before exemptApplications existed
@@ -37,6 +41,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         reason = try container.decode(ShieldReason.self, forKey: .reason)
         selectionScopes = try container.decodeIfPresent(Set<ScreenTimeSelectionScope>.self, forKey: .selectionScopes) ?? []
         exemptApplications = try container.decodeIfPresent(Set<AppIdentity.ID>.self, forKey: .exemptApplications) ?? []
+        contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
     }
 
     /// Whether this policy shields anything at all.
@@ -45,8 +50,11 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     /// carries that app in `exemptApplications`, so it is never equal to `.empty` even
     /// when it blocks nothing -- and comparing against `.empty` sent the last unlock
     /// down the apply path, where an empty selection throws and the shield stayed up.
+    /// A policy can block no app and still restrict something: a routine that only shuts
+    /// the App Store has no apps and no domains, and calling that "nothing" left it never
+    /// applied.
     var blocksNothing: Bool {
-        blockedApplications.isEmpty && blockedDomains.isEmpty
+        blockedApplications.isEmpty && blockedDomains.isEmpty && contentRestrictions.isEmpty
     }
 
     static let empty = ShieldPolicy(
@@ -61,7 +69,8 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
             blockedApplications: routine.blockedApplications,
             blockedDomains: routine.blockedDomains,
             reason: .routine(routine.id),
-            selectionScopes: selectionScopes
+            selectionScopes: selectionScopes,
+            contentRestrictions: routine.contentRestrictions
         )
     }
 }

@@ -39,7 +39,8 @@ final class LiveShieldService: ShieldServicing {
     func apply(_ policy: ShieldPolicy) async throws {
         var selection = try selectionStore.selection(for: policy)
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
-        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty else {
+        let restrictions = policy.contentRestrictions
+        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty || !restrictions.isEmpty else {
             print("Shield apply failed because no selection matched policy reason=\(String(describing: policy.reason)) blockedApps=\(policy.blockedApplications.count) blockedDomains=\(policy.blockedDomains.count)")
             throw ShieldServiceError.selectionNotConfigured
         }
@@ -66,7 +67,19 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty
             ? nil
             : .specific(selection.categoryTokens, except: exemptTokens)
-        managedSettingsStore.webContent.blockedByFilter = blockedDomains.isEmpty ? nil : .specific(blockedDomains)
+        // `.specific` is an *allow* list: `.specific(blockedDomains)` said "let this
+        // routine's blocked sites through and nothing else", so adding one domain to a
+        // routine shut off the entire web. `.auto(_:)` is the one that takes a set of
+        // domains to block. It also switches on Apple's adult-content filter, which is
+        // why the two travel together here -- iOS has no way to block named sites without
+        // it, so a routine with sites listed gets the filter whether or not it asked.
+        managedSettingsStore.webContent.blockedByFilter = webContentFilter(
+            blocking: blockedDomains,
+            restrictions: restrictions
+        )
+        managedSettingsStore.appStore.denyInAppPurchases = restrictions.blocksITunesPurchases ? true : nil
+        managedSettingsStore.appStore.requirePasswordForPurchases = restrictions.blocksITunesPurchases ? true : nil
+        managedSettingsStore.application.denyAppInstallation = restrictions.blocksAppInstallation ? true : nil
         try appGroupStore.updateRuntimeState { state in state.shieldPolicy = policy }
     }
 
@@ -76,6 +89,9 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.shield.webDomains = nil
         managedSettingsStore.shield.applicationCategories = nil
         managedSettingsStore.webContent.blockedByFilter = nil
+        managedSettingsStore.appStore.denyInAppPurchases = nil
+        managedSettingsStore.appStore.requirePasswordForPurchases = nil
+        managedSettingsStore.application.denyAppInstallation = nil
         try appGroupStore.updateRuntimeState { state in
             if state.shieldPolicy == policy { state.shieldPolicy = .empty }
         }
@@ -91,7 +107,22 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.shield.webDomains = nil
         managedSettingsStore.shield.applicationCategories = nil
         managedSettingsStore.webContent.blockedByFilter = nil
+        managedSettingsStore.appStore.denyInAppPurchases = nil
+        managedSettingsStore.appStore.requirePasswordForPurchases = nil
+        managedSettingsStore.application.denyAppInstallation = nil
         try appGroupStore.saveRuntimeState(.empty)
         print("Cleared all ManagedSettings restrictions and reset runtime state.")
+    }
+
+    /// The web filter for a policy, or nil when it wants nothing filtered.
+    ///
+    /// `.auto` carries both jobs: its argument is the set of sites to block, and turning
+    /// it on at all is what enables the automatic adult-content filter.
+    private func webContentFilter(
+        blocking domains: Set<ManagedSettings.WebDomain>,
+        restrictions: ContentRestrictions
+    ) -> ManagedSettings.WebContentSettings.FilterPolicy? {
+        guard !domains.isEmpty || restrictions.blocksAdultWebContent else { return nil }
+        return .auto(domains)
     }
 }

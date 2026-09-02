@@ -757,7 +757,7 @@ struct RuleEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -913,7 +913,7 @@ struct RuleEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
-        .padding(.bottom, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
     }

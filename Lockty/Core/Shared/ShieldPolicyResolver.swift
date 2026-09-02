@@ -23,6 +23,7 @@ struct ShieldPolicyResolver {
     ) -> ShieldPolicy {
         var blockedApplications = Set<AppIdentity.ID>()
         var blockedDomains = Set<String>()
+        var contentRestrictions = ContentRestrictions.none
         var reasons: [ShieldReason] = []
         var selectionScopes = Set<ScreenTimeSelectionScope>()
 
@@ -31,6 +32,7 @@ struct ShieldPolicyResolver {
         for activeRoutine in activeRoutines where !routineIDsOnBreak.contains(activeRoutine.routineID) {
             blockedApplications.formUnion(activeRoutine.shieldPolicy.blockedApplications)
             blockedDomains.formUnion(activeRoutine.shieldPolicy.blockedDomains)
+            contentRestrictions = contentRestrictions.union(activeRoutine.shieldPolicy.contentRestrictions)
             reasons.append(activeRoutine.shieldPolicy.reason)
             selectionScopes.formUnion(activeRoutine.shieldPolicy.selectionScopes)
         }
@@ -91,7 +93,8 @@ struct ShieldPolicyResolver {
             blockedDomains: blockedDomains,
             reason: reason,
             selectionScopes: selectionScopes,
-            exemptApplications: exemptApplications
+            exemptApplications: exemptApplications,
+            contentRestrictions: contentRestrictions
         )
     }
 }

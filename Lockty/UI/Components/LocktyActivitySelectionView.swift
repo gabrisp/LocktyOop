@@ -334,7 +334,7 @@ struct LocktyActivitySelectionView: View {
             // on this list.
             Group {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: LocktySpacing.lg) {
+                    HStack(spacing: LocktySpacing.xs) {
                         ForEach(visibleSuggestions, id: \.id) { suggestion in
                             if let token = suggestion.applicationToken {
                                 Button {
@@ -385,32 +385,32 @@ struct LocktyActivitySelectionView: View {
             // The same folders they are on the Focus tab, in a grid. A group is a
             // picture of the apps inside it, and a list of names with a checkbox on the
             // end threw all of that away and looked like a settings screen.
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: LocktySpacing.md),
-                    GridItem(.flexible(), spacing: LocktySpacing.md)
-                ],
-                spacing: LocktySpacing.lg
-            ) {
-                ForEach(appGroups) { group in
-                    let isSelected = selectedAppGroupIDs.wrappedValue.contains(group.id)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: LocktySpacing.sm) {
+                    ForEach(appGroups) { group in
+                        let isSelected = selectedAppGroupIDs.wrappedValue.contains(group.id)
 
-                    Button {
-                        toggleAppGroup(group.id)
-                    } label: {
-                        AppFolderCard(
-                            title: group.name,
-                            subtitle: group.itemCount == 1 ? "1 item" : "\(group.itemCount) items",
-                            tokens: group.tokens,
-                            // Selected is a border and nothing else -- no tick laid over
-                            // the folder, which would cover the very apps it is showing.
-                            isSelected: isSelected
-                        )
+                        Button {
+                            toggleAppGroup(group.id)
+                        } label: {
+                            AppFolderCard(
+                                title: group.name,
+                                subtitle: group.itemCount == 1 ? "1 item" : "\(group.itemCount) items",
+                                tokens: group.tokens,
+                                // Selected is a border and nothing else -- no tick laid
+                                // over the folder, which would cover the very apps it is
+                                // showing.
+                                isSelected: isSelected
+                            )
+                        }
+                        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
+                        .tappable()
                     }
-                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
-                    .tappable()
                 }
+                .padding(.horizontal, LocktySpacing.xs)
+                .padding(.vertical, 2)
             }
+            .scrollClipDisabled()
             .animation(.smooth(duration: 0.28), value: selectedAppGroupIDs.wrappedValue)
         }
     }

@@ -782,6 +782,11 @@ struct AppFolderCard: View {
 
     private let folderSide: CGFloat = 110
     private let iconScale: CGFloat = 1.58
+    /// How much of its 38pt cell an app icon actually covers, and so how wide the "+N"
+    /// scrim over the last one has to be. Not the cell: an icon is drawn inside its own
+    /// bounds with room to spare, and a scrim cut to the cell reads as a tile laid next
+    /// to the icons rather than as a shade over one of them.
+    private let overflowSide: CGFloat = 28
 
     var body: some View {
         VStack(spacing: 6) {
@@ -846,7 +851,7 @@ struct AppFolderCard: View {
                     Label(token)
                         .labelStyle(.iconOnly)
                 }
-                // Sized to the cell, not to the label.
+                // Sized to the icon, which is smaller than everything around it.
                 //
                 // Neither of the obvious places works. Outside the slot the overlay takes
                 // the slot's frame, which is maxWidth: .infinity -- the whole column.
@@ -857,19 +862,20 @@ struct AppFolderCard: View {
                 // renders that label out of process, so it is no more usable as a mask
                 // than it is as a measurement.
                 //
-                // The one number that is actually known is the cell: 38pt, square, which
-                // is what the scaling exists to make the icon fill.
+                // So it is a number, and the cell's 38 was the wrong one: that is the
+                // room the icon is given, not the room it fills. `overflowSide` is what
+                // the picture actually covers.
                 .overlay {
                     if index == visible.count - 1, overflow > 0 {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            RoundedRectangle(cornerRadius: overflowSide * 0.28, style: .continuous)
                                 .fill(Color.black.opacity(0.62))
 
                             Text("+\(overflow)")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
-                        .frame(width: 38, height: 38)
+                        .frame(width: overflowSide, height: overflowSide)
                     }
                 }
             }

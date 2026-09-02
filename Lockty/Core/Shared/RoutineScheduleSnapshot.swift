@@ -11,6 +11,10 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
+    /// Carried too, or a routine that starts on its schedule shuts the apps it was told
+    /// to and leaves the App Store open -- the same routine, enforcing less because
+    /// nobody was there to press start.
+    var contentRestrictions: ContentRestrictions
     var breakPolicy: BreakPolicy
     var pausePolicy: RoutinePausePolicy
     var allowsPauseDuringStrictMode: Bool
@@ -24,6 +28,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         appGroupIDs = routine.appGroupIDs
         blockedApplications = routine.blockedApplications
         blockedDomains = routine.blockedDomains
+        contentRestrictions = routine.contentRestrictions
         breakPolicy = routine.breakPolicy
         pausePolicy = routine.pausePolicy
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
@@ -41,6 +46,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         appGroupIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .appGroupIDs) ?? []
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
+        contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
         pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off
         allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
@@ -61,7 +67,8 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
                 blockedApplications: blockedApplications,
                 blockedDomains: blockedDomains,
                 reason: .routine(id),
-                selectionScopes: selectionScopes
+                selectionScopes: selectionScopes,
+                contentRestrictions: contentRestrictions
             ),
             breakPolicySnapshot: breakPolicy,
             pausePolicySnapshot: pausePolicy,

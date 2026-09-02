@@ -28,6 +28,13 @@ nonisolated struct ContentRestrictions: Codable, Hashable, Sendable {
 
     static let none = ContentRestrictions()
 
+    /// How many of the three are on, for the places that count what a routine shuts.
+    var enabledCount: Int {
+        [blocksAdultWebContent, blocksITunesPurchases, blocksAppInstallation]
+            .filter { $0 }
+            .count
+    }
+
     var isEmpty: Bool {
         !blocksAdultWebContent && !blocksITunesPurchases && !blocksAppInstallation
     }

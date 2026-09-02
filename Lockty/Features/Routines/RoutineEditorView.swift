@@ -1604,7 +1604,13 @@ struct RoutineEditorView: View {
 
     private var breakSummary: String {
         guard viewModel.breaksAllowed else { return "No breaks allowed" }
-        let breakCount = viewModel.maximumBreaks == 1 ? "1 break" : "\(viewModel.maximumBreaks) breaks"
+        let breakCount = if viewModel.maximumBreaks == BreakPolicy.unlimitedBreaks {
+            "Unlimited breaks"
+        } else if viewModel.maximumBreaks == 1 {
+            "1 break"
+        } else {
+            "\(viewModel.maximumBreaks) breaks"
+        }
         let duration = "\(viewModel.maximumBreakMinutes)m"
         let friction = viewModel.selectedPauseFlow.map { $0.steps.count == 1 ? "1 step" : "\($0.steps.count) steps" } ?? "No friction"
         return "\(breakCount) · \(duration) · \(friction)"
@@ -1779,40 +1785,55 @@ struct RoutineEditorView: View {
 
     private var breakDetailsCard: some View {
         VStack(spacing: 0) {
-            breakStepperRow(
+            // Unlimited sits below one, not above eight: it is fewer restrictions than a
+            // count of one, so stepping down past the last break is what reaches it.
+            LocktyCountRow(
                 title: "Max breaks",
-                valueText: "\(viewModel.maximumBreaks)",
-                decrementDisabled: viewModel.maximumBreaks <= 1,
-                incrementDisabled: viewModel.maximumBreaks >= 8,
-                onDecrement: { viewModel.maximumBreaks = max(viewModel.maximumBreaks - 1, 1) },
-                onIncrement: { viewModel.maximumBreaks = min(viewModel.maximumBreaks + 1, 8) }
+                value: Binding(
+                    get: { viewModel.maximumBreaks },
+                    set: { viewModel.maximumBreaks = $0 }
+                ),
+                values: [BreakPolicy.unlimitedBreaks] + Array(1...8),
+                format: BreakPolicy.label(forMaximumBreaks:),
+                circleSize: 36,
+                valueMinWidth: 84
             )
+            .padding(.horizontal, LocktySpacing.md)
 
             Divider()
                 .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 16)
 
-            breakStepperRow(
+            LocktyCountRow(
                 title: "Break duration",
-                valueText: "\(viewModel.maximumBreakMinutes) min",
-                decrementDisabled: viewModel.maximumBreakMinutes <= 1,
-                incrementDisabled: viewModel.maximumBreakMinutes >= 15,
-                onDecrement: { viewModel.maximumBreakMinutes = max(viewModel.maximumBreakMinutes - 1, 1) },
-                onIncrement: { viewModel.maximumBreakMinutes = min(viewModel.maximumBreakMinutes + 1, 15) }
+                value: Binding(
+                    get: { viewModel.maximumBreakMinutes },
+                    set: { viewModel.maximumBreakMinutes = $0 }
+                ),
+                range: 1...15,
+                suffix: "min",
+                circleSize: 36,
+                valueMinWidth: 84
             )
+            .padding(.horizontal, LocktySpacing.md)
 
             Divider()
                 .overlay(LocktyColors.ink(0.10))
                 .padding(.leading, 16)
 
-            breakStepperRow(
+            LocktyCountRow(
                 title: "Cooldown",
-                valueText: "\(viewModel.minimumBreakIntervalMinutes) min",
-                decrementDisabled: viewModel.minimumBreakIntervalMinutes <= 5,
-                incrementDisabled: viewModel.minimumBreakIntervalMinutes >= 180,
-                onDecrement: { viewModel.minimumBreakIntervalMinutes = max(viewModel.minimumBreakIntervalMinutes - 5, 5) },
-                onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 180) }
+                value: Binding(
+                    get: { viewModel.minimumBreakIntervalMinutes },
+                    set: { viewModel.minimumBreakIntervalMinutes = $0 }
+                ),
+                range: 5...180,
+                step: 5,
+                suffix: "min",
+                circleSize: 36,
+                valueMinWidth: 84
             )
+            .padding(.horizontal, LocktySpacing.md)
         }
         .locktyCardBackground(cornerRadius: cardRadius)
     }
@@ -1928,66 +1949,6 @@ struct RoutineEditorView: View {
         .locktyCardBackground(cornerRadius: cardRadius)
     }
 
-    private func breakStepperRow(
-        title: String,
-        valueText: String,
-        decrementDisabled: Bool,
-        incrementDisabled: Bool,
-        onDecrement: @escaping () -> Void,
-        onIncrement: @escaping () -> Void
-    ) -> some View {
-        HStack(spacing: LocktySpacing.md) {
-            Text(title)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.primaryText)
-
-            Spacer(minLength: 0)
-
-            Button(action: onDecrement) {
-                ZStack {
-                    Circle()
-                        .fill(LocktyColors.primaryText)
-
-                    Image(systemName: "minus")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(LocktyColors.onPrimary)
-                }
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-            }
-            .buttonStyle(.locktyInteractive(shape: Circle()))
-            .tappable()
-            .disabled(decrementDisabled)
-            .opacity(decrementDisabled ? 0.35 : 1)
-
-            Text(valueText)
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
-                .monospacedDigit()
-                .locktyNumericTransition(trigger: valueText)
-                .frame(minWidth: 84)
-                .multilineTextAlignment(.center)
-
-            Button(action: onIncrement) {
-                ZStack {
-                    Circle()
-                        .fill(LocktyColors.primaryText)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(LocktyColors.onPrimary)
-                }
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-            }
-            .buttonStyle(.locktyInteractive(shape: Circle()))
-            .tappable()
-            .disabled(incrementDisabled)
-            .opacity(incrementDisabled ? 0.35 : 1)
-        }
-        .padding(.horizontal, LocktySpacing.md)
-        .padding(.vertical, LocktySpacing.md)
-    }
 
     private var strictRow: some View {
         HStack(spacing: LocktySpacing.md) {
@@ -2137,6 +2098,7 @@ struct RoutineEditorView: View {
             RoutinePreviewContent(
                 viewModel: viewModel,
                 applicationTokens: previewTokens,
+                onEdit: { enterEditingFlow() },
                 activeSince: activeRoutineStartedAt,
                 nextStart: viewModel.nextScheduledStart
             )
@@ -2608,6 +2570,29 @@ enum RestrictionSummary {
         if apps > 0 { parts.append(apps == 1 ? "1 App" : "\(apps) Apps") }
         if categories > 0 { parts.append(categories == 1 ? "1 Category" : "\(categories) Categories") }
         if groups > 0 { parts.append(groups == 1 ? "1 Group" : "\(groups) Groups") }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Everything a routine shuts, counted: "2 Apps · 1 Domain · 2 Extras".
+    ///
+    /// The stack of icons beside it only ever shows apps, and only the first few of
+    /// those, so on its own it says nothing about the sites and the switches -- a routine
+    /// could be blocking the App Store and the whole adult web and look, from here,
+    /// exactly like one blocking two apps.
+    static func everything(
+        apps: Int,
+        categories: Int,
+        groups: Int,
+        domains: Int,
+        extras: Int
+    ) -> String? {
+        var parts: [String] = []
+        if apps > 0 { parts.append(apps == 1 ? "1 App" : "\(apps) Apps") }
+        if categories > 0 { parts.append(categories == 1 ? "1 Category" : "\(categories) Categories") }
+        if groups > 0 { parts.append(groups == 1 ? "1 Group" : "\(groups) Groups") }
+        if domains > 0 { parts.append(domains == 1 ? "1 Domain" : "\(domains) Domains") }
+        if extras > 0 { parts.append(extras == 1 ? "1 Extra" : "\(extras) Extras") }
         guard !parts.isEmpty else { return nil }
         return parts.joined(separator: " · ")
     }

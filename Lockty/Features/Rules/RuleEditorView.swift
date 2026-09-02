@@ -523,6 +523,7 @@ struct RuleEditorView: View {
     /// The summary, wearing the same bar the form does.
     private var readOnlyScaffold: some View {
         RulePreviewContent(
+            onEdit: { enterEditingFlow() },
             viewModel: viewModel,
             applicationTokens: previewTokens
         )
@@ -865,9 +866,11 @@ struct RuleEditorView: View {
                 VStack(spacing: 0) {
                     menuRow(
                         title: "Max breaks",
-                        valueText: "\(viewModel.maximumBreaks)",
-                        options: Array(1...8),
-                        format: { "\($0)" },
+                        valueText: BreakPolicy.label(forMaximumBreaks: viewModel.maximumBreaks),
+                        // Unlimited first, since it is the loosest of them and the list
+                        // tightens downwards.
+                        options: [BreakPolicy.unlimitedBreaks] + Array(1...8),
+                        format: BreakPolicy.label(forMaximumBreaks:),
                         selection: Binding(
                             get: { viewModel.maximumBreaks },
                             set: { viewModel.maximumBreaks = $0 }

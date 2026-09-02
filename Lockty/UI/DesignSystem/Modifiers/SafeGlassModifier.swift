@@ -36,8 +36,17 @@ struct SafeGlassModifier: ViewModifier {
                 }
             }
         } else {
+            // The tint is honoured here too. It used to be dropped on this path, so a
+            // control that reads as tinted glass on 26 came out as plain frosted grey on
+            // 18 -- and anything drawn in `onPrimary`, which expects to sit on the tint,
+            // became almost invisible.
             content
-                .background(.ultraThinMaterial, in: shape)
+                .background {
+                    shape.fill(.ultraThinMaterial)
+                    if let tint {
+                        shape.fill(tint.opacity(0.85))
+                    }
+                }
                 .overlay {
                     shape.stroke(LocktyColors.cardStroke, lineWidth: 1)
                 }

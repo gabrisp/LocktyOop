@@ -200,3 +200,68 @@ extension View {
         )
     }
 }
+
+/// A long press that lights and shrinks what is under it, and then acts.
+///
+/// The same surface a button gets, on something that is not a button. Reading a routine
+/// is not a screen of controls -- there is nothing to tap -- but holding a part of it and
+/// having it answer is the plainest way into editing that part, and it cannot be reached
+/// by accident the way a tap target can.
+private struct LocktyLongPressModifier<S: Shape>: ViewModifier {
+    let shape: S
+    let minimumDuration: Double
+    let action: () -> Void
+
+    @State private var isPressed = false
+    @State private var hapticTrigger = 0
+
+    func body(content: Content) -> some View {
+        content
+            .locktyInteractiveSurface(shape: shape)
+            .environment(\.locktySurfacePressed, isPressed)
+            .contentShape(shape)
+            .onLongPressGesture(minimumDuration: minimumDuration) {
+                hapticTrigger += 1
+                action()
+            } onPressingChanged: { pressing in
+                withAnimation(.smooth(duration: 0.18)) { isPressed = pressing }
+            }
+            // Impact on the way in and success when it fires, so the hold has an end you
+            // can feel rather than one you have to watch for.
+            .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, new in new }
+            .sensoryFeedback(.success, trigger: hapticTrigger)
+    }
+}
+
+extension View {
+    func locktyLongPress<S: Shape>(
+        shape: S,
+        minimumDuration: Double = 0.35,
+        action: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            LocktyLongPressModifier(
+                shape: shape,
+                minimumDuration: minimumDuration,
+                action: action
+            )
+        )
+    }
+}
+
+
+extension View {
+    /// Holding a summary card opens the editor for what it summarises.
+    ///
+    /// A no-op when there is nothing to open, so a preview shown somewhere that cannot
+    /// edit -- a routine that is running, a friction being read from a rule -- neither
+    /// lights up nor pretends it will do something.
+    @ViewBuilder
+    func locktyEditOnLongPress(_ action: (() -> Void)?) -> some View {
+        if let action {
+            locktyLongPress(shape: RoundedRectangle(cornerRadius: 26, style: .continuous), action: action)
+        } else {
+            self
+        }
+    }
+}

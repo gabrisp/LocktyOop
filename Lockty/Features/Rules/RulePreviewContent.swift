@@ -9,6 +9,7 @@ import SwiftUI
 /// rule dropped you into its form, so the three kinds of rule read as three unrelated
 /// screens when only one of them is really different.
 struct RulePreviewContent: View {
+    var onEdit: (() -> Void)?
     @ObservedObject var viewModel: RuleEditorViewModel
     let applicationTokens: [ApplicationToken]
 
@@ -94,6 +95,7 @@ struct RulePreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
+        .locktyEditOnLongPress(onEdit)
     }
 
     /// Named after what it counts rather than after the rule, so the row reads as a

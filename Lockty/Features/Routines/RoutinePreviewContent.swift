@@ -12,6 +12,10 @@ import SwiftUI
 struct RoutinePreviewContent: View {
     @ObservedObject var viewModel: RoutineEditorViewModel
     let applicationTokens: [ApplicationToken]
+    /// Handed the way into editing, when there is one. Holding the summary is the same
+    /// gesture as pressing the pencil, on the thing being described rather than on a
+    /// button in the corner.
+    var onEdit: (() -> Void)?
     /// Nil when the routine is not the one running.
     let activeSince: Date?
     /// The next scheduled start, when there is one and nothing is running.
@@ -131,6 +135,7 @@ struct RoutinePreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
+        .locktyEditOnLongPress(onEdit)
     }
 
     private func row<Value: View>(
@@ -172,13 +177,13 @@ struct RoutinePreviewContent: View {
     }
 
     private var blockedText: String {
-        let count = viewModel.selectionPreview.applicationTokens.count
-        let categories = viewModel.selectionPreview.categoryTokens.count
-
-        if count == 0 && categories > 0 {
-            return categories == 1 ? "1 Category" : "\(categories) Categories"
-        }
-        return count == 1 ? "1 App" : "\(count) Apps"
+        RestrictionSummary.everything(
+            apps: viewModel.selectionPreview.applicationTokens.count,
+            categories: viewModel.selectionPreview.categoryTokens.count,
+            groups: viewModel.selectedAppGroupIDs.count,
+            domains: viewModel.blockedDomains.count,
+            extras: viewModel.contentRestrictions.enabledCount
+        ) ?? "Nothing yet"
     }
 
     private var frictionText: String {

@@ -568,7 +568,7 @@ struct FrictionEditorView: View {
     /// The summary, plus the way into editing it.
     private var readOnlyContent: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            FrictionPreviewContent(viewModel: viewModel)
+            FrictionPreviewContent(onEdit: { enterEditingFlow() }, viewModel: viewModel)
         }
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)

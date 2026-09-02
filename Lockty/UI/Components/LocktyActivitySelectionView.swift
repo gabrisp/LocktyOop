@@ -236,8 +236,17 @@ struct LocktyActivitySelectionView: View {
                 selection: selection,
                 rules: rules
             ) { newSelection in
+                // Normalised here as well as inside the sheet. The picker is drawn out of
+                // process and keeps its own idea of what is ticked, so writing a stripped
+                // selection back into its binding does not always stick -- and what
+                // arrives on Save can still carry the category we said was not allowed.
+                // Saying so and then saving it anyway is the worst of both.
+                let result = normalizedSelection(newSelection, previous: selection, rules: rules)
                 withAnimation(.smooth(duration: 0.28)) {
-                    selection = newSelection
+                    selection = result.selection
+                }
+                if let violation = result.violations.first {
+                    showOverlay(message: violation.message)
                 }
             } onCancel: {
                 withAnimation(.smooth(duration: 0.28)) {
@@ -392,14 +401,18 @@ struct LocktyActivitySelectionView: View {
                                             .foregroundStyle(.white)
                                             .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
                                     }
-                                    .frame(width: 84, height: 84)
+                                    // The icon's own size, with nothing round it. A
+                                    // larger frame centres the icon inside itself, and
+                                    // the first one in the row then starts further in
+                                    // than the heading above it -- by a margin nothing
+                                    // else on the screen shares.
+                                    .frame(width: 72, height: 72)
                                 }
                                 .buttonStyle(.locktyInteractive(brighten: true))
                                 .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))
                             }
                         }
                     }
-                    .padding(.horizontal, LocktySpacing.xs)
                     .padding(.vertical, 2)
                 }
                 // The icons are drawn a little outside their own frames, so a scroll view
@@ -872,7 +885,7 @@ private struct LocktyOfficialActivityPickerSheet: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                Text("Selecciona apps/sitios web, toca \">\" para expandir")
+                Text("Pick apps or websites -- tap \">\" to expand a category")
                     .font(.system(.footnote, design: .default, weight: .semibold))
                     .foregroundStyle(LocktyColors.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -945,7 +958,7 @@ private struct LocktyOfficialActivityPickerSheet: View {
                         onCancel()
                         dismiss()
                     } label: {
-                        Text("Cancelar")
+                        Text("Cancel")
                             .font(.system(.body, design: .default, weight: .regular))
                             .foregroundStyle(LocktyColors.primaryText)
                             .frame(maxWidth: .infinity)

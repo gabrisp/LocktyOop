@@ -223,6 +223,13 @@ struct LocktyDynamicSheet<Content: View>: View {
         return false
     }()
     @StateObject private var chromeController = LocktyDynamicSheetChromeController()
+    /// How much of the screen the keyboard is covering.
+    ///
+    /// A sheet this size is a fixed detent, and a fixed detent does not get out of the
+    /// keyboard's way -- so a field near the bottom of one ended up behind it, with the
+    /// sheet lifting by a few points and no further. The detent has to grow by what the
+    /// keyboard takes, which is what actually moves the sheet up.
+    @State private var keyboardInset: CGFloat = 0
 
 
     var body: some View {
@@ -262,10 +269,13 @@ struct LocktyDynamicSheet<Content: View>: View {
                 .task { isVisible = true }
                 .modifier(
                     LocktySheetDetentModifier(
-                        height: sheetHeight,
+                        height: presentedHeight,
                         resizableDetents: resizableDetents
                     )
                 )
+                .onReceive(keyboardHeightPublisher) { height in
+                    withAnimation(.snappy(duration: 0.28)) { keyboardInset = height }
+                }
         } else {
             content
                 .environment(\.locktyDynamicSheetChromeController, chromeController)
@@ -302,10 +312,13 @@ struct LocktyDynamicSheet<Content: View>: View {
                 .task { isVisible = true }
                 .modifier(
                     LocktySheetDetentModifier(
-                        height: sheetHeight,
+                        height: presentedHeight,
                         resizableDetents: resizableDetents
                     )
                 )
+                .onReceive(keyboardHeightPublisher) { height in
+                    withAnimation(.snappy(duration: 0.28)) { keyboardInset = height }
+                }
         }
     }
 
@@ -323,6 +336,31 @@ struct LocktyDynamicSheet<Content: View>: View {
         case .medium: .medium
         case .large: .large
         }
+    }
+
+    /// The measured height, plus room for the keyboard when one is up, never taller than
+    /// the screen.
+    private var presentedHeight: CGFloat {
+        guard keyboardInset > 0 else { return sheetHeight }
+        return min(sheetHeight + keyboardInset, windowSize.height)
+    }
+
+    /// The keyboard's height as it comes and goes. `willChangeFrame` rather than
+    /// `willShow`, so a keyboard that swaps to a different height -- a suggestion bar
+    /// appearing, a language with a taller layout -- moves the sheet too.
+    private var keyboardHeightPublisher: AnyPublisher<CGFloat, Never> {
+        let willChange = NotificationCenter.default
+            .publisher(for: UIResponder.keyboardWillChangeFrameNotification)
+            .map { notification -> CGFloat in
+                let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+                return frame?.height ?? 0
+            }
+
+        let willHide = NotificationCenter.default
+            .publisher(for: UIResponder.keyboardWillHideNotification)
+            .map { _ in CGFloat(0) }
+
+        return willChange.merge(with: willHide).eraseToAnyPublisher()
     }
 
     private var windowSize: CGSize {

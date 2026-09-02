@@ -783,10 +783,14 @@ struct AppFolderCard: View {
     private let folderSide: CGFloat = 110
     private let iconScale: CGFloat = 1.58
     /// How much of its 38pt cell an app icon actually covers, and so how wide the "+N"
-    /// scrim over the last one has to be. Not the cell: an icon is drawn inside its own
-    /// bounds with room to spare, and a scrim cut to the cell reads as a tile laid next
-    /// to the icons rather than as a shade over one of them.
-    private let overflowSide: CGFloat = 28
+    /// scrim over the last one has to be.
+    ///
+    /// Not the cell: an icon is drawn inside its own bounds with room to spare, and a
+    /// scrim cut to the cell's 38 read as a tile laid beside the icons rather than as a
+    /// shade over one. 28 undershot it the other way and left the icon showing round the
+    /// scrim. There is no way to measure the real figure -- FamilyControls draws these
+    /// out of process -- so this is the midpoint of the two that were tried.
+    private let overflowSide: CGFloat = 33
 
     var body: some View {
         VStack(spacing: 6) {

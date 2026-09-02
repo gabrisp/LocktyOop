@@ -7,6 +7,7 @@ import SwiftUI
 /// controls. A friction is a sequence, and a sequence is best read as a list of what
 /// happens rather than as the fields that produced it.
 struct FrictionPreviewContent: View {
+    var onEdit: (() -> Void)?
     @ObservedObject var viewModel: FrictionEditorViewModel
 
     private var steps: [FrictionStep] {
@@ -84,6 +85,7 @@ struct FrictionPreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
+        .locktyEditOnLongPress(onEdit)
     }
 
     /// What happens once the flow is answered, which is not part of the sequence and so
@@ -106,6 +108,7 @@ struct FrictionPreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
+        .locktyEditOnLongPress(onEdit)
     }
 
     private func row(leading: String? = nil, title: String, value: String) -> some View {

@@ -45,6 +45,7 @@ struct ShieldPolicyResolver {
         for rule in rules where rule.isShielding(given: ruleEnforcement) {
             blockedApplications.formUnion(rule.blockedApplications)
             blockedDomains.formUnion(rule.blockedDomains)
+            contentRestrictions = contentRestrictions.union(rule.contentRestrictions)
             reasons.append(.rule(rule.id))
             selectionScopes.formUnion(rule.selectionScopes)
         }

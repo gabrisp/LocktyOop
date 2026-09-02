@@ -8,6 +8,18 @@ struct FocusView: View {
     @ObservedObject var router: AppRouter
     let frictionRepository: FrictionRepository
     let toastCenter: LocktyToastCenter
+    @ObservedObject var quickTimer: QuickTimerViewModel
+
+    /// Which of the timer's two pickers is open. Both are screens rather than sheets on
+    /// top of a sheet: Focus is a tab, so they push.
+    @State private var timerSheet: QuickTimerSheet?
+
+    private enum QuickTimerSheet: String, Identifiable {
+        case apps
+        case friction
+
+        var id: String { rawValue }
+    }
 
     private var gutter: CGFloat { LocktySpacing.lg }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
@@ -19,6 +31,20 @@ struct FocusView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+                // First, and not in a section: everything below is a library of things
+                // you made earlier, and this is the one thing on the screen you can act
+                // on right now.
+                QuickTimerCard(
+                    minutes: $quickTimer.minutes,
+                    endsAt: quickTimer.endsAt,
+                    blockedSummary: quickTimer.blockedSummary,
+                    frictionSummary: quickTimer.frictionSummary,
+                    onStart: { Task { await quickTimer.start() } },
+                    onStop: { Task { await quickTimer.stop() } },
+                    onOpenApps: { timerSheet = .apps },
+                    onOpenFriction: { timerSheet = .friction }
+                )
+
                 section(title: "Rules") {
                     router.push(.rulesList)
                 } content: {
@@ -51,7 +77,22 @@ struct FocusView: View {
                 }
             }
         }
+        .sheet(item: $timerSheet) { sheet in
+            quickTimerSheet(sheet)
+        }
+        .alert(
+            "Could not start",
+            isPresented: Binding(
+                get: { quickTimer.errorMessage != nil },
+                set: { if !$0 { quickTimer.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { quickTimer.errorMessage = nil }
+        } message: {
+            Text(quickTimer.errorMessage ?? "")
+        }
         .task {
+            await quickTimer.load()
             await frictionRepository.seedDefaultFrictionIfNeeded()
             await rulesViewModel.load()
             await frictionsViewModel.load()
@@ -63,6 +104,53 @@ struct FocusView: View {
                 await rulesViewModel.load()
                 await frictionsViewModel.load()
                 await appsViewModel.load()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func quickTimerSheet(_ sheet: QuickTimerSheet) -> some View {
+        switch sheet {
+        case .apps:
+            NavigationStack {
+                LocktyActivitySelectionView(
+                    title: "Selected",
+                    addLabel: "Add app or category",
+                    selection: Binding(
+                        get: { quickTimer.selection },
+                        set: { quickTimer.replaceSelection($0) }
+                    ),
+                    contentRestrictions: Binding(
+                        get: { quickTimer.contentRestrictions },
+                        set: { quickTimer.contentRestrictions = $0 }
+                    ),
+                    rules: .rule,
+                    toastCenter: toastCenter,
+                    onClose: { timerSheet = nil },
+                    onDone: { timerSheet = nil }
+                )
+                .locktyScreenBackground()
+                .navigationTitle("Blocked apps")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { timerSheet = nil }
+                    }
+                }
+            }
+
+        case .friction:
+            NavigationStack {
+                QuickTimerFrictionPicker(
+                    frictions: frictionsViewModel.frictions,
+                    selectedID: quickTimer.frictionID,
+                    onSelect: { friction in
+                        quickTimer.selectFriction(friction)
+                        timerSheet = nil
+                    }
+                )
+                .navigationTitle("Friction")
+                .navigationBarTitleDisplayMode(.inline)
             }
         }
     }

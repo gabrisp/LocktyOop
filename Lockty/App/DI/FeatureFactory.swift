@@ -35,6 +35,7 @@ struct FeatureFactory {
     let toastCenter: LocktyToastCenter
     let editorStore: EditorViewModelStore
     let usageDataService: UsageDataServicing
+    let quickTimerViewModel: QuickTimerViewModel
 
     func makeTodayView(day: Date) -> TodayView {
         TodayView(day: day, viewModel: todayViewModel, router: router)
@@ -48,7 +49,8 @@ struct FeatureFactory {
             appsViewModel: appsViewModel,
             router: router,
             frictionRepository: frictionRepository,
-            toastCenter: toastCenter
+            toastCenter: toastCenter,
+            quickTimer: quickTimerViewModel
         )
     }
 

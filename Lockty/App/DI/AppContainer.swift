@@ -241,6 +241,11 @@ final class AppContainer {
             location: locationService,
             alarms: alarmService
         )
+        let quickTimerViewModel = QuickTimerViewModel(
+            routineEngine: routineEngine,
+            selectionStore: selectionStore,
+            frictionRepository: frictionRepository
+        )
         let featureFactory = FeatureFactory(
             router: router,
             todayViewModel: todayViewModel,
@@ -272,7 +277,8 @@ final class AppContainer {
             healthService: healthService,
             toastCenter: toastCenter,
             editorStore: editorStore,
-            usageDataService: usageDataService
+            usageDataService: usageDataService,
+            quickTimerViewModel: quickTimerViewModel
         )
         let destinationFactory = DestinationFactory(featureFactory: featureFactory)
         let startupCoordinator = StartupCoordinator(

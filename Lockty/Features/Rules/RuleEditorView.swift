@@ -17,6 +17,10 @@ final class RuleEditorViewModel: ObservableObject {
     @Published var dailyResetPeriod: RuleResetPeriod = .daily
     @Published var maximumSessionMinutes = 5
     @Published var maximumBreaks = 0
+    /// Adult content, purchases, installing apps. The same three a routine offers: a
+    /// rule is a block like any other, and a limit that shuts an app while leaving the
+    /// App Store open is the same half-measure there as anywhere else.
+    @Published var contentRestrictions: ContentRestrictions = .none
     @Published var maximumBreakMinutes = 5
     @Published var minimumBreakIntervalMinutes = 60
     @Published var breakResetPeriod: RuleResetPeriod = .daily
@@ -147,6 +151,7 @@ final class RuleEditorViewModel: ObservableObject {
         dailyResetPeriod = rule.dailyUsageLimitConfiguration?.resetPeriod ?? .daily
         maximumSessionMinutes = rule.sessionDurationLimitConfiguration?.maximumMinutesPerSession ?? 5
         maximumBreaks = rule.breakPolicy.maximumBreaks
+        contentRestrictions = rule.contentRestrictions
         maximumBreakMinutes = max(rule.breakPolicy.durationMinutes ?? 5, 1)
         minimumBreakIntervalMinutes = max(rule.breakPolicy.cooldownMinutes, 1)
         breakResetPeriod = rule.breakPolicy.resetPeriod
@@ -266,6 +271,7 @@ final class RuleEditorViewModel: ObservableObject {
             kind: kind,
             appGroupIDs: selectedAppGroupIDs,
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
+            contentRestrictions: contentRestrictions,
             openCountLimitConfiguration: kind == .openCountLimit
                 ? OpenCountLimitRuleConfiguration(
                     maximumOpens: Self.clampedOpenCount(maximumOpens),
@@ -989,7 +995,12 @@ struct RuleEditorView: View {
                         get: { viewModel.selectedAppGroupIDs },
                         set: { viewModel.selectedAppGroupIDs = $0 }
                     ),
-                    rules: .routine,
+                    blockedDomains: .constant([]),
+                    contentRestrictions: Binding(
+                        get: { viewModel.contentRestrictions },
+                        set: { viewModel.contentRestrictions = $0 }
+                    ),
+                    rules: .rule,
                     suggestions: [],
                     appGroups: viewModel.appGroups,
                     toastCenter: viewModel.toastCenter,

@@ -462,3 +462,21 @@ nonisolated struct NFCTagConfiguration: Codable, Hashable, Identifiable {
         self.displayName = displayName
     }
 }
+
+extension Friction {
+    /// The policy a running session applies when it uses this friction.
+    ///
+    /// The same conversion `PauseFlow` makes, because the two carry the same four
+    /// answers: what you go through, how long it buys, whether it relocks, and how long
+    /// the breathe at the front runs.
+    var policy: RoutinePausePolicy {
+        RoutinePausePolicy(
+            isEnabled: isEnabled,
+            steps: steps,
+            allowanceDuration: allowanceDuration,
+            relockAfterAllowance: relockAfterAllowance,
+            breatheSeconds: breatheSeconds
+        )
+    }
+}
+

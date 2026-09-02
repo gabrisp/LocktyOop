@@ -121,6 +121,8 @@ nonisolated struct Rule: Codable, Hashable, Identifiable {
     var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
+    /// The device-level switches this rule throws while it is shielding.
+    var contentRestrictions: ContentRestrictions
     var scheduleConfiguration: ScheduleRuleConfiguration?
     var openCountLimitConfiguration: OpenCountLimitRuleConfiguration?
     var dailyUsageLimitConfiguration: DailyUsageLimitRuleConfiguration?
@@ -128,6 +130,27 @@ nonisolated struct Rule: Codable, Hashable, Identifiable {
     var breakPolicy: RuleBreakPolicy
     var createdAt: Date
     var updatedAt: Date
+
+    // Written by hand for one key, so a rule saved before `contentRestrictions` existed
+    // still decodes instead of throwing on every rule in the library.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        kind = try container.decode(RuleKind.self, forKey: .kind)
+        appGroupIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .appGroupIDs) ?? []
+        blockedApplications = try container.decodeIfPresent(Set<AppIdentity.ID>.self, forKey: .blockedApplications) ?? []
+        blockedDomains = try container.decodeIfPresent(Set<String>.self, forKey: .blockedDomains) ?? []
+        contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
+        scheduleConfiguration = try container.decodeIfPresent(ScheduleRuleConfiguration.self, forKey: .scheduleConfiguration)
+        openCountLimitConfiguration = try container.decodeIfPresent(OpenCountLimitRuleConfiguration.self, forKey: .openCountLimitConfiguration)
+        dailyUsageLimitConfiguration = try container.decodeIfPresent(DailyUsageLimitRuleConfiguration.self, forKey: .dailyUsageLimitConfiguration)
+        sessionDurationLimitConfiguration = try container.decodeIfPresent(SessionDurationLimitRuleConfiguration.self, forKey: .sessionDurationLimitConfiguration)
+        breakPolicy = try container.decodeIfPresent(RuleBreakPolicy.self, forKey: .breakPolicy) ?? RuleBreakPolicy()
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
 
     init(
         id: UUID = UUID(),
@@ -137,6 +160,7 @@ nonisolated struct Rule: Codable, Hashable, Identifiable {
         appGroupIDs: Set<UUID> = [],
         blockedApplications: Set<AppIdentity.ID> = [],
         blockedDomains: Set<String> = [],
+        contentRestrictions: ContentRestrictions = .none,
         scheduleConfiguration: ScheduleRuleConfiguration? = nil,
         openCountLimitConfiguration: OpenCountLimitRuleConfiguration? = nil,
         dailyUsageLimitConfiguration: DailyUsageLimitRuleConfiguration? = nil,
@@ -152,6 +176,7 @@ nonisolated struct Rule: Codable, Hashable, Identifiable {
         self.appGroupIDs = appGroupIDs
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
+        self.contentRestrictions = contentRestrictions
         self.scheduleConfiguration = scheduleConfiguration
         self.openCountLimitConfiguration = openCountLimitConfiguration
         self.dailyUsageLimitConfiguration = dailyUsageLimitConfiguration

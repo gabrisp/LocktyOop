@@ -10,6 +10,9 @@ protocol DeviceActivityServicing {
     func syncRuleSchedules(_ rules: [Rule]) async throws
     /// Drops every allowance monitor, whatever it was counting.
     func cancelPauseRelocks() async
+    /// Ends a quick timer on the wall clock, with the app not running.
+    func scheduleQuickTimerEnd(routineID: UUID, endsAt: Date) async throws
+    func cancelQuickTimer(routineID: UUID) async
 }
 
 struct LiveDeviceActivityService: DeviceActivityServicing {
@@ -85,6 +88,32 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
         let pauseActivities = center.activities.filter { $0.rawValue.hasPrefix("lockty.pause.") }
         guard !pauseActivities.isEmpty else { return }
         center.stopMonitoring(pauseActivities)
+    }
+
+    /// A quick timer's end, on the clock.
+    ///
+    /// The same trick the allowance window uses, for the same reason: the fifteen-minute
+    /// floor is on the interval's *length*, not on how soon it ends, so the start is put
+    /// far enough back to clear it and `intervalDidEnd` still lands on the minute the
+    /// countdown is showing. A ten-minute timer therefore opens a window that began six
+    /// minutes ago, which is fine -- nothing happens at the start of it.
+    func scheduleQuickTimerEnd(routineID: UUID, endsAt: Date) async throws {
+        let name = DeviceActivityName("lockty.quick.\(routineID.uuidString)")
+        let calendar = Calendar.current
+        let end = calendar.dateComponents([.hour, .minute, .second], from: endsAt)
+        let start = calendar.dateComponents(
+            [.hour, .minute, .second],
+            from: endsAt.addingTimeInterval(-16 * 60)
+        )
+
+        try center.startMonitoring(
+            name,
+            during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false)
+        )
+    }
+
+    func cancelQuickTimer(routineID: UUID) async {
+        center.stopMonitoring([DeviceActivityName("lockty.quick.\(routineID.uuidString)")])
     }
 
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws {

@@ -135,7 +135,11 @@ final class RoutineEngine: ObservableObject {
     /// apply, and the shield is the union of what they block. Only starting the *same*
     /// routine twice is refused, because that is not a second routine, it is a repeat.
     @discardableResult
-    func start(_ routine: Routine, trigger: RoutineTrigger = .manual) async -> RoutineStartOutcome {
+    func start(
+        _ routine: Routine,
+        trigger: RoutineTrigger = .manual,
+        expectedEndAt: Date? = nil
+    ) async -> RoutineStartOutcome {
         // The App Group is consulted, not just this engine: a routine the monitor
         // extension started while the app was not running is only in the runtime state,
         // and starting it again here would give it two entries and two executions.
@@ -165,6 +169,7 @@ final class RoutineEngine: ObservableObject {
             iconSnapshot: routine.icon,
             modeSnapshot: routine.mode,
             startedAt: Date(),
+            expectedEndAt: expectedEndAt,
             trigger: trigger,
             shieldPolicy: .routine(routine),
             breakPolicySnapshot: routine.breakPolicy,
@@ -188,6 +193,15 @@ final class RoutineEngine: ObservableObject {
                 )
             )
             try? await alarmService.triggerRoutineStartAlarm(for: routine)
+            // A routine with an end time has one scheduled, so it stops on the clock with
+            // the app closed. Without this the countdown would reach zero and the shield
+            // would stay up until something happened to open Lockty.
+            if let expectedEndAt {
+                try? await deviceActivityService.scheduleQuickTimerEnd(
+                    routineID: routine.id,
+                    endsAt: expectedEndAt
+                )
+            }
             return .started
         } catch {
             // Rolled back rather than left half-started: a routine whose shields never
@@ -236,6 +250,12 @@ final class RoutineEngine: ObservableObject {
         let stoppedIDs = Set(targets.map(\.routineID))
         if let first = targets.first {
             state = .ending(first.routineID)
+        }
+
+        // A timer ended by hand has no reason to fire later. Left running, its monitor
+        // would end a routine of the same id that had since been started again.
+        for target in targets where target.expectedEndAt != nil {
+            await deviceActivityService.cancelQuickTimer(routineID: target.routineID)
         }
 
         activeRoutines.removeAll { stoppedIDs.contains($0.routineID) }

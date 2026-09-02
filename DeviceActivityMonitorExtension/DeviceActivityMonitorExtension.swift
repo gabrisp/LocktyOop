@@ -35,6 +35,15 @@ private struct RuntimeRepairCoordinator {
             return
         }
 
+        // A quick timer running out. It is not in the routine library -- it was made on
+        // the spot and exists only in the runtime state -- so it is ended by id here
+        // rather than by looking a snapshot up.
+        if activity.rawValue.hasPrefix("lockty.quick."),
+           let id = UUID(uuidString: String(activity.rawValue.dropFirst("lockty.quick.".count))) {
+            endQuickTimer(routineID: id)
+            return
+        }
+
         // An allowance's window is scheduled to end on its expiry, so this is the moment
         // it runs out -- not a moment to go and check whether it has. Asking isExpired
         // here missed the ones the system delivered a second early, and then nothing
@@ -48,6 +57,19 @@ private struct RuntimeRepairCoordinator {
         }
 
         repairRuntimeState(activityName: activity.rawValue)
+    }
+
+    /// Ends a quick timer and recomputes the shield without it.
+    ///
+    /// The same shape as a scheduled routine ending: drop it from `activeRoutines`, drop
+    /// any break it granted, and let the resolver work out what is left blocked -- which
+    /// is what keeps a second routine's apps shut when this one stops.
+    func endQuickTimer(routineID: UUID) {
+        try? store.updateRuntimeState { state in
+            state.activeRoutines.removeAll { $0.routineID == routineID }
+            state.activeBreaks.removeAll { $0.routineID == routineID }
+        }
+        repairRuntimeState(activityName: "lockty.quick.\(routineID.uuidString)")
     }
 
     /// The schedule is a plain daily window (DeviceActivity has no weekday filter), so

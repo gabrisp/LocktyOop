@@ -35,6 +35,19 @@ struct LocktyActivitySelectionRules: Hashable {
         allowsContentRestrictions: true,
         pickerSeedStrategy: .currentSelection
     )
+    /// A limit rule. Everything a routine can shut except sites: a rule counts openings
+    /// and minutes, and neither is a thing a website does.
+    static let rule = LocktyActivitySelectionRules(
+        allowsApplications: true,
+        allowsCategories: true,
+        allowsWebDomains: false,
+        maximumApplications: nil,
+        maximumCategories: nil,
+        maximumWebDomains: 0,
+        allowsManualWebsites: false,
+        allowsContentRestrictions: true,
+        pickerSeedStrategy: .currentSelection
+    )
     static let pause = LocktyActivitySelectionRules(
         allowsApplications: true,
         allowsCategories: false,

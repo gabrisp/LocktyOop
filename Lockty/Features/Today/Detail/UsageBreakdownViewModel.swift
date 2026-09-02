@@ -7,6 +7,12 @@ final class UsageBreakdownViewModel: ObservableObject {
     @Published var period: UsagePeriod = .day
     @Published var anchorDay: Date
     @Published var isChoosingPeriod = false
+    /// Whether the list is being reclassified rather than read.
+    ///
+    /// The whole screen turns on what each app is called -- productive, distracting,
+    /// neutral -- and until now that could only be changed somewhere else, which meant
+    /// noticing a wrong label here and having to go and find where to fix it.
+    @Published var isEditing = false
     @Published private(set) var breakdown: UsageBreakdown
 
     private let builder: UsageBreakdownBuilder
@@ -26,6 +32,22 @@ final class UsageBreakdownViewModel: ObservableObject {
         self.classificationRepository = classificationRepository
         self.builder = builder
         self.breakdown = .empty(period: .day, anchorDay: day)
+    }
+
+    /// Moves an app to the next classification, and puts it in its new section.
+    ///
+    /// Cycled rather than picked from a menu: there are three, they have an order --
+    /// productive, neutral, distracting -- and a menu for three values is three taps
+    /// where one would do.
+    func cycleClassification(of app: UsageBreakdownApp) async {
+        let next: AppClassification = switch app.classification {
+        case .productive: .neutral
+        case .neutral: .unproductive
+        case .unproductive: .productive
+        }
+
+        await classificationRepository.saveClassification(next, for: app.app.id)
+        await reload()
     }
 
     func reload() async {

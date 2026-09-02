@@ -1,3 +1,5 @@
+import FamilyControls
+import ManagedSettings
 import SwiftUI
 
 /// Where the time went, as a list rather than a set of cards.
@@ -12,8 +14,6 @@ struct UsageBreakdownView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                periodPicker
-
                 headline
 
                 if viewModel.breakdown.hasData {
@@ -27,12 +27,34 @@ struct UsageBreakdownView: View {
             .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.vertical, LocktySpacing.lg)
         }
+        // The app's own helper, which falls back to a safeAreaInset before 26. The
+        // segmented control decides what the list *is*, so it stays put while the list
+        // scrolls under it.
+        .customSafeAreaBar(edge: .top, spacing: 0) {
+            periodPicker
+                .padding(.horizontal, LocktySpacing.screenInset)
+                .padding(.bottom, LocktySpacing.md)
+        }
         .locktyScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // The period lives in the bar, in place of the two chevrons a month-at-a-time
             // stepper would need. Stepping is the wrong gesture for "show me March": it
             // takes as many presses as there are months in between.
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.smooth(duration: 0.32)) { viewModel.isEditing.toggle() }
+                } label: {
+                    Image(systemName: viewModel.isEditing ? "checkmark" : "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.locktyInteractive(shape: Circle()))
+                .tappable()
+            }
+
             ToolbarItem(placement: .principal) {
                 Button {
                     viewModel.isChoosingPeriod = true
@@ -162,7 +184,17 @@ struct UsageBreakdownView: View {
             }
 
             ForEach(section.apps) { app in
-                appRow(app, longest: viewModel.longestDuration)
+                if viewModel.isEditing {
+                    Button {
+                        Task { await viewModel.cycleClassification(of: app) }
+                    } label: {
+                        appRow(app, longest: viewModel.longestDuration)
+                    }
+                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
+                    .tappable()
+                } else {
+                    appRow(app, longest: viewModel.longestDuration)
+                }
             }
 
             if !section.foldedApps.isEmpty {
@@ -175,7 +207,9 @@ struct UsageBreakdownView: View {
     /// column of bars tells you the *difference*, which is the thing that makes an hour
     /// on one app look like what it is next to eight minutes on another.
     private func appRow(_ app: UsageBreakdownApp, longest: TimeInterval) -> some View {
-        HStack(spacing: LocktySpacing.md) {
+        let editing = viewModel.isEditing
+
+        return HStack(spacing: LocktySpacing.md) {
             AppIconView(
                 source: app.app.iconSource,
                 applicationToken: app.app.applicationToken,
@@ -184,8 +218,9 @@ struct UsageBreakdownView: View {
                 chrome: .plain
             )
 
+
             VStack(alignment: .leading, spacing: 6) {
-                Text(app.app.displayName)
+                appName(app.app)
                     .font(.system(.body, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .lineLimit(1)
@@ -193,7 +228,11 @@ struct UsageBreakdownView: View {
                 HStack(spacing: LocktySpacing.sm) {
                     GeometryReader { proxy in
                         Capsule()
-                            .fill(LocktyColors.classification(app.classification))
+                            .fill(
+                                editing
+                                ? LocktyColors.ink(0.14)
+                                : LocktyColors.classification(app.classification)
+                            )
                             .frame(
                                 width: longest > 0
                                     ? max(proxy.size.width * CGFloat(app.duration / longest), 6)
@@ -204,7 +243,12 @@ struct UsageBreakdownView: View {
                     }
                     .frame(height: 4)
 
-                    Text(LocktyDurationFormatter.abbreviated(app.duration))
+                    // The label a tap will change, in place of the duration. Editing is
+                    // about what an app *is*, and leaving a time there would have the row
+                    // answering the question it is no longer asking.
+                    Text(editing
+                         ? app.classification.title
+                         : LocktyDurationFormatter.abbreviated(app.duration))
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(LocktyColors.classification(app.classification))
                         .monospacedDigit()
@@ -214,6 +258,21 @@ struct UsageBreakdownView: View {
             }
         }
         .frame(minHeight: 52)
+        .animation(.smooth(duration: 0.28), value: editing)
+    }
+
+    /// The app's own name, from its token where there is one.
+    ///
+    /// `displayName` falls back to the bundle identifier for anything the app has not
+    /// been told about, and the token is the only thing that carries the real, localized
+    /// name Apple shows everywhere else.
+    @ViewBuilder
+    private func appName(_ app: AppIdentity) -> some View {
+        if let token = app.applicationToken {
+            Label(token).labelStyle(.titleOnly)
+        } else {
+            Text(app.displayName)
+        }
     }
 
     /// The tail, as one row. The icons overlap so the row says how many without counting

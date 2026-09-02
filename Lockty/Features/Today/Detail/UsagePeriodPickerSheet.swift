@@ -10,8 +10,6 @@ struct UsagePeriodPickerSheet: View {
     let period: UsagePeriod
     @Binding var selection: Date
 
-    @Environment(\.dismiss) private var dismiss
-
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = .current
@@ -22,19 +20,16 @@ struct UsagePeriodPickerSheet: View {
 
     var body: some View {
         LocktyDynamicSheet {
+            // No heading. The sheet shows a calendar or a row of months -- there is
+            // nothing to explain, and a line saying "pick a day" above a calendar is the
+            // screen narrating itself.
             VStack(spacing: LocktySpacing.lg) {
-                Text(title)
-                    .font(.system(.title3, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .frame(maxWidth: .infinity)
-
                 switch period {
                 case .day, .week:
                     UsageCalendarPicker(
                         selection: $selection,
                         highlightsWholeWeek: period == .week,
-                        calendar: calendar,
-                        onPick: { dismiss() }
+                        calendar: calendar
                     )
 
                 case .month:
@@ -44,14 +39,6 @@ struct UsagePeriodPickerSheet: View {
             .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.top, LocktySpacing.lg)
             .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.lg))
-        }
-    }
-
-    private var title: String {
-        switch period {
-        case .day: "Pick a day"
-        case .week: "Pick any day in the week"
-        case .month: "Pick a month"
         }
     }
 
@@ -71,7 +58,6 @@ struct UsagePeriodPickerSheet: View {
 
                 Button {
                     selection = month
-                    dismiss()
                 } label: {
                     Text(monthLabel(month))
                         .font(.system(.subheadline, design: .default, weight: .semibold))
@@ -115,20 +101,17 @@ private struct UsageCalendarPicker: View {
     @Binding var selection: Date
     let highlightsWholeWeek: Bool
     let calendar: Calendar
-    let onPick: () -> Void
 
     @State private var visibleMonth: Date
 
     init(
         selection: Binding<Date>,
         highlightsWholeWeek: Bool,
-        calendar: Calendar,
-        onPick: @escaping () -> Void
+        calendar: Calendar
     ) {
         _selection = selection
         self.highlightsWholeWeek = highlightsWholeWeek
         self.calendar = calendar
-        self.onPick = onPick
         _visibleMonth = State(
             initialValue: calendar.dateInterval(of: .month, for: selection.wrappedValue)?.start ?? Date()
         )
@@ -248,7 +231,6 @@ private struct UsageCalendarPicker: View {
 
         return Button {
             selection = calendar.startOfDay(for: day)
-            onPick()
         } label: {
             Text("\(calendar.component(.day, from: day))")
                 .font(.system(.subheadline, design: .default, weight: isSelected ? .bold : .regular))

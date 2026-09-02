@@ -1101,7 +1101,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.vertical, LocktySpacing.lg)
     }
 
@@ -1162,7 +1162,6 @@ struct RoutineEditorView: View {
         isNameFieldFocused = false
     }
 
-    private var cardFill: Color { LocktyColors.ink(0.055) }
     private var cardRadius: CGFloat { 22 }
 
     /// The two times in one card, joined down the left by the dotted run between them.
@@ -1196,7 +1195,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
         .overlay(alignment: .topLeading) {
             // The run between the two marks, drawn once across both rows rather than
             // half in each, so it lines up whatever the rows end up measuring.
@@ -1233,7 +1232,7 @@ struct RoutineEditorView: View {
                 isStart: false
             )
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
         .overlay(alignment: .topLeading) {
             Rectangle()
                 .fill(LocktyColors.ink(0.35))
@@ -1353,7 +1352,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     /// The name for a set of days when it happens to be one, and the count when it isn't.
@@ -1402,7 +1401,7 @@ struct RoutineEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .frame(height: 52)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 22, style: .continuous)))
     }
@@ -1501,7 +1500,7 @@ struct RoutineEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
             .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
@@ -1535,7 +1534,7 @@ struct RoutineEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
             .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
@@ -1568,7 +1567,7 @@ struct RoutineEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
             .contentShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
@@ -1603,7 +1602,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var readOnlyColorRow: some View {
@@ -1626,7 +1625,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     @ViewBuilder
@@ -1671,11 +1670,11 @@ struct RoutineEditorView: View {
                 .foregroundStyle(LocktyColors.primaryText)
                 .padding(.horizontal, LocktySpacing.md)
                 .frame(height: 52)
-                .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+                .locktyCardBackground(cornerRadius: cardRadius)
             }
             .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1706,9 +1705,9 @@ struct RoutineEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1751,7 +1750,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var breakDetailsCard: some View {
@@ -1791,7 +1790,7 @@ struct RoutineEditorView: View {
                 onIncrement: { viewModel.minimumBreakIntervalMinutes = min(viewModel.minimumBreakIntervalMinutes + 5, 180) }
             )
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var frictionSelectionCard: some View {
@@ -1844,7 +1843,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var checklistScreen: some View {
@@ -1869,14 +1868,14 @@ struct RoutineEditorView: View {
                     .foregroundStyle(LocktyColors.primaryText)
                     .padding(.horizontal, LocktySpacing.md)
                     .frame(height: 52)
-                    .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+                    .locktyCardBackground(cornerRadius: cardRadius)
                 }
                 .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
             } else {
                 readOnlyTasksCard
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1902,7 +1901,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private func breakStepperRow(
@@ -2006,7 +2005,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var strictReadOnlyRow: some View {
@@ -2033,7 +2032,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var editorContent: some View {
@@ -2080,7 +2079,7 @@ struct RoutineEditorView: View {
                 }
                 .padding(.top, LocktySpacing.sm)
             }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2140,6 +2139,7 @@ struct RoutineEditorView: View {
                     }
                 }
                 .padding(.top, LocktySpacing.sm)
+                .padding(.horizontal, LocktySpacing.screenInset)
             } else if viewModel.activeRoutine() == nil {
                 LocktyHoldButton(title: "Hold to start", systemImage: "play.fill") {
                     Task {
@@ -2148,9 +2148,12 @@ struct RoutineEditorView: View {
                     }
                 }
                 .padding(.top, LocktySpacing.sm)
+                .padding(.horizontal, LocktySpacing.screenInset)
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        // No margin of its own: `RoutinePreviewContent` already sits at `screenInset`,
+        // and this block used to add a second one, so a routine at rest was inset twice
+        // as far as the same routine open for editing.
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2201,7 +2204,7 @@ struct RoutineEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var trimmedReadOnlyTasks: [EditableRoutineTask] {
@@ -2231,7 +2234,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     @ViewBuilder

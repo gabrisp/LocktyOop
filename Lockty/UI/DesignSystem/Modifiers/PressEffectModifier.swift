@@ -17,7 +17,10 @@ struct PressEffectModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .opacity(isPressed ? 0.86 : 1.0)
+            // Lit, not dimmed. Fading a control on press says it is becoming
+            // unavailable, which is the opposite of what a press means -- and on a dark
+            // screen a dimmed thing simply recedes. Adding light brings it forward.
+            .brightness(isPressed ? 0.14 : 0)
             .animation(.smooth(duration: 0.18), value: isPressed)
     }
 }
@@ -155,6 +158,13 @@ extension ButtonStyle where Self == LocktyInteractiveButtonStyle {
         pressedScale: CGFloat = 0.97
     ) -> LocktyInteractiveButtonStyle {
         LocktyInteractiveButtonStyle(shape: AnyShape(shape), tint: tint, pressedScale: pressedScale)
+    }
+
+    /// For a row in a list: lights its contents and taps back, with no shape drawn over
+    /// it. A row has no silhouette of its own to fill, and a rectangle laid across one is
+    /// a highlight bar rather than the row responding.
+    static var locktyRow: LocktyInteractiveButtonStyle {
+        LocktyInteractiveButtonStyle(brightens: true, pressedScale: 0.99)
     }
 
     /// For artwork: brightens what is there rather than putting a shape over it.

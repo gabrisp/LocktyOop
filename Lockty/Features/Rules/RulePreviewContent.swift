@@ -35,7 +35,7 @@ struct RulePreviewContent: View {
             summaryCard
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.sm)
         .padding(.bottom, LocktySpacing.md)
     }
@@ -92,12 +92,8 @@ struct RulePreviewContent: View {
 
             row(title: "Unlocks allowed", value: viewModel.breaksAllowed ? "Yes" : "No")
         }
-        .padding(.horizontal, LocktySpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .fill(LocktyColors.ink(0.055))
-        )
-        .locktyImperfectBorder(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.horizontal, LocktySpacing.cardInset)
+        .locktyCardBackground(cornerRadius: 26)
     }
 
     /// Named after what it counts rather than after the rule, so the row reads as a

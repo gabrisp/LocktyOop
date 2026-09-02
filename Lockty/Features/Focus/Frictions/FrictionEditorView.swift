@@ -687,7 +687,7 @@ struct FrictionEditorView: View {
                 }
                 .padding(.top, LocktySpacing.sm)
             }
-            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.vertical, LocktySpacing.lg)
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.height
@@ -742,12 +742,9 @@ struct FrictionEditorView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(LocktyColors.tertiaryText)
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.cardInset)
         .padding(.vertical, LocktySpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                .fill(LocktyColors.ink(0.055))
-        )
+        .locktyCardBackground(cornerRadius: Self.cardRadius)
         .contentShape(RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous))
         .onTapGesture { isShowingBreatheMenu = true }
         .locktyMenu(isPresented: $isShowingBreatheMenu) {
@@ -964,6 +961,9 @@ private struct FrictionStepEditorCard: View {
     let onMoveDown: () -> Void
 
     var body: some View {
+        // A Button, not a tap gesture. A gesture carries no pressed state, so the row it
+        // sits on cannot respond to being touched at all.
+        Button(action: onOpen) {
         CardView(radius: FrictionEditorView.cardRadius, padding: LocktySpacing.lg) {
             HStack(alignment: .center, spacing: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -1004,8 +1004,9 @@ private struct FrictionStepEditorCard: View {
                     .foregroundStyle(LocktyColors.secondaryText)
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: FrictionEditorView.cardRadius, style: .continuous))
-        .onTapGesture(perform: onOpen)
+        }
+        .buttonStyle(.locktyInteractive)
+        .tappable()
     }
 }
 

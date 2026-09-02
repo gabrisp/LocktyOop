@@ -86,7 +86,7 @@ struct ScheduledRoutinesCard: View {
             .padding(.vertical, LocktySpacing.md)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.locktyRow)
         .tappable()
     }
 }

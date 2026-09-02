@@ -404,7 +404,6 @@ struct RuleEditorView: View {
     }
 
     private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
-    private var cardFill: Color { LocktyColors.ink(0.055) }
     private var cardRadius: CGFloat { 22 }
 
     private var chromeID: String {
@@ -675,7 +674,7 @@ struct RuleEditorView: View {
                 kindTile(kind: .dailyUsageLimit, subtitle: "Daily time limit")
                 kindTile(kind: .sessionDurationLimit, subtitle: "Session time limit")
             }
-            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.vertical, LocktySpacing.lg)
         }
     }
@@ -733,7 +732,7 @@ struct RuleEditorView: View {
                 .foregroundStyle(LocktyColors.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.vertical, LocktySpacing.lg)
     }
 
@@ -756,7 +755,7 @@ struct RuleEditorView: View {
             }
             .padding(.top, LocktySpacing.sm)
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -803,7 +802,7 @@ struct RuleEditorView: View {
                 EmptyView()
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var appsRow: some View {
@@ -829,7 +828,7 @@ struct RuleEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
         }
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
     }
@@ -860,7 +859,7 @@ struct RuleEditorView: View {
             }
             .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+            .locktyCardBackground(cornerRadius: cardRadius)
 
             if viewModel.breaksAllowed {
                 VStack(spacing: 0) {
@@ -905,14 +904,14 @@ struct RuleEditorView: View {
 
                     resetPeriodRow(selection: $viewModel.breakResetPeriod)
                 }
-                .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+                .locktyCardBackground(cornerRadius: cardRadius)
 
                 sectionHeading("Friction", systemImage: "sparkles.rectangle.stack")
 
                 frictionSelectionCard
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -967,7 +966,7 @@ struct RuleEditorView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private var selectionScreen: some View {
@@ -1257,7 +1256,7 @@ struct RuleEditorView: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(RoundedRectangle(cornerRadius: cardRadius, style: .continuous).fill(cardFill))
+        .locktyCardBackground(cornerRadius: cardRadius)
     }
 
     private func sectionHeading(_ title: String, systemImage: String) -> some View {

@@ -28,10 +28,17 @@ struct ProductivityAuraView: View {
 
     private let side: CGFloat = 240
 
+    /// How much of its square the badge claims vertically.
+    ///
+    /// One constant for the frame below and for `reservedHeight`, so trimming it moves
+    /// the badge up and brings the content up with it. Split between the two, the page
+    /// would keep a gap the badge had already left.
+    static let drawnHeightRatio: CGFloat = 0.74
+
     /// What the badge occupies at a given collapse, so the screen above it can reserve
     /// exactly that and no more.
     static func reservedHeight(collapseProgress: CGFloat, side: CGFloat = 240) -> CGFloat {
-        let drawn = side * 0.82
+        let drawn = side * drawnHeightRatio
         return MetricsHeaderGeometry.lerp(drawn, drawn * 0.3, progress: collapseProgress)
     }
 
@@ -78,12 +85,12 @@ struct ProductivityAuraView: View {
         // full square claimed a band of empty space above and below it -- which is what
         // made the badge sit too low, and what dragging it back up with negative padding
         // was papering over.
-        .frame(width: side, height: side * 0.82)
+        .frame(width: side, height: side * Self.drawnHeightRatio)
         .compositingGroup()
         .scaleEffect(scale)
         // Claims the space it draws at rather than the space it was laid out at, so the
         // content below rides up as it shrinks instead of leaving a hole behind.
-        .frame(width: side * scale, height: side * 0.82 * scale)
+        .frame(width: side * scale, height: side * Self.drawnHeightRatio * scale)
         .task(id: score) {
             await arrive()
         }

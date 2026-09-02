@@ -137,7 +137,7 @@ struct PauseFlowEditorContent: View {
                 }
             }
         }
-        .padding(.horizontal, LocktySpacing.lg)
+        .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.lg)
         .padding(.bottom, LocktySpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)

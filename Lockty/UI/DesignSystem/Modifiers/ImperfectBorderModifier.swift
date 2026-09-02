@@ -53,3 +53,16 @@ enum LocktyImperfectBorder {
         ]
     }
 }
+
+extension View {
+    /// A card: the fill and the uneven edge that goes with it.
+    ///
+    /// The previews reached for the border by hand and the editors did not, so the same
+    /// card had a rim on one screen and none on the next. Anything that looks like a card
+    /// should say so in one call rather than remember two.
+    func locktyCardBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return background(shape.fill(LocktyColors.ink(0.055)))
+            .locktyImperfectBorder(shape)
+    }
+}

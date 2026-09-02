@@ -662,7 +662,7 @@ struct AppGroupEditorView: View {
                     .buttonStyle(.plain)
                     .tappable()
                 }
-                .padding(.horizontal, LocktySpacing.lg)
+                .padding(.horizontal, LocktySpacing.cardInset)
                 .background(
                     RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
                         .fill(LocktyColors.ink(0.055))

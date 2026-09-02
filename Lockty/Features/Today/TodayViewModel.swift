@@ -41,6 +41,9 @@ struct TodayScheduledRoutine: Identifiable, Equatable {
     let routineID: UUID
     var name: String
     var icon: String?
+    /// The routine's own colour, so its glyph on Today is the one it wears everywhere
+    /// else. A column of identical grey icons says nothing about which routine is which.
+    var color: RoutineColor
     var startsAt: Date
     var dayText: String
     var timeText: String
@@ -432,6 +435,7 @@ final class TodayViewModel: ObservableObject {
                             routineID: routine.id,
                             name: routine.name,
                             icon: routine.icon,
+                            color: routine.color,
                             startsAt: start,
                             dayText: dayLabel(for: start, calendar: calendar),
                             timeText: timeLabel(for: start, timeZone: timeZone)

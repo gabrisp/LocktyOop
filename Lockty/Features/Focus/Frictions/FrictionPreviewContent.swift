@@ -85,7 +85,6 @@ struct FrictionPreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
-        .locktyEditOnLongPress(onEdit)
     }
 
     /// What happens once the flow is answered, which is not part of the sequence and so
@@ -108,7 +107,6 @@ struct FrictionPreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
-        .locktyEditOnLongPress(onEdit)
     }
 
     private func row(leading: String? = nil, title: String, value: String) -> some View {
@@ -134,6 +132,7 @@ struct FrictionPreviewContent: View {
                 .lineLimit(1)
         }
         .frame(minHeight: 56)
+        .locktyEditOnLongPress(onEdit)
     }
 
     private var divider: some View {

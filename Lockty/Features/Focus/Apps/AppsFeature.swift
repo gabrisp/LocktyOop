@@ -603,6 +603,21 @@ struct AppGroupEditorView: View {
     /// thrown away.
     @State private var isPickingApps = false
     @State private var isGoingBack = false
+    /// A new group opens straight into the form -- there is nothing to read yet.
+    @State private var isEditing: Bool
+
+    init(
+        viewModel: AppGroupEditorViewModel,
+        router: AppRouter,
+        toastCenter: LocktyToastCenter,
+        onCloseEditor: @escaping () -> Void
+    ) {
+        self.viewModel = viewModel
+        self.router = router
+        self.toastCenter = toastCenter
+        self.onCloseEditor = onCloseEditor
+        _isEditing = State(initialValue: viewModel.isCreating)
+    }
 
     /// Less rounded than the cards on Today. These are rows in a form, and a form of
     /// pills reads as a set of unrelated objects rather than as one thing being filled in.
@@ -628,14 +643,12 @@ struct AppGroupEditorView: View {
     var body: some View {
         LocktyDynamicSheet(animation: sheetAnimation) {
             sheetContent
-                .locktyDynamicSheetChrome(id: isPickingApps ? "apps" : "form") {
-                    Text(isPickingApps ? "Apps" : viewModel.title)
-                        .font(.system(.title3, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
+                .locktyDynamicSheetChrome(id: chromeID) {
+                    centerChrome
                 } leading: {
                     leadingChrome
                 } trailing: {
-                    Color.clear.frame(width: 44, height: 44)
+                    trailingChrome
                 }
         }
         .task {
@@ -667,13 +680,61 @@ struct AppGroupEditorView: View {
                     .locktyDynamicSheetSizes([.large])
                     .geometryGroup()
                     .transition(screenTransition)
-            } else {
+            } else if isEditing {
                 formScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
+            } else {
+                readOnlyScreen
                     .geometryGroup()
                     .transition(screenTransition)
             }
         }
         .geometryGroup()
+    }
+
+    private var readOnlyScreen: some View {
+        AppGroupPreviewContent(
+            name: trimmedName.isEmpty ? "Group" : trimmedName,
+            applicationTokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount),
+            onEdit: enterEditing
+        )
+        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func enterEditing() {
+        isGoingBack = false
+        withAnimation(sheetAnimation) { isEditing = true }
+    }
+
+    private func returnToReading() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) { isEditing = false }
+    }
+
+    private var chromeID: String {
+        if isPickingApps { return "apps" }
+        return isEditing ? "form" : "reading"
+    }
+
+    @ViewBuilder
+    private var centerChrome: some View {
+        if isPickingApps {
+            chromeTitle("Apps")
+        } else if isEditing {
+            chromeTitle(viewModel.title)
+        } else {
+            // Nothing while reading: the folder and the name below are already at full
+            // size, and a smaller copy above them says it twice.
+            EmptyView()
+        }
+    }
+
+    private func chromeTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.title3, design: .default, weight: .regular))
+            .foregroundStyle(LocktyColors.primaryText)
     }
 
     @ViewBuilder
@@ -683,9 +744,26 @@ struct AppGroupEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
+        } else if isEditing && !viewModel.isCreating {
+            LocktyDynamicSheetBarButton(action: returnToReading) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
         } else {
             LocktyDynamicSheetBarButton(action: { dismiss() }) {
                 Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var trailingChrome: some View {
+        if isPickingApps || isEditing {
+            Color.clear.frame(width: 44, height: 44)
+        } else {
+            LocktyDynamicSheetBarButton(action: enterEditing) {
+                Image(systemName: "pencil")
                     .font(.system(size: 15, weight: .medium))
             }
         }
@@ -725,7 +803,8 @@ struct AppGroupEditorView: View {
             AppFolderCard(
                 title: trimmedName.isEmpty ? "New group" : trimmedName,
                 subtitle: viewModel.selectedCount == 1 ? "1 item" : "\(viewModel.selectedCount) items",
-                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
+                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount),
+                titleAlignment: .center
             )
             .frame(maxWidth: .infinity)
             .padding(.top, LocktySpacing.sm)
@@ -789,7 +868,7 @@ struct AppGroupEditorView: View {
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .frame(maxHeight: .infinity, alignment: .top)
     }
 }
@@ -833,9 +912,18 @@ struct AppFolderCard: View {
     /// Drawn as a border around the folder. Used where folders are being picked rather
     /// than opened.
     var isSelected = false
+    /// Where the name and count sit under the folder.
+    ///
+    /// Leading in a grid, where a column of names has an edge to line up on and a name
+    /// that wraps has to keep it. Centred where the folder is alone on the screen: there
+    /// is no column, and a centred folder with its name pushed to the left of itself
+    /// reads as two things that were laid out by different people.
+    var titleAlignment: HorizontalAlignment = .leading
 
     private let folderSide: CGFloat = 110
-    private let iconScale: CGFloat = 1.58
+    // Larger than before, which the mask makes safe: the icon can overrun its cell now
+    // and be cut back to the tile shape instead of showing its own corner mid-air.
+    private let iconScale: CGFloat = 1.82
     /// How much of its 38pt cell an app icon actually covers, and so how wide the "+N"
     /// scrim over the last one has to be.
     ///
@@ -883,17 +971,17 @@ struct AppFolderCard: View {
             // free-height, a folder whose name wrapped grew taller than the ones beside
             // it and dragged the whole row out of line -- and its subtitle sat lower than
             // everyone else's.
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: titleAlignment, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(LocktyColors.primaryText)
-                    .multilineTextAlignment(.leading)
+                    .multilineTextAlignment(titleAlignment == .center ? .center : .leading)
                     .lineLimit(2)
 
                 Text(subtitle)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
-                    .multilineTextAlignment(.leading)
+                    .multilineTextAlignment(titleAlignment == .center ? .center : .leading)
                     .lineLimit(1)
             }
             // The height is reserved on the block, not on the title.
@@ -902,7 +990,11 @@ struct AppFolderCard: View {
             // that reservation, so a one-line name had its count sitting a whole line
             // below it -- which is the gap that looked wrong. Reserving it out here keeps
             // the pair together at the top and still leaves every card the same height.
-            .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 54,
+                alignment: titleAlignment == .center ? .top : .topLeading
+            )
         }
         .frame(width: folderSide, alignment: .top)
     }

@@ -135,7 +135,6 @@ struct RoutinePreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
-        .locktyEditOnLongPress(onEdit)
     }
 
     private func row<Value: View>(
@@ -155,6 +154,7 @@ struct RoutinePreviewContent: View {
                 .lineLimit(1)
         }
         .frame(minHeight: 56)
+        .locktyEditOnLongPress(onEdit)
     }
 
     private var divider: some View {

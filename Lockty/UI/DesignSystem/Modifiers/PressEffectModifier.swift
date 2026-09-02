@@ -201,14 +201,14 @@ extension View {
     }
 }
 
-/// A long press that lights and shrinks what is under it, and then acts.
+/// A long press that lights what is under it, and then acts.
 ///
-/// The same surface a button gets, on something that is not a button. Reading a routine
-/// is not a screen of controls -- there is nothing to tap -- but holding a part of it and
-/// having it answer is the plainest way into editing that part, and it cannot be reached
-/// by accident the way a tap target can.
-private struct LocktyLongPressModifier<S: Shape>: ViewModifier {
-    let shape: S
+/// Lights it, rather than laying a shape over it. The surface a button draws is a
+/// rectangle in the button's own outline, which is right for a button and wrong here:
+/// what is being held is a row inside a card, and a rectangle across it reads as a
+/// highlight bar rather than as the row responding. This is the same treatment
+/// `.locktyRow` gives a list row, on something that is not a button.
+private struct LocktyLongPressModifier: ViewModifier {
     let minimumDuration: Double
     let action: () -> Void
 
@@ -217,14 +217,16 @@ private struct LocktyLongPressModifier<S: Shape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .locktyInteractiveSurface(shape: shape)
-            .environment(\.locktySurfacePressed, isPressed)
-            .contentShape(shape)
+            .brightness(isPressed ? 0.16 : 0)
+            .saturation(isPressed ? 1.1 : 1)
+            .scaleEffect(isPressed ? 0.99 : 1)
+            .animation(.smooth(duration: 0.18), value: isPressed)
+            .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: minimumDuration) {
                 hapticTrigger += 1
                 action()
             } onPressingChanged: { pressing in
-                withAnimation(.smooth(duration: 0.18)) { isPressed = pressing }
+                isPressed = pressing
             }
             // Impact on the way in and success when it fires, so the hold has an end you
             // can feel rather than one you have to watch for.
@@ -234,14 +236,12 @@ private struct LocktyLongPressModifier<S: Shape>: ViewModifier {
 }
 
 extension View {
-    func locktyLongPress<S: Shape>(
-        shape: S,
+    func locktyLongPress(
         minimumDuration: Double = 0.35,
         action: @escaping () -> Void
     ) -> some View {
         modifier(
             LocktyLongPressModifier(
-                shape: shape,
                 minimumDuration: minimumDuration,
                 action: action
             )
@@ -249,9 +249,12 @@ extension View {
     }
 }
 
-
 extension View {
-    /// Holding a summary card opens the editor for what it summarises.
+    /// Holding one line of a summary opens the editor for what it summarises.
+    ///
+    /// Per row, not per card. The gesture is meant to point at a thing -- hold the
+    /// schedule, get the schedule -- and a card-wide press lights the entire summary,
+    /// which says only "this whole panel is a button", which it is not.
     ///
     /// A no-op when there is nothing to open, so a preview shown somewhere that cannot
     /// edit -- a routine that is running, a friction being read from a rule -- neither
@@ -259,7 +262,7 @@ extension View {
     @ViewBuilder
     func locktyEditOnLongPress(_ action: (() -> Void)?) -> some View {
         if let action {
-            locktyLongPress(shape: RoundedRectangle(cornerRadius: 26, style: .continuous), action: action)
+            locktyLongPress(action: action)
         } else {
             self
         }

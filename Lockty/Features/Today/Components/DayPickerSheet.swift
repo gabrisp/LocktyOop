@@ -96,13 +96,16 @@ struct DayPickerSheet: View {
         Button {
             move(by: offset)
         } label: {
+            // The same glass the sheet's own bar buttons wear. A flat filled circle
+            // beside a bar of glass ones reads as a different kind of control, when it is
+            // the same gesture in the same sheet.
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(LocktyColors.primaryText)
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(LocktyColors.elevatedBackground))
+                .safeGlass(radius: 22, interactive: true)
         }
-        .buttonStyle(.locktyInteractive(shape: Circle()))
+        .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.3 : 1)

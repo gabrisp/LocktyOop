@@ -57,10 +57,10 @@ struct LocktySwitch: View {
             }
         }
         .padding(inset)
-        .background(
-            Capsule(style: .continuous)
-                .fill(LocktyColors.ink(0.07))
-        )
+        // The track is glass as well, not a flat wash. The pill slides over it and the
+        // whole control is one thing being pressed, so a solid channel under a glass pill
+        // read as two materials that happened to be the same shape.
+        .safeGlass(radius: 999, interactive: true)
         .contentShape(Capsule(style: .continuous))
         .gesture(dragGesture)
         .disabled(isDisabled)

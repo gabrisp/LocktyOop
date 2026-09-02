@@ -101,7 +101,11 @@ struct LocktyCountRow: View {
                 move(by: 1)
             }
         }
-        .frame(minHeight: 44)
+        // A little air above and below. The buttons are 32 tall inside a 44 row, so the
+        // gap to the divider was four points -- and in a card of these the whole column
+        // read as one solid block of controls.
+        .padding(.vertical, LocktySpacing.sm)
+        .frame(minHeight: 52)
     }
 
     private var valueButton: some View {

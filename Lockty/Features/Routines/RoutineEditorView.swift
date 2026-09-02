@@ -1892,9 +1892,9 @@ struct RoutineEditorView: View {
     }
 
     private var checklistScreen: some View {
+        // No heading. The sheet's own bar says "Checklist" two rows above, and a glyph
+        // and a label repeating it is the screen introducing itself twice.
         VStack(alignment: .leading, spacing: 18) {
-            sectionHeading("Checklist", systemImage: "checklist")
-
             if isCreating || isEditing {
                 editableChecklistCard
 

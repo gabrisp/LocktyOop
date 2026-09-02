@@ -132,6 +132,17 @@ struct LocktyFeedbackOverlayState: Identifiable, Equatable {
     let tint: Color
 }
 
+/// The side of every app tile on the selection screen, and of the "+" that adds one.
+///
+/// One number, because the Add row, the list of what is selected and the suggestions are
+/// three views of the same thing and were drawn at 52, 38 and 72 -- so the icon of an app
+/// you had chosen was smaller than the button that chose it, and a suggestion was larger
+/// than both.
+private let locktyActivityTileSide: CGFloat = 52
+
+/// The gap between one of those tiles and its label, likewise shared.
+private let locktyActivityTileSpacing: CGFloat = LocktySpacing.lg
+
 struct LocktyActivitySelectionView: View {
     let title: String
     let addLabel: String
@@ -273,7 +284,7 @@ struct LocktyActivitySelectionView: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(LocktyColors.ink(0.08), lineWidth: 1)
                     }
-                    .frame(width: 52, height: 52)
+                    .frame(width: locktyActivityTileSide, height: locktyActivityTileSide)
                     .overlay {
                         Image(systemName: "plus")
                             .font(.system(size: 20, weight: .regular))
@@ -333,12 +344,12 @@ struct LocktyActivitySelectionView: View {
         switch item.kind {
         case .app(let token):
             let app = AppIdentity(token: token)
-            HStack(spacing: LocktySpacing.md) {
+            HStack(spacing: locktyActivityTileSpacing) {
                 AppIconView(
                     source: app.iconSource,
                     applicationToken: token,
                     fallbackSystemImage: app.iconSystemName,
-                    size: 38,
+                    size: locktyActivityTileSide,
                     chrome: .plain
                 )
                 .matchedGeometryEffect(id: item.id, in: selectionNamespace)
@@ -388,7 +399,7 @@ struct LocktyActivitySelectionView: View {
                                             source: suggestion.iconSource,
                                             applicationToken: token,
                                             fallbackSystemImage: suggestion.iconSystemName,
-                                            size: 72,
+                                            size: locktyActivityTileSide,
                                             chrome: .plain
                                         )
                                         .matchedGeometryEffect(
@@ -397,16 +408,16 @@ struct LocktyActivitySelectionView: View {
                                         )
 
                                         Image(systemName: "plus")
-                                            .font(.system(size: 25, weight: .medium))
+                                            .font(.system(size: 20, weight: .medium))
                                             .foregroundStyle(.white)
                                             .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
                                     }
-                                    // The icon's own size, with nothing round it. A
+                                    // The tile's own size, with nothing round it. A
                                     // larger frame centres the icon inside itself, and
                                     // the first one in the row then starts further in
                                     // than the heading above it -- by a margin nothing
                                     // else on the screen shares.
-                                    .frame(width: 72, height: 72)
+                                    .frame(width: locktyActivityTileSide, height: locktyActivityTileSide)
                                 }
                                 .buttonStyle(.locktyInteractive(brighten: true))
                                 .transition(.blurReplace.combined(with: .scale(0.9)).combined(with: .opacity))

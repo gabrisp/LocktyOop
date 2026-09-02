@@ -16,16 +16,13 @@ struct ScheduledRoutinesCard: View {
 
     private var radius: CGFloat { LocktyRadius.medium }
 
-    /// Enough to read the week without the card becoming the screen. Anything past this
-    /// is counted rather than listed.
+    /// Enough to read the week without the card becoming the screen. What is past it is
+    /// simply not here: a line saying "2 more this week" is a number you cannot act on,
+    /// under a list you can, and the heading's chevron already opens the full one.
     private let visibleLimit = 4
 
     private var visible: [TodayScheduledRoutine] {
         Array(routines.prefix(visibleLimit))
-    }
-
-    private var overflow: Int {
-        max(routines.count - visible.count, 0)
     }
 
     var body: some View {
@@ -49,11 +46,6 @@ struct ScheduledRoutinesCard: View {
                     }
                 }
 
-                if overflow > 0 {
-                    Text(overflow == 1 ? "1 more this week" : "\(overflow) more this week")
-                        .font(.system(.footnote, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.tertiaryText)
-                }
             }
         }
     }
@@ -65,7 +57,7 @@ struct ScheduledRoutinesCard: View {
             HStack(spacing: LocktySpacing.md) {
                 Image(systemName: routine.icon?.isEmpty == false ? routine.icon! : "repeat")
                     .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(LocktyColors.secondaryText)
+                    .foregroundStyle(LocktyColors.routine(routine.color))
                     .frame(width: 26)
 
                 Text(routine.name)

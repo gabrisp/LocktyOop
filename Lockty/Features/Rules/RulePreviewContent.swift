@@ -95,7 +95,6 @@ struct RulePreviewContent: View {
         }
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 26)
-        .locktyEditOnLongPress(onEdit)
     }
 
     /// Named after what it counts rather than after the rule, so the row reads as a
@@ -156,6 +155,7 @@ struct RulePreviewContent: View {
                 .lineLimit(1)
         }
         .frame(minHeight: 56)
+        .locktyEditOnLongPress(onEdit)
     }
 
     private var divider: some View {

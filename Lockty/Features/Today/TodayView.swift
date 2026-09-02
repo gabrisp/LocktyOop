@@ -313,7 +313,7 @@ struct TodayView: View {
             // people open this app to look at. Productivity has not gone anywhere -- it
             // is one of the values on the screen this opens.
             Button {
-                router.push(.screenTimeInsights(day: day))
+                router.push(.usageBreakdown(day: day))
             } label: {
                 ProductivityAuraView.screenTime(
                     usage: state.hourlyActivity.totalUsage,
@@ -323,9 +323,10 @@ struct TodayView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.locktyInteractive(brighten: true))
-            // Held rather than tapped, for the longer answer. A tap opens the day with
-            // its charts and sentences; holding goes straight to where the time actually
-            // went, app by app, over whichever stretch you ask for.
+            // Tap and hold do the same thing. They were two answers to one question --
+            // the day with its charts, or where the time went -- and the second turned
+            // out to be the one worth arriving at, so both lead there. The other screen
+            // is still in the app, just not reached from here.
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 0.4).onEnded { _ in
                     router.push(.usageBreakdown(day: day))
@@ -471,7 +472,10 @@ struct TodayView: View {
 //                    .padding(.top, 16)
                     TodayMetricGrid(state: state) { metric in
                         switch metric {
-                        case .screenTime: router.presentSheet(.screenTimeDetail(day))
+                        // Pushed, not presented: it goes to the same place the badge
+                        // does, and that is a screen you go to and come back from rather
+                        // than something asking to be answered.
+                        case .screenTime: router.push(.usageBreakdown(day: day))
                         case .bestDetox: router.presentSheet(.detoxDetail(day))
                         case .routines: router.presentSheet(.routineDaySummary(day))
                         case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))

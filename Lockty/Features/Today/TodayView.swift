@@ -308,16 +308,15 @@ struct TodayView: View {
             // offset below is what carries it there. No background of its own: the
             // screen's ground is already behind it, and a second one would show as a
             // panel sliding up with it.
-            // Screen time rather than the productivity score. The score is a judgement
-            // the app made; the time is the fact it was made from, and it is the thing
-            // people open this app to look at. Productivity has not gone anywhere -- it
-            // is one of the values on the screen this opens.
+            // The productivity score, as it was. `.screenTime` stays on the badge as an
+            // entry point -- it is a good one and the breakdown behind it is where both
+            // gestures now lead -- but the number on Today is the score again: it is the
+            // one figure here that is about the day rather than about the phone.
             Button {
                 router.push(.usageBreakdown(day: day))
             } label: {
-                ProductivityAuraView.screenTime(
-                    usage: state.hourlyActivity.totalUsage,
-                    baseline: screenTimeBaseline,
+                ProductivityAuraView.productivity(
+                    score: productivityScore,
                     collapseProgress: collapseProgress
                 )
                 .frame(maxWidth: .infinity)

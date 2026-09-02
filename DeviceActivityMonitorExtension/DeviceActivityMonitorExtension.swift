@@ -2,6 +2,7 @@ import DeviceActivity
 import FamilyControls
 import Foundation
 import ManagedSettings
+import UserNotifications
 
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
@@ -19,6 +20,12 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
+
+        if event.rawValue == AutoFocusIntervention.eventName {
+            RuntimeRepairCoordinator().deliverAutoFocusIntervention()
+            return
+        }
+
         RuntimeRepairCoordinator().repair(afterThresholdFor: activity, event: event)
     }
 }
@@ -150,6 +157,36 @@ private struct RuntimeRepairCoordinator {
 
     /// The allowance's usage threshold has been reached: the granted minutes have been
     /// spent, so it ends now whether or not its wall clock has run out.
+    /// AutoFocus stepping in.
+    ///
+    /// Says something rather than shielding. A block at forty minutes into a scroll is a
+    /// door slammed after the fact; the point of AutoFocus is the sentence that arrives
+    /// while you are still in it, and a sentence you can ignore is one you can also
+    /// answer. Whether to add friction on top is what the routines are for.
+    func deliverAutoFocusIntervention() {
+        let configuration = store.loadAutoFocusConfiguration()
+        let minutes = AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel)
+
+        let content = UNMutableNotificationContent()
+        content.title = AutoFocusIntervention.title
+        content.body = AutoFocusIntervention.line(
+            minutes: minutes,
+            durationText: minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h"
+        )
+        content.sound = .default
+
+        // Immediately, with no trigger: the moment it fires *is* the moment.
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(
+                identifier: "autofocus-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: nil
+            )
+        )
+
+        print("AutoFocus intervened after \(minutes)m")
+    }
+
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {
         _ = event
         // A daily-usage rule has spent the minutes it was given. Marking it here is what

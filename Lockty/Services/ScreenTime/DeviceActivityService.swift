@@ -13,6 +13,8 @@ protocol DeviceActivityServicing {
     /// Ends a quick timer on the wall clock, with the app not running.
     func scheduleQuickTimerEnd(routineID: UUID, endsAt: Date) async throws
     func cancelQuickTimer(routineID: UUID) async
+    /// Watches the distracting apps so AutoFocus can step in after a long stretch.
+    func syncAutoFocus(_ configuration: AutoFocusConfiguration) async throws
 }
 
 struct LiveDeviceActivityService: DeviceActivityServicing {
@@ -114,6 +116,42 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
 
     func cancelQuickTimer(routineID: UUID) async {
         center.stopMonitoring([DeviceActivityName("lockty.quick.\(routineID.uuidString)")])
+    }
+
+    /// Registers the usage threshold AutoFocus intervenes on.
+    ///
+    /// A whole-day window with a usage event inside it, which is the only shape Screen
+    /// Time offers for "tell me once they have spent this long in these apps". The event
+    /// fires once per window; the monitor re-registers it afterwards, which is what makes
+    /// the cooldown between interventions a real thing rather than a stored number.
+    func syncAutoFocus(_ configuration: AutoFocusConfiguration) async throws {
+        let name = DeviceActivityName(AutoFocusIntervention.activityName)
+        center.stopMonitoring([name])
+
+        let tokens = selectionStore.applicationTokens(for: configuration.distractingApplicationIDs)
+        guard !tokens.isEmpty else {
+            print("AutoFocus not monitored: no distracting apps selected")
+            return
+        }
+
+        let minutes = AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel)
+        let event = DeviceActivityEvent(
+            applications: tokens,
+            threshold: DateComponents(minute: minutes)
+        )
+
+        let schedule = DeviceActivitySchedule(
+            intervalStart: DateComponents(hour: 0, minute: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59),
+            repeats: true
+        )
+
+        try center.startMonitoring(
+            name,
+            during: schedule,
+            events: [DeviceActivityEvent.Name(AutoFocusIntervention.eventName): event]
+        )
+        print("AutoFocus monitoring \(tokens.count) app(s) at \(minutes)m")
     }
 
     func scheduleBreakEnd(_ activeBreak: ActiveBreak) async throws {

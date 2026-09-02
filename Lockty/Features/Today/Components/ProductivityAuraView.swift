@@ -38,7 +38,7 @@ struct ProductivityAuraView: View {
     /// One constant for the frame below and for `reservedHeight`, so trimming it moves
     /// the badge up and brings the content up with it. Split between the two, the page
     /// would keep a gap the badge had already left.
-    static let drawnHeightRatio: CGFloat = 0.74
+    static let drawnHeightRatio: CGFloat = 0.723
 
     /// What the badge occupies at a given collapse, so the screen above it can reserve
     /// exactly that and no more.

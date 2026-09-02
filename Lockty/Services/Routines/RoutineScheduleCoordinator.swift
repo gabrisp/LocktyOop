@@ -46,6 +46,7 @@ struct RoutineScheduleCoordinator {
 
     func sync() async {
         await syncRules()
+        await syncAutoFocus()
 
         guard let routines = try? await repository.routines() else { return }
 
@@ -67,6 +68,20 @@ struct RoutineScheduleCoordinator {
         }
 
         await syncStartAlarms(routines: routines)
+    }
+
+    /// Keeps AutoFocus watching whatever is currently marked as distracting.
+    ///
+    /// Here rather than at the moment the list is edited, because the list is edited from
+    /// three places -- the picker, the breakdown's pencil, a routine's own choices -- and
+    /// one of them will always be the one that forgot to re-register.
+    private func syncAutoFocus() async {
+        let configuration = appGroupStore.loadAutoFocusConfiguration()
+        do {
+            try await deviceActivityService.syncAutoFocus(configuration)
+        } catch {
+            print("AutoFocus sync failed: \(error.localizedDescription)")
+        }
     }
 
     /// Books the alarm that rings before each scheduled routine, and cancels the ones

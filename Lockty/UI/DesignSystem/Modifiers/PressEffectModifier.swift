@@ -235,9 +235,12 @@ private struct LocktyLongPressModifier: ViewModifier {
     @State private var hapticTrigger = 0
     @Environment(\.colorScheme) private var colorScheme
 
-    /// The shape is drawn a little wider than the row on every side, so what it lights
-    /// has air around it rather than being touched by the corners.
-    private var outset: CGFloat { 4 }
+    /// The shape is drawn a little larger than the row, so what it lights has air around
+    /// it rather than being touched by the corners. A point more at the top and bottom
+    /// than at the sides: rows sit closer to their neighbours vertically than to
+    /// anything horizontally, so the same outset reads as tighter there.
+    private var horizontalOutset: CGFloat { 4 }
+    private var verticalOutset: CGFloat { 5 }
 
     @ViewBuilder
     private var heldSurface: some View {
@@ -263,7 +266,8 @@ private struct LocktyLongPressModifier: ViewModifier {
                         )
                         .blendMode(LocktyPressTint.secondaryBlendMode(for: colorScheme))
                 }
-                .padding(-outset)
+                .padding(.horizontal, -horizontalOutset)
+                .padding(.vertical, -verticalOutset)
                 .allowsHitTesting(false)
                 .animation(.smooth(duration: 0.18), value: isPressed)
         }

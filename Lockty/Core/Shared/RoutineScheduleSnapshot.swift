@@ -15,6 +15,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     /// to and leaves the App Store open -- the same routine, enforcing less because
     /// nobody was there to press start.
     var contentRestrictions: ContentRestrictions
+    var strictGuards: StrictModeGuards
     var breakPolicy: BreakPolicy
     var pausePolicy: RoutinePausePolicy
     var allowsPauseDuringStrictMode: Bool
@@ -29,6 +30,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         blockedApplications = routine.blockedApplications
         blockedDomains = routine.blockedDomains
         contentRestrictions = routine.contentRestrictions
+        strictGuards = routine.strictGuards
         breakPolicy = routine.breakPolicy
         pausePolicy = routine.pausePolicy
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
@@ -47,6 +49,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
         contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
+        strictGuards = try container.decodeIfPresent(StrictModeGuards.self, forKey: .strictGuards) ?? .legacy
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)
         pausePolicy = try container.decodeIfPresent(RoutinePausePolicy.self, forKey: .pausePolicy) ?? .off
         allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
@@ -68,7 +71,8 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
                 blockedDomains: blockedDomains,
                 reason: .routine(id),
                 selectionScopes: selectionScopes,
-                contentRestrictions: contentRestrictions
+                contentRestrictions: contentRestrictions,
+                strictGuards: mode == .strict ? strictGuards : .none
             ),
             breakPolicySnapshot: breakPolicy,
             pausePolicySnapshot: pausePolicy,

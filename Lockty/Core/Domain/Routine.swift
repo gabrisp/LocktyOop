@@ -23,6 +23,8 @@ struct Routine: Codable, Hashable, Identifiable {
     var blockedDomains: Set<String>
     /// The device-level switches this routine throws while it runs.
     var contentRestrictions: ContentRestrictions
+    /// What Strict Mode closes, when this routine is strict. Ignored otherwise.
+    var strictGuards: StrictModeGuards
     var tasks: [RoutineTask]
     var startAlarmEnabled: Bool
     var breakPolicy: BreakPolicy
@@ -47,6 +49,7 @@ struct Routine: Codable, Hashable, Identifiable {
         blockedApplications: Set<AppIdentity.ID>,
         blockedDomains: Set<String>,
         contentRestrictions: ContentRestrictions = .none,
+        strictGuards: StrictModeGuards = StrictModeGuards(),
         tasks: [RoutineTask],
         startAlarmEnabled: Bool = false,
         breakPolicy: BreakPolicy,
@@ -66,6 +69,7 @@ struct Routine: Codable, Hashable, Identifiable {
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
         self.contentRestrictions = contentRestrictions
+        self.strictGuards = strictGuards
         self.tasks = tasks
         self.startAlarmEnabled = startAlarmEnabled
         self.breakPolicy = breakPolicy
@@ -91,6 +95,9 @@ struct Routine: Codable, Hashable, Identifiable {
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
         contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
+        // `.legacy`, not the new default: a strict routine written before this existed
+        // only prevented editing, and it does not get new restrictions retroactively.
+        strictGuards = try container.decodeIfPresent(StrictModeGuards.self, forKey: .strictGuards) ?? .legacy
         tasks = try container.decode([RoutineTask].self, forKey: .tasks)
         startAlarmEnabled = try container.decodeIfPresent(Bool.self, forKey: .startAlarmEnabled) ?? false
         breakPolicy = try container.decode(BreakPolicy.self, forKey: .breakPolicy)

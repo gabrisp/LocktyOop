@@ -42,6 +42,8 @@ final class RoutineEditorViewModel: ObservableObject {
     /// Adult content, purchases, installing apps. Edited on the selection screen with
     /// everything else this routine shuts.
     @Published var contentRestrictions: ContentRestrictions = .none
+    /// Which doors Strict Mode closes. Only read when the mode is strict.
+    @Published var strictGuards = StrictModeGuards()
     @Published var pendingDomain = ""
     @Published var errorMessage: String?
     @Published private(set) var selectedApplicationCount = 0
@@ -71,6 +73,7 @@ final class RoutineEditorViewModel: ObservableObject {
         var tasks: [EditableRoutineTask]
         var blockedDomains: [String]
         var contentRestrictions: ContentRestrictions
+        var strictGuards: StrictModeGuards
         var startAlarmEnabled: Bool
         var pauseFlowID: UUID?
         var allowsPauseDuringStrictMode: Bool
@@ -88,6 +91,7 @@ final class RoutineEditorViewModel: ObservableObject {
             tasks: tasks,
             blockedDomains: blockedDomains,
             contentRestrictions: contentRestrictions,
+            strictGuards: strictGuards,
             startAlarmEnabled: startAlarmEnabled,
             pauseFlowID: pauseFlowID,
             allowsPauseDuringStrictMode: allowsPauseDuringStrictMode,
@@ -293,6 +297,7 @@ final class RoutineEditorViewModel: ObservableObject {
         pauseFlowID = routine.pauseFlowID
         blockedDomains = routine.blockedDomains.sorted()
         contentRestrictions = routine.contentRestrictions
+        strictGuards = routine.strictGuards
         if let selection = try? selectionStore.load(scope: persistedSelectionScope) {
             try? selectionStore.save(selection, scope: draftSelectionScope)
         } else {
@@ -508,6 +513,7 @@ final class RoutineEditorViewModel: ObservableObject {
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             blockedDomains: Set(blockedDomains),
             contentRestrictions: contentRestrictions,
+            strictGuards: strictGuards,
             tasks: tasks,
             startAlarmEnabled: startAlarmEnabled,
             breakPolicy: breakPolicy,
@@ -636,6 +642,9 @@ private enum RoutineEditorLocalSheet: String, Identifiable {
     case checklist
     case breakSettings
     case color
+    /// Which doors Strict Mode closes. Opened by turning it on, because turning it on is
+    /// exactly when the question is worth asking.
+    case strictMode
     /// Writing a new pause without leaving the routine that will use it.
     case pauseFlow
 
@@ -903,6 +912,10 @@ struct RoutineEditorView: View {
                 colorScreen
                     .geometryGroup()
                     .transition(screenTransition)
+            case .strictMode:
+                strictModeScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case .pauseFlow:
                 // Measured like the routine's own screens: a pause is a name and a few
                 // steps, and the sheet is as tall as they come out.
@@ -944,6 +957,8 @@ struct RoutineEditorView: View {
             chromeTitleText("Break")
         case .color:
             chromeTitleText("Color")
+        case .strictMode:
+            chromeTitleText("Strict Mode")
         case .pauseFlow:
             chromeTitleText(pauseFlowEditor?.title ?? "New friction")
         case nil:
@@ -1950,6 +1965,19 @@ struct RoutineEditorView: View {
     }
 
 
+    /// What Strict Mode is set to close, said as a count rather than a list: four
+    /// half-sentences do not fit under a title, and the screen behind the row spells them
+    /// out in full.
+    private var strictSummary: String {
+        guard viewModel.mode == .strict else { return "No unlocks allowed" }
+        let count = viewModel.strictGuards.enabledCount
+        switch count {
+        case 0: return "Nothing prevented yet"
+        case 1: return "1 restriction"
+        default: return "\(count) restrictions"
+        }
+    }
+
     private var strictRow: some View {
         HStack(spacing: LocktySpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
@@ -1972,7 +2000,7 @@ struct RoutineEditorView: View {
                     }
                 }
 
-                Text("No se permiten desbloqueos")
+                Text(strictSummary)
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
@@ -1984,13 +2012,123 @@ struct RoutineEditorView: View {
             LocktySwitch(
                 isOn: Binding(
                     get: { viewModel.mode == .strict },
-                    set: { viewModel.mode = $0 ? .strict : .normal }
+                    set: { isStrict in
+                        viewModel.mode = isStrict ? .strict : .normal
+                        // Turning it on asks what it should close, rather than deciding
+                        // for you: locking the passcode and locking the clock are very
+                        // different promises to make to yourself, and a single switch
+                        // that quietly makes both is the kind of thing you find out
+                        // about at the wrong moment.
+                        if isStrict { openChildSheet(.strictMode) }
+                    }
                 )
             )
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
         .locktyCardBackground(cornerRadius: cardRadius)
+        // The row itself opens it again, so the choice can be revisited without turning
+        // Strict Mode off and on.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard viewModel.mode == .strict else { return }
+            openChildSheet(.strictMode)
+        }
+    }
+
+    /// What Strict Mode prevents, one door per row.
+    private var strictModeScreen: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("While this routine runs, prevent:")
+                .font(.system(.subheadline, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+
+            VStack(spacing: 0) {
+                strictGuardRow(
+                    systemImage: "trash",
+                    title: "Editing or deleting",
+                    subtitle: "This routine cannot be changed or removed.",
+                    isOn: $viewModel.strictGuards.preventsEditing
+                )
+
+                strictGuardDivider
+
+                strictGuardRow(
+                    systemImage: "clock.badge.xmark",
+                    title: "Changing date and time",
+                    subtitle: "The clock stays automatic.",
+                    isOn: $viewModel.strictGuards.preventsDateAndTimeChanges
+                )
+
+                strictGuardDivider
+
+                strictGuardRow(
+                    systemImage: "xmark.app",
+                    title: "Uninstalling apps",
+                    subtitle: "Lockty included.",
+                    isOn: $viewModel.strictGuards.preventsAppRemoval
+                )
+
+                strictGuardDivider
+
+                strictGuardRow(
+                    systemImage: "faceid",
+                    title: "Changing Face ID and passcode",
+                    subtitle: "What guards Screen Time itself.",
+                    isOn: $viewModel.strictGuards.preventsPasscodeChanges
+                )
+            }
+            .padding(.horizontal, LocktySpacing.cardInset)
+            .locktyCardBackground(cornerRadius: cardRadius)
+
+            // Said once, plainly. Three of these are iOS restrictions that outlive the
+            // app being closed, which is the point of them and also the thing worth
+            // knowing before switching one on.
+            Text("The last three are enforced by iOS and stay in place until the routine ends.")
+                .font(.system(.footnote, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, LocktySpacing.screenInset)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func strictGuardRow(
+        systemImage: String,
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(subtitle)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: LocktySpacing.sm)
+
+            LocktySwitch(isOn: isOn)
+        }
+        .padding(.vertical, LocktySpacing.md)
+        .frame(minHeight: 56)
+    }
+
+    private var strictGuardDivider: some View {
+        Divider().overlay(LocktyColors.separator.opacity(0.45))
     }
 
     private var strictReadOnlyRow: some View {
@@ -2000,7 +2138,7 @@ struct RoutineEditorView: View {
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
-                Text(viewModel.mode == .strict ? "On" : "Desactivado")
+                Text(viewModel.mode == .strict ? strictSummary : "Off")
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
             }

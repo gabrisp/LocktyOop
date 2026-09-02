@@ -15,6 +15,8 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     var exemptApplications: Set<AppIdentity.ID>
     /// The device-level switches the routines behind this policy asked for.
     var contentRestrictions: ContentRestrictions
+    /// What the strict routines behind it close.
+    var strictGuards: StrictModeGuards
 
     init(
         blockedApplications: Set<AppIdentity.ID>,
@@ -22,7 +24,8 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         reason: ShieldReason,
         selectionScopes: Set<ScreenTimeSelectionScope> = [],
         exemptApplications: Set<AppIdentity.ID> = [],
-        contentRestrictions: ContentRestrictions = .none
+        contentRestrictions: ContentRestrictions = .none,
+        strictGuards: StrictModeGuards = .none
     ) {
         self.blockedApplications = blockedApplications
         self.blockedDomains = blockedDomains
@@ -30,6 +33,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         self.selectionScopes = selectionScopes
         self.exemptApplications = exemptApplications
         self.contentRestrictions = contentRestrictions
+        self.strictGuards = strictGuards
     }
 
     // Written by hand so a runtime state persisted before exemptApplications existed
@@ -42,6 +46,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
         selectionScopes = try container.decodeIfPresent(Set<ScreenTimeSelectionScope>.self, forKey: .selectionScopes) ?? []
         exemptApplications = try container.decodeIfPresent(Set<AppIdentity.ID>.self, forKey: .exemptApplications) ?? []
         contentRestrictions = try container.decodeIfPresent(ContentRestrictions.self, forKey: .contentRestrictions) ?? .none
+        strictGuards = try container.decodeIfPresent(StrictModeGuards.self, forKey: .strictGuards) ?? .none
     }
 
     /// Whether this policy shields anything at all.
@@ -54,7 +59,7 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     /// the App Store has no apps and no domains, and calling that "nothing" left it never
     /// applied.
     var blocksNothing: Bool {
-        blockedApplications.isEmpty && blockedDomains.isEmpty && contentRestrictions.isEmpty
+        blockedApplications.isEmpty && blockedDomains.isEmpty && contentRestrictions.isEmpty && strictGuards.isEmpty
     }
 
     static let empty = ShieldPolicy(
@@ -70,7 +75,10 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
             blockedDomains: routine.blockedDomains,
             reason: .routine(routine.id),
             selectionScopes: selectionScopes,
-            contentRestrictions: routine.contentRestrictions
+            contentRestrictions: routine.contentRestrictions,
+            // Only a strict routine closes these. A normal one carries the settings it
+            // was given and asks for none of them.
+            strictGuards: routine.mode == .strict ? routine.strictGuards : .none
         )
     }
 }

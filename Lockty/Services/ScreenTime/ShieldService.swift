@@ -40,7 +40,8 @@ final class LiveShieldService: ShieldServicing {
         var selection = try selectionStore.selection(for: policy)
         let blockedDomains = Set(policy.blockedDomains.map(ManagedSettings.WebDomain.init(domain:)))
         let restrictions = policy.contentRestrictions
-        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty || !restrictions.isEmpty else {
+        let guards = policy.strictGuards
+        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty || !blockedDomains.isEmpty || !restrictions.isEmpty || !guards.isEmpty else {
             print("Shield apply failed because no selection matched policy reason=\(String(describing: policy.reason)) blockedApps=\(policy.blockedApplications.count) blockedDomains=\(policy.blockedDomains.count)")
             throw ShieldServiceError.selectionNotConfigured
         }
@@ -80,6 +81,11 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.appStore.denyInAppPurchases = restrictions.blocksITunesPurchases ? true : nil
         managedSettingsStore.appStore.requirePasswordForPurchases = restrictions.blocksITunesPurchases ? true : nil
         managedSettingsStore.application.denyAppInstallation = restrictions.blocksAppInstallation ? true : nil
+        // Strict Mode's doors. Set through ManagedSettings rather than checked by us, so
+        // they hold with the app closed -- which is the only time they matter.
+        managedSettingsStore.application.denyAppRemoval = guards.preventsAppRemoval ? true : nil
+        managedSettingsStore.dateAndTime.requireAutomaticDateAndTime = guards.preventsDateAndTimeChanges ? true : nil
+        managedSettingsStore.passcode.lockPasscode = guards.preventsPasscodeChanges ? true : nil
         try appGroupStore.updateRuntimeState { state in state.shieldPolicy = policy }
     }
 
@@ -92,6 +98,9 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.appStore.denyInAppPurchases = nil
         managedSettingsStore.appStore.requirePasswordForPurchases = nil
         managedSettingsStore.application.denyAppInstallation = nil
+        managedSettingsStore.application.denyAppRemoval = nil
+        managedSettingsStore.dateAndTime.requireAutomaticDateAndTime = nil
+        managedSettingsStore.passcode.lockPasscode = nil
         try appGroupStore.updateRuntimeState { state in
             if state.shieldPolicy == policy { state.shieldPolicy = .empty }
         }
@@ -110,6 +119,9 @@ final class LiveShieldService: ShieldServicing {
         managedSettingsStore.appStore.denyInAppPurchases = nil
         managedSettingsStore.appStore.requirePasswordForPurchases = nil
         managedSettingsStore.application.denyAppInstallation = nil
+        managedSettingsStore.application.denyAppRemoval = nil
+        managedSettingsStore.dateAndTime.requireAutomaticDateAndTime = nil
+        managedSettingsStore.passcode.lockPasscode = nil
         try appGroupStore.saveRuntimeState(.empty)
         print("Cleared all ManagedSettings restrictions and reset runtime state.")
     }

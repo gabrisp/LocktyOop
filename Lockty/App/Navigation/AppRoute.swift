@@ -17,4 +17,6 @@ enum AppRoute: Hashable {
     case screenTimeInsights(day: Date)
     /// What the shield says when it stops you.
     case blockScreens
+    /// Where the time went, by app, over a day, a week or a month.
+    case usageBreakdown(day: Date)
 }

@@ -323,6 +323,14 @@ struct TodayView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.locktyInteractive(brighten: true))
+            // Held rather than tapped, for the longer answer. A tap opens the day with
+            // its charts and sentences; holding goes straight to where the time actually
+            // went, app by app, over whichever stretch you ask for.
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                    router.push(.usageBreakdown(day: day))
+                }
+            )
         }
         // Rides up into the navigation bar as it collapses, so what is left at the end
         // sits on the toolbar's own line, beside Settings, rather than parked under it.

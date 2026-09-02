@@ -517,6 +517,16 @@ struct FeatureFactory {
         )
     }
 
+    func makeUsageBreakdown(day: Date) -> UsageBreakdownView {
+        UsageBreakdownView(
+            day: day,
+            viewModel: UsageBreakdownViewModel(
+                day: day,
+                classificationRepository: classificationRepository
+            )
+        )
+    }
+
     func makeScreenTimeInsights(day: Date) -> ScreenTimeInsightsView {
         ScreenTimeInsightsView(day: day, viewModel: todayViewModel)
     }

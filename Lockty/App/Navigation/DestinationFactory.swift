@@ -42,6 +42,9 @@ struct DestinationFactory {
         case .blockScreens:
             featureFactory.makeBlockScreenSettings()
 
+        case .usageBreakdown(let day):
+            featureFactory.makeUsageBreakdown(day: day)
+
         }
     }
 

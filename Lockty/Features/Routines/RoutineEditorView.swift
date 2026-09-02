@@ -751,7 +751,25 @@ struct RoutineEditorView: View {
     /// Leaving is free until something has been edited, and then it asks. Applies to the
     /// X and to the naming screen's back chevron alike -- both are ways out of the same
     /// unsaved state.
+    /// Whether there is an edit in progress that could be thrown away.
+    ///
+    /// The summary is not one. Nothing on it changes the routine, so a sheet that refuses
+    /// to be swiped away from it -- and then asks whether to discard changes nobody made
+    /// -- is the app arguing with a reader.
+    private var isDiscardable: Bool {
+        isEditing || isCreating || isNaming
+    }
+
     private func requestClose() {
+        // Never from the summary. Reading a routine changes nothing, so there is nothing
+        // to discard -- and the dialog was appearing there anyway, because loading a
+        // routine can move the draft off its baseline (a sorted list of domains, a
+        // selection arriving late) without anyone having typed a thing.
+        guard isEditing || isCreating || isNaming else {
+            returnToParentOrDismiss()
+            return
+        }
+
         guard viewModel.hasChanges else {
             returnToParentOrDismiss()
             return
@@ -802,7 +820,7 @@ struct RoutineEditorView: View {
             }
         }
         .locktyInteractiveDismiss(
-            blocked: viewModel.hasChanges && activeSheet == nil,
+            blocked: isDiscardable && viewModel.hasChanges && activeSheet == nil,
             // Swiping down means the same thing the X does, so it gets the same answer
             // rather than a sheet that silently refuses to move.
             onAttempt: requestClose
@@ -2265,7 +2283,14 @@ struct RoutineEditorView: View {
                 .padding(.top, LocktySpacing.sm)
                 .padding(.horizontal, LocktySpacing.screenInset)
             } else if viewModel.activeRoutine() == nil {
-                LocktyHoldButton(title: "Hold to start", systemImage: "play.fill") {
+                // The routine's own colour, not a generic green. Every other thing on
+                // this screen is already wearing it, and the button is the one that
+                // starts the thing it belongs to.
+                LocktyHoldButton(
+                    title: "Hold to start",
+                    systemImage: "play.fill",
+                    tint: LocktyColors.routine(viewModel.color)
+                ) {
                     Task {
                         await startRoutine()
                         dismissEditor()

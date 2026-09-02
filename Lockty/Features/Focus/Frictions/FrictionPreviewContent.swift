@@ -130,6 +130,8 @@ struct FrictionPreviewContent: View {
                 .font(.system(.body, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
                 .lineLimit(1)
+                .monospacedDigit()
+                .contentTransition(.numericText())
         }
         .frame(minHeight: 56)
         .locktyEditOnLongPress(onEdit)

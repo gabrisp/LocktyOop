@@ -68,10 +68,13 @@ final class AppGroupEditorViewModel: ObservableObject {
 
     @Published var name = ""
     @Published private(set) var selectionPreview = FamilyActivitySelection()
+    @Published private(set) var usedByRoutines = 0
+    @Published private(set) var usedByRules = 0
     @Published var errorMessage: String?
 
     private let repository: UserAppGroupRepository
     private let selectionStore: ScreenTimeSelectionStore
+    private let appGroupStore: AppGroupStore
     private let initialGroupID: UUID?
     private var hasLoaded = false
     private var createdAt = Date()
@@ -80,13 +83,15 @@ final class AppGroupEditorViewModel: ObservableObject {
         appGroupID: UUID?,
         draftID: UUID,
         repository: UserAppGroupRepository,
-        selectionStore: ScreenTimeSelectionStore
+        selectionStore: ScreenTimeSelectionStore,
+        appGroupStore: AppGroupStore = AppGroupStore()
     ) {
         initialGroupID = appGroupID
         editingID = appGroupID ?? UUID()
         self.draftID = draftID
         self.repository = repository
         self.selectionStore = selectionStore
+        self.appGroupStore = appGroupStore
     }
 
     var isCreating: Bool { initialGroupID == nil }
@@ -121,6 +126,16 @@ final class AppGroupEditorViewModel: ObservableObject {
             name = group.name
             createdAt = group.createdAt
         }
+
+        // From the app-group mirrors rather than Core Data: they are the same lists the
+        // shield resolves against, so a group in a routine that has not been synced yet
+        // is not counted as in use when it is not yet in use.
+        usedByRoutines = appGroupStore.loadRoutineScheduleSnapshots()
+            .filter { $0.appGroupIDs.contains(initialGroupID) }
+            .count
+        usedByRules = appGroupStore.loadStoredRules()
+            .filter { $0.appGroupIDs.contains(initialGroupID) }
+            .count
 
         if let selection = try? selectionStore.load(scope: persistedScope) {
             try? selectionStore.save(selection, scope: draftScope)
@@ -697,6 +712,8 @@ struct AppGroupEditorView: View {
         AppGroupPreviewContent(
             name: trimmedName.isEmpty ? "Group" : trimmedName,
             applicationTokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount),
+            usedByRoutines: viewModel.usedByRoutines,
+            usedByRules: viewModel.usedByRules,
             onEdit: enterEditing
         )
         .frame(maxWidth: .infinity, alignment: .center)

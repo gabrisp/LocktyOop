@@ -94,6 +94,8 @@ struct SettingsView: View {
                         Task { await access.requestNotifications() }
                     }
 
+                    settingsDivider
+
                     navigationRow(
                         systemImage: "shield.lefthalf.filled",
                         title: "Block screens",
@@ -120,17 +122,25 @@ struct SettingsView: View {
                         Task { await access.requestScreenTime() }
                     }
 
+                    settingsDivider
+
                     accessRow(access.notificationState, systemImage: "bell.badge") {
                         Task { await access.requestNotifications() }
                     }
+
+                    settingsDivider
 
                     accessRow(access.locationState, systemImage: "location") {
                         Task { await access.requestLocation() }
                     }
 
+                    settingsDivider
+
                     accessRow(access.alarmState, systemImage: "alarm") {
                         Task { await access.requestAlarms() }
                     }
+
+                    settingsDivider
 
                     healthRow
                 }
@@ -162,10 +172,19 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             LocktySectionTitle(title, prominent: true)
 
-            VStack(spacing: LocktySpacing.sm) {
+            // One card holding rows, not a stack of one-row cards. Every other list in
+            // the app is a card with dividers in it, and Settings was the one screen
+            // where each row floated in a pill of its own.
+            VStack(spacing: 0) {
                 content()
             }
+            .padding(.horizontal, LocktySpacing.cardInset)
+            .locktyCardBackground(cornerRadius: 26)
         }
+    }
+
+    private var settingsDivider: some View {
+        Divider().overlay(LocktyColors.separator.opacity(0.45))
     }
 
     /// A row that opens something, or asks for something. The chevron is the promise
@@ -209,14 +228,11 @@ struct SettingsView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(LocktyColors.secondaryText)
             }
-            .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                    .fill(LocktyColors.ink(0.055))
-            )
+            .frame(minHeight: 58)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         .tappable()
     }
 
@@ -265,12 +281,8 @@ struct SettingsView: View {
                     .foregroundStyle(LocktyColors.productive)
             }
         }
-        .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                .fill(LocktyColors.ink(0.055))
-        )
+        .frame(minHeight: 58)
     }
 
     /// Connecting Health, and what that connection can honestly claim.
@@ -312,14 +324,11 @@ struct SettingsView: View {
                         .foregroundStyle(LocktyColors.secondaryText)
                 }
             }
-            .padding(.horizontal, LocktySpacing.md)
             .padding(.vertical, LocktySpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                    .fill(LocktyColors.ink(0.055))
-            )
+            .frame(minHeight: 58)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
         .tappable()
         .disabled(viewModel.healthState == .unavailable)
         .opacity(viewModel.healthState == .unavailable ? 0.4 : 1)

@@ -446,7 +446,7 @@ struct RuleEditorView: View {
             }
         }
         .locktyInteractiveDismiss(
-            blocked: viewModel.hasChanges && !isShowingKindChoice && activeSheet == nil,
+            blocked: isDiscardable && viewModel.hasChanges && !isShowingKindChoice && activeSheet == nil,
             onAttempt: requestClose
         )
         .confirmationDialog(
@@ -1386,7 +1386,20 @@ struct RuleEditorView: View {
         }
     }
 
+    /// Whether there is an edit in progress that could be thrown away. The summary is
+    /// not one: nothing on it changes the rule.
+    private var isDiscardable: Bool {
+        isEditing || viewModel.isCreating || isNaming
+    }
+
     private func requestClose() {
+        // Never from the summary: reading a rule changes nothing, so there is nothing to
+        // discard.
+        guard isEditing || viewModel.isCreating || isNaming else {
+            returnToParentOrDismiss()
+            return
+        }
+
         guard viewModel.hasChanges else {
             returnToParentOrDismiss()
             return

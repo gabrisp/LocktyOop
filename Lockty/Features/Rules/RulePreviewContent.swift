@@ -153,6 +153,11 @@ struct RulePreviewContent: View {
                 .font(.system(.body, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
                 .lineLimit(1)
+                // "3 days" to "4 days" is the same figure moving, and it should read as
+                // one. These are the only numbers on the screen and they were the only
+                // ones not rolling.
+                .monospacedDigit()
+                .contentTransition(.numericText())
         }
         .frame(minHeight: 56)
         .locktyEditOnLongPress(onEdit)

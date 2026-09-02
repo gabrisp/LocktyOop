@@ -11,6 +11,11 @@ import SwiftUI
 struct AppGroupPreviewContent: View {
     let name: String
     let applicationTokens: [ApplicationToken]
+    /// How many routines and rules name this group. Counted rather than named: a group
+    /// in six routines would be a paragraph, and the number is what the question is
+    /// really asking.
+    var usedByRoutines: Int = 0
+    var usedByRules: Int = 0
     /// Handed the way into editing, when there is one. Holding a line is the same gesture
     /// as pressing the pencil, on the thing being described.
     var onEdit: (() -> Void)?
@@ -48,6 +53,17 @@ struct AppGroupPreviewContent: View {
         .padding(.bottom, LocktySpacing.md)
     }
 
+    private var usageText: String {
+        var parts: [String] = []
+        if usedByRoutines > 0 {
+            parts.append(usedByRoutines == 1 ? "1 routine" : "\(usedByRoutines) routines")
+        }
+        if usedByRules > 0 {
+            parts.append(usedByRules == 1 ? "1 rule" : "\(usedByRules) rules")
+        }
+        return parts.isEmpty ? "Nothing yet" : parts.joined(separator: ", ")
+    }
+
     private var subtitleLine: String {
         "Group · \(count == 1 ? "1 app" : "\(count) apps")"
     }
@@ -66,10 +82,10 @@ struct AppGroupPreviewContent: View {
             Divider()
                 .overlay(LocktyColors.separator.opacity(0.45))
 
-            // What a group is for, said once. It is the only thing about a group that is
-            // not visible in the folder above, and the reason one is worth making.
+            // The only thing about a group that is not visible in the folder above, and
+            // the one that decides whether removing it matters.
             row("Used by") {
-                Text("Routines and rules")
+                Text(usageText)
             }
         }
         .padding(.horizontal, LocktySpacing.cardInset)
@@ -91,6 +107,11 @@ struct AppGroupPreviewContent: View {
                 .font(.system(.body, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
                 .lineLimit(1)
+                // "3 days" to "4 days" is the same figure moving, and it should read as
+                // one. These are the only numbers on the screen and they were the only
+                // ones not rolling.
+                .monospacedDigit()
+                .contentTransition(.numericText())
         }
         .frame(minHeight: 56)
         .locktyEditOnLongPress(onEdit)

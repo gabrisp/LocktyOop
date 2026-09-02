@@ -87,14 +87,24 @@ struct ScreenTimeInsightsView: View {
                 Capsule(style: .continuous)
                     .fill(tint.opacity(0.12))
             }
-            // The rim carries the value: a full ring is a full score, and the arc is the
-            // only part of the pill that says how far along it is without a second number.
+            // The rim carries the value: a full lap is a full score, and the arc is the
+            // only part of the pill that says how far along it is without a second
+            // number.
+            //
+            // No rotation. A trimmed capsule already starts its path at the top; turning
+            // it ninety degrees turns the *shape*, and a capsule rotated inside a frame
+            // that is not square comes out as a stroke that no longer follows the pill it
+            // is drawn on -- which is what the borders were doing.
             .overlay {
-                Capsule(style: .continuous)
-                    .trim(from: 0, to: max(min(metric.value / 100, 1), 0.02))
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.smooth(duration: 0.8), value: metric.value)
+                ZStack {
+                    Capsule(style: .continuous)
+                        .stroke(LocktyColors.ink(0.10), lineWidth: 2)
+
+                    Capsule(style: .continuous)
+                        .trim(from: 0, to: max(min(metric.value / 100, 1), 0.02))
+                        .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .animation(.smooth(duration: 0.8), value: metric.value)
+                }
             }
 
             Text(metric.kind.title)

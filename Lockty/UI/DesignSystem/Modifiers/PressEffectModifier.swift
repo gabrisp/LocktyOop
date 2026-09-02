@@ -201,14 +201,16 @@ extension View {
     }
 }
 
-/// A long press that lights what is under it, and then acts.
+/// A long press that answers while it is held, and then acts.
 ///
-/// Lights it, rather than laying a shape over it. The surface a button draws is a
-/// rectangle in the button's own outline, which is right for a button and wrong here:
-/// what is being held is a row inside a card, and a rectangle across it reads as a
-/// highlight bar rather than as the row responding. This is the same treatment
-/// `.locktyRow` gives a list row, on something that is not a button.
+/// Two ways of answering, because two things get held. A row inside a card has no
+/// silhouette of its own, so it *brightens* -- a rectangle laid across it reads as a
+/// highlight bar rather than as the row responding. A menu item does have one, and gets
+/// the same surface a button gets, drawn in its own rounded rectangle: it is a control in
+/// a panel of controls, and the shape is what says which one is under your finger.
 private struct LocktyLongPressModifier: ViewModifier {
+    /// Nil brightens; a shape draws the surface in it.
+    let shape: AnyShape?
     let minimumDuration: Double
     let action: () -> Void
 
@@ -217,10 +219,15 @@ private struct LocktyLongPressModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .brightness(isPressed ? 0.16 : 0)
-            .saturation(isPressed ? 1.1 : 1)
+            .brightness(shape == nil && isPressed ? 0.16 : 0)
+            .saturation(shape == nil && isPressed ? 1.1 : 1)
             .scaleEffect(isPressed ? 0.99 : 1)
             .animation(.smooth(duration: 0.18), value: isPressed)
+            .locktyInteractiveSurface(
+                enabled: shape != nil,
+                shape: shape ?? AnyShape(Rectangle())
+            )
+            .environment(\.locktySurfacePressed, isPressed)
             .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: minimumDuration) {
                 hapticTrigger += 1
@@ -236,12 +243,29 @@ private struct LocktyLongPressModifier: ViewModifier {
 }
 
 extension View {
+    /// Held, and lit by brightening. For a row inside a card.
     func locktyLongPress(
         minimumDuration: Double = 0.35,
         action: @escaping () -> Void
     ) -> some View {
         modifier(
             LocktyLongPressModifier(
+                shape: nil,
+                minimumDuration: minimumDuration,
+                action: action
+            )
+        )
+    }
+
+    /// Held, and lit by drawing the surface in the given shape. For a menu item.
+    func locktyLongPress<S: Shape>(
+        shape: S,
+        minimumDuration: Double = 0.35,
+        action: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            LocktyLongPressModifier(
+                shape: AnyShape(shape),
                 minimumDuration: minimumDuration,
                 action: action
             )

@@ -53,8 +53,13 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         //
         // Every responsible routine has to allow it: one strict routine is enough to
         // keep the app shut, and offering a button that cannot deliver would be a lie.
+        // Two questions, both of which have to be yes. Strict Mode can take the button
+        // away, and so can a routine that simply allows no breaks -- `breakAvailability`
+        // refuses on `maximumBreaks == 0`, so a shield offering "Unlock with Lockty"
+        // there was offering a button that walks you into a flow which then says no.
         let offersUnlock = !responsible.isEmpty && responsible.allSatisfy { routine in
-            routine.modeSnapshot != .strict || routine.allowsPauseDuringStrictMode
+            let strictAllows = routine.modeSnapshot != .strict || routine.allowsPauseDuringStrictMode
+            return strictAllows && routine.breakPolicySnapshot.maximumBreaks > 0
         }
 
         let preferences = AppGroupStore().loadShieldScreenPreferences()

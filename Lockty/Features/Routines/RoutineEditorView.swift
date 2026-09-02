@@ -38,7 +38,20 @@ final class RoutineEditorViewModel: ObservableObject {
     /// Minutes of warning before the routine begins, 0 through 5.
     @Published var startAlarmLeadMinutes = 5
     /// The saved pause flow this routine uses. Nil means the default wait-then-confirm.
-    @Published var pauseFlowID: UUID?
+    /// The friction a break has to go through.
+    ///
+    /// Setting one turns breaks on. They were separate switches, and a friction is by
+    /// definition the thing you go through *to take a break* -- so picking one and
+    /// getting a routine that allows none was not a choice anybody made, it was two
+    /// settings that never spoke. `makeBreakPolicy()` reads `maximumBreaks` and nothing
+    /// else, so a friction chosen while that sat at zero was saved as `.none` and the
+    /// friction never ran.
+    @Published var pauseFlowID: UUID? {
+        didSet {
+            guard pauseFlowID != nil, oldValue != pauseFlowID else { return }
+            setBreaksAllowed(true)
+        }
+    }
     @Published private(set) var pauseFlows: [PauseFlow] = []
     @Published var blockedDomains: [String] = []
     /// Adult content, purchases, installing apps. Edited on the selection screen with
@@ -506,6 +519,13 @@ final class RoutineEditorViewModel: ObservableObject {
             return false
         }
         let tasks = sanitizedTasks()
+        // A routine with a friction and no breaks cannot be what was meant: the friction
+        // would sit there unreachable. Reconciled here as well as at the moment of
+        // choosing, because the id can also arrive from a loaded routine or from the
+        // flow editor handing one back.
+        if pauseFlowID != nil, maximumBreaks <= 0 {
+            setBreaksAllowed(true)
+        }
         let breakPolicy = makeBreakPolicy()
         let routine = Routine(
             id: editingID,
@@ -1993,7 +2013,7 @@ struct RoutineEditorView: View {
     /// half-sentences do not fit under a title, and the screen behind the row spells them
     /// out in full.
     private var strictSummary: String {
-        guard viewModel.mode == .strict else { return "No unlocks allowed" }
+        guard viewModel.mode == .strict else { return "Off. Breaks work as configured." }
         let count = viewModel.strictGuards.enabledCount
         switch count {
         case 0: return "Nothing prevented yet"

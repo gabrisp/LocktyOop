@@ -153,19 +153,8 @@ struct FeatureFactory {
                 selectionStore: selectionStore
             ),
             router: router,
-            onCloseEditor: { editorStore.releaseAppGroupEditor(draftID: route.draftID) }
-        )
-    }
-
-    func makeAppGroupSelection(route: AppGroupEditorRoute) -> some View {
-        AppGroupSelectionView(
-            viewModel: editorStore.appGroupEditor(
-                route: route,
-                repository: appGroupRepository,
-                selectionStore: selectionStore
-            ),
             toastCenter: toastCenter,
-            router: router
+            onCloseEditor: { editorStore.releaseAppGroupEditor(draftID: route.draftID) }
         )
     }
 

@@ -268,7 +268,7 @@ struct AppsListView: View {
 
             ForEach(viewModel.appGroups) { group in
                 Button {
-                    router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: group.id)))
+                    router.presentSheet(.appGroupEditor(AppGroupEditorRoute(appGroupID: group.id)))
                 } label: {
                     AppFolderCard(
                         title: group.name,
@@ -280,7 +280,7 @@ struct AppsListView: View {
             }
 
             Button {
-                router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: nil)))
+                router.presentSheet(.appGroupEditor(AppGroupEditorRoute(appGroupID: nil)))
             } label: {
                 AddAppFolderCard()
             }
@@ -290,6 +290,13 @@ struct AppsListView: View {
             await viewModel.load()
         }
         .onAppear {
+            Task { await viewModel.load() }
+        }
+        // The editor is a sheet now, so this screen never leaves and `onAppear` never
+        // fires again. Without this a group you just made would not appear until the
+        // tab was left and come back to.
+        .onChange(of: router.sheet) { _, newValue in
+            guard newValue == nil else { return }
             Task { await viewModel.load() }
         }
     }
@@ -582,7 +589,20 @@ struct DistractingFrictionPickerView: View {
 struct AppGroupEditorView: View {
     @ObservedObject var viewModel: AppGroupEditorViewModel
     @ObservedObject var router: AppRouter
+    let toastCenter: LocktyToastCenter
     let onCloseEditor: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    /// Which of the two screens the sheet is showing.
+    ///
+    /// Two screens in one sheet, rather than a push. Choosing the apps used to be a
+    /// pushed destination, which meant the editor left the screen -- and its `onDisappear`
+    /// released the view model and discarded the draft selection, so the apps you had
+    /// just picked were deleted on your way back to the form that was going to save them.
+    /// A group could not be created at all. Nothing is dismissed here, so nothing is
+    /// thrown away.
+    @State private var isPickingApps = false
+    @State private var isGoingBack = false
 
     /// Less rounded than the cards on Today. These are rows in a form, and a form of
     /// pills reads as a set of unrelated objects rather than as one thing being filled in.
@@ -592,93 +612,31 @@ struct AppGroupEditorView: View {
         viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var sheetAnimation: Animation { .snappy(duration: 0.4, extraBounce: 0.02) }
+
+    private var screenTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: isGoingBack ? .leading : .trailing)
+                .combined(with: AnyTransition(.blurReplace))
+                .combined(with: .opacity),
+            removal: .move(edge: isGoingBack ? .trailing : .leading)
+                .combined(with: AnyTransition(.blurReplace))
+                .combined(with: .opacity)
+        )
+    }
+
     var body: some View {
-        LocktySectionScreen(title: viewModel.title) {
-            VStack(spacing: LocktySpacing.lg) {
-                // Centred, and the first thing on the screen: a group is a folder, and
-                // this is the folder being made. It was left-aligned in a column of
-                // form rows, where it read as one more field rather than as the result.
-                AppFolderCard(
-                    title: trimmedName.isEmpty ? "New group" : trimmedName,
-                    subtitle: viewModel.selectedCount == 1 ? "1 item" : "\(viewModel.selectedCount) items",
-                    tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.top, LocktySpacing.sm)
-                .padding(.bottom, LocktySpacing.sm)
-
-                VStack(spacing: 0) {
-                    HStack(spacing: LocktySpacing.md) {
-                        Text("Name")
-                            .font(.system(.subheadline, design: .default, weight: .regular))
-                            .foregroundStyle(LocktyColors.primaryText)
-
-                        Spacer(minLength: LocktySpacing.sm)
-
-                        TextField("Socials", text: $viewModel.name)
-                            .textInputAutocapitalization(.words)
-                            .multilineTextAlignment(.trailing)
-                            .font(.system(.subheadline, design: .default, weight: .regular))
-                            .foregroundStyle(LocktyColors.secondaryText)
-                    }
-                    .frame(minHeight: 52)
-
-                    Divider()
-                        .overlay(LocktyColors.separator.opacity(0.45))
-
-                    // The row that was a dead end. It showed the count and led nowhere,
-                    // so the only way to put apps in a group was to already know the
-                    // picker existed somewhere else.
-                    Button {
-                        router.push(
-                            .appGroupSelection(
-                                AppGroupEditorRoute(
-                                    appGroupID: viewModel.isCreating ? nil : viewModel.editingID,
-                                    draftID: viewModel.draftID
-                                )
-                            )
-                        )
-                    } label: {
-                        HStack(spacing: LocktySpacing.md) {
-                            Text("Apps")
-                                .font(.system(.subheadline, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.primaryText)
-
-                            Spacer(minLength: LocktySpacing.sm)
-
-                            Text(viewModel.selectedCount == 0
-                                 ? "Choose"
-                                 : (viewModel.selectedCount == 1 ? "1 app" : "\(viewModel.selectedCount) apps"))
-                                .font(.system(.subheadline, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.secondaryText)
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(LocktyColors.secondaryText)
-                        }
-                        .frame(minHeight: 52)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .tappable()
+        LocktyDynamicSheet(animation: sheetAnimation) {
+            sheetContent
+                .locktyDynamicSheetChrome(id: isPickingApps ? "apps" : "form") {
+                    Text(isPickingApps ? "Apps" : viewModel.title)
+                        .font(.system(.title3, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                } leading: {
+                    leadingChrome
+                } trailing: {
+                    Color.clear.frame(width: 44, height: 44)
                 }
-                .padding(.horizontal, LocktySpacing.cardInset)
-                .background(
-                    RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                        .fill(LocktyColors.ink(0.055))
-                )
-
-                LocktyHoldButton(
-                    title: viewModel.isCreating ? "Hold to create" : "Hold to save"
-                ) {
-                    Task {
-                        if await viewModel.save() {
-                            router.pop()
-                        }
-                    }
-                }
-                .padding(.top, LocktySpacing.sm)
-            }
         }
         .task {
             await viewModel.load()
@@ -701,18 +659,49 @@ struct AppGroupEditorView: View {
             Text(viewModel.errorMessage ?? "")
         }
     }
-}
 
-extension AppGroupEditorViewModel {
-    var initialGroupIDForRoute: UUID? { isCreating ? nil : editingID }
-}
+    private var sheetContent: some View {
+        ZStack {
+            if isPickingApps {
+                appsScreen
+                    .locktyDynamicSheetSizes([.large])
+                    .geometryGroup()
+                    .transition(screenTransition)
+            } else {
+                formScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
+            }
+        }
+        .geometryGroup()
+    }
 
-struct AppGroupSelectionView: View {
-    @ObservedObject var viewModel: AppGroupEditorViewModel
-    let toastCenter: LocktyToastCenter
-    @ObservedObject var router: AppRouter
+    @ViewBuilder
+    private var leadingChrome: some View {
+        if isPickingApps {
+            LocktyDynamicSheetBarButton(action: closeApps) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+            }
+        } else {
+            LocktyDynamicSheetBarButton(action: { dismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        }
+    }
 
-    var body: some View {
+    private func openApps() {
+        isGoingBack = false
+        withAnimation(sheetAnimation) { isPickingApps = true }
+    }
+
+    private func closeApps() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) { isPickingApps = false }
+    }
+
+    private var appsScreen: some View {
         LocktyActivitySelectionView(
             title: "Selected",
             addLabel: "Add app",
@@ -722,26 +711,91 @@ struct AppGroupSelectionView: View {
             ),
             rules: .appGroup,
             toastCenter: toastCenter,
-            onClose: {},
-            onDone: {}
+            onClose: closeApps,
+            onDone: closeApps
         )
-        .locktyScreenBackground()
-        .navigationTitle("Apps")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    router.pop()
-                } label: {
-                    Image(systemName: "checkmark")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var formScreen: some View {
+        VStack(spacing: LocktySpacing.lg) {
+            // Centred, and the first thing on the screen: a group is a folder, and
+            // this is the folder being made. It was left-aligned in a column of
+            // form rows, where it read as one more field rather than as the result.
+            AppFolderCard(
+                title: trimmedName.isEmpty ? "New group" : trimmedName,
+                subtitle: viewModel.selectedCount == 1 ? "1 item" : "\(viewModel.selectedCount) items",
+                tokens: viewModel.selectionPreview.applicationTokens.stablePrefix(viewModel.selectedCount)
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.top, LocktySpacing.sm)
+            .padding(.bottom, LocktySpacing.sm)
+
+            VStack(spacing: 0) {
+                HStack(spacing: LocktySpacing.md) {
+                    Text("Name")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Spacer(minLength: LocktySpacing.sm)
+
+                    TextField("Socials", text: $viewModel.name)
+                        .textInputAutocapitalization(.words)
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+                .frame(minHeight: 52)
+
+                Divider()
+                    .overlay(LocktyColors.separator.opacity(0.45))
+
+                Button(action: openApps) {
+                    HStack(spacing: LocktySpacing.md) {
+                        Text("Apps")
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                            .foregroundStyle(LocktyColors.primaryText)
+
+                        Spacer(minLength: LocktySpacing.sm)
+
+                        Text(viewModel.selectedCount == 0
+                             ? "Choose"
+                             : (viewModel.selectedCount == 1 ? "1 app" : "\(viewModel.selectedCount) apps"))
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                            .foregroundStyle(LocktyColors.secondaryText)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(LocktyColors.secondaryText)
+                    }
+                    .frame(minHeight: 52)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.locktyRow)
+                .tappable()
+            }
+            .padding(.horizontal, LocktySpacing.cardInset)
+            .locktyCardBackground(cornerRadius: cardRadius)
+
+            LocktyHoldButton(
+                title: viewModel.isCreating ? "Hold to create" : "Hold to save"
+            ) {
+                Task {
+                    if await viewModel.save() { dismiss() }
                 }
             }
+            .padding(.top, LocktySpacing.sm)
         }
-        .task {
-            await viewModel.load()
-            viewModel.refreshSelectionState()
-        }
+        .padding(.horizontal, LocktySpacing.screenInset)
+        .padding(.top, LocktySpacing.md)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
+}
+
+extension AppGroupEditorViewModel {
+    var initialGroupIDForRoute: UUID? { isCreating ? nil : editingID }
 }
 
 struct AddAppFolderCard: View {

@@ -11,6 +11,4 @@ enum AppRoute: Hashable {
     case distractingApps
     case distractingIntervention
     case distractingFriction
-    case appGroupEditor(AppGroupEditorRoute)
-    case appGroupSelection(AppGroupEditorRoute)
 }

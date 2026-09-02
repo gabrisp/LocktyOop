@@ -161,7 +161,7 @@ struct FocusView: View {
 
             ForEach(appsViewModel.appGroups) { group in
                 Button {
-                    router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: group.id)))
+                    router.presentSheet(.appGroupEditor(AppGroupEditorRoute(appGroupID: group.id)))
                 } label: {
                     AppFolderCard(
                         title: group.name,
@@ -174,7 +174,7 @@ struct FocusView: View {
             }
 
             Button {
-                router.push(.appGroupEditor(AppGroupEditorRoute(appGroupID: nil)))
+                router.presentSheet(.appGroupEditor(AppGroupEditorRoute(appGroupID: nil)))
             } label: {
                 AddAppFolderCard()
                     .frame(width: appTileWidth)

@@ -36,11 +36,6 @@ struct DestinationFactory {
         case .distractingFriction:
             featureFactory.makeDistractingFrictionPicker()
 
-        case .appGroupEditor(let route):
-            featureFactory.makeAppGroupEditor(route: route)
-
-        case .appGroupSelection(let route):
-            featureFactory.makeAppGroupSelection(route: route)
         }
     }
 
@@ -92,6 +87,9 @@ struct DestinationFactory {
 
         case .frictionEditor(let route):
             featureFactory.makeFrictionEditor(route: route)
+
+        case .appGroupEditor(let route):
+            featureFactory.makeAppGroupEditor(route: route)
 
         case .productivityDetail(let day):
             todaySheet { featureFactory.makeProductivityDetail(day: day) }

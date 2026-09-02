@@ -121,8 +121,10 @@ struct LocktyHoldButton: View {
                 }
             }
             // Added, not stacked: where two lights overlap the result is brighter than
-            // either, which is what makes a crowd of them read as one filling glow.
-            .blendMode(.plusLighter)
+            // either, which is what makes a crowd of them read as one filling glow. On a
+            // light ground the same crowd darkens instead -- there is no light left to
+            // add to white, and the button would fill with nothing at all.
+            .locktyGlow(lightScale: 0.5)
             .compositingGroup()
         }
         .allowsHitTesting(false)

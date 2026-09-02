@@ -14,13 +14,17 @@ extension EnvironmentValues {
 struct PressEffectModifier: ViewModifier {
     let isPressed: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            // Lit, not dimmed. Fading a control on press says it is becoming
-            // unavailable, which is the opposite of what a press means -- and on a dark
-            // screen a dimmed thing simply recedes. Adding light brings it forward.
-            .brightness(isPressed ? 0.14 : 0)
+            // Brought forward, not faded. Dimming a control on press says it is becoming
+            // unavailable, which is the opposite of what a press means. Which direction
+            // brings it forward depends on the ground: on black, add light; on white,
+            // take some away, because adding light to something already pale washes it
+            // out instead.
+            .brightness(LocktyPressTint.brightness(for: colorScheme, pressed: isPressed, magnitude: 0.14))
             .animation(.smooth(duration: 0.18), value: isPressed)
     }
 }
@@ -32,14 +36,22 @@ private struct LocktyInteractiveSurfaceModifier<S: Shape>: ViewModifier {
     let pressedScale: CGFloat
 
     @Environment(\.locktySurfacePressed) private var isPressed
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// White on dark, black on light. The tint the caller passes is the dark-mode one --
+    /// every call site was written against black -- and a white wash over a white card is
+    /// nothing at all.
+    private var pressTint: Color {
+        colorScheme == .dark ? tint : LocktyPressTint.color(for: colorScheme)
+    }
 
     func body(content: Content) -> some View {
         content
             .overlay {
                 if enabled {
                     shape
-                        .fill(tint.opacity(isPressed ? 0.09 : 0))
-                        .blendMode(.plusLighter)
+                        .fill(pressTint.opacity(isPressed ? 0.09 : 0))
+                        .blendMode(LocktyPressTint.blendMode(for: colorScheme))
                         .allowsHitTesting(false)
                         .animation(.smooth(duration: 0.18), value: isPressed)
                 }
@@ -50,8 +62,8 @@ private struct LocktyInteractiveSurfaceModifier<S: Shape>: ViewModifier {
                         .fill(
                             LinearGradient(
                                 stops: [
-                                    .init(color: tint.opacity(isPressed ? 0.13 : 0), location: 0),
-                                    .init(color: tint.opacity(isPressed ? 0.05 : 0), location: 0.35),
+                                    .init(color: pressTint.opacity(isPressed ? 0.13 : 0), location: 0),
+                                    .init(color: pressTint.opacity(isPressed ? 0.05 : 0), location: 0.35),
                                     .init(color: .clear, location: 0.72),
                                     .init(color: .clear, location: 1)
                                 ],
@@ -59,7 +71,7 @@ private struct LocktyInteractiveSurfaceModifier<S: Shape>: ViewModifier {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .blendMode(.screen)
+                        .blendMode(LocktyPressTint.secondaryBlendMode(for: colorScheme))
                         .allowsHitTesting(false)
                         .animation(.smooth(duration: 0.18), value: isPressed)
                 }
@@ -108,10 +120,15 @@ private struct LocktyInteractiveButtonBody: View {
     @State private var isShowingPressedState = false
     @State private var hapticTrigger = 0
     @State private var pressTaskID = UUID()
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         configuration.label
-            .brightness(brightens && isShowingPressedState ? 0.16 : 0)
+            .brightness(
+                brightens
+                ? LocktyPressTint.brightness(for: colorScheme, pressed: isShowingPressedState, magnitude: 0.16)
+                : 0
+            )
             .saturation(brightens && isShowingPressedState ? 1.1 : 1)
             .scaleEffect(brightens && isShowingPressedState ? pressedScale : 1)
             .locktyInteractiveSurface(

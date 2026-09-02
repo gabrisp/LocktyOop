@@ -99,7 +99,7 @@ struct QuickTimerCard: View {
                     .fill(LocktyColors.productive)
                     .blur(radius: 30)
                     .opacity(isRunning ? 0.28 : 0)
-                    .blendMode(.plusLighter)
+                    .locktyGlow()
                     .animation(.smooth(duration: 0.5), value: isRunning)
             }
             .locktyImperfectBorder(RoundedRectangle(cornerRadius: 24, style: .continuous))

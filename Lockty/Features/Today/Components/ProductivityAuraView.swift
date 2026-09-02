@@ -103,6 +103,10 @@ struct ProductivityAuraView: View {
             .frame(width: side * 0.9, height: side * 0.9)
             .blur(radius: 46)
             .opacity(0.8 * arrival)
+            // The bloom is the whole badge on a dark screen. On a light one an added
+            // colour over white is invisible, so it shades instead -- same colour, other
+            // direction.
+            .locktyGlow(lightScale: 0.62)
             .animation(.smooth(duration: 0.9), value: arrival)
             .animation(.smooth(duration: 0.6), value: accent)
     }
@@ -124,7 +128,7 @@ struct ProductivityAuraView: View {
                     startRadius: 0,
                     endRadius: side * 0.36
                 )
-                .blendMode(.plusLighter)
+                .locktyGlow(lightScale: 0.7)
                 .mask { shape }
                 .opacity(arrival)
             }
@@ -158,7 +162,7 @@ struct ProductivityAuraView: View {
                 labelContent
                     .foregroundStyle(accent)
                     .blur(radius: 14)
-                    .blendMode(.plusLighter)
+                    .locktyGlow(lightScale: 0.8)
                     .opacity(0.95 * arrival)
             }
     }

@@ -219,9 +219,15 @@ private struct LocktyLongPressModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // Nothing is done to the content when there is a shape to draw. The surface
+            // is the answer -- an added rectangle appearing behind the row -- and
+            // brightening the words underneath it as well is the same press stated twice,
+            // once in a form that reads as the text changing rather than as the row
+            // being held. The surface applies its own scale, so there is none here
+            // either.
             .brightness(shape == nil && isPressed ? 0.16 : 0)
             .saturation(shape == nil && isPressed ? 1.1 : 1)
-            .scaleEffect(isPressed ? 0.99 : 1)
+            .scaleEffect(shape == nil && isPressed ? 0.99 : 1)
             .animation(.smooth(duration: 0.18), value: isPressed)
             .locktyInteractiveSurface(
                 enabled: shape != nil,
@@ -280,13 +286,20 @@ extension View {
     /// schedule, get the schedule -- and a card-wide press lights the entire summary,
     /// which says only "this whole panel is a button", which it is not.
     ///
+    /// The row draws a rounded rectangle under the finger, the same one a menu item
+    /// draws. Brightening the words alone was too quiet to read as a held control: what
+    /// says "this line, and it is listening" is a shape appearing behind it.
+    ///
     /// A no-op when there is nothing to open, so a preview shown somewhere that cannot
     /// edit -- a routine that is running, a friction being read from a rule -- neither
     /// lights up nor pretends it will do something.
     @ViewBuilder
     func locktyEditOnLongPress(_ action: (() -> Void)?) -> some View {
         if let action {
-            locktyLongPress(action: action)
+            locktyLongPress(
+                shape: RoundedRectangle(cornerRadius: 14, style: .continuous),
+                action: action
+            )
         } else {
             self
         }

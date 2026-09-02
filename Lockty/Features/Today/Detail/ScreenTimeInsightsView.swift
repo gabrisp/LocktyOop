@@ -24,27 +24,42 @@ struct ScreenTimeInsightsView: View {
     }
 
     var body: some View {
-        LocktySectionScreen(title: "Screen time") {
-            ProductivityAuraView.screenTime(
-                usage: state.hourlyActivity.totalUsage,
-                baseline: baseline
-            )
-            .frame(maxWidth: .infinity)
+        // Its own scroll view rather than `LocktySectionScreen`, for one reason: the
+        // scores are a pinned section header, so they stay at the top as the cards go
+        // past. They are the summary of everything below them, and a summary that
+        // scrolls away is a summary you have to scroll back for.
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: LocktySpacing.lg, pinnedViews: [.sectionHeaders]) {
+                ProductivityAuraView.screenTime(
+                    usage: state.hourlyActivity.totalUsage,
+                    baseline: baseline
+                )
+                .frame(maxWidth: .infinity)
 
-            scores
+                Section {
+                    if !insights.isEmpty {
+                        insightsCard
+                    }
 
-            if !insights.isEmpty {
-                insightsCard
+                    if !state.timeline.buckets.isEmpty {
+                        timelineCard
+                    }
+
+                    if !state.appUsages.isEmpty {
+                        appsCard
+                    }
+
+                    countsCard
+                } header: {
+                    scores
+                }
             }
-
-            timelineCard
-
-            if !state.appUsages.isEmpty {
-                appsCard
-            }
-
-            countsCard
+            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.vertical, LocktySpacing.lg)
         }
+        .locktyScreenBackground()
+        .navigationTitle("Screen time")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load(day: day)
         }
@@ -63,6 +78,13 @@ struct ScreenTimeInsightsView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, LocktySpacing.sm)
+        // The screen's own ground, and only while pinned it matters: a card sliding
+        // under a transparent header shows through it.
+        .background {
+            LocktyColors.background
+                .padding(.horizontal, -LocktySpacing.lg)
+        }
     }
 
     private func scorePill(_ metric: PrimaryMetric) -> some View {
@@ -83,10 +105,10 @@ struct ScreenTimeInsightsView: View {
             .padding(.horizontal, LocktySpacing.md)
             .frame(height: 52)
             .frame(maxWidth: .infinity)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(tint.opacity(0.12))
-            }
+            // Glass, like every other pill in the app. A flat fill under a lit rim was
+            // two materials on one control, and the rim is what carries the value -- the
+            // body under it should be something you look through, not at.
+            .safeGlass(radius: 999, interactive: true)
             // The rim carries the value: a full lap is a full score, and the arc is the
             // only part of the pill that says how far along it is without a second
             // number.
@@ -96,15 +118,9 @@ struct ScreenTimeInsightsView: View {
             // that is not square comes out as a stroke that no longer follows the pill it
             // is drawn on -- which is what the borders were doing.
             .overlay {
-                ZStack {
-                    Capsule(style: .continuous)
-                        .stroke(LocktyColors.ink(0.10), lineWidth: 2)
-
-                    Capsule(style: .continuous)
-                        .trim(from: 0, to: max(min(metric.value / 100, 1), 0.02))
-                        .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .animation(.smooth(duration: 0.8), value: metric.value)
-                }
+                Capsule(style: .continuous)
+                    .stroke(tint.opacity(0.55), lineWidth: 1.5)
+                    .animation(.smooth(duration: 0.5), value: tint)
             }
 
             Text(metric.kind.title)
@@ -136,9 +152,7 @@ struct ScreenTimeInsightsView: View {
     private var insightsCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                Text("What stood out")
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
+                LocktySectionTitle("What stood out")
 
                 ForEach(insights) { insight in
                     insightRow(insight)
@@ -198,9 +212,7 @@ struct ScreenTimeInsightsView: View {
     private var timelineCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                Text("Through the day")
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
+                LocktySectionTitle("Through the day")
 
                 UsageTimelineChart(state: state.timeline)
                     .frame(height: 200)
@@ -213,9 +225,7 @@ struct ScreenTimeInsightsView: View {
     private var appsCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                Text("Where it went")
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
+                LocktySectionTitle("Where it went")
 
                 ForEach(Array(state.appUsages.prefix(6).enumerated()), id: \.element.id) { index, usage in
                     if index > 0 {

@@ -11,6 +11,9 @@ struct TodayView: View {
     /// Routines/Pauses hide on a downward scroll and come back the moment the finger
     /// goes the other way, independently of how collapsed the rings are.
     @State private var areShortcutsHidden = false
+    /// Which of the pulse card's three the chart is showing. Kept here rather than in the
+    /// card so the choice survives the card being rebuilt as the day's data lands.
+    @State private var pulseMetric: HourlyActivityMetric = .reduction
 
     private var state: TodayDayState {
         viewModel.state(for: day)
@@ -347,8 +350,19 @@ struct TodayView: View {
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
-                // Top of Today: the running routine comes before everything else. An
-                // unlock request, when there is one, sits even above that because it is
+                // The day itself, before anything Lockty is doing about it. It is the
+                // one card that is true every day whether or not a routine ran, and the
+                // question people open the app to ask.
+                if state.hourlyActivity.hasAnyActivity {
+                    DailyPulseCard(
+                        state: state.hourlyActivity,
+                        metric: $pulseMetric
+                    )
+                    .transition(.blurReplace.combined(with: .opacity))
+                }
+
+                // Then the running routine, which comes before everything else. An
+                // unlock request, when there is one, sits even above both because it is
                 // waiting on immediate action.
                 if let routineCardState = viewModel.routineCardState,
                    routineCardState.phase == .active {

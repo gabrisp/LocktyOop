@@ -17,6 +17,7 @@ struct TodayDayState: Equatable {
     var activities: [DigitalActivity]
     var metrics: TodayMetricsState
     var timeline: UsageTimelineChartState
+    var hourlyActivity: HourlyActivityState
     var appUsages: [AppUsageState]
 
     static func loading(day: Date) -> TodayDayState {
@@ -31,6 +32,7 @@ struct TodayDayState: Equatable {
             activities: [],
             metrics: .loading,
             timeline: .empty,
+            hourlyActivity: .empty,
             appUsages: placeholderAppUsages
         )
     }

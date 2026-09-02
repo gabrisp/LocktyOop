@@ -232,6 +232,11 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                         )
                     }
                 ),
+                hourlyActivity: makeHourlyActivity(
+                    snapshot: snapshot,
+                    dayStart: dayStart,
+                    totalUsage: summary.totalUsage
+                ),
                 appUsages: summary.applications.map { usage in
                     AppUsageState(
                         app: usage.app,
@@ -259,6 +264,64 @@ struct LiveTodayDataPipeline: TodayDataProviding {
     /// bucket per raw activity segment put a 3am segment right next to a 10pm one, which
     /// made the bars, the bands and the 00/06/12/18/24 axis three different x scales.
     /// A segment spanning several hours has its time split across them by overlap.
+    /// The day in twenty-four columns, plus how it compares with the days before it.
+    ///
+    /// Built from the same hourly segments the timeline uses, so the two cannot disagree
+    /// about when anything happened. The comparison reads cached snapshots rather than
+    /// asking Screen Time again: those are files in the app group, and a fortnight of
+    /// them costs a fortnight of file reads, where a fortnight of report requests would
+    /// cost the whole load.
+    private func makeHourlyActivity(
+        snapshot: ScreenTimeReportSnapshot?,
+        dayStart: Date,
+        totalUsage: TimeInterval
+    ) -> HourlyActivityState {
+        let calendar = Calendar.current
+        var usage = [TimeInterval](repeating: 0, count: 24)
+        var unlocks = [Int](repeating: 0, count: 24)
+        var notifications = [Int](repeating: 0, count: 24)
+
+        for segment in snapshot?.activitySegments ?? [] {
+            let hour = calendar.component(.hour, from: segment.dateInterval.start)
+            guard (0..<24).contains(hour) else { continue }
+            usage[hour] += segment.totalActivityDuration
+            unlocks[hour] += segment.pickups
+            notifications[hour] += segment.notifications
+        }
+
+        return HourlyActivityState(
+            hours: (0..<24).map {
+                HourlyActivityState.Hour(
+                    hour: $0,
+                    usage: usage[$0],
+                    unlocks: unlocks[$0],
+                    notifications: notifications[$0]
+                )
+            },
+            reductionVersusBaseline: reductionVersusBaseline(dayStart: dayStart, totalUsage: totalUsage)
+        )
+    }
+
+    /// How much less was used today than on an average earlier day.
+    ///
+    /// Nil under three days of history. Two days is not an average, it is two days, and a
+    /// figure drawn from them would swing by an hour every time one of them moved -- which
+    /// is worse than admitting there is nothing to compare with yet.
+    private func reductionVersusBaseline(dayStart: Date, totalUsage: TimeInterval) -> TimeInterval? {
+        let calendar = Calendar.current
+        var earlierUsages: [TimeInterval] = []
+
+        for daysBack in 1...14 {
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: dayStart) else { continue }
+            guard let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day)) else { continue }
+            earlierUsages.append(snapshot.totalActivityDuration)
+        }
+
+        guard earlierUsages.count >= 3 else { return nil }
+        let average = earlierUsages.reduce(0, +) / Double(earlierUsages.count)
+        return average - totalUsage
+    }
+
     private func makeTimelineBuckets(
         snapshot: ScreenTimeReportSnapshot?,
         dayStart: Date,
@@ -501,6 +564,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 )
             ),
             timeline: .empty,
+            hourlyActivity: .empty,
             appUsages: []
         )
     }

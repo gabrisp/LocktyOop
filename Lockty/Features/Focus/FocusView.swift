@@ -9,6 +9,11 @@ struct FocusView: View {
     let frictionRepository: FrictionRepository
     let toastCenter: LocktyToastCenter
     @ObservedObject var quickTimer: QuickTimerViewModel
+    /// Today's view model, for the two cards that already know how to draw a running
+    /// routine. Focus is where routines live, so what is running belongs at the top of
+    /// it -- and building a second copy of the blocked-apps card here would be two of
+    /// them to keep in step.
+    @ObservedObject var todayViewModel: TodayViewModel
 
     /// Which of the timer's two pickers is open. Both are screens rather than sheets on
     /// top of a sheet: Focus is a tab, so they push.
@@ -31,19 +36,26 @@ struct FocusView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                // First, and not in a section: everything below is a library of things
-                // you made earlier, and this is the one thing on the screen you can act
-                // on right now.
-                QuickTimerCard(
-                    minutes: $quickTimer.minutes,
-                    endsAt: quickTimer.endsAt,
-                    blockedSummary: quickTimer.blockedSummary,
-                    frictionSummary: quickTimer.frictionSummary,
-                    onStart: { Task { await quickTimer.start() } },
-                    onStop: { Task { await quickTimer.stop() } },
-                    onOpenApps: { timerSheet = .apps },
-                    onOpenFriction: { timerSheet = .friction }
-                )
+                // What is running, first. Everything below is a library of things you
+                // made earlier; this is the thing that is happening.
+                if !todayViewModel.activeRoutineGroups.isEmpty {
+                    activeRoutines
+                }
+
+//                // The quick timer, commented out rather than removed: the rings above
+//                // occupy the same place and answer the same question, and the timer's
+//                // own machinery -- a transient routine that ends on the clock with the
+//                // app closed -- is worth keeping around.
+//                QuickTimerCard(
+//                    minutes: $quickTimer.minutes,
+//                    endsAt: quickTimer.endsAt,
+//                    blockedSummary: quickTimer.blockedSummary,
+//                    frictionSummary: quickTimer.frictionSummary,
+//                    onStart: { Task { await quickTimer.start() } },
+//                    onStop: { Task { await quickTimer.stop() } },
+//                    onOpenApps: { timerSheet = .apps },
+//                    onOpenFriction: { timerSheet = .friction }
+//                )
 
                 section(title: "Rules") {
                     router.push(.rulesList)
@@ -105,6 +117,67 @@ struct FocusView: View {
                 await frictionsViewModel.load()
                 await appsViewModel.load()
             }
+        }
+    }
+
+    /// The running routines, and what they are doing.
+    ///
+    /// One ring is centred; several scroll sideways. A row of three that has to be
+    /// swiped is still a row you can see all of at rest, and stacking them down the
+    /// screen would push the library out of sight for something that is usually one item
+    /// long.
+    @ViewBuilder
+    private var activeRoutines: some View {
+        let groups = todayViewModel.activeRoutineGroups
+
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            if groups.count == 1, let group = groups.first {
+                ring(for: group)
+                    .frame(maxWidth: .infinity)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: LocktySpacing.lg) {
+                        ForEach(groups) { group in
+                            ring(for: group, side: 112)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollClipDisabled()
+            }
+
+            if let routineCardState = todayViewModel.routineCardState,
+               routineCardState.phase == .active {
+                ActiveModeCard(
+                    state: routineCardState,
+                    groups: groups,
+                    activeRoutine: todayViewModel.activeRoutine,
+                    allowance: todayViewModel.activePauseAllowance,
+                    onUnlock: { _ in },
+                    onOpenSection: {}
+                )
+            }
+
+            if let checklist = todayViewModel.state(for: Date()).activeRoutineChecklist {
+                ActiveRoutineChecklistCard(state: checklist) { item in
+                    Task {
+                        await todayViewModel.toggleActiveRoutineTask(item.id, day: Date())
+                    }
+                }
+            }
+        }
+        .animation(.smooth(duration: 0.32), value: groups.map(\.id))
+    }
+
+    private func ring(for group: TodayActiveRoutineGroup, side: CGFloat = 128) -> some View {
+        ActiveRoutineRingView(
+            routine: group.routine,
+            tint: LocktyColors.routine(group.routine.colorSnapshot),
+            side: side
+        ) {
+            router.presentSheet(
+                .routineEditor(RoutineEditorRoute(routineID: group.routine.routineID))
+            )
         }
     }
 

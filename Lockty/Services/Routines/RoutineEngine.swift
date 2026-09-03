@@ -168,6 +168,7 @@ final class RoutineEngine: ObservableObject {
             nameSnapshot: routine.name,
             iconSnapshot: routine.icon,
             modeSnapshot: routine.mode,
+            colorSnapshot: routine.color,
             startedAt: Date(),
             expectedEndAt: expectedEndAt,
             trigger: trigger,

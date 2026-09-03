@@ -53,7 +53,8 @@ struct FeatureFactory {
             router: router,
             frictionRepository: frictionRepository,
             toastCenter: toastCenter,
-            quickTimer: quickTimerViewModel
+            quickTimer: quickTimerViewModel,
+            todayViewModel: todayViewModel
         )
     }
 

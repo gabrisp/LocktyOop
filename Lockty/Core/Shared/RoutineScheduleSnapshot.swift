@@ -8,6 +8,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
     var name: String
     var icon: String?
     var mode: RoutineMode
+    var color: RoutineColor
     var appGroupIDs: Set<UUID>
     var blockedApplications: Set<AppIdentity.ID>
     var blockedDomains: Set<String>
@@ -26,6 +27,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         name = routine.name
         icon = routine.icon
         mode = routine.mode
+        color = routine.color
         appGroupIDs = routine.appGroupIDs
         blockedApplications = routine.blockedApplications
         blockedDomains = routine.blockedDomains
@@ -45,6 +47,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
         mode = try container.decode(RoutineMode.self, forKey: .mode)
+        color = try container.decodeIfPresent(RoutineColor.self, forKey: .color) ?? .mint
         appGroupIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .appGroupIDs) ?? []
         blockedApplications = try container.decode(Set<AppIdentity.ID>.self, forKey: .blockedApplications)
         blockedDomains = try container.decode(Set<String>.self, forKey: .blockedDomains)
@@ -64,6 +67,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
             nameSnapshot: name,
             iconSnapshot: icon,
             modeSnapshot: mode,
+            colorSnapshot: color,
             startedAt: startedAt,
             trigger: .schedule(schedule),
             shieldPolicy: ShieldPolicy(

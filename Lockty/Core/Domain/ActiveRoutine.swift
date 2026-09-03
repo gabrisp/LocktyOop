@@ -8,6 +8,10 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
     /// session can render it without loading the routine back from storage.
     var iconSnapshot: String?
     var modeSnapshot: RoutineMode
+    /// The routine's colour when it started. Snapshotted with the name and the icon, for
+    /// the same reason: anything showing a running routine can draw it without loading
+    /// the routine back from storage -- and the extensions cannot load it at all.
+    var colorSnapshot: RoutineColor
     var startedAt: Date
     var expectedEndAt: Date?
     var trigger: RoutineTrigger
@@ -25,6 +29,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         nameSnapshot: String,
         iconSnapshot: String? = nil,
         modeSnapshot: RoutineMode,
+        colorSnapshot: RoutineColor = .mint,
         startedAt: Date,
         expectedEndAt: Date? = nil,
         trigger: RoutineTrigger,
@@ -39,6 +44,7 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         self.nameSnapshot = nameSnapshot
         self.iconSnapshot = iconSnapshot
         self.modeSnapshot = modeSnapshot
+        self.colorSnapshot = colorSnapshot
         self.startedAt = startedAt
         self.expectedEndAt = expectedEndAt
         self.trigger = trigger
@@ -59,6 +65,10 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         nameSnapshot = try container.decode(String.self, forKey: .nameSnapshot)
         iconSnapshot = try container.decodeIfPresent(String.self, forKey: .iconSnapshot)
         modeSnapshot = try container.decode(RoutineMode.self, forKey: .modeSnapshot)
+        // A session written before the colour was snapshotted keeps running rather than
+        // failing to decode; mint is the routine default, so it is what it would have
+        // been given anyway.
+        colorSnapshot = try container.decodeIfPresent(RoutineColor.self, forKey: .colorSnapshot) ?? .mint
         startedAt = try container.decode(Date.self, forKey: .startedAt)
         expectedEndAt = try container.decodeIfPresent(Date.self, forKey: .expectedEndAt)
         trigger = try container.decode(RoutineTrigger.self, forKey: .trigger)

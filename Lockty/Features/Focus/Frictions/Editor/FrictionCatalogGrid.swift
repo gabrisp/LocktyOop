@@ -86,7 +86,11 @@ struct FrictionCatalogGrid: View {
             onSelect(item)
         } label: {
             VStack(spacing: LocktySpacing.sm) {
-                FrictionStepThumbnail(step: item.makeStep(), tint: item.tint)
+                FrictionStepThumbnail(
+                    step: item.makeStep(),
+                    tint: item.tint,
+                    index: items.firstIndex(where: { $0.id == item.id }) ?? 0
+                )
 
                 Text(item.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
@@ -110,6 +114,8 @@ struct FrictionCatalogGrid: View {
 struct FrictionStepThumbnail: View {
     let step: FrictionStep
     let tint: Color
+    /// Where it sits in the grid, used only to stagger the build.
+    var index: Int = 0
 
     /// The size the step is laid out at before being shrunk. A phone's width, so text
     /// wraps where it will wrap and a grid has the columns it will have.
@@ -117,20 +123,44 @@ struct FrictionStepThumbnail: View {
     private let renderedHeight: CGFloat = 460
 
     @State private var status = UnlockFlowStepStatus.ready
+    /// Whether the real step is built yet.
+    ///
+    /// A step view is not a picture: several of them start timers, deal boards and hold
+    /// tasks the moment they exist. Building a screenful at once is a stutter on the way
+    /// in, and keeping the ones you have scrolled past alive is a set of clocks running
+    /// for nobody -- so a cell builds when it arrives and lets go when it leaves.
+    @State private var isRendered = false
 
     var body: some View {
         GeometryReader { proxy in
             let scale = proxy.size.width / renderedWidth
 
-            content
-                .frame(width: renderedWidth, height: renderedHeight)
-                .scaleEffect(scale, anchor: .top)
-                .frame(width: proxy.size.width, height: renderedHeight * scale, alignment: .top)
-                // Inert. A thumbnail you can play is a thumbnail people will play, and
-                // the flow it belongs to has not started.
-                .allowsHitTesting(false)
-                .disabled(true)
+            Group {
+                if isRendered {
+                    content
+                        .frame(width: renderedWidth, height: renderedHeight)
+                        .scaleEffect(scale, anchor: .top)
+                        .frame(width: proxy.size.width, height: renderedHeight * scale, alignment: .top)
+                        .transition(.opacity)
+                } else {
+                    resting
+                        .frame(width: proxy.size.width, height: renderedHeight * scale, alignment: .top)
+                }
+            }
+            // Inert. A thumbnail you can play is a thumbnail people will play, and the
+            // flow it belongs to has not started.
+            .allowsHitTesting(false)
+            .disabled(true)
         }
+        .task {
+            // Staggered by position, so a screenful arrives in sequence rather than all
+            // on the same frame. Capped: past the first row or two the delay would be
+            // longer than the scroll that revealed them.
+            try? await Task.sleep(for: .milliseconds(40 * min(index, 6)))
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth(duration: 0.25)) { isRendered = true }
+        }
+        .onDisappear { isRendered = false }
         .frame(height: 132)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .background {
@@ -157,5 +187,15 @@ struct FrictionStepThumbnail: View {
     @ViewBuilder
     private var content: some View {
         UnlockFlowStepPreview(step: step, status: $status)
+    }
+
+    /// What a cell shows before its step is built, and after it has been let go. The
+    /// step's own glyph on its own tint, which is what the eye lands on at this size
+    /// anyway -- so the swap reads as the cell sharpening rather than as it appearing.
+    private var resting: some View {
+        Image(systemName: step.symbolName ?? "square.dashed")
+            .font(.system(size: 26, weight: .light))
+            .foregroundStyle(tint.opacity(0.7))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

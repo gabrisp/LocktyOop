@@ -42,7 +42,10 @@ struct LocktyGaugeRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+        // The heading and its bar are two readings of one figure, not a label sitting on
+        // a control -- so they want air between them. Tight, the "USUAL" marker crowds
+        // the words above it and the pair reads as one squashed row.
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
             HStack(alignment: .firstTextBaseline, spacing: LocktySpacing.sm) {
                 Text(title)
                     .font(.system(.headline, design: .default, weight: .semibold))

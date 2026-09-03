@@ -29,6 +29,7 @@ enum SheetRoute: Hashable, Identifiable {
     case frictionEditor(FrictionEditorRoute)
     case appGroupEditor(AppGroupEditorRoute)
     case autoFocus
+    case alwaysAllowed
     case productivityDetail(Date)
     case controlDetail(Date)
     case detoxDetail(Date)
@@ -58,6 +59,7 @@ enum SheetRoute: Hashable, Identifiable {
         case .frictionEditor(let route): "friction-editor-\(route.draftID.uuidString)"
         case .appGroupEditor(let route): "app-group-editor-\(route.draftID.uuidString)"
         case .autoFocus: "auto-focus"
+        case .alwaysAllowed: "always-allowed"
         case .productivityDetail(let day): "productivity-detail-\(day.timeIntervalSince1970)"
         case .controlDetail(let day): "control-detail-\(day.timeIntervalSince1970)"
         case .detoxDetail(let day): "detox-detail-\(day.timeIntervalSince1970)"

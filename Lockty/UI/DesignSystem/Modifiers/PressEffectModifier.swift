@@ -236,11 +236,11 @@ private struct LocktyLongPressModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     /// The shape is drawn a little larger than the row, so what it lights has air around
-    /// it rather than being touched by the corners. A point more at the top and bottom
-    /// than at the sides: rows sit closer to their neighbours vertically than to
-    /// anything horizontally, so the same outset reads as tighter there.
+    /// it rather than being touched by the corners -- but barely at the top and bottom.
+    /// Rows sit directly under one another, and a shape that grows vertically starts
+    /// overlapping the row above the moment it appears.
     private var horizontalOutset: CGFloat { 4 }
-    private var verticalOutset: CGFloat { 5 }
+    private var verticalOutset: CGFloat { 1 }
 
     @ViewBuilder
     private var heldSurface: some View {

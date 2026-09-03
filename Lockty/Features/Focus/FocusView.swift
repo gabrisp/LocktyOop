@@ -235,7 +235,7 @@ struct FocusView: View {
                     toastCenter.show(.alwaysAllowedLocked())
                     return
                 }
-                router.push(.alwaysAllowedGroup)
+                router.presentSheet(.alwaysAllowed)
             } label: {
                 AppFolderCard(
                     title: "Always Allowed",

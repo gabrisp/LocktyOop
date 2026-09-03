@@ -105,6 +105,14 @@ struct FeatureFactory {
         )
     }
 
+    func makeAlwaysAllowedSheet() -> AlwaysAllowedSheet {
+        AlwaysAllowedSheet(
+            viewModel: appsViewModel,
+            toastCenter: toastCenter,
+            selectionStore: selectionStore
+        )
+    }
+
     func makeBlockScreenSettings() -> BlockScreenSettingsView {
         BlockScreenSettingsView(viewModel: settingsViewModel)
     }

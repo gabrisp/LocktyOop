@@ -103,6 +103,9 @@ struct DestinationFactory {
         case .autoFocus:
             featureFactory.makeAutoFocusSheet()
 
+        case .alwaysAllowed:
+            featureFactory.makeAlwaysAllowedSheet()
+
         case .productivityDetail(let day):
             todaySheet { featureFactory.makeProductivityDetail(day: day) }
 

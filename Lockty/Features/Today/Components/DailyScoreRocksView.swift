@@ -54,8 +54,17 @@ struct DailyScoreRocksView: View {
                 ZStack {
                     bloom(metric)
                     face(metric)
-                    value(metric)
-                        .padding(.horizontal, LocktySpacing.lg)
+
+                    HStack(spacing: 5) {
+                        // Small, and before the number: it says which of the three this
+                        // is at a glance, where the word underneath says it properly.
+                        Image(systemName: metric.kind.systemImage)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(tint(metric))
+
+                        value(metric)
+                    }
+                    .padding(.horizontal, LocktySpacing.lg)
                 }
                 .frame(height: height)
                 .fixedSize(horizontal: true, vertical: false)

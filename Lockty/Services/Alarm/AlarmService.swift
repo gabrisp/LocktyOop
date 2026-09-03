@@ -72,8 +72,20 @@ struct LiveAlarmService: AlarmServicing {
 
         #if canImport(AlarmKit)
         if #available(iOS 26.1, *) {
+            // Asked for here rather than assumed. The authorization sheet only appears
+            // once something needs it, and a routine being saved with an alarm is that
+            // moment -- waiting for the user to find the Permissions row first meant the
+            // alarm quietly never scheduled.
+            //
+            // It also needs `NSAlarmKitUsageDescription` in the Info.plist, without which
+            // the request is refused before it is shown. It was missing, which is why
+            // none of this ever fired.
+            if AlarmManager.shared.authorizationState == .notDetermined {
+                _ = try? await AlarmManager.shared.requestAuthorization()
+            }
+
             guard AlarmManager.shared.authorizationState == .authorized else {
-                print("Routine start alarm not scheduled: AlarmKit unauthorized, routine id=\(routine.id.uuidString)")
+                print("Routine start alarm not scheduled: AlarmKit is \(AlarmManager.shared.authorizationState), routine id=\(routine.id.uuidString)")
                 return
             }
 
@@ -93,11 +105,18 @@ struct LiveAlarmService: AlarmServicing {
                 sound: .default
             )
 
-            _ = try await AlarmManager.shared.schedule(
-                id: alarmID(for: routine.id),
-                configuration: configuration
-            )
-            print("Scheduled routine start alarm routine=\(routine.id.uuidString) at \(date) lead=\(lead)m")
+            do {
+                _ = try await AlarmManager.shared.schedule(
+                    id: alarmID(for: routine.id),
+                    configuration: configuration
+                )
+                print("Scheduled routine start alarm routine=\(routine.id.uuidString) at \(date) lead=\(lead)m")
+            } catch {
+                // Said out loud rather than swallowed. Every earlier failure here was
+                // silent, which is why a feature that never worked looked like a feature
+                // that worked and did nothing.
+                print("Routine start alarm failed for \(routine.id.uuidString): \(error)")
+            }
             return
         }
         #endif

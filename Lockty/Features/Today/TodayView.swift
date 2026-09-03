@@ -496,7 +496,7 @@ struct TodayView: View {
                         case .bestDetox: router.presentSheet(.detoxDetail(day))
                         case .routines: router.presentSheet(.routineDaySummary(day))
                         case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
-                        case .distractions: router.push(.scoreDetail(day: day, kind: .held))
+                        case .distractions: router.push(.scoreDetail(day: day, kind: .detox))
                         case .intentionalTime: router.push(.scoreDetail(day: day, kind: .focus))
                         }
                     }

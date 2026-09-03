@@ -11,8 +11,8 @@ import CoreGraphics
 enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
     /// Where the time went, weighted by what each app is called.
     case focus
-    /// How many of the blocks that fired you did not unlock.
-    case held
+    /// Time away from the phone, weighted towards long stretches.
+    case detox
     /// How many times the phone was picked up.
     case checks
 
@@ -21,7 +21,7 @@ enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .focus: "Focus"
-        case .held: "Held"
+        case .detox: "Detox"
         case .checks: "Checks"
         }
     }
@@ -32,7 +32,7 @@ enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .focus: "leaf.fill"
-        case .held: "hand.raised.fill"
+        case .detox: "moon.zzz.fill"
         case .checks: "iphone.gen3"
         }
     }
@@ -40,7 +40,7 @@ enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
     var collapsedTextWidth: CGFloat {
         switch self {
         case .focus: 56
-        case .held: 48
+        case .detox: 52
         case .checks: 60
         }
     }

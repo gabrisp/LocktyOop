@@ -185,16 +185,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 primaryMetrics: PrimaryMetricsState(
                     metrics: [
                         PrimaryMetric(kind: .focus, value: productivityResult.rawValue ?? 0),
-                        // Held is the share of shields you walked away from.
-                        // `stoppedCount` is the flow being abandoned, which from the
-                        // shield's side is exactly the good outcome: it stopped you and
-                        // you left.
-                        PrimaryMetric(
-                            kind: .held,
-                            value: pauseSummary.decisionCount == 0
-                                ? 0
-                                : Double(pauseSummary.stoppedCount) / Double(pauseSummary.decisionCount) * 100
-                        ),
+                        PrimaryMetric(kind: .detox, value: detoxResult.rawValue),
                         checksMetric(today: hourly.totalUnlocks, dayStart: dayStart)
                     ]
                 ),
@@ -581,7 +572,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             primaryMetrics: PrimaryMetricsState(
                 metrics: [
                     PrimaryMetric(kind: .focus, value: 0),
-                    PrimaryMetric(kind: .held, value: 0),
+                    PrimaryMetric(kind: .detox, value: 0),
                     PrimaryMetric(kind: .checks, count: 0, progress: 0)
                 ]
             ),

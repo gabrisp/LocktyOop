@@ -62,9 +62,10 @@ struct DailyScoreDetailView: View {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
                 badge
 
-                // Every score has these three sections, so the headings hold their place
-                // and only what is under them is replaced. A page where the headings
-                // moved as well would read as three pages taking turns.
+                // Only the first is shared. What a score is made of, and which figures
+                // are worth showing beside it, are different questions for each of the
+                // three -- so the sections below are the metric's own rather than one
+                // template filled in three ways.
                 section("explanation", "What is \(kind.title)?") {
                     Text(explanation)
                         .font(.system(.body, design: .default, weight: .regular))
@@ -74,23 +75,23 @@ struct DailyScoreDetailView: View {
                         .transition(.blurReplace.combined(with: .opacity))
                 }
 
-                section("components", "What it is made of") {
-                    componentBars
-                        .id("components-\(kind.rawValue)")
-                        .transition(.blurReplace.combined(with: .opacity))
-                }
+                switch kind {
+                case .focus:
+                    section("focus-weights", "How a minute counts") { componentBars }
 
-                if kind == .focus, state.hourlyActivity.hasAnyActivity {
-                    section("hours", "Through the day") {
-                        hourlyChart
+                    if state.hourlyActivity.hasAnyActivity {
+                        section("focus-hours", "Through the day") { hourlyChart }
                     }
-                    .transition(.blurReplace.combined(with: .opacity))
-                }
 
-                section("figures", "Today's figures") {
-                    figures
-                        .id("figures-\(kind.rawValue)")
-                        .transition(.blurReplace.combined(with: .opacity))
+                    section("focus-figures", "Where the time went") { figures }
+
+                case .detox:
+                    section("detox-parts", "What counts as time away") { componentBars }
+                    section("detox-figures", "Today's gaps") { figures }
+
+                case .checks:
+                    section("checks-ring", "How the ring reads") { componentBars }
+                    section("checks-figures", "Around the count") { figures }
                 }
             }
             .padding(.horizontal, LocktySpacing.screenInset)
@@ -165,8 +166,8 @@ struct DailyScoreDetailView: View {
         switch kind {
         case .focus:
             "Every minute on screen counts for what the app it went to is called. Productive time counts in full, neutral time counts half, and time in apps you called unproductive counts for nothing. The score is that weighted total as a share of everything you used -- so it says how the time was spent, not how much of it there was."
-        case .held:
-            "Of the times Lockty stopped you, how many you walked away from. Every shield is a small argument you have with yourself; this is the share of them you won. Nothing else moves it -- not how long you were on the phone, not which apps -- only whether you went through the unlock or closed it."
+        case .detox:
+            "Time away from the phone, weighted towards long stretches. The single longest gap counts for the most, then the total time you were not on it, then how few times you were interrupted. Twenty short breaks do not add up to one long one, which is the whole point of measuring it this way."
         case .checks:
             "How many times the phone was picked up, counted by Screen Time rather than by us. The ring is not the count: a count has no natural hundred, so it compares the day with your own last fortnight -- full when you are well under your usual, empty when you are well over. An ordinary day sits in the middle, because an ordinary day is not a failure."
         }
@@ -212,8 +213,8 @@ struct DailyScoreDetailView: View {
         switch kind {
         case .focus:
             [("Productive time", 100), ("Neutral time", 50), ("Unproductive time", 0)]
-        case .held:
-            [("Shields you walked away from", 100), ("Shields you unlocked", 0)]
+        case .detox:
+            [("Longest stretch away", 45), ("Total time away", 40), ("Few interruptions", 15)]
         case .checks:
             [("Half your usual day", 100), ("Your usual day", 50), ("Twice your usual", 0)]
         }
@@ -306,13 +307,11 @@ struct DailyScoreDetailView: View {
                 ("Intentional time", state.metrics.intentionalTime.valueText),
                 ("Pickups", "\(state.hourlyActivity.totalUnlocks)")
             ]
-        case .held:
+        case .detox:
             [
-                ("Shields", state.metrics.pauseSuccess.detailText),
-                ("Routines", state.metrics.routines.valueText),
-                // A count, not a duration: blocked apps you tried to open, stretches of
-                // unproductive use, and the times you tried again.
-                ("Distractions", state.metrics.distractions.valueText)
+                ("Longest stretch away", state.metrics.bestDetox.durationText),
+                ("Screen time", LocktyDurationFormatter.abbreviated(state.hourlyActivity.totalUsage)),
+                ("Shields", state.metrics.pauseSuccess.detailText)
             ]
         case .checks:
             [

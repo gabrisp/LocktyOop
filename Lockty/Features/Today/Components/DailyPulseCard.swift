@@ -354,10 +354,11 @@ struct DailyPulseCard: View {
         }
         .padding(.horizontal, LocktySpacing.md)
         .padding(.vertical, LocktySpacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(LocktyColors.elevatedBackground)
-        )
+        // Glass, like every other thing that floats over something else in the app. It
+        // was a flat fill, which on top of a chart reads as a second card rather than as
+        // a label held above one -- and the bars underneath should still be faintly
+        // there, since the tooltip is about one of them.
+        .safeGlass(radius: 16)
         .locktyImperfectBorder(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .fixedSize()
         .allowsHitTesting(false)

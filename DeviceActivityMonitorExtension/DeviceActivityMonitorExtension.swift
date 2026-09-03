@@ -157,12 +157,16 @@ private struct RuntimeRepairCoordinator {
 
     /// The allowance's usage threshold has been reached: the granted minutes have been
     /// spent, so it ends now whether or not its wall clock has run out.
-    /// AutoFocus stepping in.
+    /// The intervention stepping in.
     ///
-    /// Says something rather than shielding. A block at forty minutes into a scroll is a
-    /// door slammed after the fact; the point of AutoFocus is the sentence that arrives
-    /// while you are still in it, and a sentence you can ignore is one you can also
-    /// answer. Whether to add friction on top is what the routines are for.
+    /// Nothing has to wake the app for this. iOS itself counts the time spent in the
+    /// chosen apps against the threshold and launches *this extension* when it is
+    /// crossed -- a separate process, with the app closed, possibly for days. All the app
+    /// ever does is register the threshold.
+    ///
+    /// Says something rather than shielding, which is not a preference: a screen in front
+    /// of an app is only allowed against a block the person set up, and this one is
+    /// noticed rather than chosen.
     func deliverAutoFocusIntervention() {
         let configuration = store.loadAutoFocusConfiguration()
         let minutes = AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel)
@@ -185,6 +189,48 @@ private struct RuntimeRepairCoordinator {
         )
 
         print("AutoFocus intervened after \(minutes)m")
+        rearmAutoFocus(afterCooldown: configuration.cooldownMinutes)
+    }
+
+    /// Sets the threshold again, once the cooldown has passed.
+    ///
+    /// A usage event fires once per window and then stays quiet, so without this the
+    /// intervention arrived once a day whatever the cooldown was set to -- the setting
+    /// existed and did nothing. Re-registering from inside the extension is what turns it
+    /// into the real gap between one intervention and the next.
+    ///
+    /// The new window opens at the end of the cooldown and runs to the end of the day.
+    /// `DeviceActivitySchedule` refuses an interval under fifteen minutes, so a cooldown
+    /// shorter than that would throw -- the window is simply carried to the end of the
+    /// day, which is always long enough, and the cooldown lives in where it *starts*.
+    private func rearmAutoFocus(afterCooldown minutes: Int) {
+        let configuration = store.loadAutoFocusConfiguration()
+        let tokens = selectionStore.applicationTokens(for: configuration.distractingApplicationIDs)
+        guard !tokens.isEmpty else { return }
+
+        let calendar = Calendar.current
+        let resumesAt = Date().addingTimeInterval(Double(max(minutes, 5)) * 60)
+
+        // Nothing left of today to watch: tomorrow's window opens on its own, because the
+        // app re-registers the repeating schedule on every sync.
+        guard calendar.isDateInToday(resumesAt) else { return }
+
+        let start = calendar.dateComponents([.hour, .minute, .second], from: resumesAt)
+        let event = DeviceActivityEvent(
+            applications: tokens,
+            threshold: DateComponents(minute: AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel))
+        )
+
+        try? DeviceActivityCenter().startMonitoring(
+            DeviceActivityName(AutoFocusIntervention.activityName),
+            during: DeviceActivitySchedule(
+                intervalStart: start,
+                intervalEnd: DateComponents(hour: 23, minute: 59, second: 0),
+                repeats: false
+            ),
+            events: [DeviceActivityEvent.Name(AutoFocusIntervention.eventName): event]
+        )
+        print("AutoFocus re-armed for \(resumesAt)")
     }
 
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {

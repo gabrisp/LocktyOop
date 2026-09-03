@@ -144,6 +144,9 @@ struct DistractingGroupSheet: View {
 
             levelCard
 
+            // The gap before it may speak again. Screen Time fires a usage threshold
+            // once per window, so this is implemented as the moment the next window
+            // opens rather than as a timer anything has to hold.
             LocktyCountRow(
                 title: "Cooldown",
                 value: Binding(

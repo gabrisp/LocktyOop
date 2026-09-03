@@ -289,10 +289,10 @@ struct FocusView: View {
     private var appsRow: some View {
         horizontalRow {
             Button {
-                router.push(.distractingGroup)
+                router.presentSheet(.autoFocus)
             } label: {
                 AppFolderCard(
-                    title: "Distracting",
+                    title: "Unproductive",
                     subtitle: folderCountText(appsViewModel.distractingTokens.count),
                     tokens: appsViewModel.distractingTokens
                 )

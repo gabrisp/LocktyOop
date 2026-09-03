@@ -249,8 +249,21 @@ final class DistractingGroupViewModel: ObservableObject {
         await load()
     }
 
+    /// Kept for the pushed screen this replaced, which is still in the app unreached.
+    /// The sheet derives the gap from the frequency instead.
     func updateCooldown(minutes: Int) async {
         configuration.cooldownMinutes = minutes
+        configuration.updatedAt = Date()
+        try? await autoFocusManager.saveConfiguration(configuration)
+        await load()
+    }
+
+    /// Whether the interventions say anything.
+    ///
+    /// Off leaves the apps listed -- they are what the breakdown calls unproductive, and
+    /// that is worth keeping -- while the interruptions stop.
+    func setNotificationsEnabled(_ isEnabled: Bool) async {
+        configuration.notificationsEnabled = isEnabled
         configuration.updatedAt = Date()
         try? await autoFocusManager.saveConfiguration(configuration)
         await load()
@@ -271,10 +284,10 @@ struct AppsListView: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: LocktySpacing.md) {
             Button {
-                router.push(.distractingGroup)
+                router.presentSheet(.autoFocus)
             } label: {
                 AppFolderCard(
-                    title: "Distracting",
+                    title: "Unproductive",
                     subtitle: folderCountText(viewModel.distractingTokens.count),
                     tokens: viewModel.distractingTokens
                 )
@@ -326,10 +339,10 @@ struct DistractingGroupView: View {
     @ObservedObject var router: AppRouter
 
     var body: some View {
-        LocktySectionScreen(title: "Distracting") {
+        LocktySectionScreen(title: "Unproductive") {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 AppFolderCard(
-                    title: "Distracting",
+                    title: "Unproductive",
                     subtitle: viewModel.distractingTokens.isEmpty ? "0 items" : "\(viewModel.distractingTokens.count) items",
                     tokens: viewModel.distractingTokens
                 )
@@ -469,7 +482,7 @@ struct DistractingAppsSelectionView: View {
 
     var body: some View {
         LocktyActivitySelectionView(
-            title: "Distracting",
+            title: "Unproductive",
             addLabel: "Add app",
             selection: $selection,
             rules: .appGroup,

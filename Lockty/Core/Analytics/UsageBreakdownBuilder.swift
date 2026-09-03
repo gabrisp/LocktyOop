@@ -55,6 +55,36 @@ struct UsageBreakdownBuilder {
         )
     }
 
+    /// Every app seen in the last month, whether or not it was used in the period on
+    /// screen.
+    ///
+    /// Editing is about what an app *is*, which does not change with the week you are
+    /// looking at -- so a grid that only offered this week's apps would refuse to let you
+    /// file the one you were thinking of. A month of cached snapshots is a month of file
+    /// reads; nothing is asked of Screen Time.
+    func knownApps(classifications: [AppIdentity.ID: AppClassification], calendar: Calendar = .current) -> [UsageBreakdownApp] {
+        var seen: [AppIdentity.ID: UsageBreakdownApp] = [:]
+        let today = calendar.startOfDay(for: Date())
+
+        for daysBack in 0...30 {
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: today),
+                  let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
+            else { continue }
+
+            for application in snapshot.applications where application.totalActivityDuration > 0 {
+                var entry = seen[application.app.id] ?? UsageBreakdownApp(
+                    app: application.app,
+                    duration: 0,
+                    classification: classifications[application.app.id] ?? .neutral
+                )
+                entry.duration += application.totalActivityDuration
+                seen[application.app.id] = entry
+            }
+        }
+
+        return seen.values.sorted { $0.duration > $1.duration }
+    }
+
     // MARK: - Totals
 
     private func totals(for days: [Date]) -> (durations: [AppIdentity.ID: UsageBreakdownApp], total: TimeInterval, daysWithData: Int) {

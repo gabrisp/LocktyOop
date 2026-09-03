@@ -7,8 +7,24 @@ import SwiftUI
 /// are the parts of one number. Headings, a chart, and prose.
 struct DailyScoreDetailView: View {
     let day: Date
-    let kind: PrimaryMetricKind
     @ObservedObject var viewModel: TodayViewModel
+
+    /// Which score the page is reading.
+    ///
+    /// One page for all three rather than three pages. They are the same shape of
+    /// question -- what is this, what is it made of, what were today's figures -- and
+    /// three screens meant going back out to the list to compare two of them.
+    @State private var kind: PrimaryMetricKind
+
+    /// Holds the sections in place while their contents change. What is the same between
+    /// two scores should stay where it is; only what differs should be replaced.
+    @Namespace private var sectionNamespace
+
+    init(day: Date, kind: PrimaryMetricKind, viewModel: TodayViewModel) {
+        self.day = day
+        self.viewModel = viewModel
+        _kind = State(initialValue: kind)
+    }
 
     /// How far the rock has collapsed, 0 at rest and 1 once the page has been scrolled
     /// past the distance. The same behaviour Today's badge has, for the same reason: the
@@ -28,45 +44,58 @@ struct DailyScoreDetailView: View {
         state.primaryMetrics.metrics.first { $0.kind == kind }
     }
 
-    private var tint: Color {
-        guard let metric else { return LocktyColors.secondaryText }
-        return switch metric.tone {
+    private func tint(for metric: PrimaryMetric) -> Color {
+        switch metric.tone {
         case .weak: LocktyColors.unproductive
         case .balanced: LocktyColors.warning
         case .strong: LocktyColors.productive
         }
     }
 
+    private var tint: Color {
+        guard let metric else { return LocktyColors.secondaryText }
+        return tint(for: metric)
+    }
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                // Room for the badge, which is drawn above the scroll rather than in it.
-                Color.clear
-                    .frame(height: ProductivityAuraView.reservedHeight(collapseProgress: collapseProgress))
+                badge
 
+                // Every score has these three sections, so the headings hold their place
+                // and only what is under them is replaced. A page where the headings
+                // moved as well would read as three pages taking turns.
                 section("What this is") {
                     Text(explanation)
                         .font(.system(.body, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
+                        .id("explanation-\(kind.rawValue)")
+                        .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 section("What it is made of") {
                     componentBars
+                        .id("components-\(kind.rawValue)")
+                        .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 if kind == .focus, state.hourlyActivity.hasAnyActivity {
                     section("Through the day") {
                         hourlyChart
                     }
+                    .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 section("Today's figures") {
                     figures
+                        .id("figures-\(kind.rawValue)")
+                        .transition(.blurReplace.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.bottom, LocktySpacing.lg)
+            .animation(.smooth(duration: 0.38), value: kind)
             .onGeometryChange(for: CGFloat.self) { proxy in
                 -proxy.frame(in: .named("score-scroll")).minY
             } action: { newValue in
@@ -74,10 +103,10 @@ struct DailyScoreDetailView: View {
             }
         }
         .coordinateSpace(name: "score-scroll")
-        // Above the scroll, not in it, so it shrinks in place instead of leaving with the
-        // content -- and with no background of its own: the screen's ground is already
-        // behind it, and a second one would slide up as a panel.
-        .overlay(alignment: .top) { badge }
+//        // Above the scroll, not in it, so it shrinks in place instead of leaving with
+//        // the content. Commented out rather than removed: the pills sit in the scroll
+//        // for now, and the sticky behaviour is worth keeping to hand.
+//        .overlay(alignment: .top) { badge }
         .locktyScreenBackground()
         // No title in the bar. The rock above says the name at full size, and a smaller
         // copy of it sitting directly on top is the same word twice.
@@ -85,17 +114,28 @@ struct DailyScoreDetailView: View {
         .task { await viewModel.load(day: day) }
     }
 
+    /// All three, with the one being read in focus and the others behind glass.
+    ///
+    /// Blurred rather than hidden: the page is about one of them but the other two are
+    /// the comparison, and a number you can half-see is an invitation to look properly.
+    /// They stay tappable at full size -- a target you can see but not hit is worse than
+    /// one you cannot see at all.
     private var badge: some View {
-        ProductivityAuraView(
-            title: kind.title,
-            value: metric.map(\.value),
-            tint: tint,
-            format: { "\(Int($0))" },
-            collapseProgress: collapseProgress
-        )
+        HStack(spacing: LocktySpacing.sm) {
+            ForEach(state.primaryMetrics.metrics) { metric in
+                let isSelected = metric.kind == kind
+
+                DailyScoreRocksView(metrics: [metric]) { picked in
+                    guard picked != kind else { return }
+                    withAnimation(.smooth(duration: 0.38)) { kind = picked }
+                }
+                .blur(radius: isSelected ? 0 : 3.5)
+                .opacity(isSelected ? 1 : 0.55)
+                .scaleEffect(isSelected ? 1 : 0.88)
+                .animation(.smooth(duration: 0.38), value: kind)
+            }
+        }
         .frame(maxWidth: .infinity)
-        .offset(y: -navigationBarHeight * collapseProgress)
-        .allowsHitTesting(false)
     }
 
     /// What the collapsed badge has to climb to sit on the toolbar's line rather than
@@ -109,6 +149,11 @@ struct DailyScoreDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             LocktySectionTitle(title, prominent: true)
+                // The heading is the same object across all three scores, so it slides
+                // rather than being torn down and rebuilt when the page grows or shrinks
+                // around it.
+                .matchedGeometryEffect(id: "heading-\(title)", in: sectionNamespace)
+
             content()
         }
     }

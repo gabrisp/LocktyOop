@@ -20,6 +20,20 @@ nonisolated enum AutoFocusIntervention {
         }
     }
 
+    /// How long it stays quiet afterwards.
+    ///
+    /// Derived from the level rather than set beside it. "How often does this interrupt
+    /// me" is one question, and it was being asked twice -- once as a threshold and once
+    /// as a cooldown -- which let the two be set against each other: a high level with a
+    /// four-hour gap is not a high level.
+    static func cooldownMinutes(for level: AutoFocusInterventionLevel) -> Int {
+        switch level {
+        case .low: 120
+        case .medium: 60
+        case .high: 30
+        }
+    }
+
     /// The lines. Written to be read on a lock screen mid-scroll, which rules out
     /// anything long, anything scolding, and anything that reads as a notification from
     /// the very kind of app it is about.

@@ -137,8 +137,19 @@ private struct RuntimeRepairCoordinator {
     private func endScheduledRoutine(activityName: String) {
         guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))),
               var runtimeState = try? store.loadRuntimeState(),
-              runtimeState.activeRoutines.contains(where: { $0.routineID == id })
+              let active = runtimeState.activeRoutines.first(where: { $0.routineID == id })
         else { return }
+
+        // Only a session this window actually started. A routine's monitoring window is
+        // registered for its schedule and ends at the schedule's end whatever is
+        // happening -- so starting the same routine by hand outside its hours got it
+        // switched off at the end of a window it had nothing to do with, and the block
+        // simply lifted. The trigger records how the session began, and a manual one ends
+        // when a person says so.
+        guard case .schedule = active.trigger else {
+            print("Ignoring schedule end for routine \(id.uuidString): started by hand, not by this window")
+            return
+        }
 
         runtimeState.activeRoutines.removeAll { $0.routineID == id }
         runtimeState.activeBreaks.removeAll { $0.routineID == id }
@@ -169,6 +180,11 @@ private struct RuntimeRepairCoordinator {
     /// noticed rather than chosen.
     func deliverAutoFocusIntervention() {
         let configuration = store.loadAutoFocusConfiguration()
+        guard configuration.notificationsEnabled else {
+            print("AutoFocus threshold reached but notifications are off")
+            return
+        }
+
         let minutes = AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel)
 
         let content = UNMutableNotificationContent()
@@ -189,7 +205,9 @@ private struct RuntimeRepairCoordinator {
         )
 
         print("AutoFocus intervened after \(minutes)m")
-        rearmAutoFocus(afterCooldown: configuration.cooldownMinutes)
+        rearmAutoFocus(
+            afterCooldown: AutoFocusIntervention.cooldownMinutes(for: configuration.interventionLevel)
+        )
     }
 
     /// Sets the threshold again, once the cooldown has passed.

@@ -26,13 +26,26 @@ struct UsageBreakdownView: View {
     /// once is not a state this screen has.
     @State private var menuAppID: AppIdentity.ID?
 
+    /// Ties each app's icon to itself across the two layouts, so an icon in the list
+    /// flies to its place in the grid rather than one disappearing while another fades
+    /// in somewhere else. Sizes are interpolated by the effect; nothing here is a
+    /// "big if editing, small if not".
+    @Namespace private var appNamespace
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                headline
+                // Everything that describes the period steps aside while apps are being
+                // filed. None of it is the question being asked, and all of it moves
+                // under you as you answer.
+                if !viewModel.isEditing {
+                    headline
+                        .transition(.blurReplace.combined(with: .opacity))
+                }
 
                 if viewModel.isEditing {
                     editingGrid
+                        .transition(.blurReplace.combined(with: .opacity))
                 } else if viewModel.breakdown.hasData {
                     ForEach(viewModel.breakdown.sections) { section in
                         sectionView(section)
@@ -48,10 +61,16 @@ struct UsageBreakdownView: View {
         // segmented control decides what the list *is*, so it stays put while the list
         // scrolls under it.
         .customSafeAreaBar(edge: .top, spacing: 0) {
-            periodPicker
-                .padding(.horizontal, LocktySpacing.screenInset)
-                .padding(.bottom, LocktySpacing.md)
+            if !viewModel.isEditing {
+                periodPicker
+                    .padding(.horizontal, LocktySpacing.screenInset)
+                    .padding(.bottom, LocktySpacing.md)
+                    .transition(.blurReplace.combined(with: .opacity))
+            }
         }
+        // No way back while editing, and no period to change: leaving is done by the tick
+        // that finishes, which is also what puts everything else back.
+        .navigationBarBackButtonHidden(viewModel.isEditing)
         .locktyScreenBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -63,6 +82,7 @@ struct UsageBreakdownView: View {
                     withAnimation(.smooth(duration: 0.32)) { viewModel.isEditing.toggle() }
                 } label: {
                     Image(systemName: viewModel.isEditing ? "checkmark" : "pencil")
+                        .contentTransition(.symbolEffect(.replace))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(LocktyColors.primaryText)
                         .frame(width: 36, height: 36)
@@ -72,6 +92,7 @@ struct UsageBreakdownView: View {
                 .tappable()
             }
 
+            if !viewModel.isEditing {
             ToolbarItem(placement: .principal) {
                 Button {
                     viewModel.isChoosingPeriod = true
@@ -92,6 +113,7 @@ struct UsageBreakdownView: View {
                 }
                 .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
                 .tappable()
+            }
             }
         }
         .sheet(isPresented: $viewModel.isChoosingPeriod) {
@@ -222,6 +244,10 @@ struct UsageBreakdownView: View {
         ) {
             ForEach(editableApps) { app in
                 editableTile(app)
+                    // The ones that were on screen a moment ago fly into place; the rest
+                    // of the month's apps arrive on their own, since they had nowhere to
+                    // fly from.
+                    .transition(.blurReplace.combined(with: .opacity))
             }
         }
     }
@@ -229,9 +255,7 @@ struct UsageBreakdownView: View {
     /// Every app in the period, largest first, sections flattened. The split is what is
     /// being edited, so grouping by it here would be grouping by the answer.
     private var editableApps: [UsageBreakdownApp] {
-        (viewModel.breakdown.sections.flatMap(\.apps)
-            + viewModel.breakdown.sections.flatMap(\.foldedApps))
-            .sorted { $0.duration > $1.duration }
+        viewModel.knownApps
     }
 
     private func editableTile(_ app: UsageBreakdownApp) -> some View {
@@ -239,6 +263,9 @@ struct UsageBreakdownView: View {
             menuAppID = app.id
         } label: {
             VStack(spacing: 5) {
+                // In colour, and the same icon the row had: an app is recognised by its
+                // own colours, and draining them made the grid a wall of grey squares
+                // nobody could pick their way through.
                 AppIconView(
                     source: app.app.iconSource,
                     applicationToken: app.app.applicationToken,
@@ -246,10 +273,7 @@ struct UsageBreakdownView: View {
                     size: 52,
                     chrome: .plain
                 )
-                // Drained. Forty app icons in full colour is forty things shouting at
-                // once, and what is being read here is the word underneath.
-                .saturation(0)
-                .opacity(0.75)
+                .matchedGeometryEffect(id: app.id, in: appNamespace)
 
                 HStack(spacing: 2) {
                     Text(shortLabel(app.classification))
@@ -273,20 +297,21 @@ struct UsageBreakdownView: View {
                 set: { if !$0 { menuAppID = nil } }
             )
         ) {
-            VStack(alignment: .leading, spacing: 0) {
+            // A wheel, like every other three-value choice in the app. Spinning past the
+            // one you want and back is how you find out the list is only three long.
+            Picker("", selection: Binding(
+                get: { app.classification },
+                set: { classification in
+                    Task { await viewModel.setClassification(classification, of: app) }
+                }
+            )) {
                 ForEach(AppClassification.allCases, id: \.self) { classification in
-                    LocktyMenuItem(
-                        title: classification.title,
-                        isSelected: app.classification == classification
-                    ) {
-                        menuAppID = nil
-                        Task { await viewModel.setClassification(classification, of: app) }
-                    }
+                    Text(classification.title).tag(classification)
                 }
             }
-            .padding(.vertical, LocktySpacing.sm)
-            .padding(.horizontal, LocktySpacing.xs)
-            .frame(width: 210)
+            .pickerStyle(.wheel)
+            .labelsHidden()
+            .frame(width: 190, height: 150)
         }
     }
 
@@ -312,6 +337,7 @@ struct UsageBreakdownView: View {
                 size: 38,
                 chrome: .plain
             )
+            .matchedGeometryEffect(id: app.id, in: appNamespace)
 
 
             VStack(alignment: .leading, spacing: 6) {

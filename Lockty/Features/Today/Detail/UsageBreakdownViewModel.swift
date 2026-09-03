@@ -14,6 +14,8 @@ final class UsageBreakdownViewModel: ObservableObject {
     /// noticing a wrong label here and having to go and find where to fix it.
     @Published var isEditing = false
     @Published private(set) var breakdown: UsageBreakdown
+    /// Every app there is data for, which is what the grid offers.
+    @Published private(set) var knownApps: [UsageBreakdownApp] = []
 
     private let builder: UsageBreakdownBuilder
     private let classificationRepository: AppClassificationRepository
@@ -49,7 +51,11 @@ final class UsageBreakdownViewModel: ObservableObject {
             classifications: classifications,
             calendar: calendar
         )
-        withAnimation(.smooth(duration: 0.3)) { breakdown = next }
+        let known = builder.knownApps(classifications: classifications, calendar: calendar)
+        withAnimation(.smooth(duration: 0.3)) {
+            breakdown = next
+            knownApps = known
+        }
     }
 
     /// The longest single app in the period, which every bar is drawn against.

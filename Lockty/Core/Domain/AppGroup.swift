@@ -85,11 +85,11 @@ nonisolated enum AutoFocusInterventionLevel: String, Codable, CaseIterable, Hash
     var summary: String {
         switch self {
         case .low:
-            "Detects distracting apps without a friction."
+            "After 45 minutes, at most every two hours."
         case .medium:
-            "Uses a friction when AutoFocus intervenes."
+            "After 25 minutes, at most every hour."
         case .high:
-            "Uses the configured friction with the strongest intervention."
+            "After 12 minutes, at most every half hour."
         }
     }
 }
@@ -98,6 +98,13 @@ nonisolated struct AutoFocusConfiguration: Codable, Hashable {
     var distractingApplicationIDs: Set<AppIdentity.ID>
     var interventionLevel: AutoFocusInterventionLevel
     var frictionID: UUID?
+    /// Whether it says anything at all.
+    ///
+    /// The only kind of intervention there is: a screen in front of an app is allowed
+    /// only against a block the person set up, and this one is noticed rather than
+    /// chosen. The switch exists so the apps can stay listed -- they are what the
+    /// breakdown calls unproductive -- while the interruptions are off.
+    var notificationsEnabled: Bool
     var cooldownMinutes: Int
     var updatedAt: Date
 
@@ -105,15 +112,29 @@ nonisolated struct AutoFocusConfiguration: Codable, Hashable {
         distractingApplicationIDs: Set<AppIdentity.ID> = [],
         interventionLevel: AutoFocusInterventionLevel = .medium,
         frictionID: UUID? = nil,
+        notificationsEnabled: Bool = true,
         cooldownMinutes: Int = 60,
         updatedAt: Date = Date()
     ) {
         self.distractingApplicationIDs = distractingApplicationIDs
         self.interventionLevel = interventionLevel
         self.frictionID = frictionID
+        self.notificationsEnabled = notificationsEnabled
         self.cooldownMinutes = cooldownMinutes
         self.updatedAt = updatedAt
     }
 
     static let `default` = AutoFocusConfiguration()
+
+    // Tolerant, so a configuration written before the switch existed keeps working and
+    // arrives with the interventions on -- which is what it was doing.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        distractingApplicationIDs = try container.decodeIfPresent(Set<AppIdentity.ID>.self, forKey: .distractingApplicationIDs) ?? []
+        interventionLevel = try container.decodeIfPresent(AutoFocusInterventionLevel.self, forKey: .interventionLevel) ?? .medium
+        frictionID = try container.decodeIfPresent(UUID.self, forKey: .frictionID)
+        notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
+        cooldownMinutes = try container.decodeIfPresent(Int.self, forKey: .cooldownMinutes) ?? 60
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+    }
 }

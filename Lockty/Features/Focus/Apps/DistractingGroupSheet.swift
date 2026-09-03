@@ -22,6 +22,7 @@ struct DistractingGroupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var screen: Screen = .settings
     @State private var isGoingBack = false
+    @State private var isChoosingLevel = false
     @State private var selection = FamilyActivitySelection()
 
     private enum Screen: String, Identifiable {
@@ -66,7 +67,7 @@ struct DistractingGroupSheet: View {
     private var title: String {
         switch screen {
         case .settings: "Interventions"
-        case .apps: "Distracting apps"
+        case .apps: "Unproductive apps"
         }
     }
 
@@ -117,7 +118,7 @@ struct DistractingGroupSheet: View {
     private var settingsScreen: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
             AppFolderCard(
-                title: "Distracting",
+                title: "Unproductive",
                 subtitle: viewModel.distractingTokens.count == 1 ? "1 app" : "\(viewModel.distractingTokens.count) apps",
                 tokens: viewModel.distractingTokens,
                 titleAlignment: .center
@@ -142,25 +143,11 @@ struct DistractingGroupSheet: View {
             .padding(.horizontal, LocktySpacing.cardInset)
             .locktyCardBackground(cornerRadius: 22)
 
-            levelCard
+            frequencyCard
 
-            // The gap before it may speak again. Screen Time fires a usage threshold
-            // once per window, so this is implemented as the moment the next window
-            // opens rather than as a timer anything has to hold.
-            LocktyCountRow(
-                title: "Cooldown",
-                value: Binding(
-                    get: { viewModel.configuration.cooldownMinutes },
-                    set: { minutes in Task { await viewModel.updateCooldown(minutes: minutes) } }
-                ),
-                range: 5...240,
-                step: 5,
-                suffix: "min",
-                circleSize: 36,
-                valueMinWidth: 84
-            )
-            .padding(.horizontal, LocktySpacing.cardInset)
-            .locktyCardBackground(cornerRadius: 22)
+            LocktySectionTitle("Intervention types", prominent: true)
+
+            typesCard
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
@@ -169,47 +156,98 @@ struct DistractingGroupSheet: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    /// The level, with what it actually means underneath: a name on its own says how
-    /// strongly you want interrupting without saying when that would happen.
-    private var levelCard: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(AutoFocusInterventionLevel.allCases.enumerated()), id: \.element) { index, level in
-                if index > 0 { divider }
+    /// How often it interrupts, as one row with a menu.
+    ///
+    /// One dial, not two. "How often does this interrupt me" was being asked twice --
+    /// once as a threshold and once as a cooldown -- which let the two be set against
+    /// each other: a high level with a four-hour gap is not a high level.
+    private var frequencyCard: some View {
+        HStack(spacing: LocktySpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Intervention frequency")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
 
-                Button {
-                    Task { await viewModel.updateInterventionLevel(level) }
-                } label: {
-                    HStack(spacing: LocktySpacing.md) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(level.title)
-                                .font(.system(.subheadline, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.primaryText)
+                Text(viewModel.configuration.interventionLevel.summary)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-                            Text("Steps in after \(AutoFocusIntervention.thresholdMinutes(for: level)) min in a row.")
-                                .font(.system(.footnote, design: .default, weight: .regular))
-                                .foregroundStyle(LocktyColors.secondaryText)
-                        }
+            Spacer(minLength: LocktySpacing.sm)
 
-                        Spacer(minLength: LocktySpacing.sm)
+            Button {
+                isChoosingLevel = true
+            } label: {
+                HStack(spacing: LocktySpacing.xs) {
+                    Text(viewModel.configuration.interventionLevel.title)
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
 
-                        Image(systemName: viewModel.configuration.interventionLevel == level
-                              ? "checkmark.circle.fill"
-                              : "circle")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(
-                                viewModel.configuration.interventionLevel == level
-                                ? LocktyColors.productive
-                                : LocktyColors.secondaryText
-                            )
-                    }
-                    .padding(.vertical, LocktySpacing.md)
-                    .frame(minHeight: 58)
-                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(LocktyColors.tertiaryText)
                 }
-                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
-                .tappable()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .tappable()
+            .locktyMenu(isPresented: $isChoosingLevel) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(AutoFocusInterventionLevel.allCases) { level in
+                        LocktyMenuItem(
+                            title: level.title,
+                            subtitle: level.summary,
+                            isSelected: viewModel.configuration.interventionLevel == level
+                        ) {
+                            isChoosingLevel = false
+                            Task { await viewModel.updateInterventionLevel(level) }
+                        }
+                    }
+                }
+                .padding(.vertical, LocktySpacing.sm)
+                .padding(.horizontal, LocktySpacing.xs)
+                .frame(width: 260)
             }
         }
+        .padding(.vertical, LocktySpacing.md)
+        .frame(minHeight: 58)
+        .padding(.horizontal, LocktySpacing.cardInset)
+        .locktyCardBackground(cornerRadius: 22)
+    }
+
+    /// The kinds of intervention there are, which is one.
+    ///
+    /// A section for a single switch, because the list is the honest answer to "what can
+    /// this do to me": one thing, and you can turn it off.
+    private var typesCard: some View {
+        HStack(spacing: LocktySpacing.md) {
+            Image(systemName: "bell")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Notifications")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text("A word when a scroll has run long.")
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+
+            Spacer(minLength: LocktySpacing.sm)
+
+            LocktySwitch(
+                isOn: Binding(
+                    get: { viewModel.configuration.notificationsEnabled },
+                    set: { isOn in Task { await viewModel.setNotificationsEnabled(isOn) } }
+                )
+            )
+        }
+        .padding(.vertical, LocktySpacing.md)
+        .frame(minHeight: 58)
         .padding(.horizontal, LocktySpacing.cardInset)
         .locktyCardBackground(cornerRadius: 22)
     }
@@ -248,7 +286,7 @@ struct DistractingGroupSheet: View {
 
     private var appsScreen: some View {
         LocktyActivitySelectionView(
-            title: "Distracting",
+            title: "Unproductive",
             addLabel: "Add app",
             selection: Binding(
                 get: { selection },

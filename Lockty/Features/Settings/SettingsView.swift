@@ -110,7 +110,7 @@ struct SettingsView: View {
                     // the scroll that has already started.
                     navigationRow(
                         systemImage: "sparkles",
-                        title: "Distracting interventions",
+                        title: "Unproductive apps",
                         subtitle: "Says something when a scroll runs long."
                     ) {
                         router.presentSheet(.autoFocus)

@@ -185,9 +185,7 @@ struct UsageBreakdownView: View {
     private func sectionView(_ section: UsageBreakdownSection) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             HStack {
-                Text(section.title)
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.primaryText)
+                LocktySectionTitle(section.title, prominent: true)
 
                 Spacer(minLength: LocktySpacing.sm)
 

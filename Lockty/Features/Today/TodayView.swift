@@ -308,29 +308,33 @@ struct TodayView: View {
             // offset below is what carries it there. No background of its own: the
             // screen's ground is already behind it, and a second one would show as a
             // panel sliding up with it.
-            // The productivity score, as it was. `.screenTime` stays on the badge as an
-            // entry point -- it is a good one and the breakdown behind it is where both
-            // gestures now lead -- but the number on Today is the score again: it is the
-            // one figure here that is about the day rather than about the phone.
-            Button {
-                router.push(.usageBreakdown(day: day))
-            } label: {
-                ProductivityAuraView.productivity(
-                    score: productivityScore,
-                    collapseProgress: collapseProgress
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.locktyInteractive(brighten: true))
-            // Tap and hold do the same thing. They were two answers to one question --
-            // the day with its charts, or where the time went -- and the second turned
-            // out to be the one worth arriving at, so both lead there. The other screen
-            // is still in the app, just not reached from here.
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                    router.push(.usageBreakdown(day: day))
-                }
-            )
+            // The big badge, commented out rather than removed: the three pills below
+            // carry the same three numbers, and this said one of them a second time at
+            // ten times the size. Kept because the sticky behaviour behind it took four
+            // attempts to get right and is not worth rediscovering.
+//            // The productivity score, as it was. `.screenTime` stays on the badge as an
+//            // entry point -- it is a good one and the breakdown behind it is where both
+//            // gestures now lead -- but the number on Today is the score again: it is the
+//            // one figure here that is about the day rather than about the phone.
+//            Button {
+//                router.push(.usageBreakdown(day: day))
+//            } label: {
+//                ProductivityAuraView.productivity(
+//                    score: productivityScore,
+//                    collapseProgress: collapseProgress
+//                )
+//                .frame(maxWidth: .infinity)
+//            }
+//            .buttonStyle(.locktyInteractive(brighten: true))
+//            // Tap and hold do the same thing. They were two answers to one question --
+//            // the day with its charts, or where the time went -- and the second turned
+//            // out to be the one worth arriving at, so both lead there. The other screen
+//            // is still in the app, just not reached from here.
+//            .simultaneousGesture(
+//                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+//                    router.push(.usageBreakdown(day: day))
+//                }
+//            )
         }
         // Rides up into the navigation bar as it collapses, so what is left at the end
         // sits on the toolbar's own line, beside Settings, rather than parked under it.

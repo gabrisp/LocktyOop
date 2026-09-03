@@ -152,7 +152,7 @@ struct ScreenTimeInsightsView: View {
     private var insightsCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                LocktySectionTitle("What stood out")
+                LocktySectionTitle("What stood out", prominent: true)
 
                 ForEach(insights) { insight in
                     insightRow(insight)
@@ -212,7 +212,7 @@ struct ScreenTimeInsightsView: View {
     private var timelineCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                LocktySectionTitle("Through the day")
+                LocktySectionTitle("Through the day", prominent: true)
 
                 UsageTimelineChart(state: state.timeline)
                     .frame(height: 200)
@@ -225,7 +225,7 @@ struct ScreenTimeInsightsView: View {
     private var appsCard: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.lg) {
             VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                LocktySectionTitle("Where it went")
+                LocktySectionTitle("Where it went", prominent: true)
 
                 ForEach(Array(state.appUsages.prefix(6).enumerated()), id: \.element.id) { index, usage in
                     if index > 0 {

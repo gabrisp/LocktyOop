@@ -102,7 +102,7 @@ struct DailyScoreDetailView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
-            LocktySectionTitle(title)
+            LocktySectionTitle(title, prominent: true)
             content()
         }
     }

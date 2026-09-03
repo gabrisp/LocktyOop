@@ -1,58 +1,56 @@
 import SwiftUI
 
-/// Control, Detox and Productivity, as three small versions of the badge above them.
+/// Control, Detox and Productivity, as three pills whose rim is the score.
 ///
-/// The same rock, not a second visual language: they are the same kind of thing as the
-/// score at the top of the screen -- a number out of a hundred about how the day went --
-/// and drawing them as rings or pills would say they were something else. Smaller, side
-/// by side, and each lit by its own value.
+/// The rim is drawn, not blurred. An aura says roughly how it is going; a stroke that
+/// stops at 71% of the way round says the number without repeating it, and the two
+/// together -- a hard edge with its own glow behind it -- is the one place in the app
+/// where a value is a shape rather than a colour.
 ///
-/// No background and no pinning. They sit in the scroll like any other row: the badge
-/// above is the one thing on this screen worth keeping in view, and three of them
-/// competing for the top would leave nothing but headings there.
+/// No background and no pinning. They sit in the scroll like any other row.
 struct DailyScoreRocksView: View {
     let metrics: [PrimaryMetric]
     var onSelect: ((PrimaryMetricKind) -> Void)?
 
-    @Environment(\.colorScheme) private var colorScheme
-
-    private let side: CGFloat = 104
-
     var body: some View {
         HStack(spacing: LocktySpacing.sm) {
             ForEach(metrics) { metric in
-                rock(metric)
+                pill(metric)
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func rock(_ metric: PrimaryMetric) -> some View {
+    private func pill(_ metric: PrimaryMetric) -> some View {
         Button {
             onSelect?(metric.kind)
         } label: {
-            VStack(spacing: 2) {
-                ZStack {
-                    bloom(metric)
-                    body(metric)
-                    value(metric)
+            VStack(spacing: LocktySpacing.sm) {
+                HStack(spacing: 6) {
+                    Image(systemName: metric.kind.systemImage)
+                        .font(.system(size: 15, weight: .medium))
+
+                    Text("\(Int(metric.value.rounded()))")
+                        .font(.system(size: 22, weight: .bold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.smooth(duration: 0.9), value: metric.value)
                 }
-                .frame(width: side, height: side * 0.78)
-                .compositingGroup()
+                .foregroundStyle(LocktyColors.primaryText)
+                .padding(.horizontal, LocktySpacing.md)
+                .frame(height: 54)
+                .frame(maxWidth: .infinity)
+                .safeGlass(radius: 999, interactive: true)
+                .overlay { rim(metric) }
 
                 Text(metric.kind.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
-                    .foregroundStyle(
-                        colorScheme == .dark
-                        ? LocktyColors.secondaryText
-                        : LocktyColors.deep(tint(metric))
-                    )
+                    .foregroundStyle(LocktyColors.secondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.locktyInteractive(brighten: true))
+        .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
         .tappable()
     }
 
@@ -64,54 +62,28 @@ struct DailyScoreRocksView: View {
         }
     }
 
-    /// The same blurred silhouette the big badge uses, so the light follows the shape
-    /// rather than being a circle behind an irregular thing.
-    private func bloom(_ metric: PrimaryMetric) -> some View {
-        RockShape()
-            .fill(tint(metric))
-            .frame(width: side * 0.86, height: side * 0.86)
-            .blur(radius: 20)
-            .opacity(0.75)
-            .locktyGlow(lightScale: 0.6)
-            .animation(.smooth(duration: 0.6), value: metric.value)
-    }
+    /// The track, then the part of it that has been earned, then that same arc again
+    /// blurred behind itself.
+    ///
+    /// The glow is a second copy rather than a shadow: a shadow follows the shape's
+    /// whole outline, and what should be glowing is the arc, not the pill.
+    private func rim(_ metric: PrimaryMetric) -> some View {
+        let progress = max(min(metric.value / 100, 1), 0.02)
 
-    private func body(_ metric: PrimaryMetric) -> some View {
-        let shape = RockShape()
+        return ZStack {
+            Capsule(style: .continuous)
+                .stroke(LocktyColors.ink(0.10), lineWidth: 2)
 
-        return shape
-            .fill(tint(metric).opacity(0.16))
-            .background { shape.fill(LocktyColors.background) }
-            .overlay {
-                // The rim inward, in the screen's own ground: a wide stroke blurred and
-                // clipped inside the shape, which is what turns a flat silhouette into
-                // something with a body.
-                shape
-                    .stroke(LocktyColors.background, lineWidth: 12)
-                    .blur(radius: 7)
-                    .mask { shape }
-            }
-            .frame(width: side * 0.74, height: side * 0.74)
-            .animation(.smooth(duration: 0.6), value: metric.value)
-    }
+            Capsule(style: .continuous)
+                .trim(from: 0, to: progress)
+                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .blur(radius: 5)
+                .locktyGlow(lightScale: 0.7)
 
-    /// White type with the colour behind it rather than in it, as on the big one: the
-    /// number stays legible at any score and reads as lit by what it sits on.
-    private func value(_ metric: PrimaryMetric) -> some View {
-        let text = Text("\(Int(metric.value.rounded()))")
-            .font(.system(size: 26, weight: .heavy))
-            .monospacedDigit()
-            .contentTransition(.numericText())
-
-        return text
-            .foregroundStyle(colorScheme == .dark ? .white : LocktyColors.deep(tint(metric)))
-            .background {
-                text
-                    .foregroundStyle(tint(metric))
-                    .blur(radius: 7)
-                    .locktyGlow(lightScale: 0.85)
-                    .opacity(colorScheme == .dark ? 1 : 0)
-            }
-            .animation(.smooth(duration: 0.9), value: metric.value)
+            Capsule(style: .continuous)
+                .trim(from: 0, to: progress)
+                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        }
+        .animation(.smooth(duration: 0.9), value: metric.value)
     }
 }

@@ -290,15 +290,14 @@ struct UsageBreakdownView: View {
         }
     }
 
-    /// Short enough for a caption under a 52pt icon. "Unproductive" at that width wraps
-    /// or shrinks to nothing, and the tile has to be read at a glance to be worth being
-    /// a grid.
+    /// The classification's own name.
+    ///
+    /// Shortened to "Distracting" for a while, to fit under a 52pt icon. It read as a
+    /// fourth value: the menu that changes it says "Unproductive", and a tile and its own
+    /// menu disagreeing about what a thing is called is worse than a word that has to
+    /// shrink to fit.
     private func shortLabel(_ classification: AppClassification) -> String {
-        switch classification {
-        case .productive: "Productive"
-        case .neutral: "Neutral"
-        case .unproductive: "Distracting"
-        }
+        classification.title
     }
 
     /// The bar is the row's whole point. A column of durations tells you the order; a

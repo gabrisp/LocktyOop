@@ -26,7 +26,7 @@ struct DailyScoreRocksView: View {
     /// round an edge wants to be drawn on.
     @Environment(\.colorScheme) private var colorScheme
 
-    private let side: CGFloat = 92
+    private let side: CGFloat = 100
 
     private func pill(_ metric: PrimaryMetric) -> some View {
         Button {

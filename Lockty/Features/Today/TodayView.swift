@@ -382,11 +382,7 @@ struct TodayView: View {
                 // as the number above -- so they are the same rock, smaller.
                 if case .loaded = state.loadingState {
                     DailyScoreRocksView(metrics: state.primaryMetrics.metrics) { kind in
-                        switch kind {
-                        case .productivity: router.presentSheet(.productivityDetail(day))
-                        case .control: router.presentSheet(.controlDetail(day))
-                        case .detox: router.presentSheet(.detoxDetail(day))
-                        }
+                        router.push(.scoreDetail(day: day, kind: kind))
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }
@@ -492,8 +488,8 @@ struct TodayView: View {
                         case .bestDetox: router.presentSheet(.detoxDetail(day))
                         case .routines: router.presentSheet(.routineDaySummary(day))
                         case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
-                        case .distractions: router.presentSheet(.distractionsDetail(day))
-                        case .intentionalTime: router.presentSheet(.intentionalTimeDetail(day))
+                        case .distractions: router.push(.scoreDetail(day: day, kind: .control))
+                        case .intentionalTime: router.push(.scoreDetail(day: day, kind: .productivity))
                         }
                     }
                 }

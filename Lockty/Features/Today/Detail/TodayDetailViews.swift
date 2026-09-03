@@ -122,46 +122,6 @@ struct PauseDaySummaryView: View {
     }
 }
 
-struct DistractionsDetailView: View {
-    let day: Date
-    let viewModel: TodayViewModel
-
-    var body: some View {
-        TodayMetricDetailScaffold(day: day, title: "Distractions", viewModel: viewModel) { state in
-            DetailValueCard(
-                title: "Count",
-                value: state.metrics.distractions.valueText,
-                detail: state.metrics.distractions.comparisonText
-            )
-
-            DetailActivityListCard(
-                title: "Distraction windows",
-                activities: state.activities.filter { $0.type == .distraction }
-            )
-        }
-    }
-}
-
-struct IntentionalTimeDetailView: View {
-    let day: Date
-    let viewModel: TodayViewModel
-
-    var body: some View {
-        TodayMetricDetailScaffold(day: day, title: "Intentional Time", viewModel: viewModel) { state in
-            DetailValueCard(
-                title: "Intentional usage",
-                value: state.metrics.intentionalTime.valueText,
-                detail: state.metrics.intentionalTime.detailText
-            )
-
-            DetailActivityListCard(
-                title: "Meaningful periods",
-                activities: state.activities.filter { $0.type == .routine || $0.type == .focus || $0.type == .detox }
-            )
-        }
-    }
-}
-
 struct DigitalBalanceDetailView: View {
     let day: Date
     let viewModel: TodayViewModel

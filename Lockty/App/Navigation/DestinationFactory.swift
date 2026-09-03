@@ -45,6 +45,9 @@ struct DestinationFactory {
         case .usageBreakdown(let day):
             featureFactory.makeUsageBreakdown(day: day)
 
+        case .scoreDetail(let day, let kind):
+            featureFactory.makeScoreDetail(day: day, kind: kind)
+
         }
     }
 
@@ -123,12 +126,6 @@ struct DestinationFactory {
 
         case .pauseDaySummary(let day):
             todaySheet { featureFactory.makePauseDaySummary(day: day) }
-
-        case .distractionsDetail(let day):
-            todaySheet { featureFactory.makeDistractionsDetail(day: day) }
-
-        case .intentionalTimeDetail(let day):
-            todaySheet { featureFactory.makeIntentionalTimeDetail(day: day) }
 
         case .digitalBalanceDetail(let day):
             todaySheet { featureFactory.makeDigitalBalanceDetail(day: day) }

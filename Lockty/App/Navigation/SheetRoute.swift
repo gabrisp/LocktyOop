@@ -36,8 +36,6 @@ enum SheetRoute: Hashable, Identifiable {
     case screenTimeDetail(Date)
     case routineDaySummary(Date)
     case pauseDaySummary(Date)
-    case distractionsDetail(Date)
-    case intentionalTimeDetail(Date)
     case digitalBalanceDetail(Date)
 
     var id: String {
@@ -66,8 +64,6 @@ enum SheetRoute: Hashable, Identifiable {
         case .screenTimeDetail(let day): "screen-time-detail-\(day.timeIntervalSince1970)"
         case .routineDaySummary(let day): "routine-day-summary-\(day.timeIntervalSince1970)"
         case .pauseDaySummary(let day): "pause-day-summary-\(day.timeIntervalSince1970)"
-        case .distractionsDetail(let day): "distractions-detail-\(day.timeIntervalSince1970)"
-        case .intentionalTimeDetail(let day): "intentional-time-detail-\(day.timeIntervalSince1970)"
         case .digitalBalanceDetail(let day): "digital-balance-detail-\(day.timeIntervalSince1970)"
         }
     }

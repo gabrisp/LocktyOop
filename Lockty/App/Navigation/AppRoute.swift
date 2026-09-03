@@ -19,4 +19,6 @@ enum AppRoute: Hashable {
     case blockScreens
     /// Where the time went, by app, over a day, a week or a month.
     case usageBreakdown(day: Date)
+    /// One of the three daily scores, explained.
+    case scoreDetail(day: Date, kind: PrimaryMetricKind)
 }

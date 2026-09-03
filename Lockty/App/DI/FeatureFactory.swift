@@ -534,6 +534,10 @@ struct FeatureFactory {
         )
     }
 
+    func makeScoreDetail(day: Date, kind: PrimaryMetricKind) -> DailyScoreDetailView {
+        DailyScoreDetailView(day: day, kind: kind, viewModel: todayViewModel)
+    }
+
     func makeUsageBreakdown(day: Date) -> UsageBreakdownView {
         UsageBreakdownView(
             day: day,
@@ -570,14 +574,6 @@ struct FeatureFactory {
 
     func makePauseDaySummary(day: Date) -> PauseDaySummaryView {
         PauseDaySummaryView(day: day, viewModel: todayViewModel)
-    }
-
-    func makeDistractionsDetail(day: Date) -> DistractionsDetailView {
-        DistractionsDetailView(day: day, viewModel: todayViewModel)
-    }
-
-    func makeIntentionalTimeDetail(day: Date) -> IntentionalTimeDetailView {
-        IntentionalTimeDetailView(day: day, viewModel: todayViewModel)
     }
 
     func makeDigitalBalanceDetail(day: Date) -> DigitalBalanceDetailView {

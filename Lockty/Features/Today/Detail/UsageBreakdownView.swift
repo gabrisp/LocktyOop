@@ -315,9 +315,11 @@ struct UsageBreakdownView: View {
 
 
             VStack(alignment: .leading, spacing: 6) {
-                appName(app.app)
+                // Coloured by what it has been called. The list is already grouped that
+                // way, but a name in its own colour is what makes a red row readable as
+                // red at the speed you actually scan a list.
+                appName(app.app, color: LocktyColors.classification(app.classification))
                     .font(.system(.body, design: .default, weight: .regular))
-                    .foregroundStyle(LocktyColors.primaryText)
                     .lineLimit(1)
 
                 HStack(spacing: LocktySpacing.sm) {
@@ -352,11 +354,11 @@ struct UsageBreakdownView: View {
     /// been told about, and the token is the only thing that carries the real, localized
     /// name Apple shows everywhere else.
     @ViewBuilder
-    private func appName(_ app: AppIdentity) -> some View {
+    private func appName(_ app: AppIdentity, color: Color) -> some View {
         if let token = app.applicationToken {
-            Label(token).labelStyle(.titleOnly)
+            Label(token).labelStyle(.locktyAppName(color))
         } else {
-            Text(app.displayName)
+            Text(app.displayName).foregroundStyle(color)
         }
     }
 

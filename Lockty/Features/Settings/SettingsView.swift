@@ -107,11 +107,11 @@ struct SettingsView: View {
 
                     // No waiting room. A timed screen you sit through before an app opens
                     // teaches you to sit through it, and the thing worth interrupting is
-                    // the scroll that has already started -- which is what Autofocus does.
+                    // the scroll that has already started.
                     navigationRow(
                         systemImage: "sparkles",
-                        title: "Autofocus",
-                        subtitle: "Steps in when a scroll runs long."
+                        title: "Distracting interventions",
+                        subtitle: "Says something when a scroll runs long."
                     ) {
                         router.presentSheet(.autoFocus)
                     }

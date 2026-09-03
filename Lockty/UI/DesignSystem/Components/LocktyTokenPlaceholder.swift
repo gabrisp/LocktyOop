@@ -101,11 +101,11 @@ struct LocktyStackedAppTokens: View {
                     if overflow > 0, index == visible.count - 1 {
                         ZStack {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.black.opacity(0.62))
+                                .fill(LocktyColors.background.opacity(0.66))
 
                             Text("+\(overflow)")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(LocktyColors.primaryText)
                         }
                     }
                 }

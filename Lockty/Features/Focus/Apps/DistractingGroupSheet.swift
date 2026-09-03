@@ -1,13 +1,18 @@
 import FamilyControls
 import SwiftUI
 
-/// AutoFocus, in one sheet.
+/// Distracting interventions, in one sheet.
 ///
-/// It was four pushed screens -- the apps, the level, the friction, the cooldown --
-/// which is a lot of travelling for four answers that only make sense together: the
-/// friction is greyed out at the lowest level, and the cooldown means nothing without
-/// the apps. One sheet with the picker as its second face, the way every other editor
-/// in the app works.
+/// It was four pushed screens -- the apps, the level, the friction, the cooldown -- which
+/// is a lot of travelling for answers that only mean anything together. One sheet with
+/// the picker as its second face, the way every other editor in the app works.
+///
+/// There is no friction here, and there cannot be. A friction is a screen that stands in
+/// front of an app, and standing in front of an app is something Screen Time only lets
+/// Lockty do against a block the person set up themselves. This fires off a threshold the
+/// app noticed on its own, so what it can do is *say something* -- a notification, which
+/// you can ignore. Offering a friction here would be offering a door we are not allowed
+/// to close.
 struct DistractingGroupSheet: View {
     @ObservedObject var viewModel: DistractingGroupViewModel
     let frictions: [Friction]
@@ -22,7 +27,6 @@ struct DistractingGroupSheet: View {
     private enum Screen: String, Identifiable {
         case settings
         case apps
-        case friction
 
         var id: String { rawValue }
     }
@@ -61,9 +65,8 @@ struct DistractingGroupSheet: View {
 
     private var title: String {
         switch screen {
-        case .settings: "AutoFocus"
+        case .settings: "Interventions"
         case .apps: "Distracting apps"
-        case .friction: "Friction"
         }
     }
 
@@ -77,10 +80,6 @@ struct DistractingGroupSheet: View {
             case .apps:
                 appsScreen
                     .locktyDynamicSheetSizes([.large])
-                    .geometryGroup()
-                    .transition(screenTransition)
-            case .friction:
-                frictionScreen
                     .geometryGroup()
                     .transition(screenTransition)
             }
@@ -125,7 +124,11 @@ struct DistractingGroupSheet: View {
             )
             .frame(maxWidth: .infinity)
 
-            // What it watches, then how hard it steps in, then what it says it with.
+            Text("A notification, once you have been in these apps long enough. It cannot block anything: Lockty may only stand in front of an app against a block you set up yourself, and this one is noticed rather than chosen.")
+                .font(.system(.footnote, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
             VStack(spacing: 0) {
                 row(
                     title: "Apps",
@@ -135,14 +138,6 @@ struct DistractingGroupSheet: View {
                 ) {
                     open(.apps)
                 }
-
-                divider
-
-                row(title: "Friction", value: viewModel.frictionName ?? "None") {
-                    open(.friction)
-                }
-                .disabled(viewModel.configuration.interventionLevel == .low)
-                .opacity(viewModel.configuration.interventionLevel == .low ? 0.45 : 1)
             }
             .padding(.horizontal, LocktySpacing.cardInset)
             .locktyCardBackground(cornerRadius: 22)
@@ -270,18 +265,4 @@ struct DistractingGroupSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    // MARK: - Friction
-
-    private var frictionScreen: some View {
-        QuickTimerFrictionPicker(
-            frictions: frictions,
-            selectedID: viewModel.configuration.frictionID,
-            onSelect: { friction in
-                Task {
-                    await viewModel.updateFriction(friction?.id)
-                    back()
-                }
-            }
-        )
-    }
 }

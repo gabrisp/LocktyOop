@@ -1060,12 +1060,16 @@ struct AppFolderCard: View {
                 .overlay {
                     if index == visible.count - 1, overflow > 0 {
                         ZStack {
+                            // The ground, not black. White on a light page and black on
+                            // a dark one, so if the scrim runs a point past the icon it
+                            // lands on the background and is not there -- where a fixed
+                            // black square shows as a tab sticking out of a white icon.
                             tileShape
-                                .fill(Color.black.opacity(0.62))
+                                .fill(LocktyColors.background.opacity(0.66))
 
                             Text("+\(overflow)")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(LocktyColors.primaryText)
                         }
                         .frame(width: overflowSide, height: overflowSide)
                     }

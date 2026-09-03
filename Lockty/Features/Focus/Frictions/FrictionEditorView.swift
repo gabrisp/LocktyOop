@@ -829,14 +829,26 @@ struct FrictionEditorView: View {
         withAnimation(sheetAnimation) { activeSheet = nil }
     }
 
+    /// The grid of miniatures, and the list underneath it.
+    ///
+    /// Both, not one instead of the other. The grid answers "what will this look like
+    /// when it stops me", which is the question; the rows underneath still say what each
+    /// one is called and what it does, which is what you want once you have narrowed it
+    /// down to two.
     private var catalogContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+                FrictionCatalogGrid { item in
+                    viewModel.addStep(item)
+                    closeCatalog()
+                }
+
                 ForEach(FrictionCategory.allCases) { category in
                     VStack(alignment: .leading, spacing: LocktySpacing.md) {
                         Text(category.title)
                             .font(LocktyTypography.headline)
                             .foregroundStyle(LocktyColors.primaryText)
+                            .padding(.horizontal, LocktySpacing.screenInset)
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: LocktySpacing.md) {
@@ -851,13 +863,11 @@ struct FrictionEditorView: View {
                                     .tappable()
                                 }
                             }
-                            .padding(.horizontal, LocktySpacing.lg)
+                            .padding(.horizontal, LocktySpacing.screenInset)
                         }
-                        .padding(.horizontal, -LocktySpacing.lg)
                     }
                 }
             }
-            .padding(.horizontal, LocktySpacing.lg)
             .padding(.vertical, LocktySpacing.lg)
         }
     }

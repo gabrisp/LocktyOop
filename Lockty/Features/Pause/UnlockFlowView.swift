@@ -243,91 +243,11 @@ struct UnlockFlowView: View {
 
     @ViewBuilder
     private func frictionContent(_ frictionStep: PauseStep) -> some View {
-        switch frictionStep {
-        case .countdown:
-            // The glyph, and nothing written under it. The seconds are already running
-            // down inside the primary button -- the label here was the configured length
-            // rather than what is left, so it sat there contradicting the live number.
-            UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
-                Image(systemName: "timer")
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .frame(maxWidth: .infinity)
-            }
-
-        case .breathing:
-            // Filtered out of `frictionSteps`: it is the opening breathe's duration, not
-            // a screen. Unreachable, and here only because the switch is exhaustive.
-            EmptyView()
-
-        case .intention(let configuration),
-             .intentionTemplate(let configuration),
-             .customIntention(let configuration):
-            UnlockIntentionStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .confirmation(let configuration):
-            UnlockConfirmationStepView(configuration: configuration)
-
-        case .personalText(let configuration):
-            UnlockPersonalTextStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .copyPhrase(let configuration):
-            UnlockCopyPhraseStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .holdSteady(let configuration):
-            UnlockHoldSteadyStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .oddOneOut(let configuration):
-            UnlockOddOneOutStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .sortNumbers(let configuration):
-            UnlockSortNumbersStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .pastAnswers(let configuration):
-            UnlockPastAnswersStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .tuneValue(let configuration):
-            UnlockTuneValueStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .wordSearch(let configuration):
-            UnlockWordSearchStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .letterMatch(let configuration):
-            UnlockLetterMatchStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .operations(let configuration):
-            UnlockOperationsStepView(
-                configuration: configuration,
-                submitTrigger: operationsSubmitTrigger,
-                status: $currentStepStatus
-            )
-
-        case .personalVideo(let configuration):
-            UnlockPersonalVideoStepView(configuration: configuration, status: $currentStepStatus)
-
-        case .nfcTag(let configuration):
-            UnlockNFCTagStepView(
-                configuration: configuration,
-                scanTrigger: nfcScanTrigger,
-                nfcService: nfcService,
-                status: $currentStepStatus
-            )
-
-        case .steps(let configuration):
-            UnlockStepsStepView(
-                configuration: configuration,
-                healthService: healthService,
-                status: $currentStepStatus
-            )
-
-        case .location(let configuration):
-            UnlockLocationStepView(
-                configuration: configuration,
-                checkTrigger: locationCheckTrigger,
-                locationService: locationService,
-                status: $currentStepStatus
-            )
-        }
+        UnlockFlowStepPreview(
+            step: frictionStep,
+            status: $currentStepStatus,
+            operationsSubmitTrigger: operationsSubmitTrigger
+        )
     }
 
     private func handlePrimaryActionForFriction(at index: Int) {
@@ -466,5 +386,147 @@ private struct BreathingRest: View {
         .frame(height: 260)
         .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: isExpanded)
         .onAppear { isExpanded = true }
+    }
+}
+
+/// One friction step, drawn on its own.
+///
+/// Lifted out of the flow so the catalogue's miniatures show the real thing. Two copies
+/// of this mapping would drift apart the first time a step changed its mind about what
+/// it looks like, and a preview that lies is worse than no preview.
+struct UnlockFlowStepPreview: View {
+    let step: PauseStep
+    @Binding var status: UnlockFlowStepStatus
+    var operationsSubmitTrigger: Int = 0
+    /// The three steps that need something outside the app: a tag to scan, a step count
+    /// to read, a place to be. Optional so the catalogue can draw them without any of it
+    /// -- a thumbnail is not going to scan a tag.
+    var nfcScanTrigger: Int = 0
+    var nfcService: NFCServicing?
+    var healthService: HealthServicing?
+    var locationCheckTrigger: Int = 0
+    var locationService: LocationTriggerServicing?
+
+    var body: some View {
+        content
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch step {
+        case .countdown:
+            // The glyph, and nothing written under it. The seconds are already running
+            // down inside the primary button -- the label here was the configured length
+            // rather than what is left, so it sat there contradicting the live number.
+            UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
+                Image(systemName: "timer")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity)
+            }
+
+        case .breathing:
+            // Filtered out of `frictionSteps`: it is the opening breathe's duration, not
+            // a screen. Unreachable, and here only because the switch is exhaustive.
+            EmptyView()
+
+        case .intention(let configuration),
+             .intentionTemplate(let configuration),
+             .customIntention(let configuration):
+            UnlockIntentionStepView(configuration: configuration, status: $status)
+
+        case .confirmation(let configuration):
+            UnlockConfirmationStepView(configuration: configuration)
+
+        case .personalText(let configuration):
+            UnlockPersonalTextStepView(configuration: configuration, status: $status)
+
+        case .copyPhrase(let configuration):
+            UnlockCopyPhraseStepView(configuration: configuration, status: $status)
+
+        case .holdSteady(let configuration):
+            UnlockHoldSteadyStepView(configuration: configuration, status: $status)
+
+        case .oddOneOut(let configuration):
+            UnlockOddOneOutStepView(configuration: configuration, status: $status)
+
+        case .sortNumbers(let configuration):
+            UnlockSortNumbersStepView(configuration: configuration, status: $status)
+
+        case .pastAnswers(let configuration):
+            UnlockPastAnswersStepView(configuration: configuration, status: $status)
+
+        case .tuneValue(let configuration):
+            UnlockTuneValueStepView(configuration: configuration, status: $status)
+
+        case .wordSearch(let configuration):
+            UnlockWordSearchStepView(configuration: configuration, status: $status)
+
+        case .letterMatch(let configuration):
+            UnlockLetterMatchStepView(configuration: configuration, status: $status)
+
+        case .operations(let configuration):
+            UnlockOperationsStepView(
+                configuration: configuration,
+                submitTrigger: operationsSubmitTrigger,
+                status: $status
+            )
+
+        case .personalVideo(let configuration):
+            UnlockPersonalVideoStepView(configuration: configuration, status: $status)
+
+        case .nfcTag(let configuration):
+            if let nfcService {
+                UnlockNFCTagStepView(
+                    configuration: configuration,
+                    scanTrigger: nfcScanTrigger,
+                    nfcService: nfcService,
+                    status: $status
+                )
+            } else {
+                placeholder(systemImage: "wave.3.right", title: "Scan a tag")
+            }
+
+        case .steps(let configuration):
+            if let healthService {
+                UnlockStepsStepView(
+                    configuration: configuration,
+                    healthService: healthService,
+                    status: $status
+                )
+            } else {
+                placeholder(systemImage: "figure.walk", title: "\(configuration.dailyGoal.formatted(.number.grouping(.automatic))) steps")
+            }
+
+        case .location(let configuration):
+            if let locationService {
+                UnlockLocationStepView(
+                    configuration: configuration,
+                    checkTrigger: locationCheckTrigger,
+                    locationService: locationService,
+                    status: $status
+                )
+            } else {
+                placeholder(systemImage: "location", title: "Be somewhere")
+            }
+        }
+    }
+
+    /// What a step looks like with nothing behind it. Only the catalogue ever sees this:
+    /// in the flow itself every service is present.
+    private func placeholder(systemImage: String, title: String) -> some View {
+        UnlockStepSurface(tone: .neutral, shakeTrigger: 0) {
+            VStack(spacing: LocktySpacing.md) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(LocktyColors.primaryText)
+
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 16)
     }
 }

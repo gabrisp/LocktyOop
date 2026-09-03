@@ -359,7 +359,43 @@ private struct RuntimeRepairCoordinator {
         managedSettingsStore.shield.applicationCategories = selection.categoryTokens.isEmpty
             ? nil
             : .specific(selection.categoryTokens, except: exemptTokens)
-        managedSettingsStore.webContent.blockedByFilter = blockedDomains.isEmpty ? nil : .specific(blockedDomains)
+        // `.specific` is an *allow* list. This said "let the routine's blocked sites
+        // through and nothing else", which shut off the entire web whenever the
+        // extension applied a policy with a domain in it -- the same inversion the app
+        // had, fixed there and left here, so it survived in exactly the path that runs
+        // with the app closed.
+        managedSettingsStore.webContent.blockedByFilter = webContentFilter(
+            blocking: blockedDomains,
+            restrictions: policy.contentRestrictions,
+            guards: policy.strictGuards
+        )
+
+        // The device-level switches, which this path was not applying at all. A routine
+        // that started on its schedule, or any background repair, silently dropped the
+        // adult filter, the purchase block, the install block and every one of Strict
+        // Mode's doors -- the app applied them and the extension quietly did not, so the
+        // same routine enforced less depending on who had put its shield up.
+        let restrictions = policy.contentRestrictions
+        let guards = policy.strictGuards
+        managedSettingsStore.appStore.denyInAppPurchases = restrictions.blocksITunesPurchases ? true : nil
+        managedSettingsStore.appStore.requirePasswordForPurchases = restrictions.blocksITunesPurchases ? true : nil
+        managedSettingsStore.application.denyAppInstallation = restrictions.blocksAppInstallation ? true : nil
+        managedSettingsStore.application.denyAppRemoval = guards.preventsAppRemoval ? true : nil
+        managedSettingsStore.dateAndTime.requireAutomaticDateAndTime = guards.preventsDateAndTimeChanges ? true : nil
+        managedSettingsStore.passcode.lockPasscode = guards.preventsPasscodeChanges ? true : nil
+    }
+
+    /// The web filter for a policy, or nil when it wants nothing filtered.
+    ///
+    /// `.auto` carries both jobs: its argument is the set of sites to block, and turning
+    /// it on at all is what enables the automatic adult-content filter.
+    private func webContentFilter(
+        blocking domains: Set<ManagedSettings.WebDomain>,
+        restrictions: ContentRestrictions,
+        guards: StrictModeGuards
+    ) -> ManagedSettings.WebContentSettings.FilterPolicy? {
+        guard !domains.isEmpty || restrictions.blocksAdultWebContent else { return nil }
+        return .auto(domains)
     }
 
     func markShieldRestoreNeeded() {

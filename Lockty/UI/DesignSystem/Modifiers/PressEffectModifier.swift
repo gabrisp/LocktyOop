@@ -338,9 +338,9 @@ extension View {
     /// schedule, get the schedule -- and a card-wide press lights the entire summary,
     /// which says only "this whole panel is a button", which it is not.
     ///
-    /// The row draws a rounded rectangle under the finger, the same one a menu item
-    /// draws. Brightening the words alone was too quiet to read as a held control: what
-    /// says "this line, and it is listening" is a shape appearing behind it.
+    /// The row lights its own contents rather than drawing a shape behind them. Inside a
+    /// sheet the rows already sit on a card with its own edge, and a second rectangle
+    /// appearing under one is a box inside a box.
     ///
     /// A no-op when there is nothing to open, so a preview shown somewhere that cannot
     /// edit -- a routine that is running, a friction being read from a rule -- neither
@@ -348,10 +348,7 @@ extension View {
     @ViewBuilder
     func locktyEditOnLongPress(_ action: (() -> Void)?) -> some View {
         if let action {
-            locktyLongPress(
-                shape: RoundedRectangle(cornerRadius: 14, style: .continuous),
-                action: action
-            )
+            locktyLongPress(action: action)
         } else {
             self
         }

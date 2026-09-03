@@ -34,19 +34,10 @@ final class UsageBreakdownViewModel: ObservableObject {
         self.breakdown = .empty(period: .day, anchorDay: day)
     }
 
-    /// Moves an app to the next classification, and puts it in its new section.
-    ///
-    /// Cycled rather than picked from a menu: there are three, they have an order --
-    /// productive, neutral, distracting -- and a menu for three values is three taps
-    /// where one would do.
-    func cycleClassification(of app: UsageBreakdownApp) async {
-        let next: AppClassification = switch app.classification {
-        case .productive: .neutral
-        case .neutral: .unproductive
-        case .unproductive: .productive
-        }
-
-        await classificationRepository.saveClassification(next, for: app.app.id)
+    /// Files an app under a classification, and puts it in its new section.
+    func setClassification(_ classification: AppClassification, of app: UsageBreakdownApp) async {
+        guard classification != app.classification else { return }
+        await classificationRepository.saveClassification(classification, for: app.app.id)
         await reload()
     }
 

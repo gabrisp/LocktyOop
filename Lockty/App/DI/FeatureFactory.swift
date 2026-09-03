@@ -96,6 +96,15 @@ struct FeatureFactory {
         )
     }
 
+    func makeAutoFocusSheet() -> DistractingGroupSheet {
+        DistractingGroupSheet(
+            viewModel: distractingGroupViewModel,
+            frictions: frictionsViewModel.frictions,
+            toastCenter: toastCenter,
+            manager: autoFocusManager
+        )
+    }
+
     func makeBlockScreenSettings() -> BlockScreenSettingsView {
         BlockScreenSettingsView(viewModel: settingsViewModel)
     }

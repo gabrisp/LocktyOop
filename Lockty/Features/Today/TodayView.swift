@@ -377,6 +377,20 @@ struct TodayView: View {
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
+                // The other two scores, beside the one in the badge. They were on a
+                // screen nothing linked to any more, and they are the same kind of thing
+                // as the number above -- so they are the same rock, smaller.
+                if case .loaded = state.loadingState {
+                    DailyScoreRocksView(metrics: state.primaryMetrics.metrics) { kind in
+                        switch kind {
+                        case .productivity: router.presentSheet(.productivityDetail(day))
+                        case .control: router.presentSheet(.controlDetail(day))
+                        case .detox: router.presentSheet(.detoxDetail(day))
+                        }
+                    }
+                    .transition(.blurReplace.combined(with: .opacity))
+                }
+
                 // The day itself, before anything Lockty is doing about it. It is the
                 // one card that is true every day whether or not a routine ran, and the
                 // question people open the app to ask.

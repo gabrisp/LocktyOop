@@ -113,7 +113,7 @@ struct SettingsView: View {
                         title: "Autofocus",
                         subtitle: "Steps in when a scroll runs long."
                     ) {
-                        router.push(.distractingGroup)
+                        router.presentSheet(.autoFocus)
                     }
                 }
 

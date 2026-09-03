@@ -280,7 +280,7 @@ extension ProductivityAuraView {
 ///
 /// The radii are fixed, not random. This view redraws on every tick of the count, and a
 /// shape that reshuffled each frame would boil rather than sit there.
-private struct RockShape: Shape {
+struct RockShape: Shape {
     private static let radii: [CGFloat] = [
         1.00, 0.92, 0.99, 0.87, 0.97, 0.90,
         1.02, 0.93, 0.98, 0.88, 1.00, 0.94

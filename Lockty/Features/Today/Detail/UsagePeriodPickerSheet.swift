@@ -218,14 +218,24 @@ private struct UsageCalendarPicker: View {
     /// Which days the current selection covers. One for a day, the whole Monday-to-Sunday
     /// week for a week -- so touching a Wednesday shows the week that Wednesday is in
     /// rather than the seven days ending on it.
-    private var selectedInterval: DateInterval? {
-        highlightsWholeWeek
-            ? calendar.dateInterval(of: .weekOfYear, for: selection)
-            : DateInterval(start: calendar.startOfDay(for: selection), duration: 1)
+    private var selectedDays: Set<Date> {
+        // Built as a set of days rather than as a `DateInterval`, because `contains`
+        // includes the interval's end -- and a week's end is the *next* Monday, so the
+        // highlight ran Monday to Monday across eight days.
+        guard highlightsWholeWeek else { return [calendar.startOfDay(for: selection)] }
+        guard let interval = calendar.dateInterval(of: .weekOfYear, for: selection) else {
+            return [calendar.startOfDay(for: selection)]
+        }
+        return Set(
+            (0..<7).compactMap {
+                calendar.date(byAdding: .day, value: $0, to: interval.start)
+                    .map(calendar.startOfDay(for:))
+            }
+        )
     }
 
     private func dayCell(_ day: Date) -> some View {
-        let isSelected = selectedInterval.map { $0.contains(calendar.startOfDay(for: day)) } ?? false
+        let isSelected = selectedDays.contains(calendar.startOfDay(for: day))
         let isToday = calendar.isDateInToday(day)
         let isFuture = calendar.startOfDay(for: day) > calendar.startOfDay(for: Date())
 
@@ -294,7 +304,10 @@ private struct UsageCalendarPicker: View {
             return start == weekStart || calendar.component(.weekday, from: day) == calendar.firstWeekday
         }
 
-        let weekEnd = calendar.date(byAdding: .day, value: -1, to: interval.end).map(calendar.startOfDay(for:))
+        // The Sunday, which is six days after the Monday -- not `interval.end`, which is
+        // the next Monday.
+        let weekEnd = calendar.date(byAdding: .day, value: 6, to: interval.start)
+            .map(calendar.startOfDay(for:))
         let lastWeekday = (calendar.firstWeekday + 5) % 7 + 1
         return start == weekEnd || calendar.component(.weekday, from: day) == lastWeekday
     }

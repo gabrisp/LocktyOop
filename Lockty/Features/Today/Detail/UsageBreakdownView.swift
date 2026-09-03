@@ -9,7 +9,22 @@ import SwiftUI
 /// content squeezed inside them. Sections here are a heading, a total, and rows.
 struct UsageBreakdownView: View {
     let day: Date
-    @ObservedObject var viewModel: UsageBreakdownViewModel
+    /// Owned, not observed.
+    ///
+    /// The destination factory builds a fresh view model every time the navigation stack
+    /// re-evaluates its destinations, and an `@ObservedObject` would take the new one --
+    /// which starts empty. That is the screen that "sometimes opens at zero": nothing had
+    /// failed to load, the loaded object had just been replaced by a blank one.
+    @StateObject private var viewModel: UsageBreakdownViewModel
+
+    init(day: Date, viewModel: UsageBreakdownViewModel) {
+        self.day = day
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    /// Which row has its menu open. One id rather than a flag per row: two menus open at
+    /// once is not a state this screen has.
+    @State private var menuAppID: AppIdentity.ID?
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -185,13 +200,7 @@ struct UsageBreakdownView: View {
 
             ForEach(section.apps) { app in
                 if viewModel.isEditing {
-                    Button {
-                        Task { await viewModel.cycleClassification(of: app) }
-                    } label: {
-                        appRow(app, longest: viewModel.longestDuration)
-                    }
-                    .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
-                    .tappable()
+                    editableRow(app)
                 } else {
                     appRow(app, longest: viewModel.longestDuration)
                 }
@@ -203,13 +212,48 @@ struct UsageBreakdownView: View {
         }
     }
 
+    /// A row while the list is being sorted: it looks exactly as it does when read, and
+    /// opens the app's own menu.
+    ///
+    /// A menu rather than a tap that cycles. Cycling is fine for two values and a guess
+    /// for three -- you press it and find out where you landed -- where a menu names all
+    /// three and ticks the one that is true, which is the question being asked.
+    private func editableRow(_ app: UsageBreakdownApp) -> some View {
+        Button {
+            menuAppID = app.id
+        } label: {
+            appRow(app, longest: viewModel.longestDuration)
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
+        .tappable()
+        .locktyMenu(
+            isPresented: Binding(
+                get: { menuAppID == app.id },
+                set: { if !$0 { menuAppID = nil } }
+            )
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(AppClassification.allCases, id: \.self) { classification in
+                    LocktyMenuItem(
+                        title: classification.title,
+                        isSelected: app.classification == classification
+                    ) {
+                        menuAppID = nil
+                        Task { await viewModel.setClassification(classification, of: app) }
+                    }
+                }
+            }
+            .padding(.vertical, LocktySpacing.sm)
+            .padding(.horizontal, LocktySpacing.xs)
+            .frame(width: 210)
+        }
+    }
+
     /// The bar is the row's whole point. A column of durations tells you the order; a
     /// column of bars tells you the *difference*, which is the thing that makes an hour
     /// on one app look like what it is next to eight minutes on another.
     private func appRow(_ app: UsageBreakdownApp, longest: TimeInterval) -> some View {
-        let editing = viewModel.isEditing
-
-        return HStack(spacing: LocktySpacing.md) {
+        HStack(spacing: LocktySpacing.md) {
             AppIconView(
                 source: app.app.iconSource,
                 applicationToken: app.app.applicationToken,
@@ -228,11 +272,7 @@ struct UsageBreakdownView: View {
                 HStack(spacing: LocktySpacing.sm) {
                     GeometryReader { proxy in
                         Capsule()
-                            .fill(
-                                editing
-                                ? LocktyColors.ink(0.14)
-                                : LocktyColors.classification(app.classification)
-                            )
+                            .fill(LocktyColors.classification(app.classification))
                             .frame(
                                 width: longest > 0
                                     ? max(proxy.size.width * CGFloat(app.duration / longest), 6)
@@ -243,12 +283,7 @@ struct UsageBreakdownView: View {
                     }
                     .frame(height: 4)
 
-                    // The label a tap will change, in place of the duration. Editing is
-                    // about what an app *is*, and leaving a time there would have the row
-                    // answering the question it is no longer asking.
-                    Text(editing
-                         ? app.classification.title
-                         : LocktyDurationFormatter.abbreviated(app.duration))
+                    Text(LocktyDurationFormatter.abbreviated(app.duration))
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(LocktyColors.classification(app.classification))
                         .monospacedDigit()
@@ -258,7 +293,6 @@ struct UsageBreakdownView: View {
             }
         }
         .frame(minHeight: 52)
-        .animation(.smooth(duration: 0.28), value: editing)
     }
 
     /// The app's own name, from its token where there is one.

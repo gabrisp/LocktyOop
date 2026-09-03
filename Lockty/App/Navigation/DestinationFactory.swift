@@ -100,6 +100,9 @@ struct DestinationFactory {
         case .appGroupEditor(let route):
             featureFactory.makeAppGroupEditor(route: route)
 
+        case .autoFocus:
+            featureFactory.makeAutoFocusSheet()
+
         case .productivityDetail(let day):
             todaySheet { featureFactory.makeProductivityDetail(day: day) }
 

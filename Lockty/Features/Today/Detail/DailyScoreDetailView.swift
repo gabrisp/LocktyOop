@@ -94,8 +94,14 @@ struct DailyScoreDetailView: View {
             collapseProgress: collapseProgress
         )
         .frame(maxWidth: .infinity)
+        .offset(y: -navigationBarHeight * collapseProgress)
         .allowsHitTesting(false)
     }
+
+    /// What the collapsed badge has to climb to sit on the toolbar's line rather than
+    /// under it. The bar has no background of its own here, so there is nothing for it to
+    /// hide behind on the way.
+    private var navigationBarHeight: CGFloat { 44 }
 
     private func section<Content: View>(
         _ title: String,

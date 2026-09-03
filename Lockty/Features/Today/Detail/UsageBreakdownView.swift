@@ -31,7 +31,9 @@ struct UsageBreakdownView: View {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
                 headline
 
-                if viewModel.breakdown.hasData {
+                if viewModel.isEditing {
+                    editingGrid
+                } else if viewModel.breakdown.hasData {
                     ForEach(viewModel.breakdown.sections) { section in
                         sectionView(section)
                     }
@@ -197,11 +199,7 @@ struct UsageBreakdownView: View {
             }
 
             ForEach(section.apps) { app in
-                if viewModel.isEditing {
-                    editableRow(app)
-                } else {
-                    appRow(app, longest: viewModel.longestDuration)
-                }
+                appRow(app, longest: viewModel.longestDuration)
             }
 
             if !section.foldedApps.isEmpty {
@@ -210,19 +208,64 @@ struct UsageBreakdownView: View {
         }
     }
 
-    /// A row while the list is being sorted: it looks exactly as it does when read, and
-    /// opens the app's own menu.
+    /// Sorting, as a grid of icons rather than a list of rows.
     ///
-    /// A menu rather than a tap that cycles. Cycling is fine for two values and a guess
-    /// for three -- you press it and find out where you landed -- where a menu names all
-    /// three and ticks the one that is true, which is the question being asked.
-    private func editableRow(_ app: UsageBreakdownApp) -> some View {
+    /// The list is arranged *by* the thing being changed, so editing it in place means
+    /// watching rows leap between sections as you work -- you lose your position after
+    /// every choice. A grid holds still: every app is in one place, drained of colour so
+    /// the labels are what you are reading, and each one carries the answer it currently
+    /// has.
+    private var editingGrid: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: LocktySpacing.sm), count: 4),
+            spacing: LocktySpacing.lg
+        ) {
+            ForEach(editableApps) { app in
+                editableTile(app)
+            }
+        }
+    }
+
+    /// Every app in the period, largest first, sections flattened. The split is what is
+    /// being edited, so grouping by it here would be grouping by the answer.
+    private var editableApps: [UsageBreakdownApp] {
+        (viewModel.breakdown.sections.flatMap(\.apps)
+            + viewModel.breakdown.sections.flatMap(\.foldedApps))
+            .sorted { $0.duration > $1.duration }
+    }
+
+    private func editableTile(_ app: UsageBreakdownApp) -> some View {
         Button {
             menuAppID = app.id
         } label: {
-            appRow(app, longest: viewModel.longestDuration)
+            VStack(spacing: 5) {
+                AppIconView(
+                    source: app.app.iconSource,
+                    applicationToken: app.app.applicationToken,
+                    fallbackSystemImage: app.app.iconSystemName,
+                    size: 52,
+                    chrome: .plain
+                )
+                // Drained. Forty app icons in full colour is forty things shouting at
+                // once, and what is being read here is the word underneath.
+                .saturation(0)
+                .opacity(0.75)
+
+                HStack(spacing: 2) {
+                    Text(shortLabel(app.classification))
+                        .font(.system(.caption2, design: .default, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(LocktyColors.classification(app.classification))
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
+        .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()
         .locktyMenu(
             isPresented: Binding(
@@ -244,6 +287,17 @@ struct UsageBreakdownView: View {
             .padding(.vertical, LocktySpacing.sm)
             .padding(.horizontal, LocktySpacing.xs)
             .frame(width: 210)
+        }
+    }
+
+    /// Short enough for a caption under a 52pt icon. "Unproductive" at that width wraps
+    /// or shrinks to nothing, and the tile has to be read at a glance to be worth being
+    /// a grid.
+    private func shortLabel(_ classification: AppClassification) -> String {
+        switch classification {
+        case .productive: "Productive"
+        case .neutral: "Neutral"
+        case .unproductive: "Distracting"
         }
     }
 

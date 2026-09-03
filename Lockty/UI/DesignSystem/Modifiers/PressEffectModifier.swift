@@ -240,7 +240,7 @@ private struct LocktyLongPressModifier: ViewModifier {
     /// Rows sit directly under one another, and a shape that grows vertically starts
     /// overlapping the row above the moment it appears.
     private var horizontalOutset: CGFloat { 4 }
-    private var verticalOutset: CGFloat { 1 }
+    private var verticalOutset: CGFloat { 2 }
 
     @ViewBuilder
     private var heldSurface: some View {

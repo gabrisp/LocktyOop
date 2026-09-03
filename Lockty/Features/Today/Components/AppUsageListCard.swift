@@ -10,6 +10,11 @@ struct AppUsageListCard: View {
     }
     let onClassificationChange: (AppUsageState, AppClassification) -> Void
     let onAppSelected: ((AppUsageState) -> Void)? = nil
+    /// Where the card leads. The breakdown answers everything this sheet did and more --
+    /// the whole list, split by classification, over a day, a week or a month -- and it
+    /// carries the pencil that changes what an app is called, so opening a sheet of the
+    /// same rows here was a second, smaller version of a screen we already have.
+    var onOpen: (() -> Void)?
 
     @State private var showAllApps = false
 
@@ -27,9 +32,11 @@ struct AppUsageListCard: View {
 
     var body: some View {
         Button {
-            withAnimation(.smooth(duration: 0.24)) {
-                showAllApps = true
+            guard let onOpen else {
+                withAnimation(.smooth(duration: 0.24)) { showAllApps = true }
+                return
             }
+            onOpen()
         } label: {
             CardView(
                 radius: LocktyRadius.medium,

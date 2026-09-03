@@ -498,13 +498,17 @@ struct TodayView: View {
                     }
                 }
 
-                AppUsageListCard(state: state) { appUsage, classification in
-                    viewModel.updateClassification(
-                        appID: appUsage.id,
-                        classification: classification,
-                        day: day
-                    )
-                }
+                AppUsageListCard(
+                    state: state,
+                    onClassificationChange: { appUsage, classification in
+                        viewModel.updateClassification(
+                            appID: appUsage.id,
+                            classification: classification,
+                            day: day
+                        )
+                    },
+                    onOpen: { router.push(.usageBreakdown(day: day)) }
+                )
 
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)

@@ -92,6 +92,18 @@ struct UsageBreakdownView: View {
                 .tappable()
             }
 
+            // While editing, the bar says what is happening rather than which period is
+            // on screen -- the period is not what is being changed, and it is not even
+            // shown.
+            if viewModel.isEditing {
+                ToolbarItem(placement: .principal) {
+                    Text("Edit")
+                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .transition(.blurReplace.combined(with: .opacity))
+                }
+            }
+
             if !viewModel.isEditing {
             ToolbarItem(placement: .principal) {
                 Button {

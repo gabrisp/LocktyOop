@@ -71,7 +71,7 @@ struct UsageBreakdownBuilder {
                   let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
             else { continue }
 
-            for application in snapshot.applications where application.totalActivityDuration > 0 {
+            for application in snapshot.applications where application.totalActivityDuration > 0 && Self.isRealApp(application.app) {
                 var entry = seen[application.app.id] ?? UsageBreakdownApp(
                     app: application.app,
                     duration: 0,
@@ -83,6 +83,19 @@ struct UsageBreakdownBuilder {
         }
 
         return seen.values.sorted { $0.duration > $1.duration }
+    }
+
+    /// Whether an entry is an app someone could recognise and file.
+    ///
+    /// Screen Time reports things that are not apps -- activity it could name but not
+    /// identify, which arrives with no token and an id synthesised from a display name.
+    /// Those are fine in a list of where the time went; they are not fine in a grid whose
+    /// whole purpose is to say what each *app* is, because there is nothing to say it
+    /// about and nothing that would remember the answer.
+    private static func isRealApp(_ app: AppIdentity) -> Bool {
+        if app.applicationToken != nil { return true }
+        guard let bundleIdentifier = app.bundleIdentifier else { return false }
+        return !bundleIdentifier.isEmpty && !bundleIdentifier.hasPrefix("display.")
     }
 
     // MARK: - Totals

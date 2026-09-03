@@ -10,15 +10,28 @@ import SwiftUI
 /// No background and no pinning. They sit in the scroll like any other row.
 struct DailyScoreRocksView: View {
     let metrics: [PrimaryMetric]
+    /// Which one is being read, on a screen that is reading one.
+    ///
+    /// The others go behind a blur: the page is about one of them and the other two are
+    /// the comparison, so a number you can half-see is an invitation to look properly.
+    /// They stay tappable at full size -- a target you can see but not hit is worse than
+    /// one you cannot see at all. Nil means none is singled out, which is Today.
+    var focusedKind: PrimaryMetricKind?
     var onSelect: ((PrimaryMetricKind) -> Void)?
 
     var body: some View {
         // Centred, and each one only as wide as its own number. Stretched to equal
         // thirds they read as a segmented control -- three parts of one thing, where
         // these are three separate answers that happen to sit together.
-        HStack(spacing: LocktySpacing.md) {
+        HStack(spacing: LocktySpacing.xl) {
             ForEach(metrics) { metric in
+                let isDimmed = focusedKind != nil && metric.kind != focusedKind
+
                 pill(metric)
+                    .blur(radius: isDimmed ? 3.5 : 0)
+                    .opacity(isDimmed ? 0.55 : 1)
+                    .scaleEffect(isDimmed ? 0.9 : 1)
+                    .animation(.smooth(duration: 0.38), value: focusedKind)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -42,7 +55,7 @@ struct DailyScoreRocksView: View {
                     bloom(metric)
                     face(metric)
                     value(metric)
-                        .padding(.horizontal, LocktySpacing.md)
+                        .padding(.horizontal, LocktySpacing.lg)
                 }
                 .frame(height: height)
                 .fixedSize(horizontal: true, vertical: false)

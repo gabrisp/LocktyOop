@@ -65,7 +65,7 @@ struct DailyScoreDetailView: View {
                 // Every score has these three sections, so the headings hold their place
                 // and only what is under them is replaced. A page where the headings
                 // moved as well would read as three pages taking turns.
-                section("What this is") {
+                section("explanation", "What is \(kind.title)?") {
                     Text(explanation)
                         .font(.system(.body, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
@@ -74,20 +74,20 @@ struct DailyScoreDetailView: View {
                         .transition(.blurReplace.combined(with: .opacity))
                 }
 
-                section("What it is made of") {
+                section("components", "What it is made of") {
                     componentBars
                         .id("components-\(kind.rawValue)")
                         .transition(.blurReplace.combined(with: .opacity))
                 }
 
                 if kind == .focus, state.hourlyActivity.hasAnyActivity {
-                    section("Through the day") {
+                    section("hours", "Through the day") {
                         hourlyChart
                     }
                     .transition(.blurReplace.combined(with: .opacity))
                 }
 
-                section("Today's figures") {
+                section("figures", "Today's figures") {
                     figures
                         .id("figures-\(kind.rawValue)")
                         .transition(.blurReplace.combined(with: .opacity))
@@ -120,20 +120,18 @@ struct DailyScoreDetailView: View {
     /// the comparison, and a number you can half-see is an invitation to look properly.
     /// They stay tappable at full size -- a target you can see but not hit is worse than
     /// one you cannot see at all.
+    /// The same row Today has, singling one out.
+    ///
+    /// One component, not a copy: they have to sit at the same spacing and the same size
+    /// in both places, and two arrangements of the same three pills is two things to keep
+    /// in step.
     private var badge: some View {
-        HStack(spacing: LocktySpacing.sm) {
-            ForEach(state.primaryMetrics.metrics) { metric in
-                let isSelected = metric.kind == kind
-
-                DailyScoreRocksView(metrics: [metric]) { picked in
-                    guard picked != kind else { return }
-                    withAnimation(.smooth(duration: 0.38)) { kind = picked }
-                }
-                .blur(radius: isSelected ? 0 : 3.5)
-                .opacity(isSelected ? 1 : 0.55)
-                .scaleEffect(isSelected ? 1 : 0.88)
-                .animation(.smooth(duration: 0.38), value: kind)
-            }
+        DailyScoreRocksView(
+            metrics: state.primaryMetrics.metrics,
+            focusedKind: kind
+        ) { picked in
+            guard picked != kind else { return }
+            withAnimation(.smooth(duration: 0.38)) { kind = picked }
         }
         .frame(maxWidth: .infinity)
     }
@@ -144,6 +142,7 @@ struct DailyScoreDetailView: View {
     private var navigationBarHeight: CGFloat { 44 }
 
     private func section<Content: View>(
+        _ id: String,
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
@@ -152,7 +151,7 @@ struct DailyScoreDetailView: View {
                 // The heading is the same object across all three scores, so it slides
                 // rather than being torn down and rebuilt when the page grows or shrinks
                 // around it.
-                .matchedGeometryEffect(id: "heading-\(title)", in: sectionNamespace)
+                .matchedGeometryEffect(id: "heading-\(id)", in: sectionNamespace)
 
             content()
         }

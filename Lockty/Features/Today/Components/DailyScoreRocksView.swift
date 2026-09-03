@@ -42,6 +42,11 @@ struct DailyScoreRocksView: View {
                 }
                 .frame(width: side, height: side)
                 .compositingGroup()
+                // The press surface in the circle's own outline, inside the label where
+                // the style publishes the pressed state. The style scales and lights the
+                // whole cell; this is what makes the light land *on the circle* rather
+                // than on the label under it as well.
+                .locktyInteractiveSurface(shape: Circle(), pressedScale: 0.95)
 
                 Text(metric.kind.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))

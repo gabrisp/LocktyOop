@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Control, Detox and Productivity, as three pills whose rim is the score.
+/// Control, Detox and Productivity, as three circles whose rim is the score.
 ///
 /// The rim is drawn, not blurred. An aura says roughly how it is going; a stroke that
 /// stops at 71% of the way round says the number without repeating it, and the two
@@ -21,27 +21,28 @@ struct DailyScoreRocksView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// How wide each one is. A circle, not a capsule: the number is one or two digits
+    /// and a pill around it is mostly empty pill -- and a ring is what a value going
+    /// round an edge wants to be drawn on.
+    private let side: CGFloat = 92
+
     private func pill(_ metric: PrimaryMetric) -> some View {
         Button {
             onSelect?(metric.kind)
         } label: {
             VStack(spacing: LocktySpacing.sm) {
-                HStack(spacing: 6) {
-                    Image(systemName: metric.kind.systemImage)
-                        .font(.system(size: 15, weight: .medium))
-
-                    Text("\(Int(metric.value.rounded()))")
-                        .font(.system(size: 22, weight: .bold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .animation(.smooth(duration: 0.9), value: metric.value)
-                }
-                .foregroundStyle(LocktyColors.primaryText)
-                .padding(.horizontal, LocktySpacing.md)
-                .frame(height: 54)
-                .frame(maxWidth: .infinity)
-                .safeGlass(radius: 999, interactive: true)
-                .overlay { rim(metric) }
+                // No glyph. The label under it already names the score, and a symbol
+                // beside the number in a circle this size leaves neither room to be read.
+                Text("\(Int(metric.value.rounded()))")
+                    .font(.system(size: 26, weight: .bold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.smooth(duration: 0.9), value: metric.value)
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(width: side, height: side)
+                    .safeGlass(radius: 999, interactive: true)
+                    .clipShape(Circle())
+                    .overlay { rim(metric) }
 
                 Text(metric.kind.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
@@ -49,8 +50,11 @@ struct DailyScoreRocksView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
+        // Lights its own contents rather than laying a shape over them: the circle
+        // already has an edge, and a second one drawn on press is a ring around a ring.
+        .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()
     }
 
@@ -71,19 +75,23 @@ struct DailyScoreRocksView: View {
         let progress = max(min(metric.value / 100, 1), 0.02)
 
         return ZStack {
-            Capsule(style: .continuous)
-                .stroke(LocktyColors.ink(0.10), lineWidth: 2)
+            Circle()
+                .stroke(LocktyColors.ink(0.10), lineWidth: 2.5)
 
-            Capsule(style: .continuous)
+            Circle()
                 .trim(from: 0, to: progress)
-                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .blur(radius: 5)
                 .locktyGlow(lightScale: 0.7)
 
-            Capsule(style: .continuous)
+            Circle()
                 .trim(from: 0, to: progress)
-                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(tint(metric), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
         }
+        // From the top, clockwise. A circle's path starts at three o'clock, which would
+        // have every score beginning on its right-hand side for no reason anyone could
+        // see -- unlike a capsule, a circle has no top edge of its own to start from.
+        .rotationEffect(.degrees(-90))
         .animation(.smooth(duration: 0.9), value: metric.value)
     }
 }

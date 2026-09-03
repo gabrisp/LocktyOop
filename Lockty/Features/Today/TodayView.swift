@@ -140,10 +140,14 @@ struct TodayView: View {
     /// date slider and the shortcut row, so the content must not be pushed down to clear
     /// chrome that isn't there.
     private var topChromeExpandedHeight: CGFloat {
+        // Zero, because the badge above it is commented out. The reservation existed to
+        // keep the content clear of something drawn over it; with nothing drawn there it
+        // is a gap the length of a badge nobody can see.
+        0
         // Interpolated, not fixed: the badge is pinned above the content, so the content
         // has to start below where it is drawn *and* ride up as it shrinks -- otherwise
         // it would leave the full-size gap behind.
-        ProductivityAuraView.reservedHeight(collapseProgress: collapseProgress)
+//        ProductivityAuraView.reservedHeight(collapseProgress: collapseProgress)
 //        headerTopInset + MetricsHeaderGeometry.expandedHeight
 //        DayPageSliderMetrics.barHeight + topChromeSpacing + headerTopInset
 //            + shortcutRowHeight + topChromeSpacing + MetricsHeaderGeometry.expandedHeight

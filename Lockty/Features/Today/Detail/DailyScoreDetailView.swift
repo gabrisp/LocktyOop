@@ -83,15 +83,19 @@ struct DailyScoreDetailView: View {
                         section("focus-hours", "Through the day") { hourlyChart }
                     }
 
-                    section("focus-figures", "Where the time went") { figures }
+                    if !distractingApps.isEmpty {
+                        section("focus-apps", "What took the most") { appList }
+                    }
+
+                    section("focus-figures", "Where the time went") { gauges }
 
                 case .detox:
                     section("detox-parts", "What counts as time away") { componentBars }
-                    section("detox-figures", "Today's gaps") { figures }
+                    section("detox-figures", "Today's gaps") { gauges }
 
                 case .checks:
                     section("checks-ring", "How the ring reads") { componentBars }
-                    section("checks-figures", "Around the count") { figures }
+                    section("checks-figures", "Around the count") { gauges }
                 }
             }
             .padding(.horizontal, LocktySpacing.screenInset)
@@ -264,6 +268,117 @@ struct DailyScoreDetailView: View {
         if value > 0, total > 0 {
             color.frame(height: height * CGFloat(value / total))
         }
+    }
+
+    // MARK: - Apps
+
+    /// The apps that took the most, with their own icons.
+    ///
+    /// A score is an average of a day, and an average never says which app it was about.
+    /// Three rows with the real icons answer the question the number provokes.
+    private var distractingApps: [AppUsageState] {
+        Array(
+            state.appUsages
+                .filter { $0.classification == .unproductive && $0.duration >= 60 }
+                .prefix(3)
+        )
+    }
+
+    private var appList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(distractingApps.enumerated()), id: \.element.id) { index, usage in
+                if index > 0 {
+                    Divider().overlay(LocktyColors.separator.opacity(0.45))
+                }
+
+                HStack(spacing: LocktySpacing.md) {
+                    AppIconView(
+                        source: usage.app.iconSource,
+                        applicationToken: usage.app.applicationToken,
+                        fallbackSystemImage: usage.app.iconSystemName,
+                        size: 34,
+                        chrome: .plain
+                    )
+
+                    Text(usage.app.displayName)
+                        .font(.system(.body, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
+
+                    Spacer(minLength: LocktySpacing.sm)
+
+                    Text(usage.durationText)
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.unproductive)
+                        .monospacedDigit()
+                }
+                .frame(minHeight: 48)
+            }
+        }
+    }
+
+    // MARK: - Gauges
+
+    /// The day's figures as gauges rather than as a list of values.
+    ///
+    /// A number on its own is not a reading: "40 unlocks" means nothing until you know
+    /// whether forty is a lot, and the only honest answer to that is your own usual.
+    private var gauges: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+            ForEach(gaugeRows, id: \.title) { row in
+                LocktyGaugeRow(
+                    title: row.title,
+                    value: row.value,
+                    position: row.position,
+                    higherIsWorse: row.higherIsWorse
+                )
+            }
+        }
+    }
+
+    private var gaugeRows: [(title: String, value: String, position: Double?, higherIsWorse: Bool)] {
+        let hourly = state.hourlyActivity
+
+        switch kind {
+        case .focus:
+            return [
+                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true),
+                ("Intentional time", state.metrics.intentionalTime.valueText, nil, false)
+            ]
+        case .detox:
+            return [
+                ("Longest stretch away", state.metrics.bestDetox.durationText, nil, false),
+                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true)
+            ]
+        case .checks:
+            return [
+                ("Phone unlocks", "\(hourly.totalUnlocks)", checksPosition, true),
+                ("Notifications", "\(hourly.totalNotifications)", nil, true)
+            ]
+        }
+    }
+
+    /// Where today's screen time sits against the fortnight behind it, on the same scale
+    /// the gauge reads: half the usual is the far left, twice it the far right.
+    private var usagePosition: Double? {
+        guard let reduction = state.hourlyActivity.reductionVersusBaseline else { return nil }
+        let baseline = state.hourlyActivity.totalUsage + reduction
+        guard baseline > 0 else { return nil }
+        return placed(ratio: state.hourlyActivity.totalUsage / baseline)
+    }
+
+    /// The pickup ring already knows this, so the gauge reads the same figure the pill
+    /// does rather than working it out a second way.
+    private var checksPosition: Double? {
+        guard let metric = state.primaryMetrics.metrics.first(where: { $0.kind == .checks }) else {
+            return nil
+        }
+        // The ring is full when the day is good; the gauge runs the other way.
+        return 1 - metric.progress
+    }
+
+    private func placed(ratio: Double) -> Double {
+        min(max((ratio - 0.5) / 1.5, 0), 1)
     }
 
     // MARK: - Figures

@@ -10,6 +10,16 @@ struct DailyScoreDetailView: View {
     let kind: PrimaryMetricKind
     @ObservedObject var viewModel: TodayViewModel
 
+    /// How far the rock has collapsed, 0 at rest and 1 once the page has been scrolled
+    /// past the distance. The same behaviour Today's badge has, for the same reason: the
+    /// number is what the page is about, and it should still be there when you are three
+    /// screens into the explanation of it.
+    @State private var scrollOffset: CGFloat = 0
+
+    private var collapseProgress: CGFloat {
+        min(max(scrollOffset / 120, 0), 1)
+    }
+
     private var state: TodayDayState {
         viewModel.state(for: day)
     }
@@ -30,7 +40,9 @@ struct DailyScoreDetailView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
-                badge
+                // Room for the badge, which is drawn above the scroll rather than in it.
+                Color.clear
+                    .frame(height: ProductivityAuraView.reservedHeight(collapseProgress: collapseProgress))
 
                 section("What this is") {
                     Text(explanation)
@@ -54,10 +66,21 @@ struct DailyScoreDetailView: View {
                 }
             }
             .padding(.horizontal, LocktySpacing.screenInset)
-            .padding(.vertical, LocktySpacing.lg)
+            .padding(.bottom, LocktySpacing.lg)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                -proxy.frame(in: .named("score-scroll")).minY
+            } action: { newValue in
+                scrollOffset = newValue
+            }
         }
+        .coordinateSpace(name: "score-scroll")
+        // Above the scroll, not in it, so it shrinks in place instead of leaving with the
+        // content -- and with no background of its own: the screen's ground is already
+        // behind it, and a second one would slide up as a panel.
+        .overlay(alignment: .top) { badge }
         .locktyScreenBackground()
-        .navigationTitle(kind.title)
+        // No title in the bar. The rock above says the name at full size, and a smaller
+        // copy of it sitting directly on top is the same word twice.
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load(day: day) }
     }
@@ -67,9 +90,11 @@ struct DailyScoreDetailView: View {
             title: kind.title,
             value: metric.map(\.value),
             tint: tint,
-            format: { "\(Int($0))" }
+            format: { "\(Int($0))" },
+            collapseProgress: collapseProgress
         )
         .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
     }
 
     private func section<Content: View>(

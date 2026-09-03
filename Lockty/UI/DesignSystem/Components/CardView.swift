@@ -130,11 +130,15 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
 
     /// The light-mode card: white, a touch cooler towards the bottom so it still has the
     /// same direction of light the dark one does.
+    /// The same surface the smaller cards use, with the faintest fall towards the bottom
+    /// so the card still has a top and a bottom. Not white: on a 0.945 page a paper-white
+    /// card shouts, and the page is grey precisely so a card can be a little lighter
+    /// rather than a lot.
     private var lightSurface: LinearGradient {
         LinearGradient(
             colors: [
-                Color.white,
-                Color.white.opacity(0.94)
+                LocktyColors.cardSurface,
+                LocktyColors.cardSurface.opacity(0.93)
             ],
             startPoint: .top,
             endPoint: .bottom

@@ -51,7 +51,7 @@ enum LocktyColors {
     /// is grey precisely so a card can be lighter than it -- the same relationship the
     /// dark theme has, the other way up.
     static let cardSurface = adaptive(
-        light: .white,
+        light: UIColor(red: 0.985, green: 0.985, blue: 0.995, alpha: 1),
         dark: UIColor.white.withAlphaComponent(0.055)
     )
 

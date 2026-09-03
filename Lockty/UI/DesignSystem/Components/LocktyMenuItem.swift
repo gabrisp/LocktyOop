@@ -43,7 +43,7 @@ struct LocktyMenuItem<Content: View>: View {
         }
         .buttonStyle(.locktyInteractive(shape: shape))
         .tappable()
-        .locktyMenuItemLongPress(longPressAction, shape: shape)
+        .locktyMenuItemLongPress(longPressAction)
     }
 }
 
@@ -51,12 +51,12 @@ private extension View {
     /// Attached only when there is something to hold for. A gesture that does nothing
     /// still swallows the press it was given, which would make an ordinary tap feel slow.
     ///
-    /// It carries the row's own shape, so holding lights the same rectangle a tap does
-    /// rather than leaving the hold looking like nothing is happening until it fires.
+    /// Lights the row's content rather than drawing a shape behind it. A menu row is
+    /// small, and a rectangle around one is mostly rectangle.
     @ViewBuilder
-    func locktyMenuItemLongPress<S: Shape>(_ action: (() -> Void)?, shape: S) -> some View {
+    func locktyMenuItemLongPress(_ action: (() -> Void)?) -> some View {
         if let action {
-            locktyLongPress(shape: shape, minimumDuration: 0.4, action: action)
+            locktyLongPress(minimumDuration: 0.4, action: action)
         } else {
             self
         }

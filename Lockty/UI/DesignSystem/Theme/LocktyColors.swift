@@ -15,7 +15,7 @@ enum LocktyColors {
     /// the screen would read as a stack of grey boxes on paper. A soft grey lets the
     /// cards be lighter than the page, the way they are darker than it in the dark.
     static let background = adaptive(
-        light: UIColor(red: 0.945, green: 0.945, blue: 0.955, alpha: 1),
+        light: UIColor(red: 0.914, green: 0.914, blue: 0.929, alpha: 1),
         dark: .black
     )
 
@@ -51,7 +51,7 @@ enum LocktyColors {
     /// is grey precisely so a card can be lighter than it -- the same relationship the
     /// dark theme has, the other way up.
     static let cardSurface = adaptive(
-        light: UIColor(red: 0.985, green: 0.985, blue: 0.995, alpha: 1),
+        light: .white,
         dark: UIColor.white.withAlphaComponent(0.055)
     )
 

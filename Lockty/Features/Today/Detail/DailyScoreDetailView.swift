@@ -1,3 +1,4 @@
+import FamilyControls
 import SwiftUI
 
 /// One score, in full: the rock again, what the number is made of, and what it means.
@@ -19,6 +20,10 @@ struct DailyScoreDetailView: View {
     /// Holds the sections in place while their contents change. What is the same between
     /// two scores should stay where it is; only what differs should be replaced.
     @Namespace private var sectionNamespace
+
+    /// Which of the day chart's three the section is showing. Its own state, so moving
+    /// between scores does not reset what you were looking at.
+    @State private var pulseMetric: HourlyActivityMetric = .reduction
 
     init(day: Date, kind: PrimaryMetricKind, viewModel: TodayViewModel) {
         self.day = day
@@ -77,25 +82,37 @@ struct DailyScoreDetailView: View {
 
                 switch kind {
                 case .focus:
-                    section("focus-weights", "How a minute counts") { componentBars }
+                    section("focus-weights", "How a minute counts") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
 
                     if state.hourlyActivity.hasAnyActivity {
-                        section("focus-hours", "Through the day") { hourlyChart }
+                        section("focus-hours", "Through the day") {
+                            // The card from Today, not a plainer copy of its chart. It
+                            // already reads the hours three ways and answers a finger
+                            // dragged along it, and a second chart drawn here would be
+                            // the same data with less of it.
+                            DailyPulseCard(
+                                state: state.hourlyActivity,
+                                metric: $pulseMetric
+                            )
+                        }
                     }
 
                     if !distractingApps.isEmpty {
-                        section("focus-apps", "What took the most") { appList }
+                        section("focus-apps", "What took the most") { appList.id("appList-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
                     }
 
-                    section("focus-figures", "Where the time went") { gauges }
+                    section("focus-figures", "Where the time went") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
 
                 case .detox:
-                    section("detox-parts", "What counts as time away") { componentBars }
-                    section("detox-figures", "Today's gaps") { gauges }
+                    section("detox-parts", "What counts as time away") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                    section("detox-figures", "Today's gaps") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
 
                 case .checks:
-                    section("checks-ring", "How the ring reads") { componentBars }
-                    section("checks-figures", "Around the count") { gauges }
+                    // No weights section. Checks has no formula to take apart -- the ring
+                    // is a comparison with your own fortnight, which the paragraph above
+                    // already says. Bars labelled "Half your usual day -- 100%" were the
+                    // weights component wearing a scale's clothes, and read as nonsense.
+                    section("checks-figures", "Around the count") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
                 }
             }
             .padding(.horizontal, LocktySpacing.screenInset)
@@ -220,7 +237,9 @@ struct DailyScoreDetailView: View {
         case .detox:
             [("Longest stretch away", 45), ("Total time away", 40), ("Few interruptions", 15)]
         case .checks:
-            [("Half your usual day", 100), ("Your usual day", 50), ("Twice your usual", 0)]
+            // Nothing: the ring is a comparison, not a sum of parts. Kept as an empty
+            // case rather than removed so the switch still names all three.
+            []
         }
     }
 
@@ -284,6 +303,15 @@ struct DailyScoreDetailView: View {
         )
     }
 
+    @ViewBuilder
+    private func appName(_ app: AppIdentity) -> some View {
+        if let token = app.applicationToken {
+            Label(token).labelStyle(.locktyAppName(LocktyColors.primaryText))
+        } else {
+            Text(app.displayName).foregroundStyle(LocktyColors.primaryText)
+        }
+    }
+
     private var appList: some View {
         VStack(spacing: 0) {
             ForEach(Array(distractingApps.enumerated()), id: \.element.id) { index, usage in
@@ -300,9 +328,10 @@ struct DailyScoreDetailView: View {
                         chrome: .plain
                     )
 
-                    Text(usage.app.displayName)
+                    // From the token. `displayName` falls back to the bundle identifier,
+                    // and no one recognises "com.burbn.instagram" as Instagram.
+                    appName(usage.app)
                         .font(.system(.body, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.primaryText)
                         .lineLimit(1)
 
                     Spacer(minLength: LocktySpacing.sm)
@@ -343,19 +372,73 @@ struct DailyScoreDetailView: View {
         case .focus:
             return [
                 ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true),
-                ("Intentional time", state.metrics.intentionalTime.valueText, nil, false)
+                ("Unproductive time", LocktyDurationFormatter.abbreviated(unproductiveUsage), sharePosition(unproductiveUsage), true),
+                ("Intentional time", state.metrics.intentionalTime.valueText, nil, false),
+                ("Busiest hour", busiestHourText, nil, true)
             ]
         case .detox:
             return [
                 ("Longest stretch away", state.metrics.bestDetox.durationText, nil, false),
-                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true)
+                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true),
+                ("Hours untouched", "\(untouchedHours) of 24", nil, false),
+                ("First look", firstLookText, nil, true)
             ]
         case .checks:
             return [
                 ("Phone unlocks", "\(hourly.totalUnlocks)", checksPosition, true),
-                ("Notifications", "\(hourly.totalNotifications)", nil, true)
+                ("Notifications", "\(hourly.totalNotifications)", nil, true),
+                ("Average visit", averageVisitText, nil, true),
+                ("Busiest hour", busiestHourText, nil, true)
             ]
         }
+    }
+
+    /// Time in apps called unproductive. The figure Focus is really about: the score
+    /// falls because of these minutes and no others.
+    private var unproductiveUsage: TimeInterval {
+        state.appUsages
+            .filter { $0.classification == .unproductive }
+            .reduce(0) { $0 + $1.duration }
+    }
+
+    /// A share of the day, placed on the gauge directly: a third of your time in
+    /// unproductive apps is the middle, none of it the far left, two thirds the far
+    /// right. No history needed -- a proportion is already comparable to itself.
+    private func sharePosition(_ duration: TimeInterval) -> Double? {
+        let total = state.hourlyActivity.totalUsage
+        guard total > 0 else { return nil }
+        return min(max((duration / total) / 0.66, 0), 1)
+    }
+
+    /// When the day was heaviest, which an average of it can never say.
+    private var busiestHourText: String {
+        guard let peak = state.hourlyActivity.hours.max(by: { $0.usage < $1.usage }),
+              peak.usage > 0
+        else { return "--" }
+        return String(format: "%d:00", peak.hour)
+    }
+
+    /// Hours with nothing on the screen at all. A blunter reading of the same thing Detox
+    /// scores, and one nobody has to be told how to interpret.
+    private var untouchedHours: Int {
+        state.hourlyActivity.hours.filter { $0.usage < 60 }.count
+    }
+
+    /// The first hour with real use in it. People are almost always surprised by this
+    /// one, which is the mark of a figure worth showing.
+    private var firstLookText: String {
+        guard let first = state.hourlyActivity.hours.first(where: { $0.usage >= 5 * 60 }) else {
+            return "--"
+        }
+        return String(format: "%d:00", first.hour)
+    }
+
+    /// How long a pickup lasted on average. Two hours across ten visits and two hours
+    /// across ninety are different days, and this is the only line that separates them.
+    private var averageVisitText: String {
+        let unlocks = state.hourlyActivity.totalUnlocks
+        guard unlocks > 0, state.hourlyActivity.totalUsage > 0 else { return "--" }
+        return LocktyDurationFormatter.abbreviated(state.hourlyActivity.totalUsage / Double(unlocks))
     }
 
     /// Where today's screen time sits against the fortnight behind it, on the same scale

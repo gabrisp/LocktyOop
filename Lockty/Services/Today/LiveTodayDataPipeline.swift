@@ -86,6 +86,14 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             let totalRoutineTasks = routineExecutions.flatMap(\.taskCompletions).count
             let completedRoutines = routineExecutions.filter { $0.endedAt != nil }.count
             let pauseSummary = PauseSuccessCalculator().summary(from: pauseEvents)
+            let hourly = makeHourlyActivity(
+                snapshot: snapshot,
+                dayStart: dayStart,
+                totalUsage: summary.totalUsage,
+                classifications: Dictionary(
+                    uniqueKeysWithValues: summary.applications.map { ($0.app.id, $0.classification) }
+                )
+            )
             let unproductiveBursts = timelineBuckets.filter { $0.unproductive > (10 * 60) }.count
             let repeatedPauseAttempts = max(0, pauseEvents.count - Set(pauseEvents.map(\.application.id)).count)
             let distractionCount = distractionCalculator.count(
@@ -176,9 +184,18 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 activeRoutineChecklist: makeActiveRoutineChecklist(day: dayStart, runtimeState: runtimeState),
                 primaryMetrics: PrimaryMetricsState(
                     metrics: [
-                        PrimaryMetric(kind: .productivity, value: productivityResult.rawValue ?? 0),
-                        PrimaryMetric(kind: .control, value: controlResult.rawValue),
-                        PrimaryMetric(kind: .detox, value: detoxResult.rawValue)
+                        PrimaryMetric(kind: .focus, value: productivityResult.rawValue ?? 0),
+                        // Held is the share of shields you walked away from.
+                        // `stoppedCount` is the flow being abandoned, which from the
+                        // shield's side is exactly the good outcome: it stopped you and
+                        // you left.
+                        PrimaryMetric(
+                            kind: .held,
+                            value: pauseSummary.decisionCount == 0
+                                ? 0
+                                : Double(pauseSummary.stoppedCount) / Double(pauseSummary.decisionCount) * 100
+                        ),
+                        checksMetric(today: hourly.totalUnlocks, dayStart: dayStart)
                     ]
                 ),
                 perspective: perspective,
@@ -232,14 +249,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                         )
                     }
                 ),
-                hourlyActivity: makeHourlyActivity(
-                    snapshot: snapshot,
-                    dayStart: dayStart,
-                    totalUsage: summary.totalUsage,
-                    classifications: Dictionary(
-                        uniqueKeysWithValues: summary.applications.map { ($0.app.id, $0.classification) }
-                    )
-                ),
+                hourlyActivity: hourly,
                 appUsages: {
                     let counts = Dictionary(
                         (snapshot?.applications ?? []).map { ($0.app.id, ($0.pickups, $0.notifications)) },
@@ -275,6 +285,39 @@ struct LiveTodayDataPipeline: TodayDataProviding {
     /// bucket per raw activity segment put a 3am segment right next to a 10pm one, which
     /// made the bars, the bands and the 00/06/12/18/24 axis three different x scales.
     /// A segment spanning several hours has its time split across them by overlap.
+    /// Today's pickups, and how they stand against the days before.
+    ///
+    /// A count has no natural hundred, so the ring is a comparison instead: full when the
+    /// day is well under the recent average, empty when it is well over. Half a ring with
+    /// no history to compare against -- neither praise nor a telling-off for a number
+    /// nobody has anything to measure yet.
+    private func checksMetric(today: Int, dayStart: Date) -> PrimaryMetric {
+        let calendar = Calendar.current
+        var earlier: [Int] = []
+
+        for daysBack in 1...14 {
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: dayStart),
+                  let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day)),
+                  snapshot.totalActivityDuration > 0
+            else { continue }
+            earlier.append(snapshot.activitySegments.reduce(0) { $0 + $1.pickups })
+        }
+
+        guard earlier.count >= 3 else {
+            return PrimaryMetric(kind: .checks, count: today, progress: 0.5)
+        }
+
+        let average = Double(earlier.reduce(0, +)) / Double(earlier.count)
+        guard average > 0 else { return PrimaryMetric(kind: .checks, count: today, progress: 0.5) }
+
+        // Half the average is a full ring, twice it is an empty one, and the average
+        // itself sits at half -- so an ordinary day looks ordinary rather than like a
+        // failure.
+        let ratio = Double(today) / average
+        let progress = min(max(1 - (ratio - 0.5) / 1.5, 0), 1)
+        return PrimaryMetric(kind: .checks, count: today, progress: progress)
+    }
+
     /// The day in twenty-four columns, plus how it compares with the days before it.
     ///
     /// Built from the same hourly segments the timeline uses, so the two cannot disagree
@@ -537,9 +580,9 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             activeRoutineChecklist: makeActiveRoutineChecklist(day: day, runtimeState: runtimeState),
             primaryMetrics: PrimaryMetricsState(
                 metrics: [
-                    PrimaryMetric(kind: .productivity, value: 0),
-                    PrimaryMetric(kind: .control, value: controlResult.rawValue),
-                    PrimaryMetric(kind: .detox, value: 0)
+                    PrimaryMetric(kind: .focus, value: 0),
+                    PrimaryMetric(kind: .held, value: 0),
+                    PrimaryMetric(kind: .checks, count: 0, progress: 0)
                 ]
             ),
             perspective: DailyPerspective(

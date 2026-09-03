@@ -7,7 +7,7 @@ struct ProductivityDetailView: View {
 
     private var state: TodayDayState { viewModel.state(for: day) }
     private var metric: PrimaryMetric? {
-        state.primaryMetrics.metrics.first(where: { $0.kind == .productivity })
+        state.primaryMetrics.metrics.first(where: { $0.kind == .focus })
     }
 
     var body: some View {
@@ -35,7 +35,7 @@ struct ControlDetailView: View {
 
     private var state: TodayDayState { viewModel.state(for: day) }
     private var metric: PrimaryMetric? {
-        state.primaryMetrics.metrics.first(where: { $0.kind == .control })
+        state.primaryMetrics.metrics.first(where: { $0.kind == .held })
     }
 
     var body: some View {

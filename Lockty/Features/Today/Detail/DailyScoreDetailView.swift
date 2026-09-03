@@ -55,7 +55,7 @@ struct DailyScoreDetailView: View {
                     componentBars
                 }
 
-                if kind == .productivity, state.hourlyActivity.hasAnyActivity {
+                if kind == .focus, state.hourlyActivity.hasAnyActivity {
                     section("Through the day") {
                         hourlyChart
                     }
@@ -119,12 +119,12 @@ struct DailyScoreDetailView: View {
     /// number it is explaining.
     private var explanation: String {
         switch kind {
-        case .productivity:
-            "Every minute on screen counts for what the app it went to is called. Productive time counts in full, neutral time counts half, and time in apps you called distracting counts for nothing. The score is that weighted total as a share of everything you used -- so it says how the time was spent, not how much of it there was."
-        case .control:
-            "How much of what you set up actually held. Finishing the routines you started is the largest part of it, then unlocks you began and did not see through, then blocks that stayed up. Time spent hopping in and out of apps takes points off: the score is about staying with a decision, and the shape of the day says as much as the totals."
-        case .detox:
-            "Time away from the phone, weighted towards long stretches. The single longest gap is worth the most, then the total time you were not on it, then how few times you were interrupted. Twenty short breaks do not add up to one long one, which is the whole point of the measure."
+        case .focus:
+            "Every minute on screen counts for what the app it went to is called. Productive time counts in full, neutral time counts half, and time in apps you called unproductive counts for nothing. The score is that weighted total as a share of everything you used -- so it says how the time was spent, not how much of it there was."
+        case .held:
+            "Of the times Lockty stopped you, how many you walked away from. Every shield is a small argument you have with yourself; this is the share of them you won. Nothing else moves it -- not how long you were on the phone, not which apps -- only whether you went through the unlock or closed it."
+        case .checks:
+            "How many times the phone was picked up, counted by Screen Time rather than by us. The ring is not the count: a count has no natural hundred, so it compares the day with your own last fortnight -- full when you are well under your usual, empty when you are well over. An ordinary day sits in the middle, because an ordinary day is not a failure."
         }
     }
 
@@ -162,14 +162,16 @@ struct DailyScoreDetailView: View {
         }
     }
 
+    /// What each minute or each event is worth. Not weights of a formula for Held and
+    /// Checks -- those two have no parts -- so the bars say what counts instead.
     private var components: [(title: String, weight: Int)] {
         switch kind {
-        case .productivity:
-            [("Productive time", 100), ("Neutral time", 50), ("Distracting time", 0)]
-        case .control:
-            [("Routines finished", 55), ("Blocks that held", 25), ("Unlocks seen through", 20)]
-        case .detox:
-            [("Longest stretch away", 45), ("Total time away", 40), ("Few interruptions", 15)]
+        case .focus:
+            [("Productive time", 100), ("Neutral time", 50), ("Unproductive time", 0)]
+        case .held:
+            [("Shields you walked away from", 100), ("Shields you unlocked", 0)]
+        case .checks:
+            [("Half your usual day", 100), ("Your usual day", 50), ("Twice your usual", 0)]
         }
     }
 
@@ -251,7 +253,7 @@ struct DailyScoreDetailView: View {
 
     private var rows: [(title: String, value: String)] {
         switch kind {
-        case .productivity:
+        case .focus:
             [
                 ("Screen time", LocktyDurationFormatter.abbreviated(state.hourlyActivity.totalUsage)),
                 // Intentional time is productivity's other half: productive minutes plus
@@ -260,19 +262,19 @@ struct DailyScoreDetailView: View {
                 ("Intentional time", state.metrics.intentionalTime.valueText),
                 ("Pickups", "\(state.hourlyActivity.totalUnlocks)")
             ]
-        case .control:
+        case .held:
             [
+                ("Shields", state.metrics.pauseSuccess.detailText),
                 ("Routines", state.metrics.routines.valueText),
-                ("Unlocks", state.metrics.pauseSuccess.valueText),
-                // Distractions is a count, not a duration: blocked apps you tried to
-                // open, stretches of distracting use, and the times you tried again.
+                // A count, not a duration: blocked apps you tried to open, stretches of
+                // unproductive use, and the times you tried again.
                 ("Distractions", state.metrics.distractions.valueText)
             ]
-        case .detox:
+        case .checks:
             [
+                ("Notifications", "\(state.hourlyActivity.totalNotifications)"),
                 ("Longest stretch away", state.metrics.bestDetox.durationText),
-                ("Screen time", LocktyDurationFormatter.abbreviated(state.hourlyActivity.totalUsage)),
-                ("Notifications", "\(state.hourlyActivity.totalNotifications)")
+                ("Screen time", LocktyDurationFormatter.abbreviated(state.hourlyActivity.totalUsage))
             ]
         }
     }

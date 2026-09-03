@@ -87,12 +87,9 @@ nonisolated struct UsageBreakdownSection: Identifiable, Hashable {
         foldedApps.reduce(0) { $0 + $1.duration }
     }
 
+    /// The classification's own name, so this screen and the menu that changes it agree.
     var title: String {
-        switch classification {
-        case .productive: "Productive"
-        case .unproductive: "Distracting"
-        case .neutral: "Everything else"
-        }
+        classification.title
     }
 }
 

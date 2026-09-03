@@ -106,7 +106,7 @@ struct DailyScoreRocksView: View {
     }
 
     private func value(_ metric: PrimaryMetric) -> some View {
-        let text = Text("\(Int(metric.value.rounded()))")
+        let text = Text(metric.displayValue.replacingOccurrences(of: "%", with: ""))
             .font(.system(size: 26, weight: .bold))
             .monospacedDigit()
             .contentTransition(.numericText())
@@ -137,7 +137,7 @@ struct DailyScoreRocksView: View {
     /// The glow is a second copy rather than a shadow: a shadow follows the shape's
     /// whole outline, and what should be glowing is the arc, not the pill.
     private func rim(_ metric: PrimaryMetric) -> some View {
-        let progress = max(min(metric.value / 100, 1), 0.02)
+        let progress = max(min(metric.progress, 1), 0.02)
 
         return ZStack {
             Circle()

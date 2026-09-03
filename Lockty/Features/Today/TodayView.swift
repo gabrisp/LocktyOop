@@ -23,7 +23,7 @@ struct TodayView: View {
     /// rather than animating up to a zero it would then have to correct.
     private var productivityScore: Int? {
         guard case .loaded = state.loadingState else { return nil }
-        guard let metric = state.primaryMetrics.metrics.first(where: { $0.kind == .productivity }) else {
+        guard let metric = state.primaryMetrics.metrics.first(where: { $0.kind == .focus }) else {
             return nil
         }
         return Int(metric.value.rounded())
@@ -496,8 +496,8 @@ struct TodayView: View {
                         case .bestDetox: router.presentSheet(.detoxDetail(day))
                         case .routines: router.presentSheet(.routineDaySummary(day))
                         case .pauseSuccess: router.presentSheet(.pauseDaySummary(day))
-                        case .distractions: router.push(.scoreDetail(day: day, kind: .control))
-                        case .intentionalTime: router.push(.scoreDetail(day: day, kind: .productivity))
+                        case .distractions: router.push(.scoreDetail(day: day, kind: .held))
+                        case .intentionalTime: router.push(.scoreDetail(day: day, kind: .focus))
                         }
                     }
                 }

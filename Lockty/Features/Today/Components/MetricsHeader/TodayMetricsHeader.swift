@@ -14,7 +14,7 @@ struct TodayMetricsHeader: View {
     /// own detail sheets; the header just stopped being a row of three, so the one that
     /// matters can sit in the middle and shrink there.
     private var headlineMetric: PrimaryMetric? {
-        metrics.first { $0.kind == .productivity } ?? metrics.first
+        metrics.first { $0.kind == .focus } ?? metrics.first
     }
 
     var body: some View {

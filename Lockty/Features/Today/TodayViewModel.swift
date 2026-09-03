@@ -100,7 +100,7 @@ final class TodayViewModel: ObservableObject {
         guard Calendar.current.isDateInToday(day) else { return }
         guard case .loaded = state(for: day).loadingState else { return }
         guard let metric = state(for: day).primaryMetrics.metrics
-            .first(where: { $0.kind == .productivity })
+            .first(where: { $0.kind == .focus })
         else { return }
 
         let score = Int(metric.value.rounded())

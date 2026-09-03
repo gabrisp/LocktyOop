@@ -1,18 +1,28 @@
 import Foundation
 import CoreGraphics
 
+/// The three numbers the day is judged by.
+///
+/// Chosen for one property: you can name what would move each of them tomorrow. The
+/// three before these were Productivity, Control and Detox, and two of them were
+/// composites of composites -- Control was routine completion plus pause abandonment
+/// plus restriction adherence minus a fragmentation penalty -- so nobody could feel what
+/// moved them. A metric you cannot act on is decoration.
 enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
-    case productivity
-    case control
-    case detox
+    /// Where the time went, weighted by what each app is called.
+    case focus
+    /// How many of the blocks that fired you did not unlock.
+    case held
+    /// How many times the phone was picked up.
+    case checks
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .productivity: "Productivity"
-        case .control: "Control"
-        case .detox: "Detox"
+        case .focus: "Focus"
+        case .held: "Held"
+        case .checks: "Checks"
         }
     }
 
@@ -21,20 +31,17 @@ enum PrimaryMetricKind: String, CaseIterable, Codable, Hashable, Identifiable {
     /// time went to, not how much of it there was.
     var systemImage: String {
         switch self {
-        case .productivity: "leaf.fill"
-        case .control: "hand.raised.fill"
-        case .detox: "moon.zzz.fill"
+        case .focus: "leaf.fill"
+        case .held: "hand.raised.fill"
+        case .checks: "iphone.gen3"
         }
     }
 
     var collapsedTextWidth: CGFloat {
         switch self {
-        case .productivity:
-            84
-        case .control:
-            56
-        case .detox:
-            44
+        case .focus: 56
+        case .held: 48
+        case .checks: 60
         }
     }
 }
@@ -60,11 +67,19 @@ struct PrimaryMetric: Codable, Hashable, Identifiable {
     var id: PrimaryMetricKind { kind }
 
     let kind: PrimaryMetricKind
+    /// What the circle shows. A percentage for two of them and a count for Checks, which
+    /// is why this is no longer assumed to be the same number as the ring.
     let value: Double
+    /// How far round the rim goes, 0 to 1.
+    ///
+    /// Separate from `value` because a count has no natural hundred. Checks fills its
+    /// ring by how it compares with the days before it -- full when well under, empty
+    /// when well over -- so a good day is a full ring whichever metric you are reading.
     let progress: Double
     let displayValue: String
     let tone: DailyScoreTone
 
+    /// A score out of a hundred: the value and the ring are the same thing.
     init(kind: PrimaryMetricKind, value: Double) {
         let clampedValue = min(max(value, 0), 100)
 
@@ -73,6 +88,19 @@ struct PrimaryMetric: Codable, Hashable, Identifiable {
         self.progress = clampedValue / 100
         self.displayValue = "\(Int(clampedValue.rounded()))%"
         self.tone = DailyScoreTone.tone(for: clampedValue)
+    }
+
+    /// A count, with its ring given separately.
+    init(kind: PrimaryMetricKind, count: Int, progress: Double) {
+        let clampedProgress = min(max(progress, 0), 1)
+
+        self.kind = kind
+        self.value = Double(count)
+        self.progress = clampedProgress
+        self.displayValue = "\(count)"
+        // Toned by the ring, not by the count: eighty checks is a good day for one person
+        // and a bad one for another, and the ring is the only part that knows which.
+        self.tone = DailyScoreTone.tone(for: clampedProgress * 100)
     }
 }
 

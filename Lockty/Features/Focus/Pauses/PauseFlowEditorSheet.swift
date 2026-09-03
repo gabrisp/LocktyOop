@@ -272,6 +272,12 @@ struct PauseFlowStepRow: View {
     @ViewBuilder
     private var settings: some View {
         switch step {
+        // The six newer steps have their settings in the friction editor, which is where
+        // steps are written now. This sheet edits the older pause flows and shows them
+        // as they are.
+        case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+            EmptyView()
+
         case .countdown(let configuration):
             labelled("Seconds", value: "\(Int(configuration.duration))") {
                 DurationSlider(value: binding(configuration).duration, range: 1...60)

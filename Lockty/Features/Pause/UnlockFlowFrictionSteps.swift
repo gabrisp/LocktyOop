@@ -17,11 +17,11 @@ enum UnlockFlowStepPrimaryState: Equatable {
     var title: String {
         switch self {
         case .advance:
-            "Continuar"
+            "Continue"
         case .submit:
-            "Comprobar"
+            "Check"
         case .scan:
-            "Escanear"
+            "Scan"
         }
     }
 }
@@ -1959,23 +1959,27 @@ private func makeWordSearchWords(configuration: WordSearchConfiguration) -> [Str
         return [target]
     }
 
-    let bank: [String]
+    // Sized to the grid and drawn from the whole bank each time. It used to be six
+    // fixed words per difficulty -- FOCUS, CALM, INTENT -- so within a week you were not
+    // reading the grid, you were remembering it. Ordinary nouns also stop the puzzle
+    // reading as a lecture.
     let count: Int
+    let maximum = configuration.difficulty.gridSize
+    let bank: [String]
+
     switch configuration.difficulty {
     case .easy:
-        bank = ["FOCUS", "CALM", "PAUSE", "BOUND", "INTENT", "CHOICE"]
         count = 2
+        bank = FrictionWordBank.words(count: 12, minimumLength: 4, maximumLength: min(6, maximum))
     case .medium:
-        bank = ["FOCUS", "INTENT", "BALANCE", "ROUTINE", "BREATH", "CENTER", "DECIDE"]
         count = 3
+        bank = FrictionWordBank.words(count: 16, minimumLength: 5, maximumLength: min(7, maximum))
     case .hard:
-        bank = ["BOUNDARY", "CLARITY", "DISCIPLINE", "INTENTION", "PRIORITY", "ATTENTION", "STABILITY"]
         count = 4
+        bank = FrictionWordBank.words(count: 20, minimumLength: 6, maximumLength: min(9, maximum))
     }
 
-    let maxLength = configuration.difficulty.gridSize
-    let filtered = bank.filter { $0.count <= maxLength }
-    return Array(filtered.shuffled().prefix(count))
+        return Array(bank.shuffled().prefix(count))
 }
 
 private func makeLetterMatchSession(configuration: LetterMatchConfiguration) -> LetterMatchSession {

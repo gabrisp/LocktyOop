@@ -33,6 +33,66 @@ struct FrictionCatalogItem: Identifiable {
 enum FrictionCatalog {
     static let items: [FrictionCatalogItem] = [
         FrictionCatalogItem(
+            kind: .copyPhrase,
+            category: .games,
+            title: "Copy the Phrase",
+            subtitle: "Retype a sentence, exactly as written.",
+            systemImage: "text.cursor",
+            tint: .indigo
+        ) {
+            .copyPhrase(CopyPhraseConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .holdSteady,
+            category: .games,
+            title: "Hold Steady",
+            subtitle: "Keep a finger down. Letting go starts again.",
+            systemImage: "hand.tap",
+            tint: .orange
+        ) {
+            .holdSteady(HoldSteadyConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .oddOneOut,
+            category: .games,
+            title: "Odd One Out",
+            subtitle: "Find the one shape that is not like the rest.",
+            systemImage: "squareshape.split.3x3",
+            tint: .purple
+        ) {
+            .oddOneOut(OddOneOutConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .sortNumbers,
+            category: .games,
+            title: "Sort the Numbers",
+            subtitle: "Tap them lowest first. One slip and they shuffle.",
+            systemImage: "list.number",
+            tint: .teal
+        ) {
+            .sortNumbers(SortNumbersConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .tuneValue,
+            category: .games,
+            title: "Tune the Value",
+            subtitle: "Drag the handle to an exact number.",
+            systemImage: "slider.horizontal.below.square.filled.and.square",
+            tint: .cyan
+        ) {
+            .tuneValue(TuneValueConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .pastAnswers,
+            category: .intentions,
+            title: "Your Past Answers",
+            subtitle: "Read back the reasons you gave last time.",
+            systemImage: "clock.arrow.circlepath",
+            tint: .pink
+        ) {
+            .pastAnswers(PastAnswersConfiguration())
+        },
+        FrictionCatalogItem(
             kind: .wordSearch,
             category: .games,
             title: "Word Search",

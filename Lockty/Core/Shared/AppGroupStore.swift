@@ -346,6 +346,30 @@ final class AppGroupStore {
         try saveRuleEnforcementState(state)
     }
 
+    /// The reasons written at unlock time, oldest first.
+    ///
+    /// Kept so the "past answers" friction can hand them back. Capped hard: this is a
+    /// record of moments someone was trying not to have, and keeping years of it would
+    /// be building an archive nobody asked for.
+    nonisolated func loadIntentionAnswers() -> [String] {
+        guard let data = (try? readData(fileName: "intention-answers.json", legacyDefaultsKey: nil)) ?? nil,
+              let answers = try? decoder.decode([String].self, from: data) else {
+            return []
+        }
+        return answers
+    }
+
+    nonisolated func appendIntentionAnswer(_ answer: String) {
+        let trimmed = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        var answers = loadIntentionAnswers()
+        answers.append(trimmed)
+        answers = Array(answers.suffix(20))
+        guard let data = try? encoder.encode(answers) else { return }
+        try? writeData(data, fileName: "intention-answers.json", legacyDefaultsKey: nil)
+    }
+
     /// What the block screen should say. Read by the shield extension, which cannot
     /// reach anything else the app stores.
     nonisolated func loadShieldScreenPreferences() -> ShieldScreenPreferences {

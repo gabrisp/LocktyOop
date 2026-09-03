@@ -1039,6 +1039,82 @@ private struct FrictionStepSettings: View {
     @ViewBuilder
     private var configurationView: some View {
         switch step {
+        case .copyPhrase(let configuration):
+            EnumPicker(
+                title: "Length",
+                selection: configuration.length,
+                onSelect: { onChange(.copyPhrase(CopyPhraseConfiguration(id: configuration.id, length: $0, isCaseSensitive: configuration.isCaseSensitive))) }
+            )
+
+            LocktyToggle(
+                title: "Match exactly",
+                isOn: Binding(
+                    get: { configuration.isCaseSensitive },
+                    set: { onChange(.copyPhrase(CopyPhraseConfiguration(id: configuration.id, length: configuration.length, isCaseSensitive: $0))) }
+                )
+            )
+
+        case .holdSteady(let configuration):
+            LocktyCountRow(
+                title: "Hold for",
+                value: Binding(
+                    get: { configuration.seconds },
+                    set: { onChange(.holdSteady(HoldSteadyConfiguration(id: configuration.id, seconds: $0))) }
+                ),
+                range: 3...120,
+                step: 1,
+                suffix: "s"
+            )
+
+        case .oddOneOut(let configuration):
+            LocktyCountRow(
+                title: "Rounds",
+                value: Binding(
+                    get: { configuration.rounds },
+                    set: { onChange(.oddOneOut(OddOneOutConfiguration(id: configuration.id, rounds: $0, side: configuration.side))) }
+                ),
+                range: 1...5
+            )
+
+            LocktyCountRow(
+                title: "Grid",
+                value: Binding(
+                    get: { configuration.side },
+                    set: { onChange(.oddOneOut(OddOneOutConfiguration(id: configuration.id, rounds: configuration.rounds, side: $0))) }
+                ),
+                range: 3...6
+            )
+
+        case .sortNumbers(let configuration):
+            LocktyCountRow(
+                title: "Numbers",
+                value: Binding(
+                    get: { configuration.count },
+                    set: { onChange(.sortNumbers(SortNumbersConfiguration(id: configuration.id, count: $0))) }
+                ),
+                range: 4...12
+            )
+
+        case .pastAnswers(let configuration):
+            LocktyCountRow(
+                title: "Answers shown",
+                value: Binding(
+                    get: { configuration.recallCount },
+                    set: { onChange(.pastAnswers(PastAnswersConfiguration(id: configuration.id, recallCount: $0))) }
+                ),
+                range: 1...5
+            )
+
+        case .tuneValue(let configuration):
+            LocktyCountRow(
+                title: "Tolerance",
+                value: Binding(
+                    get: { configuration.tolerance },
+                    set: { onChange(.tuneValue(TuneValueConfiguration(id: configuration.id, tolerance: $0))) }
+                ),
+                range: 0...5
+            )
+
         case .countdown(let configuration):
             LocktyCountRow(
                 title: "Seconds",

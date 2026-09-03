@@ -175,6 +175,12 @@ struct UnlockFlowView: View {
     }
 
     private func advanceFromFriction(at index: Int) {
+        // Kept as it is written, so the "past answers" step has something to hand back.
+        // Nothing else reads it, and the store keeps only the last twenty.
+        if let answer = currentStepStatus.intentionText {
+            AppGroupStore().appendIntentionAnswer(answer)
+        }
+
         let nextIndex = frictionSteps.index(after: index)
         withAnimation(.smooth(duration: 0.34)) {
             step = frictionSteps.indices.contains(nextIndex) ? .friction(nextIndex) : .duration
@@ -264,6 +270,24 @@ struct UnlockFlowView: View {
 
         case .personalText(let configuration):
             UnlockPersonalTextStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .copyPhrase(let configuration):
+            UnlockCopyPhraseStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .holdSteady(let configuration):
+            UnlockHoldSteadyStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .oddOneOut(let configuration):
+            UnlockOddOneOutStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .sortNumbers(let configuration):
+            UnlockSortNumbersStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .pastAnswers(let configuration):
+            UnlockPastAnswersStepView(configuration: configuration, status: $currentStepStatus)
+
+        case .tuneValue(let configuration):
+            UnlockTuneValueStepView(configuration: configuration, status: $currentStepStatus)
 
         case .wordSearch(let configuration):
             UnlockWordSearchStepView(configuration: configuration, status: $currentStepStatus)

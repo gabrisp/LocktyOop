@@ -265,6 +265,10 @@ final class PauseEditorViewModel: ObservableObject {
     private func sanitizeSteps() -> [PauseStep] {
         steps.compactMap { step in
             switch step {
+            // Nothing to sanitise: every one of these is valid at any setting it can
+            // hold, because the configurations clamp themselves.
+            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+                return step
             case .countdown(let configuration):
                 return configuration.duration > 0 ? step : nil
             case .breathing(let configuration):
@@ -693,6 +697,11 @@ private struct PauseStepEditorCard: View {
             }
 
             switch step {
+            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+                Text(step.detail)
+                    .font(.system(size: 20, weight: .light, design: .rounded))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .center)
             case .countdown(let configuration):
                 Text("\(Int(configuration.duration)) s")
                     .font(.system(size: 28, weight: .light, design: .rounded))

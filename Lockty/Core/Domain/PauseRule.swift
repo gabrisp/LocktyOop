@@ -58,6 +58,12 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
     case nfcTag(NFCTagConfiguration)
     case location(LocationTrigger)
     case steps(StepsConfiguration)
+    case copyPhrase(CopyPhraseConfiguration)
+    case holdSteady(HoldSteadyConfiguration)
+    case oddOneOut(OddOneOutConfiguration)
+    case sortNumbers(SortNumbersConfiguration)
+    case pastAnswers(PastAnswersConfiguration)
+    case tuneValue(TuneValueConfiguration)
 
     var id: UUID {
         switch self {
@@ -88,6 +94,18 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
         case .location(let configuration):
             configuration.id
         case .steps(let configuration):
+            configuration.id
+        case .copyPhrase(let configuration):
+            configuration.id
+        case .holdSteady(let configuration):
+            configuration.id
+        case .oddOneOut(let configuration):
+            configuration.id
+        case .sortNumbers(let configuration):
+            configuration.id
+        case .pastAnswers(let configuration):
+            configuration.id
+        case .tuneValue(let configuration):
             configuration.id
         }
     }
@@ -120,6 +138,18 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             "NFC Tag"
         case .location:
             "Location"
+        case .copyPhrase:
+            "Copy the Phrase"
+        case .holdSteady:
+            "Hold Steady"
+        case .oddOneOut:
+            "Odd One Out"
+        case .sortNumbers:
+            "Sort the Numbers"
+        case .pastAnswers:
+            "Your Past Answers"
+        case .tuneValue:
+            "Tune the Value"
         case .steps:
             "Steps"
         }
@@ -153,6 +183,18 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             return label.isEmpty ? "\(Int(configuration.radiusMeters)) m radius" : label
         case .confirmation:
             return "Deliberate choice"
+        case .copyPhrase(let configuration):
+            return configuration.length.title.lowercased() + " phrase"
+        case .holdSteady(let configuration):
+            return "\(configuration.seconds)s hold"
+        case .oddOneOut(let configuration):
+            return configuration.rounds == 1 ? "1 round" : "\(configuration.rounds) rounds"
+        case .sortNumbers(let configuration):
+            return "\(configuration.count) numbers"
+        case .pastAnswers(let configuration):
+            return configuration.recallCount == 1 ? "1 answer" : "\(configuration.recallCount) answers"
+        case .tuneValue(let configuration):
+            return configuration.tolerance == 0 ? "exact" : "±\(configuration.tolerance)"
         case .steps(let configuration):
             return "\(configuration.dailyGoal.formatted(.number.grouping(.automatic))) steps"
         }

@@ -119,6 +119,12 @@ struct PauseRuleMapper {
         case .nfcTag: "nfcTag"
         case .location: "location"
         case .steps: "steps"
+        case .copyPhrase: "copyPhrase"
+        case .holdSteady: "holdSteady"
+        case .oddOneOut: "oddOneOut"
+        case .sortNumbers: "sortNumbers"
+        case .pastAnswers: "pastAnswers"
+        case .tuneValue: "tuneValue"
         }
     }
 }

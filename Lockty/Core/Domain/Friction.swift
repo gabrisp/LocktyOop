@@ -35,6 +35,19 @@ nonisolated enum FrictionKind: String, Codable, CaseIterable, Identifiable, Hash
     case nfcTag
     case location
     case steps
+    /// Retype a sentence exactly. The strongest of the six: slow, dull, and impossible to
+    /// finish from memory however many times you have seen it.
+    case copyPhrase
+    /// Hold a button down. Letting go starts again.
+    case holdSteady
+    /// Find the one glyph in a grid that is not like the others.
+    case oddOneOut
+    /// Tap shuffled numbers in order. One mistake and they reshuffle.
+    case sortNumbers
+    /// Read back what you wrote the last few times you opened this app.
+    case pastAnswers
+    /// Drag a handle to an exact value.
+    case tuneValue
 
     var id: String { rawValue }
 }
@@ -260,6 +273,18 @@ extension PauseStep {
             .nfcTag
         case .location:
             .location
+        case .copyPhrase:
+            .copyPhrase
+        case .holdSteady:
+            .holdSteady
+        case .oddOneOut:
+            .oddOneOut
+        case .sortNumbers:
+            .sortNumbers
+        case .pastAnswers:
+            .pastAnswers
+        case .tuneValue:
+            .tuneValue
         case .steps:
             .steps
         case .countdown, .breathing, .intention, .confirmation:
@@ -291,6 +316,18 @@ extension PauseStep {
             "wave.3.right.circle"
         case .location:
             "location"
+        case .copyPhrase:
+            "text.cursor"
+        case .holdSteady:
+            "hand.tap"
+        case .oddOneOut:
+            "squareshape.split.3x3"
+        case .sortNumbers:
+            "list.number"
+        case .pastAnswers:
+            "clock.arrow.circlepath"
+        case .tuneValue:
+            "slider.horizontal.below.square.filled.and.square"
         case .steps:
             "figure.walk"
         }
@@ -320,7 +357,103 @@ nonisolated enum WordSearchDifficulty: String, Codable, CaseIterable, Hashable, 
     }
 }
 
-nonisolated struct WordSearchConfiguration: Codable, Hashable, Identifiable {
+/// How long the sentence to retype is.
+nonisolated enum CopyPhraseLength: String, Codable, CaseIterable, Identifiable, Hashable {
+    case short
+    case medium
+    case long
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .short: "Short"
+        case .medium: "Medium"
+        case .long: "Long"
+        }
+    }
+
+    /// Roughly how many words. Not exact: the phrases are real sentences, and trimming
+    /// one to a word count is how you get a sentence nobody would write.
+    var approximateWordCount: Int {
+        switch self {
+        case .short: 6
+        case .medium: 11
+        case .long: 18
+        }
+    }
+}
+
+nonisolated struct CopyPhraseConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    var length: CopyPhraseLength
+    /// Whether it has to match exactly, punctuation and all.
+    var isCaseSensitive: Bool
+
+    init(id: UUID = UUID(), length: CopyPhraseLength = .medium, isCaseSensitive: Bool = false) {
+        self.id = id
+        self.length = length
+        self.isCaseSensitive = isCaseSensitive
+    }
+}
+
+nonisolated struct HoldSteadyConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    var seconds: Int
+
+    init(id: UUID = UUID(), seconds: Int = 15) {
+        self.id = id
+        self.seconds = max(3, min(seconds, 120))
+    }
+}
+
+nonisolated struct OddOneOutConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    /// How many rounds have to be won.
+    var rounds: Int
+    /// The grid's side. Four is a 4x4; six is genuinely hard.
+    var side: Int
+
+    init(id: UUID = UUID(), rounds: Int = 2, side: Int = 4) {
+        self.id = id
+        self.rounds = max(1, min(rounds, 5))
+        self.side = max(3, min(side, 6))
+    }
+}
+
+nonisolated struct SortNumbersConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    var count: Int
+
+    init(id: UUID = UUID(), count: Int = 8) {
+        self.id = id
+        self.count = max(4, min(count, 12))
+    }
+}
+
+nonisolated struct PastAnswersConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    /// How many of your previous answers to show back.
+    var recallCount: Int
+
+    init(id: UUID = UUID(), recallCount: Int = 3) {
+        self.id = id
+        self.recallCount = max(1, min(recallCount, 5))
+    }
+}
+
+nonisolated struct TuneValueConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    /// How close is close enough, in whole units out of a hundred.
+    var tolerance: Int
+
+    init(id: UUID = UUID(), tolerance: Int = 1) {
+        self.id = id
+        self.tolerance = max(0, min(tolerance, 5))
+    }
+}
+
+struct WordSearchConfiguration: Codable, Hashable, Identifiable {
     let id: UUID
     var difficulty: WordSearchDifficulty
     var targetWord: String?

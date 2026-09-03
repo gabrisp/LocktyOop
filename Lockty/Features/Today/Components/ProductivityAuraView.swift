@@ -30,6 +30,7 @@ struct ProductivityAuraView: View {
     /// Climbs to `value` once the view is on screen. Separate from the value itself so
     /// re-rendering for any other reason does not restart the arrival.
     @State private var displayedValue: Double = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     private let side: CGFloat = 240
 
@@ -157,13 +158,13 @@ struct ProductivityAuraView: View {
     /// keeps the digits legible at any score.
     private var label: some View {
         labelContent
-            .foregroundStyle(.white)
+            .foregroundStyle(colorScheme == .dark ? .white : LocktyColors.deep(accent))
             .background {
                 labelContent
                     .foregroundStyle(accent)
                     .blur(radius: 14)
                     .locktyGlow(lightScale: 0.8)
-                    .opacity(0.95 * arrival)
+                    .opacity(colorScheme == .dark ? 0.95 * arrival : 0)
             }
     }
 

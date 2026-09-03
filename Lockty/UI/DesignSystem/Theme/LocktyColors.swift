@@ -43,6 +43,44 @@ enum LocktyColors {
         dark: UIColor.white.withAlphaComponent(0.03)
     )
 
+    /// A card's own surface.
+    ///
+    /// White in light mode, not a wash of black. `ink()` says "a little of the
+    /// foreground", which is right for a hairline and wrong for a card: on a grey page a
+    /// slightly darker grey box reads as a stain rather than as a raised thing. The page
+    /// is grey precisely so a card can be lighter than it -- the same relationship the
+    /// dark theme has, the other way up.
+    static let cardSurface = adaptive(
+        light: .white,
+        dark: UIColor.white.withAlphaComponent(0.055)
+    )
+
+    /// A colour dark enough to read as type on a pale ground.
+    ///
+    /// The accents are tuned to glow on black, and every one of them is too light to be
+    /// read against a white card -- so text in them is set in a deepened version of the
+    /// same hue rather than in grey, which would lose the one thing the colour was
+    /// saying.
+    static func deep(_ color: Color) -> Color {
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard UIColor(color).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return color
+        }
+
+        return Color(
+            UIColor(
+                hue: hue,
+                saturation: min(saturation * 1.15, 1),
+                brightness: brightness * 0.42,
+                alpha: alpha
+            )
+        )
+    }
+
     /// The colour to draw *on* a filled `primaryText` shape -- the label inside a
     /// selected pill, the glyph inside a stepper button.
     static let onPrimary = adaptive(light: .white, dark: .black)

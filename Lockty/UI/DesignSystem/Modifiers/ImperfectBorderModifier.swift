@@ -61,8 +61,34 @@ extension View {
     /// card had a rim on one screen and none on the next. Anything that looks like a card
     /// should say so in one call rather than remember two.
     func locktyCardBackground(cornerRadius: CGFloat) -> some View {
+        modifier(LocktyCardBackgroundModifier(cornerRadius: cornerRadius))
+    }
+}
+
+/// A card: its surface, the uneven edge, and -- on a pale ground -- the shadow that makes
+/// it a card rather than a rectangle of a slightly different grey.
+///
+/// The dark theme needs no shadow: a lighter shape on black is already raised. The light
+/// one needs it, because white on light grey is only a card if something says it is
+/// sitting above the page.
+private struct LocktyCardBackgroundModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return background(shape.fill(LocktyColors.ink(0.055)))
+
+        return content
+            .background {
+                shape
+                    .fill(LocktyColors.cardSurface)
+                    .shadow(
+                        color: colorScheme == .dark ? .clear : .black.opacity(0.06),
+                        radius: 12,
+                        y: 4
+                    )
+            }
             .locktyImperfectBorder(shape)
     }
 }

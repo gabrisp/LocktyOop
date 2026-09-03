@@ -14,6 +14,8 @@ struct DailyScoreRocksView: View {
     let metrics: [PrimaryMetric]
     var onSelect: ((PrimaryMetricKind) -> Void)?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private let side: CGFloat = 104
 
     var body: some View {
@@ -40,7 +42,11 @@ struct DailyScoreRocksView: View {
 
                 Text(metric.kind.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
-                    .foregroundStyle(LocktyColors.secondaryText)
+                    .foregroundStyle(
+                        colorScheme == .dark
+                        ? LocktyColors.secondaryText
+                        : LocktyColors.deep(tint(metric))
+                    )
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -98,12 +104,13 @@ struct DailyScoreRocksView: View {
             .contentTransition(.numericText())
 
         return text
-            .foregroundStyle(.white)
+            .foregroundStyle(colorScheme == .dark ? .white : LocktyColors.deep(tint(metric)))
             .background {
                 text
                     .foregroundStyle(tint(metric))
                     .blur(radius: 7)
                     .locktyGlow(lightScale: 0.85)
+                    .opacity(colorScheme == .dark ? 1 : 0)
             }
             .animation(.smooth(duration: 0.9), value: metric.value)
     }

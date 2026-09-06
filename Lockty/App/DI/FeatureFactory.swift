@@ -353,31 +353,47 @@ struct FeatureFactory {
         )
     }
 
-    func makeUnlockFlow(token: ApplicationToken?) -> UnlockFlowView {
+    func makeUnlockFlow(route: UnlockFlowRoute) -> UnlockFlowView {
         // Everything every running routine is holding shut, not just the first one's.
         // The flow's app picker offers what can be unlocked, and with two routines
         // running it was offering half of it.
+        let requestContext = route.context
+        let token = requestContext?.applicationToken ?? route.token
         let running = routineEngine.activeRoutines
-        let blockedSelection = running.reduce(into: Set<ApplicationToken>()) { result, routine in
-            let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?.applicationTokens ?? []
-            result.formUnion(selection)
+        var blockedSelection = running.reduce(into: Set<ApplicationToken>()) { result, routine in
+            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            result.formUnion(selection.applicationTokens)
+        }
+        if let token {
+            blockedSelection.insert(token)
         }
         let blockedTokens = blockedSelection.stablePrefix(blockedSelection.count)
 
         // The friction to walk is the one belonging to a routine that actually blocks the
         // app being asked about. Falling back to whichever routine started first would
         // put up a friction that has nothing to do with the app in hand.
-        let appID = token.map(AppIdentity.ID.init(token:))
-        let activeRoutine = appID
-            .flatMap { id in running.first { $0.shieldPolicy.blockedApplications.contains(id) } }
+        let appID = token.map(AppIdentity.ID.init(token:)) ?? requestContext?.appID
+        let activeRoutine = requestContext?.activeRoutineID
+            .flatMap { routineID in running.first { $0.routineID == routineID } }
+            ?? appID.flatMap { id in
+                running.first { routine in
+                    if routine.shieldPolicy.blockedApplications.contains(id) {
+                        return true
+                    }
+                    let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+                    return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == id }
+                }
+            }
             ?? routineEngine.activeRoutine()
+        let requestedSteps = requestContext?.steps ?? []
+        let flowSteps = requestedSteps.isEmpty ? (activeRoutine?.pausePolicySnapshot.steps ?? []) : requestedSteps
 
         return UnlockFlowView(
             tokens: blockedTokens,
             initialToken: token,
-            frictionSteps: activeRoutine?.pausePolicySnapshot.steps ?? [],
+            frictionSteps: flowSteps,
             breatheSeconds: activeRoutine?.pausePolicySnapshot.breatheSeconds ?? LocktyBreathe.minimumSeconds,
-            defaultMinutes: Int((activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
+            defaultMinutes: Int((requestContext?.allowanceDuration ?? activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
             nfcService: nfcService,
             locationService: locationService,
             healthService: healthService
@@ -385,7 +401,11 @@ struct FeatureFactory {
             Task { @MainActor in
                 // Checked against every routine holding the chosen app, not just one:
                 // all of them have to agree before it comes out.
-                if let chosenID = chosenToken.map(AppIdentity.ID.init(token:)) {
+                if requestContext?.limitRuleID != nil {
+                    // Limit rules were already checked when the shield request was
+                    // presented. They are not routine breaks, so asking the routine
+                    // engine here rejects valid limit unlocks.
+                } else if let chosenID = chosenToken.map(AppIdentity.ID.init(token:)) {
                     switch await routineEngine.breakAvailability(
                         forApp: chosenID,
                         trigger: .manual,
@@ -417,6 +437,7 @@ struct FeatureFactory {
                     among: blockedTokens,
                     minutes: minutes,
                     activeRoutine: activeRoutine,
+                    requestContext: requestContext,
                     intention: intention
                 )
                 router.dismissFullScreen()
@@ -424,6 +445,17 @@ struct FeatureFactory {
         } onClose: {
             router.dismissFullScreen()
         }
+    }
+
+    func makeFrictionRun(frictionID: UUID) -> some View {
+        GlobalFrictionRunView(
+            frictionID: frictionID,
+            repository: frictionRepository,
+            nfcService: nfcService,
+            locationService: locationService,
+            healthService: healthService,
+            onClose: { router.dismissFullScreen() }
+        )
     }
 
     /// Grants the allowance the flow just asked for.
@@ -436,14 +468,18 @@ struct FeatureFactory {
         among blockedTokens: [ApplicationToken],
         minutes: Int,
         activeRoutine: ActiveRoutine?,
+        requestContext: PauseContext?,
         intention: String?
     ) async {
-        let released = token.map { [$0] } ?? blockedTokens
+        let fallbackReleased = blockedTokens.isEmpty
+            ? requestContext?.applicationToken.map { [$0] } ?? []
+            : blockedTokens
+        let released = token.map { [$0] } ?? fallbackReleased
         guard let representative = released.first else { return }
 
         let identity = AppIdentity(token: representative)
         let releasedIDs = Set(released.map(AppIdentity.ID.init(token:)))
-        let context = PauseContext(
+        var context = requestContext ?? PauseContext(
             pauseRuleID: activeRoutine?.routineID ?? identity.id.rawValue.stableUUID,
             appID: identity.id,
             applicationToken: representative,
@@ -456,6 +492,13 @@ struct FeatureFactory {
             activeRoutineID: activeRoutine?.routineID,
             source: .app
         )
+        context.applicationToken = representative
+        context.appID = token.map(AppIdentity.ID.init(token:)) ?? context.appID
+        context.releasedApplications = releasedIDs.isEmpty ? context.releasedApplications : releasedIDs
+        context.displayName = token == nil && !blockedTokens.isEmpty ? "All apps" : identity.displayName
+        context.allowanceDuration = TimeInterval(minutes * 60)
+        context.steps = []
+        context.activeRoutineID = activeRoutine?.routineID ?? context.activeRoutineID
         await pauseEngine.allowTemporarily(context, intention: intention)
         toastCenter.show(
             .unlockGranted(
@@ -719,5 +762,46 @@ struct FeatureFactory {
             ),
             router: router
         )
+    }
+}
+
+private struct GlobalFrictionRunView: View {
+    let frictionID: UUID
+    let repository: FrictionRepository
+    let nfcService: NFCServicing
+    let locationService: LocationTriggerServicing
+    let healthService: HealthServicing
+    let onClose: () -> Void
+
+    @State private var friction: Friction?
+
+    var body: some View {
+        Group {
+            if let friction {
+                UnlockFlowView(
+                    tokens: [],
+                    frictionSteps: friction.steps,
+                    breatheSeconds: friction.breatheSeconds,
+                    defaultMinutes: max(1, Int(friction.allowanceDuration / 60)),
+                    nfcService: nfcService,
+                    locationService: locationService,
+                    healthService: healthService,
+                    includesDurationStep: false,
+                    onUnlock: { _, _, _ in onClose() },
+                    onClose: onClose
+                )
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .locktyScreenBackground()
+            }
+        }
+        .task(id: frictionID) {
+            let loaded = await repository.friction(id: frictionID)
+            friction = loaded
+            if loaded == nil {
+                onClose()
+            }
+        }
     }
 }

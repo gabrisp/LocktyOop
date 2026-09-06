@@ -45,12 +45,27 @@ final class ActiveRoutineViewModel: ObservableObject {
             && activeRoutine.breakPolicySnapshot.allowedTriggers.contains(.manual)
     }
 
+    var canEditRoutine: Bool {
+        guard let activeRoutine else { return false }
+        return StrictModePolicy()
+            .decision(for: .editRoutine, activeRoutine: activeRoutine)
+            .isAllowed
+    }
+
+    var canStopRoutine: Bool {
+        guard let activeRoutine else { return false }
+        return StrictModePolicy()
+            .decision(for: .stopRoutine, activeRoutine: activeRoutine)
+            .isAllowed
+    }
+
     func toggleTaskCompletion(_ completion: RoutineTaskCompletion) async {
         guard completion.completedAt == nil else { return }
         await routineEngine.completeTask(completion.taskID, routineID: routineID)
     }
 
     func stopRoutine() async {
+        guard canStopRoutine else { return }
         await routineEngine.stop(routineID: routineID)
     }
 
@@ -82,11 +97,13 @@ struct ActiveRoutineView: View {
                                 .fontWeight(.ultraLight)
                         }
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: viewModel.routineID)))
-                        } label: {
-                            Image(systemName: "pencil")
+                    if viewModel.canEditRoutine {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: viewModel.routineID)))
+                            } label: {
+                                Image(systemName: "pencil")
+                            }
                         }
                     }
                 }
@@ -195,18 +212,20 @@ struct ActiveRoutineView: View {
             .padding(.vertical, LocktySpacing.lg)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button(role: .destructive) {
-                Task {
-                    await viewModel.stopRoutine()
-                    dismiss()
+            if viewModel.canStopRoutine {
+                Button(role: .destructive) {
+                    Task {
+                        await viewModel.stopRoutine()
+                        dismiss()
+                    }
+                } label: {
+                    Text("Stop Routine")
                 }
-            } label: {
-                Text("Stop Routine")
+                .buttonStyle(.plain)
+                .locktySecondaryActionStyle()
+                .padding(.horizontal, LocktySpacing.md)
+                .padding(.vertical, LocktySpacing.sm)
             }
-            .buttonStyle(.plain)
-            .locktySecondaryActionStyle()
-            .padding(.horizontal, LocktySpacing.md)
-            .padding(.vertical, LocktySpacing.sm)
         }
     }
 }

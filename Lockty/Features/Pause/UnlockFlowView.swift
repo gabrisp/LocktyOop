@@ -18,6 +18,7 @@ struct UnlockFlowView: View {
     let nfcService: NFCServicing?
     let locationService: LocationTriggerServicing?
     let healthService: HealthServicing?
+    let includesDurationStep: Bool
     let onUnlock: (ApplicationToken?, Int, String?) -> Void
     let onClose: () -> Void
 
@@ -47,6 +48,7 @@ struct UnlockFlowView: View {
         nfcService: NFCServicing? = nil,
         locationService: LocationTriggerServicing? = nil,
         healthService: HealthServicing? = nil,
+        includesDurationStep: Bool = true,
         onUnlock: @escaping (ApplicationToken?, Int, String?) -> Void,
         onClose: @escaping () -> Void
     ) {
@@ -58,6 +60,7 @@ struct UnlockFlowView: View {
         self.nfcService = nfcService
         self.locationService = locationService
         self.healthService = healthService
+        self.includesDurationStep = includesDurationStep
         self.onUnlock = onUnlock
         self.onClose = onClose
         // Falls back to the first blocked app rather than to nothing: the flow always
@@ -182,8 +185,17 @@ struct UnlockFlowView: View {
         }
 
         let nextIndex = frictionSteps.index(after: index)
+        let nextStep: Step? = frictionSteps.indices.contains(nextIndex)
+            ? .friction(nextIndex)
+            : (includesDurationStep ? .duration : nil)
+
+        guard let nextStep else {
+            onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound, capturedIntention)
+            return
+        }
+
         withAnimation(.smooth(duration: 0.34)) {
-            step = frictionSteps.indices.contains(nextIndex) ? .friction(nextIndex) : .duration
+            step = nextStep
         }
     }
 
@@ -204,6 +216,10 @@ struct UnlockFlowView: View {
             onPrimary: {
                 switch step {
                 case .rest:
+                    guard includesDurationStep || !frictionSteps.isEmpty else {
+                        onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound, capturedIntention)
+                        return
+                    }
                     withAnimation(.smooth(duration: 0.34)) { step = nextMainStepAfterRest }
                 case .app:
                     withAnimation(.smooth(duration: 0.34)) { step = returnStep }
@@ -246,7 +262,12 @@ struct UnlockFlowView: View {
         UnlockFlowStepPreview(
             step: frictionStep,
             status: $currentStepStatus,
-            operationsSubmitTrigger: operationsSubmitTrigger
+            operationsSubmitTrigger: operationsSubmitTrigger,
+            nfcScanTrigger: nfcScanTrigger,
+            nfcService: nfcService,
+            healthService: healthService,
+            locationCheckTrigger: locationCheckTrigger,
+            locationService: locationService
         )
     }
 

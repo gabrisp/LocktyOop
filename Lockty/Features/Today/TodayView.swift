@@ -67,12 +67,8 @@ struct TodayView: View {
             let appID = token.map(AppIdentity.ID.init(token:))
             switch await viewModel.unlockAvailability(for: context, appID: appID) {
             case .available:
-                if context != nil {
-                    withAnimation(.smooth(duration: 0.28)) {
-                        router.pendingUnlock = nil
-                    }
-                }
-                router.presentFullScreen(.unlockFlow(token))
+                let route = context.map(UnlockFlowRoute.init(context:)) ?? UnlockFlowRoute(token: token)
+                router.presentFullScreen(.unlockFlow(route))
 
             case .unavailable(let unavailable):
                 router.presentSheet(.breakStatus(unavailable))
@@ -233,7 +229,6 @@ struct TodayView: View {
         .onChange(of: objectivesViewModel.completedCount) { _, _ in
             Task { await viewModel.load(day: day, force: true) }
         }
-        .animation(.smooth(duration: 0.32), value: router.pendingUnlock?.id)
         // Ending a routine takes its cards off the screen rather than having them
         // disappear between one frame and the next: the mode card and the checklist both
         // belong to the routine that was running.
@@ -415,23 +410,6 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 Color.clear
                     .frame(height: topChromeExpandedHeight + LocktySpacing.sm)
-
-                // Above everything else: an unlock the shield asked for is the one thing
-                // on this screen that is waiting on an answer.
-                if let pendingUnlock = router.pendingUnlock {
-                    UnlockRequestCard(
-                        context: pendingUnlock,
-                        availability: viewModel.badgeAvailability(forApp: pendingUnlock.appID)
-                    ) {
-                        Task { @MainActor in
-                            openUnlockFlow(
-                                for: pendingUnlock.applicationToken,
-                                context: pendingUnlock
-                            )
-                        }
-                    }
-                    .transition(.blurReplace.combined(with: .opacity))
-                }
 
                 // The other two scores, beside the one in the badge. They were on a
                 // screen nothing linked to any more, and they are the same kind of thing

@@ -90,7 +90,7 @@ struct ActiveModePills: View {
     /// want to know is when it lets you out. A mode with no end has nothing to count down
     /// to, so it counts up instead -- the same figure, read the other way.
     private func secondsShown(_ routine: ActiveRoutine, at date: Date) -> Int {
-        if let end = routine.expectedEndAt {
+        if let end = endsAt(for: routine) {
             return max(Int(end.timeIntervalSince(date)), 0)
         }
         return max(Int(date.timeIntervalSince(routine.startedAt)), 0)
@@ -103,11 +103,27 @@ struct ActiveModePills: View {
     /// How much of the rim is drawn: what is left of the mode, as a share of the whole of
     /// it. A mode with no end keeps a full rim -- there is no fraction of forever.
     private func progress(_ routine: ActiveRoutine, at date: Date) -> Double {
-        guard let end = routine.expectedEndAt else { return 1 }
+        guard let end = endsAt(for: routine) else { return 1 }
 
         let total = end.timeIntervalSince(routine.startedAt)
         guard total > 0 else { return 1 }
         return min(max(end.timeIntervalSince(date) / total, 0.02), 1)
+    }
+
+    private func endsAt(for routine: ActiveRoutine) -> Date? {
+        if let expected = routine.expectedEndAt { return expected }
+        guard case .schedule(let schedule) = routine.trigger else { return nil }
+
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: schedule.timeZoneIdentifier) ?? .current
+
+        var components = calendar.dateComponents([.year, .month, .day], from: routine.startedAt)
+        components.hour = schedule.endHour
+        components.minute = schedule.endMinute
+        components.second = 0
+
+        guard let end = calendar.date(from: components) else { return nil }
+        return end > routine.startedAt ? end : calendar.date(byAdding: .day, value: 1, to: end)
     }
 
     // MARK: - The pill's body

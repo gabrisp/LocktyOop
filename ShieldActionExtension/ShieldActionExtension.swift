@@ -107,12 +107,17 @@ final class ShieldActionExtension: ShieldActionDelegate {
         // The routine to ask about this app is one that is actually blocking it. With
         // several running, the first in the list may well be holding something else
         // entirely, and its friction is not the one standing between you and this app.
-        let blocking = (runtime?.activeRoutines ?? []).filter {
-            $0.shieldPolicy.blockedApplications.contains(identity.id)
+        let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        let blocking = (runtime?.activeRoutines ?? []).filter { routine in
+            if routine.shieldPolicy.blockedApplications.contains(identity.id) {
+                return true
+            }
+            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == identity.id }
         }
         let activeRoutine = blocking.first ?? runtime?.primaryActiveRoutine
 
-        let policy = activeRoutine
+        var policy = activeRoutine
             .map(\.pausePolicySnapshot)
             .flatMap { $0.offersPause ? $0 : nil }
             ?? .standard
@@ -127,6 +132,10 @@ final class ShieldActionExtension: ShieldActionDelegate {
         if case .allow(let ruleID, let ruleAllowance) = ruleLookup.decision(for: token) {
             limitRuleID = ruleID
             allowanceDuration = ruleAllowance
+            if let rule = appGroupStore.loadStoredRules().first(where: { $0.id == ruleID }),
+               rule.breakPolicy.frictionPolicy.offersPause {
+                policy = rule.breakPolicy.frictionPolicy
+            }
         }
 
         return PauseContext(

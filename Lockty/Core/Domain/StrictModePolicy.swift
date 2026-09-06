@@ -31,7 +31,7 @@ struct StrictModePolicy {
 
         switch action {
         case .stopRoutine:
-            return .allowed
+            return .denied("This routine is running in Strict Mode.")
 
         case .editRoutine, .deleteRoutine, .modifyBlockedApplications, .modifyDomains, .changePauseRule:
             // The one door Strict Mode closes by itself rather than through

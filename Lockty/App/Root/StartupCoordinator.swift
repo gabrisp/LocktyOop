@@ -158,7 +158,7 @@ final class StartupCoordinator: ObservableObject {
                     router.pendingUnlock = nil
                     toastCenter.show(.ruleLimitReached(ruleName: ruleName))
                 case .allow, .notLimited:
-                    router.pendingUnlock = context
+                    router.pendingUnlock = nil
                     toastCenter.show(.unlockRequested(context: context) { [weak self] in
                         self?.openUnlockRequest(context)
                     })
@@ -173,7 +173,7 @@ final class StartupCoordinator: ObservableObject {
             )
 
             guard case .unavailable(let unavailable) = availability else {
-                router.pendingUnlock = context
+                router.pendingUnlock = nil
                 toastCenter.show(.unlockRequested(context: context) { [weak self] in
                     self?.openUnlockRequest(context)
                 })
@@ -202,12 +202,10 @@ final class StartupCoordinator: ObservableObject {
         }
     }
 
-    /// Opens the flow the toast was asking about, on the tab that runs it.
+    /// Opens the flow the toast was asking about without selecting a tab first.
     private func openUnlockRequest(_ context: PauseContext) {
-        withAnimation(.smooth(duration: 0.3)) {
-            router.select(.today)
-            router.pendingUnlock = context
-        }
+        router.pendingUnlock = nil
+        router.presentFullScreen(.unlockFlow(UnlockFlowRoute(context: context)))
     }
 
     /// The shield posts a notification alongside opening the app, because it cannot tell

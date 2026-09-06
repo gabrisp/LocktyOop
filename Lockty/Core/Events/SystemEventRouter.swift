@@ -17,7 +17,7 @@ struct SystemEventRouter {
 
         switch event.payload {
         case .pauseRequested(let context):
-            return .fullScreen(.unlockFlow(context.applicationToken))
+            return .fullScreen(.unlockFlow(UnlockFlowRoute(context: context)))
 
         case .routineStartRequested(let routineID):
             return .startRoutine(routineID)

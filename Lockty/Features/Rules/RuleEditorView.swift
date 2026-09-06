@@ -252,21 +252,25 @@ final class RuleEditorViewModel: ObservableObject {
         }
 
         let selection = selectionPreview
-        // Apps, and only apps. A limit counts minutes and pickups, and those are reported
-        // per app: a category or a group is a set that can grow behind the rule's back,
-        // so "30 minutes a day" would quietly start counting something it was never
-        // pointed at. The picker no longer offers either; this is the guard that means an
-        // older rule cannot save one through the back door.
-        guard !selection.applicationTokens.isEmpty else {
-            errorMessage = "Select at least one app."
+        guard !selection.applicationTokens.isEmpty
+            || !selection.categoryTokens.isEmpty
+            || !selectedAppGroupIDs.isEmpty
+            || !contentRestrictions.isEmpty
+        else {
+            errorMessage = "Select at least one app, category, app group, or restriction."
             return false
         }
 
         // A rule that names an app nothing may block is a rule that contradicts itself:
         // it would save, and then the shield would exempt the very app it was built
         // around. Refused here rather than silently doing nothing at runtime.
+        let groupScopes = Set(selectedAppGroupIDs.map { ScreenTimeSelectionScope.appGroupScope(for: $0) })
+        let groupSelection = selectionStore.mergedSelection(scopes: groupScopes)
+        var restrictedApplicationTokens = selection.applicationTokens
+        restrictedApplicationTokens.formUnion(groupSelection.applicationTokens)
+
         let alwaysAllowed = (try? selectionStore.load(scope: .alwaysAllowed))?.applicationTokens ?? []
-        let conflicting = selection.applicationTokens.intersection(alwaysAllowed)
+        let conflicting = restrictedApplicationTokens.intersection(alwaysAllowed)
         if !conflicting.isEmpty {
             toastCenter.show(
                 .blockedAppIsAlwaysAllowed(
@@ -286,8 +290,8 @@ final class RuleEditorViewModel: ObservableObject {
             name: trimmedName,
             isEnabled: isEnabled,
             kind: kind,
-            appGroupIDs: [],
-            blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
+            appGroupIDs: selectedAppGroupIDs,
+            blockedApplications: Set(restrictedApplicationTokens.map(AppIdentity.ID.init(token:))),
             contentRestrictions: contentRestrictions,
             openCountLimitConfiguration: kind == .openCountLimit
                 ? OpenCountLimitRuleConfiguration(

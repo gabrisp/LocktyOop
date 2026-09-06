@@ -2602,7 +2602,7 @@ struct RoutineEditorView: View {
             RoutinePreviewContent(
                 viewModel: viewModel,
                 applicationTokens: previewTokens,
-                onEdit: { enterEditingFlow() },
+                onEdit: viewModel.isEditingBlocked ? nil : { enterEditingFlow() },
                 activeSince: activeRoutineStartedAt,
                 nextStart: viewModel.nextScheduledStart
             )

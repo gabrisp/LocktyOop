@@ -162,8 +162,11 @@ struct DestinationFactory {
         case .activeRoutine(let id):
             featureFactory.makeActiveRoutine(routineID: id)
 
-        case .unlockFlow(let token):
-            featureFactory.makeUnlockFlow(token: token)
+        case .unlockFlow(let route):
+            featureFactory.makeUnlockFlow(route: route)
+
+        case .frictionRun(let id):
+            featureFactory.makeFrictionRun(frictionID: id)
         }
     }
 }

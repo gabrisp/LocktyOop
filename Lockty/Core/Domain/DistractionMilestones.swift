@@ -41,6 +41,16 @@ nonisolated enum DistractionMilestones {
     /// Every step there is. Which of them are actually registered depends on the level.
     static let all: [Milestone] = [
         Milestone(
+            minutes: 5,
+            title: "Five minutes in",
+            body: "Over 5 min in distracting apps today. This is still easy to reset."
+        ),
+        Milestone(
+            minutes: 10,
+            title: "Ten minutes in",
+            body: "Over 10 min in distracting apps today. Worth checking you meant to stay."
+        ),
+        Milestone(
             minutes: 15,
             title: "It is adding up",
             body: "Over 15 min in distracting apps today. A small reset still counts."
@@ -59,16 +69,6 @@ nonisolated enum DistractionMilestones {
             minutes: 60,
             title: "An hour gone",
             body: "An hour today in apps you called distracting. Nothing new has happened since you started."
-        ),
-        Milestone(
-            minutes: 90,
-            title: "Ninety minutes",
-            body: "That is an evening. What were you about to do instead?"
-        ),
-        Milestone(
-            minutes: 150,
-            title: "Two and a half hours",
-            body: "The feed has no end. You do."
         )
     ]
 
@@ -80,8 +80,8 @@ nonisolated enum DistractionMilestones {
     /// by construction.
     static func milestones(for level: AutoFocusInterventionLevel) -> [Milestone] {
         switch level {
-        case .low: all.filter { $0.minutes >= 60 }
-        case .medium: all.filter { [30, 60, 90, 150].contains($0.minutes) }
+        case .low: all.filter { $0.minutes >= 30 }
+        case .medium: all.filter { [10, 15, 30, 60].contains($0.minutes) }
         case .high: all
         }
     }

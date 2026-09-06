@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import FamilyControls
 
 /// What came of asking the engine to start a routine.
 ///
@@ -99,7 +100,14 @@ final class RoutineEngine: ObservableObject {
     /// More than one can, and that is the whole reason this returns a list: an app two
     /// routines block is not free until both of them agree to let it out.
     func activeRoutines(blocking appID: AppIdentity.ID) -> [ActiveRoutine] {
-        activeRoutines.filter { $0.shieldPolicy.blockedApplications.contains(appID) }
+        let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        return activeRoutines.filter { routine in
+            if routine.shieldPolicy.blockedApplications.contains(appID) {
+                return true
+            }
+            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == appID }
+        }
     }
 
     private func refreshDerivedState() {

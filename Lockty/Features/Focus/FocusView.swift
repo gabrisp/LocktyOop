@@ -318,7 +318,7 @@ struct FocusView: View {
 
             ForEach(frictionsViewModel.frictions) { friction in
                 FrictionFocusCard(friction: friction) {
-                    router.presentSheet(.frictionEditor(FrictionEditorRoute(frictionID: friction.id)))
+                    router.presentFullScreen(.frictionRun(friction.id))
                 }
                 .frame(width: tileWidth)
                 .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))

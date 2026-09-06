@@ -14,9 +14,9 @@ nonisolated enum AutoFocusIntervention {
     /// same question twice.
     static func thresholdMinutes(for level: AutoFocusInterventionLevel) -> Int {
         switch level {
-        case .low: 45
-        case .medium: 25
-        case .high: 12
+        case .low: 30
+        case .medium: 10
+        case .high: 5
         }
     }
 

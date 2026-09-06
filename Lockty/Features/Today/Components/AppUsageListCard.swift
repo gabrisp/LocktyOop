@@ -22,8 +22,17 @@ struct AppUsageListCard: View {
         Array(state.appUsages.prefix(5))
     }
 
+    /// The day's screen time as Screen Time reports it, which is the figure the
+    /// breakdown screen shows.
+    ///
+    /// Not the sum of the rows below. The report's total includes time it will not put a
+    /// name to, so adding up the apps always came out short -- and the same day read two
+    /// numbers depending on which screen you were on. The rows are still what they are;
+    /// this heading is the day.
     private var totalDuration: TimeInterval {
-        state.appUsages.reduce(0) { $0 + $1.duration }
+        state.metrics.screenTime.duration > 0
+            ? state.metrics.screenTime.duration
+            : state.appUsages.reduce(0) { $0 + $1.duration }
     }
 
     private var largestVisibleDuration: TimeInterval {
@@ -42,7 +51,9 @@ struct AppUsageListCard: View {
                 radius: LocktyRadius.medium,
                 padding: LocktySpacing.xl,
                 interactive: true,
-                tint: Color(red: 0.82, green: 0.98, blue: 0.88)
+                // The card wears the day's colour rather than a fixed mint. It was green
+                // on the worst day anybody has ever had.
+                tint: totalTint
             ) {
                 VStack(alignment: .leading, spacing: 0) {
                     header
@@ -69,9 +80,18 @@ struct AppUsageListCard: View {
                                 )
                             }
                         }
+                        // The rows are a picture of the day, not controls. Left
+                        // hit-testable they took the tap for themselves -- an app icon
+                        // drawn from a token especially -- so the bottom two thirds of a
+                        // card that is one big button did nothing when pressed.
+                        .allowsHitTesting(false)
                     }
                 }
             }
+            // The whole card, corner to corner. Without it the button is only where
+            // something was actually drawn, so the gaps between the rows and the space
+            // beside the heading were dead.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.locktyInteractive)
         .tappable()
@@ -103,26 +123,80 @@ struct AppUsageListCard: View {
             // The same heading component the active mode card uses, in its chevron-only
             // form: this card is a button in its entirety, so the title must not take
             // the tap for itself.
-            LocktySectionTitle("Tiempo de uso", showsChevron: true)
+            LocktySectionTitle("Screen Time", showsChevron: true)
 
-            Text(totalDurationText)
-                .font(.system(.largeTitle, design: .default, weight: .semibold))
-                // The transition goes directly on the Text, before any layout modifier:
-                // applied after padding it was decorating the padded container instead.
-                // minimumScaleFactor is gone with it -- a text that is allowed to rescale
-                // itself gets redrawn whole rather than animated digit by digit.
-                .monospacedDigit()
-                .locktyNumericTransition(trigger: totalDurationText)
-                .foregroundStyle(LocktyColors.primaryText)
-                .lineLimit(1)
-                .locktyPlaceholder(isPlaceholder)
-                .padding(.top, 4)
+            HStack(alignment: .firstTextBaseline, spacing: LocktySpacing.sm) {
+                total
+
+                // The arrow only. The sentence that used to go with it -- "24m more than
+                // the other day" -- lives on the breakdown screen, where there is room
+                // to say which day and over what period; here it is one mark saying
+                // which way today went, in the colour of the answer.
+                if let delta {
+                    Image(systemName: delta >= 0 ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(totalTint)
+                        .locktyPlaceholder(isPlaceholder)
+                        .transition(.blurReplace)
+                }
+            }
+            .animation(.smooth(duration: 0.3), value: state.metrics.screenTime.deltaVersusPreviousDay)
+            .padding(.top, 4)
 
 //            Text("Today")
 //                .font(.system(.callout, design: .default, weight: .regular))
 //                .foregroundStyle(LocktyColors.ink(0.56))
 //                .padding(.top, 18)
         }
+    }
+
+    /// Which way today went against yesterday, if it went anywhere worth saying.
+    private var delta: TimeInterval? {
+        guard let delta = state.metrics.screenTime.deltaVersusPreviousDay, abs(delta) >= 60 else {
+            return nil
+        }
+        return delta
+    }
+
+    /// The day's colour, on the same three bands everything else in the app is judged
+    /// by: lighter than yesterday is green, heavier is red, and much the same is amber.
+    ///
+    /// Not two colours. A day fourteen minutes under yesterday is not a good day, it is
+    /// yesterday again, and painting it green for being a minute on the right side of the
+    /// line makes the colour mean nothing. Grey when there is no yesterday to compare
+    /// with -- a first day has not gone any way yet.
+    ///
+    /// The number, the arrow beside it and the card's own tint all read this, because
+    /// they are one answer: it looked like decoration when only the arrow carried it.
+    private var totalTint: Color {
+        guard let raw = state.metrics.screenTime.deltaVersusPreviousDay else {
+            return LocktyColors.neutral
+        }
+
+        // A quarter of an hour either way. Below that the difference is noise, and the
+        // day is an ordinary one.
+        if raw >= 15 * 60 { return LocktyColors.productive }
+        if raw <= -15 * 60 { return LocktyColors.unproductive }
+        return LocktyColors.warning
+    }
+
+    private var total: some View {
+        Text(totalDurationText)
+            .font(.system(.largeTitle, design: .default, weight: .semibold))
+            // The transition goes directly on the Text, before any layout modifier:
+            // applied after padding it was decorating the padded container instead.
+            // minimumScaleFactor is gone with it -- a text that is allowed to rescale
+            // itself gets redrawn whole rather than animated digit by digit.
+            .monospacedDigit()
+            .locktyNumericTransition(trigger: totalDurationText)
+            .foregroundStyle(totalTint)
+            // A breath of softness, and no more than that: the figure is a total of
+            // minutes Screen Time rounds on its own, and a number drawn razor-sharp
+            // claims a precision it does not have.
+            .blur(radius: 1.2)
+            .animation(.smooth(duration: 0.3), value: totalTint)
+            .lineLimit(1)
+            .locktyPlaceholder(isPlaceholder)
     }
 
     private var totalDurationText: String {
@@ -186,9 +260,22 @@ private struct AppUsageSummaryRow: View {
                     let available = max(0, geometry.size.width - durationColumnWidth)
 
                     HStack(alignment: .center, spacing: LocktySpacing.sm) {
+                        // The same soft end the breakdown's bars and the gauges have.
                         Capsule(style: .continuous)
-                            .fill(barColor)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        barColor,
+                                        barColor.opacity(0.85),
+                                        barColor.opacity(0.25),
+                                        barColor.opacity(0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .frame(width: max(22, available * progress), height: 4)
+                            .blur(radius: 1.2)
                             .locktyPlaceholder(isPlaceholder)
 
                         Text(state.durationText)

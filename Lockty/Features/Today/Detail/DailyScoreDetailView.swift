@@ -21,9 +21,9 @@ struct DailyScoreDetailView: View {
     /// two scores should stay where it is; only what differs should be replaced.
     @Namespace private var sectionNamespace
 
-    /// Which of the day chart's three the section is showing. Its own state, so moving
-    /// between scores does not reset what you were looking at.
-    @State private var pulseMetric: HourlyActivityMetric = .reduction
+    // The day chart's three tabs, and which one was showing. Kept with the pulse card
+    // itself: nothing on this page has tabs any more, so there is nothing to remember.
+//    @State private var pulseMetric: HourlyActivityMetric = .reduction
 
     init(day: Date, kind: PrimaryMetricKind, viewModel: TodayViewModel) {
         self.day = day
@@ -64,58 +64,111 @@ struct DailyScoreDetailView: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: LocktySpacing.xl) {
+            // Generous between sections. Each one is a different question about the same
+            // score -- what it is, what it counts, when it happened -- and at 24 they
+            // read as one long block where the headings are the only thing separating
+            // them. The heading has to arrive after a gap to be a heading.
+            VStack(alignment: .leading, spacing: LocktySpacing.xxl) {
                 badge
 
                 // Only the first is shared. What a score is made of, and which figures
                 // are worth showing beside it, are different questions for each of the
                 // three -- so the sections below are the metric's own rather than one
                 // template filled in three ways.
-                section("explanation", "What is \(kind.title)?") {
+                section("explanation", "What is \(kind.title)?", showsDivider: false) {
                     Text(explanation)
                         .font(.system(.body, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .id("explanation-\(kind.rawValue)")
-                        .transition(.blurReplace.combined(with: .opacity))
+                        .transition(.blurReplace)
                 }
 
                 switch kind {
                 case .focus:
-                    section("focus-weights", "How a minute counts") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                    section("focus-weights", "What a minute is worth") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace) }
 
                     if state.hourlyActivity.hasAnyActivity {
-                        section("focus-hours", "Through the day") {
-                            // The card from Today, not a plainer copy of its chart. It
-                            // already reads the hours three ways and answers a finger
-                            // dragged along it, and a second chart drawn here would be
-                            // the same data with less of it.
-                            DailyPulseCard(
-                                state: state.hourlyActivity,
-                                metric: $pulseMetric
-                            )
+                        section("focus-hours", "How your time was distributed") {
+                            // The chart, without the card around it and without the three
+                            // tabs. Only one of the three was worth a picture: how the
+                            // hours divided. Unlocks and notifications are counts, said
+                            // exactly in a line further down the same page, and drawing
+                            // eighty-two of something as bars adds nothing to knowing it
+                            // was eighty-two.
+                            //
+                            // `DailyPulseCard` is untouched and still compiles -- it is
+                            // simply not reached from here any more.
+                            DailyDistributionChart(state: state.hourlyActivity, day: day)
+                                .id("distribution-\(kind.rawValue)")
+                                .transition(.blurReplace)
                         }
                     }
 
                     if !distractingApps.isEmpty {
-                        section("focus-apps", "What took the most") { appList.id("appList-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                        section("focus-apps", "What took the most") { appList.id("appList-\(kind.rawValue)").transition(.blurReplace) }
                     }
 
-                    section("focus-figures", "Where the time went") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                    section("focus-figures", "Where the time went") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace) }
 
                 case .detox:
-                    section("detox-parts", "What counts as time away") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
-                    section("detox-figures", "Today's gaps") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                    section("detox-parts", "How the score is weighed") { componentBars.id("componentBars-\(kind.rawValue)").transition(.blurReplace) }
+
+                    if !quietStretches.isEmpty {
+                        section("detox-stretches", "When you were off it") {
+                            stretchList.id("stretchList-\(kind.rawValue)").transition(.blurReplace)
+                        }
+                    }
+
+                    if viewModel.trend.count >= 3 {
+                        section("detox-trend", "Time off the phone") {
+                            LocktyTrendChart(
+                                points: untouchedPoints,
+                                tint: LocktyColors.productive,
+                                format: { "\(Int($0.rounded()))h" }
+                            )
+                            .id("detoxTrend-\(kind.rawValue)")
+                            .transition(.blurReplace)
+                        }
+                    }
+
+                    if state.hourlyActivity.hasAnyActivity {
+                        section("detox-hours", "How your time was distributed") {
+                            DailyDistributionChart(state: state.hourlyActivity, day: day)
+                                .id("distribution-\(kind.rawValue)")
+                                .transition(.blurReplace)
+                        }
+                    }
+
+                    section("detox-figures", "Today's gaps") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace) }
 
                 case .checks:
                     // No weights section. Checks has no formula to take apart -- the ring
                     // is a comparison with your own fortnight, which the paragraph above
                     // already says. Bars labelled "Half your usual day -- 100%" were the
                     // weights component wearing a scale's clothes, and read as nonsense.
-                    section("checks-figures", "Around the count") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace.combined(with: .opacity)) }
+                    if !busiestPickupHours.isEmpty {
+                        section("checks-hours-list", "When you reached for it") {
+                            pickupList.id("pickupList-\(kind.rawValue)").transition(.blurReplace)
+                        }
+                    }
+
+                    if viewModel.trend.count >= 3 {
+                        section("checks-trend", "Pickups over the fortnight") {
+                            LocktyTrendChart(
+                                points: pickupPoints,
+                                tint: LocktyColors.warning,
+                                format: { "\(Int($0.rounded()))" }
+                            )
+                            .id("checksTrend-\(kind.rawValue)")
+                            .transition(.blurReplace)
+                        }
+                    }
+
+                    section("checks-figures", "Around the count") { gauges.id("gauges-\(kind.rawValue)").transition(.blurReplace) }
                 }
             }
-            .padding(.horizontal, LocktySpacing.screenInset)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.bottom, LocktySpacing.lg)
             .animation(.smooth(duration: 0.38), value: kind)
             .onGeometryChange(for: CGFloat.self) { proxy in
@@ -166,9 +219,19 @@ struct DailyScoreDetailView: View {
     private func section<Content: View>(
         _ id: String,
         _ title: String,
+        showsDivider: Bool = true,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            // A rule above each section rather than below it, so the last one on the page
+            // does not end on a line with nothing under it. Space alone was not enough:
+            // the weight bars run to the bottom of their section and the next heading
+            // arrived looking like another row of the same list.
+            if showsDivider {
+                Divider()
+                    .overlay(LocktyColors.separator.opacity(0.45))
+            }
+
             LocktySectionTitle(title, prominent: true)
                 // The heading is the same object across all three scores, so it slides
                 // rather than being torn down and rebuilt when the page grows or shrinks
@@ -177,6 +240,14 @@ struct DailyScoreDetailView: View {
 
             content()
         }
+        // On the whole section, not only on what is inside it.
+        //
+        // Half the sections belong to one score alone -- the app list to Focus, the quiet
+        // stretches to Detox -- so switching pill inserts and removes them outright, and
+        // an insertion with no transition of its own gets SwiftUI's default, which is a
+        // plain fade. That was the opacity left in the change: the contents were blurring
+        // and the sections holding them were dissolving.
+        .transition(.blurReplace)
     }
 
     // MARK: - Explanation
@@ -200,7 +271,41 @@ struct DailyScoreDetailView: View {
     ///
     /// The weights are the explanation: a score you cannot take apart is a number you are
     /// asked to trust, and this is the app telling you what it decided and by how much.
+    /// The parts of the number, as rings.
+    ///
+    /// One ring per part, filled to the share it carries. See `LocktyWeightRings` for why
+    /// these are not bars any more.
     private var componentBars: some View {
+        LocktyWeightRings(items: componentItems, tint: tint)
+    }
+
+    private var componentItems: [LocktyWeightRings.Item] {
+        components.map { component in
+            LocktyWeightRings.Item(
+                title: component.title,
+                weight: component.weight,
+                // Focus names its parts after what the app is called, so each ring wears
+                // that classification's own colour. The other scores have no such
+                // vocabulary and take the score's.
+                tint: kind == .focus ? Self.classificationTint(for: component.title) : nil
+            )
+        }
+    }
+
+    /// The colour a Focus component is already called elsewhere on the page.
+    private static func classificationTint(for title: String) -> Color? {
+        switch title {
+        case "Productive time": LocktyColors.productive
+        case "Neutral time": LocktyColors.neutral
+        case "Unproductive time": LocktyColors.unproductive
+        default: nil
+        }
+    }
+
+    // The same weights as bars, which is what they were until they became rings. A bar
+    // says how much of something there is; these are shares of one number, and three of
+    // them side by side are read against each other rather than measured off a left edge.
+    private var componentBarsLegacy: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             ForEach(components, id: \.title) { component in
                 VStack(alignment: .leading, spacing: 6) {
@@ -218,9 +323,25 @@ struct DailyScoreDetailView: View {
                     }
 
                     GeometryReader { proxy in
+                        // The same bar the figures and the breakdown draw: solid where it
+                        // starts, dissolving where it ends. A weight is a proportion, not
+                        // a measurement of anything, so a hard edge on it is the most
+                        // misleading of the three.
                         Capsule()
-                            .fill(tint.opacity(0.7))
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        tint.opacity(0.85),
+                                        tint.opacity(0.7),
+                                        tint.opacity(0.2),
+                                        tint.opacity(0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .frame(width: proxy.size.width * CGFloat(component.weight) / 100, height: 5)
+                            .blur(radius: 1.2)
                     }
                     .frame(height: 5)
                 }
@@ -241,6 +362,145 @@ struct DailyScoreDetailView: View {
             // case rather than removed so the switch still names all three.
             []
         }
+    }
+
+    // MARK: - Trends
+
+    /// Hours off the phone, one point per day with data.
+    private var untouchedPoints: [LocktyTrendChart.Point] {
+        trendPoints { Double($0.untouchedHours) }
+    }
+
+    private var pickupPoints: [LocktyTrendChart.Point] {
+        trendPoints { Double($0.pickups) }
+    }
+
+    /// The fortnight as chart points, with the ends and the middle named.
+    ///
+    /// Three labels, not fourteen: a strip this wide cannot carry a name per day without
+    /// them touching, and the useful thing about a trend line is the shape rather than
+    /// which Tuesday was which.
+    private func trendPoints(_ value: (DailyTrendPoint) -> Double) -> [LocktyTrendChart.Point] {
+        let days = viewModel.trend
+        let named = Set([0, days.count / 2, days.count - 1])
+
+        return days.enumerated().map { index, day in
+            LocktyTrendChart.Point(
+                id: index,
+                value: value(day),
+                label: named.contains(index) ? Self.weekdayFormatter.string(from: day.date) : nil,
+                caption: Self.captionFormatter.string(from: day.date)
+            )
+        }
+    }
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter
+    }()
+
+    private static let captionFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter
+    }()
+
+    // MARK: - Lists
+
+    /// The day's longest runs of hours with the screen dark.
+    ///
+    /// Read at the hour, because that is the resolution Screen Time reports in -- an hour
+    /// with under a minute in it counts as one you were off the phone. Three of them, not
+    /// all: the point is the shape of the day, and a list of every quiet hour is the day
+    /// again in a longer form.
+    private var quietStretches: [(id: Int, range: String, duration: String)] {
+        var runs: [(start: Int, length: Int)] = []
+        var current: (start: Int, length: Int)?
+
+        for hour in state.hourlyActivity.hours {
+            if hour.usage < 60 {
+                if var open = current {
+                    open.length += 1
+                    current = open
+                } else {
+                    current = (hour.hour, 1)
+                }
+            } else if let open = current {
+                runs.append(open)
+                current = nil
+            }
+        }
+        if let open = current { runs.append(open) }
+
+        return runs
+            .filter { $0.length >= 2 }
+            .sorted { $0.length > $1.length }
+            .prefix(3)
+            .map { run in
+                (
+                    id: run.start,
+                    range: String(format: "%d:00 – %d:00", run.start, (run.start + run.length) % 24),
+                    duration: run.length == 1 ? "1 h" : "\(run.length) h"
+                )
+            }
+    }
+
+    private var stretchList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(quietStretches.enumerated()), id: \.element.id) { index, stretch in
+                if index > 0 {
+                    Divider().overlay(LocktyColors.separator.opacity(0.45))
+                }
+                listRow(title: stretch.range, value: stretch.duration)
+            }
+        }
+        .padding(.horizontal, LocktySpacing.cardInset)
+        .locktyCardBackground(cornerRadius: 26)
+    }
+
+    /// The three hours with the most pickups in them. The count on its own says how much;
+    /// this says when, which is the half of it a total can never carry.
+    private var busiestPickupHours: [(id: Int, hour: String, count: Int)] {
+        state.hourlyActivity.hours
+            .filter { $0.unlocks > 0 }
+            .sorted { $0.unlocks > $1.unlocks }
+            .prefix(3)
+            .map { (id: $0.hour, hour: String(format: "%d:00", $0.hour), count: $0.unlocks) }
+    }
+
+    private var pickupList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(busiestPickupHours.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 {
+                    Divider().overlay(LocktyColors.separator.opacity(0.45))
+                }
+                listRow(
+                    title: entry.hour,
+                    value: entry.count == 1 ? "1 pickup" : "\(entry.count) pickups"
+                )
+            }
+        }
+        .padding(.horizontal, LocktySpacing.cardInset)
+        .locktyCardBackground(cornerRadius: 26)
+    }
+
+    private func listRow(title: String, value: String) -> some View {
+        HStack(spacing: LocktySpacing.md) {
+            Text(title)
+                .font(.system(.body, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.primaryText)
+                .monospacedDigit()
+
+            Spacer(minLength: LocktySpacing.sm)
+
+            Text(value)
+                .font(.system(.body, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+        .frame(minHeight: 52)
     }
 
     // MARK: - Chart
@@ -359,38 +619,135 @@ struct DailyScoreDetailView: View {
                     title: row.title,
                     value: row.value,
                     position: row.position,
-                    higherIsWorse: row.higherIsWorse
+                    verdicts: row.verdicts
                 )
             }
         }
     }
 
-    private var gaugeRows: [(title: String, value: String, position: Double?, higherIsWorse: Bool)] {
+    /// Every row carries a placed reading, not just the ones that were easy.
+    ///
+    /// A row with no position draws an empty track, and a page of empty tracks with one
+    /// coloured bar in it reads as broken rather than as honest. Each of these is placed
+    /// against something real -- the day's own composition, the fortnight behind it, or
+    /// the clock -- and where a figure genuinely has no better or worse (which hour was
+    /// busiest, say) it is not on this list at all rather than given an invented verdict.
+    private var gaugeRows: [GaugeRow] {
         let hourly = state.hourlyActivity
 
         switch kind {
         case .focus:
             return [
-                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true),
-                ("Unproductive time", LocktyDurationFormatter.abbreviated(unproductiveUsage), sharePosition(unproductiveUsage), true),
-                ("Intentional time", state.metrics.intentionalTime.valueText, nil, false),
-                ("Busiest hour", busiestHourText, nil, true)
+                GaugeRow("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition,
+                         .init("Light day", "An ordinary day", "A heavy one")),
+                GaugeRow("Unproductive time", LocktyDurationFormatter.abbreviated(unproductiveUsage), sharePosition(unproductiveUsage),
+                         .init("Barely any", "A fair chunk", "Most of the day")),
+                GaugeRow("Productive time", LocktyDurationFormatter.abbreviated(productiveUsage), sharePosition(productiveUsage, inverted: true),
+                         .init("Most of the day", "A fair chunk", "Barely any")),
+                GaugeRow("Intentional time", state.metrics.intentionalTime.valueText, sharePosition(intentionalUsage, inverted: true),
+                         .init("Nearly all on purpose", "Half by choice", "Mostly drift"))
             ]
         case .detox:
             return [
-                ("Longest stretch away", state.metrics.bestDetox.durationText, nil, false),
-                ("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition, true),
-                ("Hours untouched", "\(untouchedHours) of 24", nil, false),
-                ("First look", firstLookText, nil, true)
+                GaugeRow("Longest stretch away", state.metrics.bestDetox.durationText, detoxStretchPosition,
+                         .init("A real break", "A short break", "No real break")),
+                GaugeRow("Screen time", LocktyDurationFormatter.abbreviated(hourly.totalUsage), usagePosition,
+                         .init("Light day", "An ordinary day", "A heavy one")),
+                GaugeRow("Hours untouched", "\(untouchedHours) of 24", untouchedPosition,
+                         .init("Down most of the day", "Down half the day", "Rarely down")),
+                GaugeRow("First look", firstLookText, firstLookPosition,
+                         .init("A late start", "A normal start", "Straight away"))
             ]
         case .checks:
             return [
-                ("Phone unlocks", "\(hourly.totalUnlocks)", checksPosition, true),
-                ("Notifications", "\(hourly.totalNotifications)", nil, true),
-                ("Average visit", averageVisitText, nil, true),
-                ("Busiest hour", busiestHourText, nil, true)
+                GaugeRow("Phone unlocks", "\(hourly.totalUnlocks)", checksPosition,
+                         .init("Few pickups", "About as usual", "Picked up constantly")),
+                GaugeRow("Notifications", "\(hourly.totalNotifications)", notificationsPosition,
+                         .init("A quiet day", "About as usual", "A noisy one")),
+                GaugeRow("Average visit", averageVisitText, averageVisitPosition,
+                         .init("Glances", "Short visits", "Long sittings")),
+                GaugeRow("First look", firstLookText, firstLookPosition,
+                         .init("A late start", "A normal start", "Straight away"))
             ]
         }
+    }
+
+    /// One line of the figures block.
+    private struct GaugeRow {
+        let title: String
+        let value: String
+        let position: Double?
+        let verdicts: LocktyGaugeRow.Verdicts
+
+        init(
+            _ title: String,
+            _ value: String,
+            _ position: Double?,
+            _ verdicts: LocktyGaugeRow.Verdicts
+        ) {
+            self.title = title
+            self.value = value
+            self.position = position
+            self.verdicts = verdicts
+        }
+    }
+
+    /// Time in apps called productive, and time the user said they meant to spend.
+    private var productiveUsage: TimeInterval {
+        state.appUsages
+            .filter { $0.classification == .productive }
+            .reduce(0) { $0 + $1.duration }
+    }
+
+    private var intentionalUsage: TimeInterval {
+        state.metrics.intentionalTime.duration
+    }
+
+    /// The longest unbroken stretch away from the screen, against four hours.
+    ///
+    /// Four because that is roughly a working morning: long enough that reaching it is
+    /// something, short enough that an ordinary day gets somewhere near. Not a baseline
+    /// from history -- this is the one figure people are actively trying to grow, and a
+    /// gauge that quietly moves its own goalposts every time you beat it never lets you.
+    private var detoxStretchPosition: Double? {
+        guard let duration = state.metrics.bestDetox.duration, duration > 0 else { return nil }
+        return 1 - min(duration / (4 * 3600), 1)
+    }
+
+    /// Hours with the screen dark, out of a whole day. Two thirds of the day untouched is
+    /// as far left as the bar goes -- the remaining third is sleep and a normal evening.
+    private var untouchedPosition: Double? {
+        guard state.hourlyActivity.hasAnyActivity else { return nil }
+        return 1 - min(Double(untouchedHours) / 16, 1)
+    }
+
+    /// When the phone was first properly picked up, on the clock. Six in the morning is
+    /// the far right and midday the far left: this is the one figure where the reading is
+    /// simply how long you left it.
+    private var firstLookPosition: Double? {
+        guard let first = state.hourlyActivity.hours.first(where: { $0.usage >= 5 * 60 }) else {
+            return nil
+        }
+        return 1 - min(max(Double(first.hour) - 6, 0) / 6, 1)
+    }
+
+    /// Notifications against an ordinary earlier day's, on the same scale as everything
+    /// else: half the usual is the far left, twice it the far right.
+    private var notificationsPosition: Double? {
+        guard let baseline = state.hourlyActivity.baselineNotifications, baseline > 0 else { return nil }
+        return placed(ratio: Double(state.hourlyActivity.totalNotifications) / baseline)
+    }
+
+    /// How long a pickup lasted, against five minutes.
+    ///
+    /// Longer is worse here, which surprises people: a day of long visits is a day spent
+    /// in apps, where the same hours across short ones is a day of glances. Both are on
+    /// the page, which is the point -- neither number means much without the other.
+    private var averageVisitPosition: Double? {
+        let unlocks = state.hourlyActivity.totalUnlocks
+        guard unlocks > 0, state.hourlyActivity.totalUsage > 0 else { return nil }
+        let average = state.hourlyActivity.totalUsage / Double(unlocks)
+        return min(max(average / (10 * 60), 0), 1)
     }
 
     /// Time in apps called unproductive. The figure Focus is really about: the score
@@ -404,10 +761,13 @@ struct DailyScoreDetailView: View {
     /// A share of the day, placed on the gauge directly: a third of your time in
     /// unproductive apps is the middle, none of it the far left, two thirds the far
     /// right. No history needed -- a proportion is already comparable to itself.
-    private func sharePosition(_ duration: TimeInterval) -> Double? {
+    private func sharePosition(_ duration: TimeInterval, inverted: Bool = false) -> Double? {
         let total = state.hourlyActivity.totalUsage
         guard total > 0 else { return nil }
-        return min(max((duration / total) / 0.66, 0), 1)
+        let placed = min(max((duration / total) / 0.66, 0), 1)
+        // A share that is good to have runs the other way: two thirds of the day spent
+        // on purpose is the far *left*, where two thirds of it wasted is the far right.
+        return inverted ? 1 - placed : placed
     }
 
     /// When the day was heaviest, which an average of it can never say.

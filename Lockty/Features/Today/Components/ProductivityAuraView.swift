@@ -122,16 +122,21 @@ struct ProductivityAuraView: View {
             }
             // From the middle: a very faint lift, so the body is not evenly dark and the
             // speckles have something to sit in.
+            //
+            // Added on black, drawn plainly on white. The same fix the score pills
+            // needed: multiplying a gradient that fades to `Color.clear` darkens where
+            // the colour runs out -- clear being black with no alpha -- so the lift in
+            // the middle came out as a dark ring around it.
             .overlay {
                 RadialGradient(
-                    colors: [accent.opacity(0.22), .clear],
+                    colors: [accent.opacity(colorScheme == .dark ? 0.22 : 0.18), .clear],
                     center: .center,
                     startRadius: 0,
                     endRadius: side * 0.36
                 )
-                .locktyGlow(lightScale: 0.7)
+                .blendMode(colorScheme == .dark ? .plusLighter : .normal)
                 .mask { shape }
-                .opacity(arrival)
+                .opacity(colorScheme == .dark ? arrival : 0.7 * arrival)
             }
             .overlay {
                 SpeckleField()

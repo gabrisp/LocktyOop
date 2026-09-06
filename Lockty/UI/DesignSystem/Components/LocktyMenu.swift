@@ -78,13 +78,13 @@ private struct LocktyMenuPanel<Content: View>: View {
     var body: some View {
         content
             .opacity(isVisible ? 1 : 0)
-            // The popover's own surface is white in light mode, which next to a sheet in
-            // the app's soft grey reads as a bright patch cut out of it. A wash of the
-            // background over it brings it back to the page it is floating above.
-            .presentationBackground {
-                LocktyColors.background
-                    .overlay(LocktyColors.ink(0.03))
-            }
+            // No ground of its own. It was painted with the page's background so it would
+            // not read as a white patch cut out of a light screen -- but that makes the
+            // menu an opaque slab, and what should be behind a floating panel is whatever
+            // it is floating over. The system's own material is left to do that, and the
+            // imperfect border below is what makes it a Lockty menu rather than a context
+            // menu.
+            .presentationBackground(.clear)
             // An edge that is lit on some sides and gone on others. The popover's own
             // surface has the same even outline every system surface has; this is what
             // makes a Lockty menu look like Lockty rather than like a context menu.

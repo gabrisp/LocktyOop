@@ -35,6 +35,12 @@ nonisolated struct PendingSystemEvent: Codable, Hashable, Identifiable {
         guard case .pauseRequested(let context) = payload else { return false }
         return context.pauseRuleID == pauseRuleID
     }
+
+    /// Whether this is a queued pause request at all, whoever it belongs to.
+    var isPauseRequest: Bool {
+        if case .pauseRequested = payload { return true }
+        return false
+    }
 }
 
 nonisolated enum SystemEventSource: String, Codable, Hashable {

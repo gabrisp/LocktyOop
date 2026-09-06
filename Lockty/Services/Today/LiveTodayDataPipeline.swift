@@ -3,7 +3,15 @@ import Foundation
 
 protocol TodayDataProviding {
     func dayState(for day: Date) async -> TodayDayState
+    /// The day built from what is already stored, for the first paint.
+    func dayState(for day: Date, preferCached: Bool) async -> TodayDayState
     func updateClassification(appID: AppIdentity.ID, classification: AppClassification) async
+}
+
+extension TodayDataProviding {
+    func dayState(for day: Date, preferCached: Bool) async -> TodayDayState {
+        await dayState(for: day)
+    }
 }
 
 struct LiveTodayDataPipeline: TodayDataProviding {
@@ -49,11 +57,15 @@ struct LiveTodayDataPipeline: TodayDataProviding {
     }
 
     func dayState(for day: Date) async -> TodayDayState {
+        await dayState(for: day, preferCached: false)
+    }
+
+    func dayState(for day: Date, preferCached: Bool) async -> TodayDayState {
         let calendar = Calendar.current
         let dayStart = calendar.startOfDay(for: day)
         let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
         do {
-            let summary = try await usageDataService.usageSummary(for: dayStart)
+            let summary = try await usageDataService.usageSummary(for: dayStart, preferCached: preferCached)
             let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: dayStart))
             let runtimeState = try? appGroupStore.loadRuntimeState()
 
@@ -84,6 +96,23 @@ struct LiveTodayDataPipeline: TodayDataProviding {
 
             let completedRoutineTasks = routineExecutions.flatMap(\.taskCompletions).filter { $0.completedAt != nil }.count
             let totalRoutineTasks = routineExecutions.flatMap(\.taskCompletions).count
+
+            // What was finished today, on top of how the time was spent. Only for today
+            // and only for the day it belongs to: an objective is counted in its own
+            // period, and a day read back has whatever it had.
+            let objectives = appGroupStore.loadObjectives()
+            let objectiveProgress = appGroupStore.loadObjectiveProgress()
+            let completedObjectives = objectives.filter { objectiveProgress.isComplete($0, on: dayStart) }.count
+
+            let focusScore = min(
+                (productivityResult.rawValue ?? 0) + FocusCreditCalculator().credit(
+                    completedTasks: completedRoutineTasks,
+                    totalTasks: totalRoutineTasks,
+                    completedObjectives: completedObjectives,
+                    totalObjectives: objectives.count
+                ),
+                100
+            )
             let completedRoutines = routineExecutions.filter { $0.endedAt != nil }.count
             let pauseSummary = PauseSuccessCalculator().summary(from: pauseEvents)
             let hourly = makeHourlyActivity(
@@ -164,6 +193,9 @@ struct LiveTodayDataPipeline: TodayDataProviding {
             )
 
             let averageUsage = await rollingAverageUsage(endingBefore: dayStart, days: 7)
+            // The day before, on its own: the figure the breakdown screen compares a day
+            // against, so the arrow on the card and the line on that screen agree.
+            let previousDayUsage = await rollingAverageUsage(endingBefore: dayStart, days: 1)
             let averageDistractions = await rollingAveragePauseEvents(endingBefore: dayStart, days: 7)
             let rawDebugText = makeRawDebugText(
                 day: dayStart,
@@ -184,7 +216,7 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 activeRoutineChecklist: makeActiveRoutineChecklist(day: dayStart, runtimeState: runtimeState),
                 primaryMetrics: PrimaryMetricsState(
                     metrics: [
-                        PrimaryMetric(kind: .focus, value: productivityResult.rawValue ?? 0),
+                        PrimaryMetric(kind: .focus, value: focusScore),
                         PrimaryMetric(kind: .detox, value: detoxResult.rawValue),
                         checksMetric(today: hourly.totalUnlocks, dayStart: dayStart)
                     ]
@@ -205,11 +237,14 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                 metrics: TodayMetricsState(
                     screenTime: ScreenTimeCardState(
                         durationText: LocktyDurationFormatter.abbreviated(summary.totalUsage),
-                        comparisonText: usageComparisonText(current: summary.totalUsage, average: averageUsage)
+                        comparisonText: usageComparisonText(current: summary.totalUsage, average: averageUsage),
+                        deltaVersusPreviousDay: previousDayUsage > 0 ? previousDayUsage - summary.totalUsage : nil,
+                        duration: summary.totalUsage
                     ),
                     bestDetox: BestDetoxCardState(
                         durationText: LocktyDurationFormatter.abbreviated(bestDetox.duration ?? 0),
-                        comparisonText: bestDetoxComparisonText(duration: bestDetox.duration)
+                        comparisonText: bestDetoxComparisonText(duration: bestDetox.duration),
+                        duration: bestDetox.duration
                     ),
                     routines: RoutineSummaryCardState(
                         valueText: routineSummaryValue(completedRoutines: completedRoutines, totalRoutines: routineExecutions.count),
@@ -225,7 +260,8 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     ),
                     intentionalTime: IntentionalTimeCardState(
                         valueText: LocktyDurationFormatter.abbreviated(intentionalTime),
-                        detailText: intentionalTimeDetailText(intentionalTime: intentionalTime, totalUsage: summary.totalUsage)
+                        detailText: intentionalTimeDetailText(intentionalTime: intentionalTime, totalUsage: summary.totalUsage),
+                        duration: intentionalTime
                     )
                 ),
                 timeline: UsageTimelineChartState(
@@ -358,8 +394,35 @@ struct LiveTodayDataPipeline: TodayDataProviding {
                     unproductive: unproductive[$0]
                 )
             },
-            reductionVersusBaseline: reductionVersusBaseline(dayStart: dayStart, totalUsage: totalUsage)
+            reductionVersusBaseline: reductionVersusBaseline(dayStart: dayStart, totalUsage: totalUsage),
+            baselineUnlocks: baseline(dayStart: dayStart) { $0.pickups },
+            baselineNotifications: baseline(dayStart: dayStart) { $0.notifications }
         )
+    }
+
+    /// An ordinary earlier day's count of something, from the cached fortnight.
+    ///
+    /// The same three-day floor the usage baseline keeps: a figure drawn from two days
+    /// swings wildly every time one of them moves, and a gauge that moves for reasons the
+    /// day did not is worse than a gauge with no fill in it.
+    private func baseline(
+        dayStart: Date,
+        _ count: (ScreenTimeActivitySegmentSnapshot) -> Int
+    ) -> Double? {
+        let calendar = Calendar.current
+        var totals: [Int] = []
+
+        for daysBack in 1...14 {
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: dayStart),
+                  let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day)),
+                  snapshot.totalActivityDuration > 0
+            else { continue }
+            totals.append(snapshot.activitySegments.reduce(0) { $0 + count($1) })
+        }
+
+        guard totals.count >= 3 else { return nil }
+        let average = Double(totals.reduce(0, +)) / Double(totals.count)
+        return average > 0 ? average : nil
     }
 
     /// How much less was used today than on an average earlier day.

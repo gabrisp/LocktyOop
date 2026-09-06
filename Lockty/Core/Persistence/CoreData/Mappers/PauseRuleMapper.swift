@@ -125,6 +125,7 @@ struct PauseRuleMapper {
         case .sortNumbers: "sortNumbers"
         case .pastAnswers: "pastAnswers"
         case .tuneValue: "tuneValue"
+        case .objectives: "objectives"
         }
     }
 }

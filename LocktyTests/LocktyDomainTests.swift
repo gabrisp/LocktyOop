@@ -182,18 +182,22 @@ struct LocktyDomainTests {
     }
 
     @Test
-    func openCountRuleShieldsUntilAPassIsAvailableAgain() {
+    func openCountRuleOnlyShieldsOnceTheOpensAreSpent() {
         let rule = Rule(
             name: "Instagram",
             kind: .openCountLimit,
             openCountLimitConfiguration: OpenCountLimitRuleConfiguration(maximumOpens: 2, windowHours: 24)
         )
 
+        // Free while there are opens left. Ten opens a day has to mean ten ordinary
+        // opens; the shield standing there from the first one would make it ten
+        // interruptions, which is a different rule.
         var enforcement = RuleEnforcementState()
         #expect(rule.remainingOpens(given: enforcement) == 2)
-        // The apps stay shielded throughout: the shield is what counts the opens, so it
-        // has to be there even while passes remain.
-        #expect(rule.isShielding(given: enforcement) == true)
+        #expect(rule.isShielding(given: enforcement) == false)
+
+        enforcement.update(rule.id) { $0.openCountUsed = 1 }
+        #expect(rule.isShielding(given: enforcement) == false)
 
         enforcement.update(rule.id) { $0.openCountUsed = 2 }
         #expect(rule.remainingOpens(given: enforcement) == 0)

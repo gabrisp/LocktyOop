@@ -45,6 +45,12 @@ struct DestinationFactory {
         case .usageBreakdown(let day):
             featureFactory.makeUsageBreakdown(day: day)
 
+        case .objectives(let focused):
+            featureFactory.makeObjectives(focused: focused)
+
+        case .ruleStats:
+            featureFactory.makeRuleStats()
+
         case .scoreDetail(let day, let kind):
             featureFactory.makeScoreDetail(day: day, kind: kind)
 
@@ -59,6 +65,12 @@ struct DestinationFactory {
 
         case .dayPicker:
             featureFactory.makeDayPickerSheet()
+
+        case .streak:
+            featureFactory.makeStreakSheet()
+
+        case .objectiveEditor(let id):
+            featureFactory.makeObjectiveEditor(objectiveID: id)
 
         case .focusCreationChoice(let route):
             featureFactory.makeFocusCreationChoiceSheet(route: route)
@@ -102,6 +114,9 @@ struct DestinationFactory {
 
         case .appGroupEditor(let route):
             featureFactory.makeAppGroupEditor(route: route)
+
+        case .quickShield:
+            featureFactory.makeQuickShieldSheet()
 
         case .autoFocus:
             featureFactory.makeAutoFocusSheet()

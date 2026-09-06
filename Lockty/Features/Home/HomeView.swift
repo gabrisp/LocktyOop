@@ -8,77 +8,320 @@ struct HomeView: View {
     /// Shared namespace so the bottom bar zooms into the live session sheet.
     @Namespace private var liveSessionZoom
 
-    private var activeRoutine: ActiveRoutine? {
-        featureFactory.routineEngine.activeRoutine()
-    }
+    @State private var selectedBarTab: HomeBarTab = .today
+    @State private var isPanelOpen = false
+    @State private var quickActionsFeedback = 0
+    @State private var quickActions = QuickActionSet.default
+    /// The objectives the panel can log, cached. Read when the panel opens and when a
+    /// sheet closes -- never from a body, which is what made the shell crawl.
+    @State private var objectives: [Objective] = []
+    /// The modes the panel can start, cached with the objectives and for the same reason.
+    @State private var routines: [Routine] = []
+
+    private let appGroupStore = AppGroupStore()
 
     var body: some View {
-        // Two tabs, the plain system TabView: Today, and Routines/Pauses -- which is one
-        // tab holding both behind a segmented control, not two. Each keeps its own
-        // NavigationStack path so a push in one doesn't surface in the other.
+        shell
+            .tint(LocktyColors.primaryText)
+            .sensoryFeedback(.selection, trigger: quickActionsFeedback)
+            .task {
+                selectedBarTab = HomeBarTab(router.selectedTab)
+                reloadPanel()
+            }
+            .onChange(of: router.selectedTab) { _, newValue in
+                let barTab = HomeBarTab(newValue)
+                guard selectedBarTab != barTab else { return }
+                selectedBarTab = barTab
+            }
+            .onChange(of: router.sheet) { _, newValue in
+                guard newValue == nil else { return }
+                reloadPanel()
+            }
+            .sheet(item: $router.sheet) { route in
+                if route == .liveSession {
+                    destinationFactory.sheet(for: route)
+                        .navigationTransition(.zoom(sourceID: SheetRoute.liveSession.id, in: liveSessionZoom))
+                } else {
+                    destinationFactory.sheet(for: route)
+                }
+            }
+            .fullScreenCover(item: $router.fullScreen) { route in
+                destinationFactory.fullScreen(for: route)
+            }
+    }
+
+    @ViewBuilder
+    private var shell: some View {
+        if #available(iOS 26.0, *) {
+            morphingShell
+        } else {
+            fallbackShell
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private var morphingShell: some View {
+        ZStack(alignment: .bottom) {
+            TabView(selection: $router.selectedTab) {
+                Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
+                    tabContent(.today, usesOverlay: false)
+                }
+
+                Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
+                    tabContent(.focus, usesOverlay: false)
+                }
+            }
+            .toolbar(.hidden, for: .tabBar)
+            .toolbarVisibility(.hidden, for: .tabBar)
+            .safeAreaPadding(.bottom, isPanelOpen ? 0 : 74)
+
+            morphingBottomBar
+        }
+        .ignoresSafeArea(.all, edges: .bottom)
+        .onChange(of: selectedBarTab) { _, newValue in
+            closePanel()
+            router.selectedTab = newValue.appTab
+        }
+    }
+
+    private var fallbackShell: some View {
         TabView(selection: $router.selectedTab) {
-            NavigationStack(path: $router.todayPath) {
+            Tab(AppTab.today.title, systemImage: AppTab.today.systemImage, value: AppTab.today) {
+                tabContent(.today, usesOverlay: true)
+            }
+
+            Tab(AppTab.focus.title, systemImage: AppTab.focus.systemImage, value: AppTab.focus) {
+                tabContent(.focus, usesOverlay: true)
+            }
+        }
+        .modifier(LocktyTabBarChrome())
+        .toolbar {
+            ToolbarItem(placement: .bottomBar) {
+                Spacer()
+            }
+
+            ToolbarItem(placement: .bottomBar) {
+                Button {
+                    tapQuickActionsButton()
+                } label: {
+                    fallbackPlusLabel
+                }
+            }
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private var morphingBottomBar: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            MorphingTabBar(activeTab: $selectedBarTab, isExpanded: $isPanelOpen, collapsedWidth: 132) {
+                panel
+            }
+
+            Button {
+                tapQuickActionsButton()
+            } label: {
+                glassPlusLabel
+            }
+            .buttonStyle(PlainGlassButtonEffect(shape: Circle()))
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 25)
+        .animation(.smooth(duration: 0.28), value: isPanelOpen)
+    }
+
+    private var plusRotation: Angle {
+        .degrees(isPanelOpen ? 45 : 0)
+    }
+
+    private var fallbackPlusLabel: some View {
+        Image(systemName: "plus")
+            .font(.body.weight(.light))
+            .rotationEffect(plusRotation)
+            .frame(width: 44, height: 40)
+            .contentShape(Rectangle())
+    }
+
+    private var glassPlusLabel: some View {
+        Image(systemName: "plus")
+            .font(.body.weight(.light))
+            .rotationEffect(plusRotation)
+            .frame(width: 52, height: 52)
+            .contentShape(Circle())
+    }
+
+    @ViewBuilder
+    private func tabContent(_ tab: AppTab, usesOverlay: Bool) -> some View {
+        switch tab {
+        case .today:
+            let stack = NavigationStack(path: $router.todayPath) {
                 featureFactory.makeTodayView(day: router.selectedDay)
                     .locktyScreenBackground()
                     .navigationDestination(for: AppRoute.self) { route in
                         destinationFactory.destination(for: route)
                     }
             }
-            .tabItem {
-                Label(AppTab.today.title, systemImage: AppTab.today.systemImage)
-            }
-            .tag(AppTab.today)
 
-            NavigationStack(path: $router.focusPath) {
+            if usesOverlay {
+                stack.tabOverlay(isPresented: isPanelOpen) { panel } onDismiss: { closePanel() }
+            } else {
+                stack
+                    .toolbar(.hidden, for: .tabBar)
+                    .toolbarVisibility(.hidden, for: .tabBar)
+            }
+
+        case .focus:
+            let stack = NavigationStack(path: $router.focusPath) {
                 featureFactory.makeFocusView()
                     .locktyScreenBackground()
                     .navigationDestination(for: AppRoute.self) { route in
                         destinationFactory.destination(for: route)
                     }
             }
-            .tabItem {
-                Label(AppTab.focus.title, systemImage: AppTab.focus.systemImage)
-            }
-            .tag(AppTab.focus)
-        }
-        // The selected tab is the app's own primary, not the AccentColor asset the bar
-        // was falling back to. Nothing else in Lockty is tinted by that accent, so the
-        // bar was the one place a colour from outside the palette showed up.
-        .tint(LocktyColors.primaryText)
-//        .safeAreaInset(edge: .bottom) {
-//            Group {
-//                if let activeRoutine {
-//                    ActiveSessionBar(
-//                        routine: activeRoutine,
-//                        pauseCount: featureFactory.pausesViewModel.eventsSince(activeRoutine.startedAt).count
-//                    ) {
-//                        router.presentSheet(.liveSession)
-//                    }
-//                    .transition(.move(edge: .bottom).combined(with: .opacity))
-//                }
-//            }
-//            // The zoom source is on this container, not on the bar itself. The bar
-//            // redraws every second from its own TimelineView clock, and a source that
-//            // gets re-created while the transition is running is dropped -- which is why
-//            // dismissing sometimes just snapped back with no animation at all.
-//            .matchedTransitionSource(id: SheetRoute.liveSession.id, in: liveSessionZoom)
-//            .padding(.bottom, LocktySpacing.sm)
-//            // Scoped to the bar. On the whole TabView this implicit animation was picked
-//            // up by the presentation itself and fought the zoom.
-//            .animation(.snappy(duration: 0.28, extraBounce: 0.05), value: activeRoutine?.id)
-//        }
-        .sheet(item: $router.sheet) { route in
-            // Only the live session zooms, and only from the bottom bar that opened it —
-            // every other sheet has no matching source and must present normally.
-            if route == .liveSession {
-                destinationFactory.sheet(for: route)
-                    .navigationTransition(.zoom(sourceID: SheetRoute.liveSession.id, in: liveSessionZoom))
+
+            if usesOverlay {
+                stack.tabOverlay(isPresented: isPanelOpen) { panel } onDismiss: { closePanel() }
             } else {
-                destinationFactory.sheet(for: route)
+                stack
+                    .toolbar(.hidden, for: .tabBar)
+                    .toolbarVisibility(.hidden, for: .tabBar)
             }
+
+        case .lifetime:
+            EmptyView()
         }
-        .fullScreenCover(item: $router.fullScreen) { route in
-            destinationFactory.fullScreen(for: route)
+    }
+
+    private var panel: some View {
+        QuickActionsPanel(
+            set: $quickActions,
+            objectives: objectives,
+            routines: routines,
+            isComplete: { featureFactory.objectivesViewModel.isComplete($0) },
+            onRun: run,
+            onSave: { try? appGroupStore.saveQuickActions($0) }
+        )
+    }
+
+    /// What the panel offers, read when it opens rather than while it draws.
+    private func reloadPanel() {
+        quickActions = appGroupStore.loadQuickActions()
+        featureFactory.objectivesViewModel.load()
+        // Only the ones you count yourself. Steps and sleep are read from Health, and a
+        // tile that added to your step count would be writing down a walk you did not
+        // take -- there is nothing for a press to mean.
+        objectives = featureFactory.objectivesViewModel.dailyObjectives
+            .filter { !$0.source.isMeasured }
+
+        Task {
+            routines = (try? await featureFactory.routineRepository.routines()) ?? []
         }
+    }
+
+    private func togglePanel() {
+        if isPanelOpen {
+            closePanel()
+        } else {
+            reloadPanel()
+            withAnimation(.smooth(duration: 0.28)) { isPanelOpen = true }
+        }
+    }
+
+    private func tapQuickActionsButton() {
+        quickActionsFeedback += 1
+        togglePanel()
+    }
+
+    private func closePanel() {
+        withAnimation(.smooth(duration: 0.28)) { isPanelOpen = false }
+    }
+
+    /// Closes the panel and then opens the sheet, rather than both at once.
+    private func open(_ route: SheetRoute) {
+        closePanel()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            router.presentSheet(route)
+        }
+    }
+
+    private func run(_ action: QuickAction) {
+        switch action.kind {
+        case .newRoutine:
+            open(.routineEditor(RoutineEditorRoute(routineID: nil, startsEditing: true)))
+
+        case .newLimit:
+            open(.ruleEditor(RuleEditorRoute(ruleID: nil)))
+
+        case .newObjective:
+            open(.objectiveEditor(nil))
+
+        case .newFriction:
+            open(.frictionEditor(FrictionEditorRoute(frictionID: nil)))
+
+        case .quickBlock:
+            open(.quickShield)
+
+        case .startRoutine:
+            closePanel()
+            Task { await start(action) }
+
+        case .logObjective:
+            log(action)
+        }
+    }
+
+    /// Starts the mode a tile is about, or opens the screen with all of them when the tile
+    /// is not about one in particular.
+    private func start(_ action: QuickAction) async {
+        guard let id = action.routineID,
+              let routine = (try? await featureFactory.routineRepository.routines())?
+                  .first(where: { $0.id == id })
+        else {
+            router.selectedTab = .focus
+            return
+        }
+
+        _ = await featureFactory.routineEngine.start(routine)
+    }
+
+    private func log(_ action: QuickAction) {
+        guard let id = action.objectiveID,
+              let objective = featureFactory.objectivesViewModel.objectives.first(where: { $0.id == id })
+        else { return }
+
+        let model = featureFactory.objectivesViewModel
+        if objective.isYesNo {
+            if model.isComplete(objective) {
+                model.reset(objective)
+            } else {
+                model.complete(objective)
+            }
+        } else {
+            model.advance(objective)
+        }
+    }
+}
+
+private enum HomeBarTab: CaseIterable, Hashable, MorphingTabProtocol {
+    case today
+    case focus
+
+    init(_ tab: AppTab) {
+        self = tab == .focus ? .focus : .today
+    }
+
+    var appTab: AppTab {
+        switch self {
+        case .today: .today
+        case .focus: .focus
+        }
+    }
+
+    var symbolImage: String { appTab.systemImage }
+}
+
+/// No-op wrapper kept so the older shell keeps the same call site.
+struct LocktyTabBarChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        content
     }
 }

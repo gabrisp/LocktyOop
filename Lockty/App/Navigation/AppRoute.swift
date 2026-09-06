@@ -21,4 +21,12 @@ enum AppRoute: Hashable {
     case usageBreakdown(day: Date)
     /// One of the three daily scores, explained.
     case scoreDetail(day: Date, kind: PrimaryMetricKind)
+    /// What you meant to do, and how far along each one is.
+    ///
+    /// Carries one to single out, for the quick cards on Today: tapping a name there is
+    /// asking about that objective, so the page opens with it already picked rather than
+    /// leaving you to find it again in the row.
+    case objectives(focused: UUID?)
+    /// What the rules did, and how each of them has been going.
+    case ruleStats
 }

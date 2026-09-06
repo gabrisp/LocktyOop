@@ -7,8 +7,38 @@ nonisolated enum RoutineColor: String, Codable, CaseIterable, Hashable, Identifi
     case coral
     case rose
     case violet
+    case teal
+    case ocean
+    case lime
+    case peach
+    case plum
+    case slate
 
     var id: String { rawValue }
+
+    /// The colour itself, as plain components.
+    ///
+    /// Here rather than in the design system because the shield extension needs these
+    /// too, and it has no SwiftUI in it. Two definitions of six colours is two
+    /// definitions that will disagree the first time one of them is adjusted -- and the
+    /// place it would show is the shield, which is the one screen the person who chose
+    /// the colour did not choose to look at.
+    nonisolated var components: (red: Double, green: Double, blue: Double) {
+        switch self {
+        case .mint: (0.43, 0.92, 0.76)
+        case .sky: (0.45, 0.78, 1.0)
+        case .amber: (1.0, 0.78, 0.40)
+        case .coral: (1.0, 0.54, 0.49)
+        case .rose: (1.0, 0.48, 0.71)
+        case .violet: (0.72, 0.58, 1.0)
+        case .teal: (0.40, 0.85, 0.82)
+        case .ocean: (0.36, 0.62, 0.95)
+        case .lime: (0.76, 0.94, 0.48)
+        case .peach: (1.0, 0.72, 0.55)
+        case .plum: (0.86, 0.55, 0.92)
+        case .slate: (0.64, 0.70, 0.80)
+        }
+    }
 }
 
 struct Routine: Codable, Hashable, Identifiable {

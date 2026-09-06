@@ -50,7 +50,6 @@ struct UnlockCopyPhraseStepView: View {
                     .contentTransition(.numericText())
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             phrase = FrictionWordBank.phrase(
                 approximateWordCount: configuration.length.approximateWordCount,
@@ -122,7 +121,6 @@ struct UnlockHoldSteadyStepView: View {
                 pressing ? begin() : cancel()
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             status = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
         }
@@ -211,7 +209,6 @@ struct UnlockOddOneOutStepView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) { deal() }
         .sensoryFeedback(.selection, trigger: round)
     }
@@ -296,7 +293,6 @@ struct UnlockSortNumbersStepView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) { deal() }
         .sensoryFeedback(.selection, trigger: tapped.count)
     }
@@ -373,7 +369,6 @@ struct UnlockPastAnswersStepView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             answers = Array(store.loadIntentionAnswers().suffix(configuration.recallCount).reversed())
             status = UnlockFlowStepStatus(primaryState: .advance(enabled: true))
@@ -383,16 +378,27 @@ struct UnlockPastAnswersStepView: View {
 
 // MARK: - Tune the value
 
-/// Drag a handle to an exact number.
+/// Drag a line up a scale until it sits on a number.
 ///
-/// Trivial to describe and unreasonably fiddly to do, which is the whole point: it costs
-/// a steady hand and about fifteen seconds, and there is nothing to get better at.
+/// Not a slider and not a scroll view: a bar you take hold of and move, on a scale short
+/// enough to read at a glance and fine enough that you cannot fling it into place. Ten
+/// marks and a line -- put the line on the eight.
+///
+/// Vertical because the hand is worse at it. A horizontal drag is the gesture every
+/// slider in every app has trained; dragging upward against a scale that counts upward
+/// takes a moment of thought each time, which is the whole job.
 struct UnlockTuneValueStepView: View {
     let configuration: TuneValueConfiguration
     @Binding var status: UnlockFlowStepStatus
 
-    @State private var target = 50
-    @State private var value: Double = 0
+    /// The scale. Ten is enough to be fiddly and few enough to label every mark.
+    private let steps = 10
+
+    @State private var target = 8
+    /// Where the line sits, in scale units. Continuous rather than snapped: snapping
+    /// would do the aiming for you.
+    @State private var value: Double = 1
+    @State private var isDragging = false
 
     private var current: Int { Int(value.rounded()) }
     private var isOnTarget: Bool { abs(current - target) <= configuration.tolerance }
@@ -400,33 +406,214 @@ struct UnlockTuneValueStepView: View {
     var body: some View {
         UnlockStepSurface(tone: isOnTarget ? .success : .neutral, shakeTrigger: 0) {
             VStack(spacing: LocktySpacing.lg) {
-                HStack(alignment: .firstTextBaseline, spacing: LocktySpacing.sm) {
-                    Text("\(current)")
-                        .font(.system(size: 44, weight: .bold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .foregroundStyle(isOnTarget ? LocktyColors.productive : LocktyColors.primaryText)
+                Text("Put the line on \(target)")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .contentTransition(.numericText())
 
-                    Text("of \(target)")
-                        .font(.system(.title3, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.secondaryText)
-                        .monospacedDigit()
-                }
+                scale
 
-                Slider(value: $value, in: 0...100)
-                    .tint(isOnTarget ? LocktyColors.productive : LocktyColors.neutral)
+                Text("\(current)")
+                    .font(.system(size: 34, weight: .bold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .foregroundStyle(isOnTarget ? LocktyColors.productive : LocktyColors.primaryText)
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
-            // Never near either end: dragging to a stop is not aiming.
-            target = Int.random(in: 12...88)
-            value = Double(Int.random(in: 0...100))
+            // Never the ends, and never where the line already is: both would be arrived
+            // at without aiming.
+            target = Int.random(in: 2...(steps - 1))
+            value = Double(target > steps / 2 ? 1 : steps)
             status = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
         }
         .onChange(of: isOnTarget, initial: true) { _, onTarget in
             status = UnlockFlowStepStatus(primaryState: .advance(enabled: onTarget))
         }
-        .sensoryFeedback(.selection, trigger: isOnTarget)
+        .sensoryFeedback(.selection, trigger: current)
+    }
+
+    private var scale: some View {
+        GeometryReader { proxy in
+            let height = proxy.size.height
+            // 1 at the bottom and `steps` at the top: a scale that counts upward should
+            // go upward.
+            let y = height - (value - 1) / Double(steps - 1) * height
+
+            ZStack(alignment: .topLeading) {
+                marks(height: height)
+
+                line
+                    .position(x: proxy.size.width / 2, y: y)
+            }
+            .frame(width: proxy.size.width, height: height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        isDragging = true
+                        let ratio = 1 - min(max(drag.location.y / height, 0), 1)
+                        value = 1 + ratio * Double(steps - 1)
+                    }
+                    .onEnded { _ in isDragging = false }
+            )
+        }
+        .frame(height: 220)
+    }
+
+    private func marks(height: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array((1...steps).reversed()), id: \.self) { mark in
+                HStack(spacing: LocktySpacing.sm) {
+                    Text("\(mark)")
+                        .font(.system(.caption, design: .default, weight: mark == target ? .bold : .regular))
+                        .foregroundStyle(mark == target ? LocktyColors.productive : LocktyColors.tertiaryText)
+                        .monospacedDigit()
+                        .frame(width: 22, alignment: .trailing)
+
+                    Rectangle()
+                        .fill(mark == target ? LocktyColors.productive.opacity(0.5) : LocktyColors.ink(0.10))
+                        .frame(height: 1)
+                }
+                .frame(maxHeight: .infinity)
+            }
+        }
+        .frame(height: height)
+    }
+
+    /// The bar you take hold of. Wide, because a thin one is a target you miss, and lit
+    /// while held so it is clear the drag has it.
+    private var line: some View {
+        Capsule(style: .continuous)
+            .fill(isOnTarget ? LocktyColors.productive : LocktyColors.primaryText)
+            .frame(height: 6)
+            .shadow(
+                color: (isOnTarget ? LocktyColors.productive : LocktyColors.primaryText)
+                    .opacity(isDragging ? 0.5 : 0.25),
+                radius: isDragging ? 10 : 5
+            )
+            .scaleEffect(y: isDragging ? 1.4 : 1)
+            .animation(.smooth(duration: 0.18), value: isDragging)
+    }
+}
+
+/// Have you done what you said you would?
+///
+/// The one friction made of your own words. It lists the objectives that are not met in
+/// the period they are counted in, and the way through is to meet them -- the rings fill
+/// here, on this screen, the same way they do on the card.
+///
+/// Nothing to solve and nothing to type, which makes it the slowest friction in the app
+/// by a distance: the others cost twenty seconds of attention, and this one can cost a
+/// glass of water and a walk to the kitchen. That is the point of it.
+struct UnlockObjectivesStepView: View {
+    let configuration: ObjectivesFrictionConfiguration
+    @Binding var status: UnlockFlowStepStatus
+    /// Handed down when there is one, so a step objective reads Health here too rather
+    /// than showing whatever was last written.
+    var healthService: HealthServicing?
+
+    @StateObject private var viewModel: ObjectivesViewModel
+
+    init(
+        configuration: ObjectivesFrictionConfiguration,
+        status: Binding<UnlockFlowStepStatus>,
+        healthService: HealthServicing? = nil
+    ) {
+        self.configuration = configuration
+        _status = status
+        self.healthService = healthService
+        _viewModel = StateObject(
+            wrappedValue: ObjectivesViewModel(healthService: healthService)
+        )
+    }
+
+    private var outstanding: [Objective] {
+        viewModel.objectives.filter { !viewModel.isComplete($0) }
+    }
+
+    /// Whether the flow may go on: everything done, or one thing done, as configured.
+    ///
+    /// An empty list passes. A friction that cannot be satisfied is not a friction, it is
+    /// a locked door -- and somebody who has set no objectives has not agreed to anything
+    /// they can be held to.
+    private var isSatisfied: Bool {
+        guard !viewModel.objectives.isEmpty else { return true }
+        return configuration.requiresAll
+            ? outstanding.isEmpty
+            : viewModel.completedCount > 0
+    }
+
+    var body: some View {
+        UnlockStepSurface(tone: isSatisfied ? .success : .neutral, shakeTrigger: 0) {
+            VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+                Text(headline)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: LocktySpacing.md) {
+                    ForEach(viewModel.objectives) { objective in
+                        row(objective)
+                    }
+                }
+            }
+        }
+        .task {
+            viewModel.load()
+            status = UnlockFlowStepStatus(primaryState: .advance(enabled: isSatisfied))
+        }
+        .onChange(of: isSatisfied, initial: true) { _, satisfied in
+            status = UnlockFlowStepStatus(primaryState: .advance(enabled: satisfied))
+        }
+    }
+
+    private var headline: String {
+        guard !viewModel.objectives.isEmpty else { return "Nothing set for now." }
+        if isSatisfied { return "Done. That was the deal." }
+        return configuration.requiresAll
+            ? "Finish what you set yourself first."
+            : "Finish one of these first."
+    }
+
+    private func row(_ objective: Objective) -> some View {
+        Button {
+            viewModel.advance(objective)
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                ObjectiveRing(
+                    symbolName: objective.symbolName,
+                    fraction: viewModel.fraction(of: objective),
+                    isComplete: viewModel.isComplete(objective),
+                    color: objective.color,
+                    side: 34,
+                    lineWidth: 2.5
+                )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(objective.name)
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.primaryText)
+                        .lineLimit(1)
+
+                    Text("\(viewModel.detail(for: objective)) · \(objective.period.currentTitle)")
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(
+                            viewModel.isComplete(objective)
+                                ? LocktyColors.productive
+                                : LocktyColors.secondaryText
+                        )
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 46)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.locktyInteractive(brighten: true))
+        .tappable()
     }
 }

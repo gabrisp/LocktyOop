@@ -1,6 +1,7 @@
 import Combine
 import FamilyControls
 import Foundation
+import WidgetKit
 import ManagedSettings
 import OSLog
 import SwiftUI
@@ -56,6 +57,13 @@ final class TodayViewModel: ObservableObject {
     private let pauseEngine: PauseEngine
     private let routineRepository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
+    /// Its own handle on the shared container: the limits and what they have spent live
+    /// there, written by the extensions.
+    private let appGroupStore = AppGroupStore()
+    private let trendBuilder = DailyTrendBuilder()
+    private var cancellables: Set<AnyCancellable> = []
+    /// Which day the trend currently belongs to, so it is not rebuilt on every retry.
+    private var trendDayKey: String?
     private let autoFocusManager: AutoFocusManager
     private let toastCenter: LocktyToastCenter
     /// The productivity score the last load reported, so a rise can be noticed. Nil until
@@ -67,6 +75,14 @@ final class TodayViewModel: ObservableObject {
     @Published private(set) var routineCardState: TodayRoutineCardState?
     /// Every scheduled start between now and a week out, in order.
     @Published private(set) var upcomingRoutines: [TodayScheduledRoutine] = []
+    /// Rules and routines currently held, with the day the hold ends.
+    @Published private(set) var pausedItems: [TodayPausedItem] = []
+
+    /// Where every limit rule stands today. Rebuilt with the day, since the figure in it
+    /// is the day's own usage.
+    @Published private(set) var limits: [TodayLimitState] = []
+    /// The fortnight behind the day being read, for the trend lines on the score pages.
+    @Published private(set) var trend: [DailyTrendPoint] = []
     /// Whether a break can be taken at all right now.
     ///
     /// Published rather than asked for on tap: the app badges are coloured by it, so it
@@ -89,9 +105,27 @@ final class TodayViewModel: ObservableObject {
         self.selectionStore = selectionStore
         self.autoFocusManager = autoFocusManager
         self.toastCenter = toastCenter
+
+        // The screens read this model, and this model reads the engine -- so a routine
+        // that starts or ends anywhere at all lands here without anyone having to
+        // remember to say so.
+        //
+        // Ending one from its own editor is the case that was broken: the engine stopped
+        // it, the editor closed, and the Focus tab kept its ring and its card until the
+        // tab was left and come back to, because only `load` refreshed them.
+        routineEngine.$activeRoutines
+            .map { $0.map(\.routineID) }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor in await self?.refreshRoutineCard() }
+            }
+            .store(in: &cancellables)
     }
 
     /// Announces a productivity score that has gone up since the last time we looked.
+    ///
+    /// Nothing calls this at the moment -- see the note at the Today `task` that used to.
     ///
     /// Only upwards, and only for today. A score falling is not news worth interrupting
     /// someone with, and a score for a day being browsed in the past has not "risen" at
@@ -108,6 +142,183 @@ final class TodayViewModel: ObservableObject {
 
         guard let previous = lastAnnouncedScore, score > previous else { return }
         toastCenter.show(.scoreRose(to: score, from: previous))
+    }
+
+    /// The fortnight behind this day, read off the cached snapshots.
+    ///
+    /// On a background task: it is a directory of files and a decode each. Only rebuilt
+    /// when the day changes -- the days behind it do not move while you are looking at
+    /// them.
+    private func refreshTrend(day: Date) async {
+        let key = DayKey(date: day)
+        guard trendDayKey != key.id else { return }
+        trendDayKey = key.id
+
+        let builder = trendBuilder
+        let next = await Task.detached(priority: .utility) {
+            builder.trend(endingOn: day)
+        }.value
+
+        guard trend != next else { return }
+        withAnimation(.smooth(duration: 0.35)) { trend = next }
+    }
+
+    /// Leaves the day's finished scores where the home screen can read them.
+    ///
+    /// Only for today, and only once they are actually known: the widget has no way to
+    /// compute any of this -- the figures come out of Core Data, Screen Time and half a
+    /// dozen calculators -- so this is the one path by which it ever learns anything. A
+    /// snapshot of a past day, or of a day still loading, would be the widget showing a
+    /// screen of zeroes with confidence.
+    private func writeScoreSnapshot(day: Date, state: TodayDayState) {
+        guard Calendar.current.isDateInToday(day), case .loaded = state.loadingState else { return }
+
+        let snapshot = DailyScoreSnapshot(
+            day: DayKey(date: day).id,
+            updatedAt: Date(),
+            scores: state.primaryMetrics.metrics.map { metric in
+                DailyScoreSnapshot.Score(
+                    kind: metric.kind.rawValue,
+                    title: metric.kind.title,
+                    displayValue: metric.displayValue,
+                    progress: metric.progress
+                )
+            },
+            screenTime: state.appUsages.reduce(0) { $0 + $1.duration }
+        )
+
+        guard snapshot != appGroupStore.loadDailyScores() else { return }
+        try? appGroupStore.saveDailyScores(snapshot)
+        WidgetCenter.shared.reloadTimelines(ofKind: DailyScoreWidgets.kind)
+    }
+
+    /// Rereads where every limit rule stands.
+    ///
+    /// Only for today. A limit is a fact about now -- three opens left, twenty minutes
+    /// spent -- and there is no record of what was left at four o'clock last Tuesday, so
+    /// showing today's figures on a past day would be showing the wrong day's numbers
+    /// under the right day's heading.
+    private func refreshLimits(day: Date, state: TodayDayState, recordsOpens: Bool = true) async {
+        guard Calendar.current.isDateInToday(day) else {
+            limits = []
+            return
+        }
+
+        if recordsOpens {
+            await recordObservedOpens(state: state)
+        }
+
+        let shieldRules = appGroupStore.loadShieldRules()
+        let next = TodayLimitBuilder.limits(
+            rules: shieldRules.rules,
+            enforcement: shieldRules.enforcement,
+            appUsages: state.appUsages,
+            tokensForRule: { rule in
+                let selection = selectionStore.mergedSelection(scopes: rule.selectionScopes)
+                // All of them: the card draws the first few and matches the day's apps
+                // against the rest.
+                return selection.applicationTokens.stablePrefix(selection.applicationTokens.count)
+            }
+        )
+
+        guard limits != next else { return }
+        withAnimation(.smooth(duration: 0.3)) { limits = next }
+
+        recordRuleHistory(rules: shieldRules.rules, enforcement: shieldRules.enforcement, state: state, day: day)
+    }
+
+    /// Copies today into the history before midnight takes it.
+    ///
+    /// The enforcement record keeps one day and forgets it, which is right for enforcing a
+    /// limit and useless for reading one back. This is the only place in the app that has
+    /// both halves at once -- what the rule allows and what the day's report says was
+    /// spent -- so it is where the day gets written down.
+    private func recordRuleHistory(
+        rules: [Rule],
+        enforcement: RuleEnforcementState,
+        state: TodayDayState,
+        day: Date
+    ) {
+        guard !rules.isEmpty else { return }
+
+        // Only when it has actually moved.
+        //
+        // This runs on every load of the screen -- and a load can retry eight times while
+        // Screen Time catches up -- so writing the whole history file each pass was a
+        // decode and an encode of ninety days of records nine times over for figures that
+        // had not changed. The read is cheap; the write is not.
+        let existing = appGroupStore.loadRuleHistory()
+        var next = existing
+
+        do {
+            for rule in rules where rule.kind != .schedule {
+                let tokens = Set(selectionStore.mergedSelection(scopes: rule.selectionScopes).applicationTokens)
+                let matched = state.appUsages.filter { usage in
+                    if let token = usage.app.applicationToken, tokens.contains(token) { return true }
+                    return rule.blockedApplications.contains(usage.app.id)
+                }
+
+                let record = enforcement.record(for: rule.id, on: day)
+                next.write(
+                    RuleHistory.DayRecord(
+                        opens: matched.reduce(0) { $0 + $1.opens },
+                        seconds: matched.reduce(0) { $0 + $1.duration },
+                        wasReached: record.usageLimitReachedAt != nil || rule.isShielding(given: enforcement, on: day)
+                    ),
+                    for: rule.id,
+                    on: day
+                )
+            }
+
+            next.prune(keeping: Set(rules.map(\.id)), on: day)
+        }
+
+        guard next != existing else { return }
+        try? appGroupStore.saveRuleHistory(next)
+    }
+
+    /// Writes what the day's report says about each open-count rule, and puts the shield
+    /// up the moment one of them runs out.
+    ///
+    /// This is the whole enforcement of an open count. Screen Time reports pickups per
+    /// app per day and offers no event for them, so the count moves when a report lands
+    /// -- which is when this screen loads. The apps are ordinary apps until then, which
+    /// is the point: ten opens should be ten opens, not ten trips through a shield.
+    private func recordObservedOpens(state: TodayDayState) async {
+        let lookup = RuleShieldLookup(appGroupStore: appGroupStore)
+        // Paused rules left out: a held rule shields nothing, so counting opens against
+        // it would have it run out while it was switched off and come back already spent.
+        let pauses = appGroupStore.loadRulePauseState()
+        let rules = appGroupStore.loadStoredRules()
+            .filter { $0.isEnabled && $0.kind == .openCountLimit && !pauses.isPaused($0.id) }
+        guard !rules.isEmpty else { return }
+
+        var didChange = false
+        for rule in rules {
+            // Matched by token, for the same reason the limits card matches by token: the
+            // rule's apps are stored as encoded tokens (the app cannot see their bundle
+            // identifiers) and the day's report stores them as bundle identifiers, so
+            // comparing the two ids found nothing and every rule observed zero opens.
+            let tokens = Set(selectionStore.mergedSelection(scopes: rule.selectionScopes).applicationTokens)
+            let opens = state.appUsages
+                .filter { usage in
+                    if let token = usage.app.applicationToken, tokens.contains(token) { return true }
+                    return rule.blockedApplications.contains(usage.app.id)
+                }
+                .reduce(0) { $0 + $1.opens }
+
+            let stored = appGroupStore.loadRuleEnforcementState().record(for: rule.id).openCountUsed
+            guard stored != opens else { continue }
+
+            lookup.recordObservedOpens(opens, ruleID: rule.id)
+            didChange = true
+        }
+
+        // Only when something moved: applying a shield is a write to ManagedSettings and
+        // this runs on every load of the screen.
+        if didChange {
+            await pauseEngine.refreshShields()
+        }
     }
 
     /// Ends the running routine. Strict mode can refuse, which the engine decides.
@@ -167,24 +378,66 @@ final class TodayViewModel: ObservableObject {
             )
         }
 
+        guard activeRoutineGroups != groups else { return }
         activeRoutineGroups = groups
     }
+
+    /// The days being loaded right now.
+    ///
+    /// Two things ask for the same day at launch -- the screen's own task and the scene
+    /// becoming active -- and both were served: two full pipelines, two live Screen Time
+    /// queries, two of everything, racing to publish the same answer. The second one is
+    /// not a different question, so it waits for nothing and simply does not run.
+    private var loadingDayKeys: Set<String> = []
 
     func load(day: Date, force: Bool = false) async {
         await refreshRoutineCard()
         let key = DayKey(date: day)
-        if force || days[key] == nil {
+
+        guard !loadingDayKeys.contains(key.id) else { return }
+        loadingDayKeys.insert(key.id)
+        defer { loadingDayKeys.remove(key.id) }
+
+        // Only when there is nothing to show. A refresh used to blank the day back to
+        // zeroes and then wait on Screen Time, which is why coming back to the app looked
+        // like nothing had been saved: what was on screen had been thrown away before the
+        // reading that would replace it had even been asked for.
+        if days[key] == nil {
             withAnimation(.smooth(duration: 0.24)) {
                 days[key] = .loading(day: day)
             }
             todayLogger().debug("Today load started for \(key.id, privacy: .public)")
             print("Today load started for \(key.id)")
+
+            // The day as it was last written, straight from the App Group. It costs a
+            // file read, and it means the screen has the real figures on it while the
+            // live query -- which takes seconds -- is still running.
+            let cachedState = await dataProvider.dayState(for: day, preferCached: true)
+            if case .loaded = cachedState.loadingState {
+                withAnimation(.smooth(duration: 0.28)) {
+                    days[key] = cachedState
+                }
+                // Read-only: the limits are drawn from it, but nothing is written down
+                // from a reading that may be an hour old. A stale open count written back
+                // would take a shield down that should be up.
+                await refreshLimits(day: day, state: cachedState, recordsOpens: false)
+            }
         }
 
         var loadedState = await dataProvider.dayState(for: day)
-        withAnimation(.smooth(duration: 0.28)) {
-            days[key] = loadedState
+        // Only when it is different.
+        //
+        // Every assignment here publishes, and everything watching this model rebuilds --
+        // Today, and the Focus screen with it. The load retries up to eight times while
+        // Screen Time catches up, and most of those attempts come back with exactly what
+        // was already on screen: nine full rebuilds of two screens to show the same thing.
+        if days[key] != loadedState {
+            withAnimation(.smooth(duration: 0.28)) {
+                days[key] = loadedState
+            }
         }
+        writeScoreSnapshot(day: day, state: loadedState)
+        await refreshLimits(day: day, state: loadedState)
         todayLogger().debug("Today initial state for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
         print("Today initial state for \(key.id): \(String(describing: loadedState.loadingState))")
 
@@ -193,11 +446,16 @@ final class TodayViewModel: ObservableObject {
         for attempt in 1...8 {
             try? await Task.sleep(nanoseconds: 750_000_000)
             loadedState = await dataProvider.dayState(for: day)
-            withAnimation(.smooth(duration: 0.28)) {
-                days[key] = loadedState
+            if days[key] != loadedState {
+                withAnimation(.smooth(duration: 0.28)) {
+                    days[key] = loadedState
+                }
             }
+            writeScoreSnapshot(day: day, state: loadedState)
             todayLogger().debug("Today retry \(attempt) for \(key.id, privacy: .public): \(String(describing: loadedState.loadingState), privacy: .public)")
             print("Today retry \(attempt) for \(key.id): \(String(describing: loadedState.loadingState))")
+
+            await refreshLimits(day: day, state: loadedState)
 
             if case .loaded = loadedState.loadingState {
                 print("Today loaded successfully for \(key.id) on retry \(attempt)")
@@ -237,18 +495,19 @@ final class TodayViewModel: ObservableObject {
     }
 
     func updateClassification(
-        appID: AppIdentity.ID,
+        app: AppIdentity,
         classification: AppClassification,
         day: Date
     ) {
         let key = DayKey(date: day)
+        let appID = app.id
 
         Task {
             await dataProvider.updateClassification(
                 appID: appID,
                 classification: classification
             )
-            await autoFocusManager.updateMembership(for: appID, classification: classification)
+            await autoFocusManager.updateMembership(for: app, classification: classification)
             let updated = await dataProvider.dayState(for: day)
             withAnimation(.smooth(duration: 0.28)) {
                 days[key] = updated
@@ -368,8 +627,17 @@ final class TodayViewModel: ObservableObject {
 
         let routines = (try? await routineRepository.routines()) ?? []
         let now = Date()
-        upcomingRoutines = makeUpcomingRoutines(from: routines, now: now)
-        let nextRoutine = routines.compactMap { routine -> (Routine, Date, TimeZone)? in
+        let pauses = appGroupStore.loadRulePauseState()
+        // A held routine is not upcoming: it will not start, and listing it under
+        // "Scheduled" is the screen promising something that is not going to happen.
+        let live = routines.filter { !pauses.isPaused($0.id, on: now) }
+        let upcoming = makeUpcomingRoutines(from: live, now: now)
+        if upcomingRoutines != upcoming { upcomingRoutines = upcoming }
+        refreshPaused(routines: routines, pauses: pauses, now: now)
+        // From the live ones, not from all of them: a held routine has no next start worth
+        // announcing, and the card above the day would have gone on counting down to
+        // something that is not going to happen.
+        let nextRoutine = live.compactMap { routine -> (Routine, Date, TimeZone)? in
             let nextStarts = routine.triggers.compactMap { trigger -> (Date, TimeZone)? in
                 guard case .schedule(let schedule) = trigger else { return nil }
                 let timeZone = TimeZone(identifier: schedule.timeZoneIdentifier) ?? .current
@@ -381,7 +649,7 @@ final class TodayViewModel: ObservableObject {
         }
         .min(by: { $0.1 < $1.1 })
 
-        routineCardState = nextRoutine.map { routine, startDate, timeZone in
+        let nextCardState = nextRoutine.map { routine, startDate, timeZone in
             TodayRoutineCardState(
                 id: routine.id,
                 name: routine.name,
@@ -390,6 +658,61 @@ final class TodayViewModel: ObservableObject {
                 phase: .upcoming
             )
         }
+
+        if routineCardState != nextCardState { routineCardState = nextCardState }
+    }
+
+    /// Everything on hold right now: the rules and the routines together.
+    ///
+    /// One list because a hold is one fact -- `RulePauseState` is keyed by id and does not
+    /// care which of the two the id belongs to -- and because "what is switched off at the
+    /// moment" is one question however many kinds of thing can answer it.
+    private func refreshPaused(routines: [Routine], pauses: RulePauseState, now: Date) {
+        let rules = appGroupStore.loadStoredRules()
+
+        var items: [TodayPausedItem] = []
+
+        for rule in rules {
+            guard let until = pauses.pauseEnd(for: rule.id, on: now) else { continue }
+            items.append(
+                TodayPausedItem(
+                    id: rule.id,
+                    name: rule.name,
+                    kind: .rule,
+                    symbolName: "hourglass",
+                    until: until
+                )
+            )
+        }
+
+        for routine in routines {
+            guard let until = pauses.pauseEnd(for: routine.id, on: now) else { continue }
+            items.append(
+                TodayPausedItem(
+                    id: routine.id,
+                    name: routine.name,
+                    kind: .routine,
+                    symbolName: routine.icon ?? "moon.zzz",
+                    until: until
+                )
+            )
+        }
+
+        // The one coming back soonest first: it is the one about to matter again.
+        let next = items.sorted { $0.until < $1.until }
+        guard pausedItems != next else { return }
+        withAnimation(.smooth(duration: 0.3)) { pausedItems = next }
+    }
+
+    /// Ends a hold early.
+    ///
+    /// The shields are re-applied straight after, because a rule coming back is a rule
+    /// that has to start holding its apps again -- and nothing else would do it until the
+    /// next thing happened to touch them.
+    func resumePaused(_ id: UUID, day: Date) async {
+        try? appGroupStore.updateRulePauseState { state in state.resume(id) }
+        await pauseEngine.refreshShields()
+        await load(day: day, force: true)
     }
 
     /// Every start a scheduled routine has between now and seven days out.

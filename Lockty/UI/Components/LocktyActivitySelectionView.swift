@@ -21,6 +21,12 @@ struct LocktyActivitySelectionRules: Hashable {
     /// belong on this screen. They are a routine's business and nothing else's: a group
     /// is a list of apps, and a pause is one app.
     var allowsContentRestrictions: Bool = false
+    /// Whether saved groups can be picked here.
+    ///
+    /// A limit counts something across a set of apps, and a group is a set that can grow
+    /// behind its back: adding an app to a group tomorrow would quietly change what "30
+    /// minutes a day" was counting. A rule names its apps.
+    var allowsAppGroups: Bool = true
     var pickerSeedStrategy: PickerSeedStrategy = .currentSelection
 
     static let library = LocktyActivitySelectionRules()
@@ -35,17 +41,26 @@ struct LocktyActivitySelectionRules: Hashable {
         allowsContentRestrictions: true,
         pickerSeedStrategy: .currentSelection
     )
-    /// A limit rule. Everything a routine can shut except sites: a rule counts openings
-    /// and minutes, and neither is a thing a website does.
+    /// A limit rule: apps, and nothing else at all.
+    ///
+    /// Not sites -- a rule counts openings and minutes, and neither is a thing a website
+    /// does. Not categories -- a category is a set Apple maintains, so "30 minutes of
+    /// Social" would silently start counting an app filed there next month. Not groups,
+    /// for the same reason with your own hands on it. And not the device switches, which
+    /// are a routine's business: they are not counted, they are simply on or off.
+    ///
+    /// What is left is what a limit can honestly measure: named apps, whose minutes and
+    /// pickups Screen Time reports one by one.
     static let rule = LocktyActivitySelectionRules(
         allowsApplications: true,
-        allowsCategories: true,
+        allowsCategories: false,
         allowsWebDomains: false,
         maximumApplications: nil,
-        maximumCategories: nil,
+        maximumCategories: 0,
         maximumWebDomains: 0,
         allowsManualWebsites: false,
-        allowsContentRestrictions: true,
+        allowsContentRestrictions: false,
+        allowsAppGroups: false,
         pickerSeedStrategy: .currentSelection
     )
     static let pause = LocktyActivitySelectionRules(
@@ -165,6 +180,15 @@ struct LocktyActivitySelectionView: View {
     /// those come from Apple's picker and are opaque, these are strings we can show.
     var blockedDomains: Binding<[String]>
     var contentRestrictions: Binding<ContentRestrictions>
+    /// Whether this routine runs strict, and what strictness closes.
+    ///
+    /// Here rather than on the routine's own form. Strict Mode is a restriction like the
+    /// three below it -- it is the one that shuts the doors *around* the block, so that
+    /// what has been blocked cannot simply be undone -- and it belongs on the screen
+    /// that asks what this routine shuts. Nil leaves it off the screen entirely, which
+    /// is every caller that is not a routine.
+    var isStrict: Binding<Bool>?
+    var strictGuards: Binding<StrictModeGuards>?
     let rules: LocktyActivitySelectionRules
     let suggestions: [AppIdentity]
     let appGroups: [LocktySelectableAppGroup]
@@ -185,6 +209,8 @@ struct LocktyActivitySelectionView: View {
         selectedAppGroupIDs: Binding<Set<UUID>> = .constant([]),
         blockedDomains: Binding<[String]> = .constant([]),
         contentRestrictions: Binding<ContentRestrictions> = .constant(.none),
+        isStrict: Binding<Bool>? = nil,
+        strictGuards: Binding<StrictModeGuards>? = nil,
         rules: LocktyActivitySelectionRules,
         suggestions: [AppIdentity] = [],
         appGroups: [LocktySelectableAppGroup] = [],
@@ -198,6 +224,8 @@ struct LocktyActivitySelectionView: View {
         self.selectedAppGroupIDs = selectedAppGroupIDs
         self.blockedDomains = blockedDomains
         self.contentRestrictions = contentRestrictions
+        self.isStrict = isStrict
+        self.strictGuards = strictGuards
         self.rules = rules
         self.suggestions = suggestions
         self.appGroups = appGroups
@@ -235,7 +263,7 @@ struct LocktyActivitySelectionView: View {
                                 .transition(.blurReplace.combined(with: .opacity))
                         }
 
-                        if !appGroups.isEmpty {
+                        if rules.allowsAppGroups, !appGroups.isEmpty {
                             appGroupsSection
                                 .transition(.blurReplace.combined(with: .opacity))
                         }
@@ -331,25 +359,33 @@ struct LocktyActivitySelectionView: View {
         .animation(.smooth(duration: 0.28), value: selectedItems.map(\.id))
     }
 
+    /// One thing that is currently selected, and the way to unselect it.
+    ///
+    /// The whole row, not just the cross. A category is chosen by tapping it in the
+    /// picker, so tapping it again in the list of what is chosen is what everyone tries
+    /// first -- and it did nothing, because the only way out was a 38pt target at the far
+    /// end of the row. The cross stays: it is what says the row can be got rid of at all.
     @ViewBuilder
     private func selectedRow(_ item: LocktySelectedActivityItem) -> some View {
-        HStack(spacing: LocktySpacing.lg) {
-            selectedRowLabel(item)
+        Button {
+            remove(item)
+        } label: {
+            HStack(spacing: LocktySpacing.lg) {
+                selectedRowLabel(item)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            Button {
-                remove(item)
-            } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(LocktyColors.ink(0.09)))
             }
-            .buttonStyle(.locktyInteractive(shape: Circle()))
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 8)
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 16, style: .continuous)))
+        .tappable()
     }
 
     @ViewBuilder
@@ -523,17 +559,85 @@ struct LocktyActivitySelectionView: View {
                     subtitle: "Stops new apps being installed.",
                     isOn: contentRestrictions.blocksAppInstallation
                 )
+
+                if let isStrict {
+                    restrictionDivider
+
+                    restrictionRow(
+                        systemImage: "lock.shield",
+                        title: "Strict mode",
+                        subtitle: "Closes the ways out while this runs.",
+                        isOn: isStrict
+                    )
+
+                    // The doors, inline, and only once it is on. A screen of its own for
+                    // four switches would be a screen you have to go and find to
+                    // discover that Strict Mode is four things rather than one -- and
+                    // they are the same kind of switch as the three above them.
+                    if isStrict.wrappedValue, let strictGuards {
+                        strictGuardRows(strictGuards)
+                            .transition(.blurReplace)
+                    }
+                }
             }
             .padding(.horizontal, LocktySpacing.cardInset)
             .locktyCardBackground(cornerRadius: 26)
+            .animation(.smooth(duration: 0.3), value: isStrict?.wrappedValue)
         }
+    }
+
+    /// What strictness closes, one door per row.
+    @ViewBuilder
+    private func strictGuardRows(_ guards: Binding<StrictModeGuards>) -> some View {
+        restrictionDivider
+
+        restrictionRow(
+            systemImage: "trash",
+            title: "Editing or deleting",
+            subtitle: "This routine cannot be changed or removed.",
+            isOn: guards.preventsEditing,
+            isNested: true
+        )
+
+        restrictionDivider
+
+        restrictionRow(
+            systemImage: "clock",
+            title: "Changing date and time",
+            subtitle: "The clock stays automatic.",
+            isOn: guards.preventsDateAndTimeChanges,
+            isNested: true
+        )
+
+        restrictionDivider
+
+        restrictionRow(
+            systemImage: "iphone.slash",
+            title: "Uninstalling apps",
+            subtitle: "Lockty included.",
+            isOn: guards.preventsAppRemoval,
+            isNested: true
+        )
+
+        restrictionDivider
+
+        restrictionRow(
+            systemImage: "faceid",
+            title: "Changing Face ID and passcode",
+            subtitle: "What guards Screen Time itself.",
+            isOn: guards.preventsPasscodeChanges,
+            isNested: true
+        )
     }
 
     private func restrictionRow(
         systemImage: String,
         title: String,
         subtitle: String,
-        isOn: Binding<Bool>
+        isOn: Binding<Bool>,
+        /// Indented, for the doors that belong to Strict Mode rather than standing beside
+        /// it. The inset is what says they are conditional on the switch above.
+        isNested: Bool = false
     ) -> some View {
         HStack(spacing: LocktySpacing.md) {
             Image(systemName: systemImage)
@@ -556,6 +660,7 @@ struct LocktyActivitySelectionView: View {
 
             LocktySwitch(isOn: isOn)
         }
+        .padding(.leading, isNested ? LocktySpacing.lg : 0)
         .padding(.vertical, LocktySpacing.md)
         .frame(minHeight: 56)
     }
@@ -781,13 +886,17 @@ struct LocktyReadOnlyActivitySelectionView: View {
 
     var body: some View {
         ZStack {
-            Color.black
+            // The page's own ground, not black. These sheets were written against a dark
+            // build and painted themselves black whatever the phone was set to, so the
+            // system picker inside them -- which follows the device and cannot be told
+            // otherwise -- arrived in light mode on a black card.
+            LocktyColors.background
                 .ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: LocktySpacing.xl) {
                     if selectedItems.isEmpty {
-                        Text("Nada configurado")
+                        Text("Nothing selected")
                             .font(.system(.body, design: .default, weight: .medium))
                             .foregroundStyle(LocktyColors.secondaryText)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -905,7 +1014,11 @@ private struct LocktyOfficialActivityPickerSheet: View {
         // 92pt scrim, which covered the last rows outright -- the fade was cropping real
         // content instead of just softening an edge.
         ZStack {
-            Color.black
+            // The page's own ground, not black. These sheets were written against a dark
+            // build and painted themselves black whatever the phone was set to, so the
+            // system picker inside them -- which follows the device and cannot be told
+            // otherwise -- arrived in light mode on a black card.
+            LocktyColors.background
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -965,15 +1078,22 @@ private struct LocktyOfficialActivityPickerSheet: View {
                         }
                         dismiss()
                     } label: {
+                        // The page's own colour, inverted: black on a light screen, white
+                        // on a dark one, with the type the other way round. It is the one
+                        // button on this sheet that commits, and the strongest thing the
+                        // palette has is the plain opposite of the page.
+                        //
+                        // It was ink at 55% with black type -- a grey bar with grey letters
+                        // in the dark, and grey on grey in the light.
                         Text("Save")
                             .font(.system(.body, design: .default, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .frame(height: 58)
+                            .foregroundStyle(canSave ? LocktyColors.onPrimary : LocktyColors.tertiaryText)
                             .background(
                                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                    .fill(canSave ? LocktyColors.ink(0.55) : LocktyColors.ink(0.16))
+                                    .fill(canSave ? LocktyColors.primaryText : LocktyColors.ink(0.12))
                             )
-                            .foregroundStyle(canSave ? .black.opacity(0.72) : LocktyColors.ink(0.28))
                     }
                     .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 28, style: .continuous)))
                     .disabled(!canSave)
@@ -994,7 +1114,7 @@ private struct LocktyOfficialActivityPickerSheet: View {
                 .padding(.horizontal, LocktySpacing.xl)
                 .padding(.top, LocktySpacing.sm)
                 .padding(.bottom, LocktySpacing.xl)
-                .background(Color.black)
+                .background(LocktyColors.background)
             }
         }
     }

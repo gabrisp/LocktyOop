@@ -1,3 +1,4 @@
+import DeviceActivity
 import Foundation
 import FamilyControls
 import ManagedSettings
@@ -26,6 +27,10 @@ struct FeatureFactory {
     let classificationRepository: AppClassificationRepository
     let appGroupRepository: UserAppGroupRepository
     let autoFocusManager: AutoFocusManager
+    let objectivesViewModel: ObjectivesViewModel
+    /// One rules model for the card on Today and the screen behind it: two of them would
+    /// be two answers to "how many ran".
+    let ruleStatsViewModel: RuleStatsViewModel
     let appsViewModel: AppsLibraryViewModel
     let distractingGroupViewModel: DistractingGroupViewModel
     let haptics: HapticsProviding
@@ -41,7 +46,13 @@ struct FeatureFactory {
     let settingsViewModel: SettingsViewModel
 
     func makeTodayView(day: Date) -> TodayView {
-        TodayView(day: day, viewModel: todayViewModel, router: router)
+        TodayView(
+            day: day,
+            viewModel: todayViewModel,
+            objectivesViewModel: objectivesViewModel,
+            ruleStatsViewModel: ruleStatsViewModel,
+            router: router
+        )
     }
 
     func makeFocusView() -> FocusView {
@@ -89,12 +100,99 @@ struct FeatureFactory {
         )
     }
 
+    /// The streak, in a sheet of its own.
+    ///
+    /// A fresh view model each time it is opened, on purpose: it is a read of the last
+    /// ninety days and it should be the read as of now, not as of whenever the sheet was
+    /// first built.
+    func makeObjectiveEditor(objectiveID: UUID?) -> ObjectiveEditorSheet {
+        ObjectiveEditorSheet(
+            objective: objectiveID.flatMap { id in
+                objectivesViewModel.objectives.first { $0.id == id }
+            },
+            viewModel: objectivesViewModel,
+            onSave: { objectivesViewModel.save($0) },
+            onDelete: { objectivesViewModel.delete($0) }
+        )
+    }
+
+    func makeQuickShieldSheet() -> some View {
+        QuickShieldSheet(
+            viewModel: quickTimerViewModel,
+            frictionsViewModel: frictionsViewModel,
+            toastCenter: toastCenter,
+            onClose: { router.dismissSheet() }
+        )
+    }
+
+    func makeRuleStats() -> RuleStatsView {
+        RuleStatsView(viewModel: ruleStatsViewModel, router: router)
+    }
+
+    func makeObjectives(focused: UUID? = nil) -> ObjectivesView {
+        ObjectivesView(viewModel: objectivesViewModel, router: router, initialFocus: focused)
+    }
+
+    func makeStreakSheet() -> some View {
+        LocktyDynamicSheet {
+            StreakSheet(
+                viewModel: StreakViewModel(routineExecutionRepository: routineExecutionRepository)
+            )
+        }
+    }
+
     func makeSettingsView() -> SettingsView {
         SettingsView(
             viewModel: settingsViewModel,
             access: systemAccessViewModel,
-            router: router
+            router: router,
+            onKillEverything: { await killEverything() },
+            onResumeEnforcement: { await resumeEnforcement() }
         )
+    }
+
+    /// Lets everything arm again.
+    ///
+    /// The other half of the switch: without it the kill is permanent for that install,
+    /// because every path that would rebuild the policy is now asking a flag that says no.
+    func resumeEnforcement() async {
+        DebugKillSwitch.set(false)
+        await pauseEngine.refreshShields()
+    }
+
+    /// Tears every block down, in the order that leaves nothing holding on.
+    ///
+    /// Debug only -- the button that calls it is compiled out of release builds. Each step
+    /// undoes a different keeper of the same fact: the engine holds the routines, the
+    /// shield service holds ManagedSettings, the runtime state is what the extensions read
+    /// when the app is not running, and DeviceActivity holds the monitors that would put
+    /// half of it back at the next threshold.
+    ///
+    /// Nothing is deleted. Rules, modes, frictions and objectives are all still there when
+    /// it is done: this stops what is running, it does not empty the library.
+    func killEverything() async {
+        // The latch first, so anything that runs while this is working finds enforcement
+        // already switched off rather than helpfully rebuilding it behind us.
+        DebugKillSwitch.set(true)
+
+        // Every routine, not one: `stop()` with no id ends them all.
+        await routineEngine.stop()
+
+        // The shared container is a path and a coder, so one made here is the same store
+        // the extensions read.
+        let store = AppGroupStore()
+        store.resetRuntimeStateToSafeDefault()
+        try? store.saveRuleEnforcementState(.empty)
+        try? store.saveRulePauseState(.empty)
+
+        // The monitors that would put half of it back at the next threshold.
+        DeviceActivityCenter().stopMonitoring()
+
+        // And no `refreshShields` at the end, deliberately. That is the call every other
+        // change finishes with, and here it would recompute the policy from the stored
+        // rules and put every shield straight back -- the kill would have lasted about a
+        // second. The latch above is what keeps the next one from doing it either.
+        await pauseEngine.clearShields()
     }
 
     func makeAutoFocusSheet() -> DistractingGroupSheet {
@@ -205,7 +303,8 @@ struct FeatureFactory {
                             selectionStore: selectionStore,
                             frictionRepository: frictionRepository,
                             appGroupRepository: appGroupRepository,
-                            toastCenter: toastCenter
+                            toastCenter: toastCenter,
+                            pauseEngine: pauseEngine
                         ),
                         makeScheduleRuleEditor: { onReturnToRuleChoice in
                             AnyView(
@@ -215,6 +314,7 @@ struct FeatureFactory {
                                         repository: routineRepository,
                                         selectionStore: selectionStore,
                                         routineEngine: routineEngine,
+                                        pauseEngine: pauseEngine,
                                         usageDataService: usageDataService,
                                         pauseFlowRepository: pauseFlowRepository,
                                         appGroupRepository: appGroupRepository,
@@ -434,6 +534,7 @@ struct FeatureFactory {
                 repository: routineRepository,
                 selectionStore: selectionStore,
                 routineEngine: routineEngine,
+                pauseEngine: pauseEngine,
                 usageDataService: usageDataService,
                 pauseFlowRepository: pauseFlowRepository,
                 appGroupRepository: appGroupRepository,
@@ -453,7 +554,8 @@ struct FeatureFactory {
                 selectionStore: selectionStore,
                 frictionRepository: frictionRepository,
                 appGroupRepository: appGroupRepository,
-                toastCenter: toastCenter
+                toastCenter: toastCenter,
+                pauseEngine: pauseEngine
             ),
             makeScheduleRuleEditor: { onReturnToRuleChoice in
                 AnyView(
@@ -467,6 +569,7 @@ struct FeatureFactory {
                             repository: routineRepository,
                             selectionStore: selectionStore,
                             routineEngine: routineEngine,
+                            pauseEngine: pauseEngine,
                             usageDataService: usageDataService,
                             pauseFlowRepository: pauseFlowRepository,
                             appGroupRepository: appGroupRepository,
@@ -544,7 +647,8 @@ struct FeatureFactory {
             day: day,
             viewModel: UsageBreakdownViewModel(
                 day: day,
-                classificationRepository: classificationRepository
+                classificationRepository: classificationRepository,
+                autoFocusManager: autoFocusManager
             )
         )
     }

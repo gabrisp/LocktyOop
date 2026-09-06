@@ -14,7 +14,11 @@ struct LocktySectionScreen<Content: View>: View {
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
                 content
             }
-            .padding(.horizontal, LocktySpacing.lg)
+            // The tab inset, not the sheet one: this is a pushed screen with a
+            // navigation bar over it, and the bar lays its own items out to a wider
+            // margin. At 16 every card on the page started a few points inside the back
+            // button above it.
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.vertical, LocktySpacing.lg)
         }
         .locktyScreenBackground()

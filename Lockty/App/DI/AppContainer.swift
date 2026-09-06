@@ -118,11 +118,6 @@ final class AppContainer {
         let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
         let appGroupRepository = AppGroupStoreUserAppGroupRepository(appGroupStore: appGroupStore)
         let autoFocusRepository = AppGroupStoreAutoFocusRepository(appGroupStore: appGroupStore)
-        let autoFocusManager = AutoFocusManager(
-            repository: autoFocusRepository,
-            classificationRepository: classificationRepository,
-            selectionStore: selectionStore
-        )
         let editorStore = EditorViewModelStore()
         let usageDataService = LiveUsageDataService(
             appGroupStore: appGroupStore,
@@ -130,6 +125,12 @@ final class AppContainer {
         )
         let shieldService = LiveShieldService(appGroupStore: appGroupStore, selectionStore: selectionStore)
         let deviceActivityService = LiveDeviceActivityService(selectionStore: selectionStore)
+        let autoFocusManager = AutoFocusManager(
+            repository: autoFocusRepository,
+            classificationRepository: classificationRepository,
+            selectionStore: selectionStore,
+            deviceActivityService: deviceActivityService
+        )
         let pauseRuleRepository = CoreDataPauseRuleRepository(
             controller: persistenceController,
             appGroupStore: appGroupStore,
@@ -164,6 +165,13 @@ final class AppContainer {
         let nfcService = LiveNFCService()
         let locationService = LiveLocationTriggerService()
         let healthService = LiveHealthService()
+        let objectivesViewModel = ObjectivesViewModel(appGroupStore: appGroupStore, healthService: healthService)
+        let ruleStatsViewModel = RuleStatsViewModel(
+            repository: ruleRepository,
+            executionRepository: routineExecutionRepository,
+            routineEngine: routineEngine,
+            appGroupStore: appGroupStore
+        )
         let toastCenter = LocktyToastCenter()
         let notificationService = LiveNotificationService()
 
@@ -185,6 +193,7 @@ final class AppContainer {
         )
         let routineScheduleCoordinator = RoutineScheduleCoordinator(
             repository: routineRepository,
+            routineExecutionRepository: routineExecutionRepository,
             appGroupStore: appGroupStore,
             deviceActivityService: deviceActivityService,
             alarmService: alarmService
@@ -200,10 +209,12 @@ final class AppContainer {
         )
         let rulesViewModel = RulesViewModel(
             routineEngine: routineEngine,
+            pauseEngine: pauseEngine,
             repository: ruleRepository,
             appGroupRepository: appGroupRepository,
             scheduleCoordinator: routineScheduleCoordinator,
-            selectionStore: selectionStore
+            selectionStore: selectionStore,
+            appGroupStore: appGroupStore
         )
         let focusViewModel = FocusViewModel()
         let pauseFlowRepository = AppGroupPauseFlowRepository(appGroupStore: appGroupStore)
@@ -270,6 +281,8 @@ final class AppContainer {
             classificationRepository: classificationRepository,
             appGroupRepository: appGroupRepository,
             autoFocusManager: autoFocusManager,
+            objectivesViewModel: objectivesViewModel,
+            ruleStatsViewModel: ruleStatsViewModel,
             appsViewModel: appsViewModel,
             distractingGroupViewModel: distractingGroupViewModel,
             haptics: haptics,

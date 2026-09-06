@@ -70,6 +70,9 @@ final class RoutineEditorViewModel: ObservableObject {
     private let repository: RoutineRepository
     private let selectionStore: ScreenTimeSelectionStore
     private let routineEngine: RoutineEngine
+    /// So a hold on a routine takes effect at the moment it is taken, rather than at
+    /// whatever next happens to recompute the policy.
+    private let pauseEngine: PauseEngine
     private let usageDataService: UsageDataServicing
     private let pauseFlowRepository: PauseFlowRepository
     private let appGroupRepository: UserAppGroupRepository
@@ -136,6 +139,7 @@ final class RoutineEditorViewModel: ObservableObject {
         repository: RoutineRepository,
         selectionStore: ScreenTimeSelectionStore,
         routineEngine: RoutineEngine,
+        pauseEngine: PauseEngine,
         usageDataService: UsageDataServicing,
         pauseFlowRepository: PauseFlowRepository,
         appGroupRepository: UserAppGroupRepository,
@@ -147,11 +151,75 @@ final class RoutineEditorViewModel: ObservableObject {
         self.repository = repository
         self.selectionStore = selectionStore
         self.routineEngine = routineEngine
+        self.pauseEngine = pauseEngine
         self.usageDataService = usageDataService
         self.pauseFlowRepository = pauseFlowRepository
         self.appGroupRepository = appGroupRepository
         self.toastCenter = toastCenter
         createdAt = Date()
+    }
+
+    /// Its own handle on the shared container, for the hold. The store is a path and a
+    /// coder -- it holds nothing -- so one made here is the same store as any other.
+    private let appGroupStore = AppGroupStore()
+
+    /// When the hold on this routine ends, or nil when it is not on hold.
+    @Published private(set) var pausedUntil: Date?
+
+    /// Whether this routine has a schedule at all. Only a schedule can be paused: a
+    /// routine you start by hand is already only running when you say so.
+    var hasSchedule: Bool {
+        triggers.contains { if case .schedule = $0 { return true } else { return false } }
+    }
+
+    func refreshPauseState() {
+        pausedUntil = appGroupStore.loadRulePauseState().pauseEnd(for: editingID)
+    }
+
+    func pause(for duration: RulePauseDuration) {
+        try? appGroupStore.updateRulePauseState { state in
+            state.pause(editingID, until: Date().addingTimeInterval(duration.duration))
+        }
+        refreshPauseState()
+        applyShields()
+    }
+
+    func resume() {
+        try? appGroupStore.updateRulePauseState { state in
+            state.resume(editingID)
+        }
+        refreshPauseState()
+        applyShields()
+    }
+
+    /// A hold takes effect where it is taken, rather than at whatever happens next.
+    private func applyShields() {
+        Task { await pauseEngine.refreshShields() }
+    }
+
+    /// Removes the routine for good.
+    ///
+    /// Refused while Strict Mode is holding it, by the same policy that refuses editing
+    /// and stopping: deleting a running strict routine is the simplest way out of one,
+    /// and a door left open there is the whole feature undone.
+    func delete() async -> Bool {
+        guard !isCreating else { return true }
+
+        let decision = strictModePolicy.decision(for: .deleteRoutine, activeRoutine: routineEngine.activeRoutine())
+        guard decision.isAllowed else {
+            errorMessage = decision.reason
+            return false
+        }
+
+        do {
+            try await repository.delete(id: editingID)
+            try? selectionStore.remove(scope: .routine(editingID))
+            try? appGroupStore.updateRulePauseState { state in state.resume(editingID) }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     static let defaultIcon = "repeat"
@@ -250,6 +318,18 @@ final class RoutineEditorViewModel: ObservableObject {
         !editingBlockDecision.isAllowed
     }
 
+    /// Whether this routine can actually be ended by hand right now.
+    ///
+    /// Strict mode refuses to be stopped -- that is the whole of it -- so the button held,
+    /// filled, fired, and the routine carried on. A control that looks like it worked and
+    /// did not is worse than no control: it teaches the wrong thing about what strict mode
+    /// does. Asked of the stop action itself rather than of `isEditingBlocked`, which is
+    /// true for *any* running routine.
+    var canStopRoutine: Bool {
+        guard let active = routineEngine.activeRoutine(), active.routineID == editingID else { return false }
+        return strictModePolicy.decision(for: .stopRoutine, activeRoutine: active).isAllowed
+    }
+
     /// Displayed and edited directly in the editor, always -- with no weekdays
     /// selected this has no practical effect (manual start only), so there is
     /// no separate enable/disable toggle.
@@ -324,6 +404,7 @@ final class RoutineEditorViewModel: ObservableObject {
         refreshSelectionState()
         captureBaseline()
         print("Routine editor loaded routineID=\(initialRoutineID.uuidString) selectionApps=\(selectionPreview.applicationTokens.count) domains=\(blockedDomains.count)")
+        refreshPauseState()
     }
 
     func loadPauseFlows() async {
@@ -652,6 +733,11 @@ struct RoutineAppPickerSheet: View {
                 get: { viewModel.contentRestrictions },
                 set: { viewModel.contentRestrictions = $0 }
             ),
+            isStrict: Binding(
+                get: { viewModel.mode == .strict },
+                set: { viewModel.mode = $0 ? .strict : .normal }
+            ),
+            strictGuards: $viewModel.strictGuards,
             rules: .routine,
             suggestions: viewModel.suggestedApplications,
             toastCenter: viewModel.toastCenter,
@@ -673,6 +759,10 @@ private enum RoutineEditorLocalSheet: String, Identifiable {
     case strictMode
     /// Writing a new pause without leaving the routine that will use it.
     case pauseFlow
+    /// Putting the schedule on hold, and throwing the routine away. Both are last
+    /// things, and both are asked about on a screen of their own rather than in a dialog.
+    case hold
+    case delete
 
     var id: String { rawValue }
 }
@@ -710,6 +800,9 @@ struct RoutineEditorView: View {
     let onCloseEditor: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RoutineEditorLocalSheet?
+    /// Where the hold wheel sits. A day: long enough to be a real break from a routine,
+    /// short enough that nobody has to remember they did it.
+    @State private var holdDuration: RulePauseDuration = .oneDay
     /// The same view serves reading and editing; the pencil flips this rather than
     /// pushing a different screen.
     @State private var isEditing: Bool
@@ -969,6 +1062,14 @@ struct RoutineEditorView: View {
                 pauseFlowScreen
                     .geometryGroup()
                     .transition(screenTransition)
+            case .hold:
+                holdScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
+            case .delete:
+                deleteScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
                 case .naming:
@@ -1008,6 +1109,10 @@ struct RoutineEditorView: View {
             chromeTitleText("Strict Mode")
         case .pauseFlow:
             chromeTitleText(pauseFlowEditor?.title ?? "New friction")
+        case .hold:
+            chromeTitleText("Pause")
+        case .delete:
+            chromeTitleText("Delete")
         case nil:
             if isNaming {
                 chromeTitleText("Name")
@@ -1052,10 +1157,14 @@ struct RoutineEditorView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
             }
-        } else if onReturnToParent != nil {
-            // This is the schedule step of "Create Rule", so there is a screen behind it.
-            // requestClose already lands on that screen once the discard is confirmed --
-            // only the glyph was wrong, and it read as "throw all of this away".
+        } else if onReturnToParent != nil, isCreating {
+            // The schedule step of "Create Rule", and only that: there is a screen behind
+            // it -- the kind you just picked -- so a chevron is right.
+            //
+            // It was shown whenever this editor had a parent at all, which is also true of
+            // an existing mode opened from the rules list: reading a mode you already have
+            // and pressing back took you into the screen for making a new one. There is
+            // nothing behind that one but the way out.
             LocktyDynamicSheetBarButton(action: requestClose) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .medium))
@@ -1095,8 +1204,10 @@ struct RoutineEditorView: View {
 
     @ViewBuilder
     private var trailingChrome: some View {
-        if activeSheet == .pauseFlow {
-            // No check here: the pause is committed by holding the button on it.
+        if activeSheet == .pauseFlow || activeSheet == .hold || activeSheet == .delete {
+            // No check on any of these: each is committed by holding the button on it,
+            // and a tick beside "Delete this routine?" is a second way to say yes sitting
+            // exactly where the way to say no should be.
             Color.clear
                 .frame(width: 44, height: 44)
         } else if activeSheet != nil {
@@ -1116,11 +1227,28 @@ struct RoutineEditorView: View {
             }
             .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } else if !viewModel.isEditingBlocked {
-            // Also while creating. It used to be shown only when reading an existing
-            // routine, so a new one had no way to reach the screen that names it.
-            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 15, weight: .medium))
+            // Delete and edit, in that order, with the trash in red: both are things you
+            // do to the routine, so they sit together rather than one in the bar and one
+            // at the foot of the form.
+            HStack(spacing: LocktySpacing.sm) {
+                // Only while editing, as on a rule. Reading a routine is not the moment to
+                // be one tap from destroying it, and the pencil beside it is the way in --
+                // the trash was showing on the read-only screen too, where the only thing
+                // it can do is the one thing you did not come for.
+                if !isCreating, isEditing {
+                    LocktyDynamicSheetBarButton(action: { openChildSheet(.delete) }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(LocktyColors.error)
+                    }
+                }
+
+                // Also while creating. It used to be shown only when reading an existing
+                // routine, so a new one had no way to reach the screen that names it.
+                LocktyDynamicSheetBarButton(action: enterEditingFlow) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                }
             }
         } else {
             Color.clear
@@ -1395,9 +1523,14 @@ struct RoutineEditorView: View {
 
                 Spacer(minLength: 0)
 
+                // It moves with the circles under it: the whole point of the line is that
+                // it answers what you just tapped, and a label that swapped instantly
+                // while the days animated read as a different control.
                 Text(RoutineEditorView.presetName(for: selected))
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
+                    .contentTransition(.numericText())
+                    .animation(.smooth(duration: 0.28), value: selected)
             }
 
             HStack(spacing: 10) {
@@ -1413,12 +1546,15 @@ struct RoutineEditorView: View {
                     } label: {
                         Text(weekday.shortLabel)
                             .font(.system(.subheadline, design: .default, weight: .regular))
-                            .foregroundStyle(isOn ? .black : LocktyColors.primaryText)
+                            // The ground and the ink, not black and white. A white
+                            // circle sat on a white card in light mode, so a chosen day
+                            // and a day never chosen looked exactly the same.
+                            .foregroundStyle(isOn ? Color(uiColor: .systemBackground) : LocktyColors.primaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 38)
                             .background {
                                 if isOn {
-                                    Circle().fill(.white)
+                                    Circle().fill(LocktyColors.primaryText)
                                 } else {
                                     Circle().stroke(LocktyColors.ink(0.18), lineWidth: 1)
                                 }
@@ -1445,8 +1581,8 @@ struct RoutineEditorView: View {
 
         switch weekdays {
         case []: return "Never"
-        case weekend: return "Fines de semana"
-        case workweek: return "Entre semana"
+        case weekend: return "Weekends"
+        case workweek: return "Weekdays"
         case Set(Weekday.orderedWeek): return "Every day"
         default: return weekdays.count == 1 ? "1 day" : "\(weekdays.count) days"
         }
@@ -1457,7 +1593,7 @@ struct RoutineEditorView: View {
             openChildSheet(.apps)
         } label: {
             HStack {
-                Text("Apps seleccionadas")
+                Text("Selected apps")
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.primaryText)
 
@@ -1511,6 +1647,13 @@ struct RoutineEditorView: View {
                         get: { viewModel.contentRestrictions },
                         set: { viewModel.contentRestrictions = $0 }
                     ),
+                    // Strict Mode belongs to this screen -- it is the restriction that
+                    // closes the ways out of everything else on it.
+                    isStrict: Binding(
+                        get: { viewModel.mode == .strict },
+                        set: { viewModel.mode = $0 ? .strict : .normal }
+                    ),
+                    strictGuards: $viewModel.strictGuards,
                     rules: .routine,
                     suggestions: viewModel.suggestedApplications,
                     appGroups: viewModel.appGroups,
@@ -2271,7 +2414,7 @@ struct RoutineEditorView: View {
         // editor does, for the same reason.
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                sectionHeading("SCHEDULE", systemImage: "calendar")
+                sectionHeading("Schedule", systemImage: "calendar")
 
                 scheduleCard
 
@@ -2281,13 +2424,17 @@ struct RoutineEditorView: View {
 
                 checklistRow
 
-                sectionHeading("RESTRICTIONS", systemImage: "lock.shield")
+                sectionHeading("Restrictions", systemImage: "lock.shield")
 
                 appsRow
 
                 breakRow
 
-                strictRow
+                // Strict Mode moved into the restrictions screen, where the other three
+                // switches are: it is the restriction that closes the ways out of the
+                // block, and it was sitting on the form asking the same question from
+                // outside. The row is kept, unreached, rather than deleted.
+//                strictRow
 
                 LocktyHoldButton(
                     title: isCreating ? "Hold to confirm" : "Hold to save",
@@ -2308,6 +2455,7 @@ struct RoutineEditorView: View {
                     }
                 }
                 .padding(.top, LocktySpacing.sm)
+
             }
             .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.top, LocktySpacing.md)
@@ -2351,6 +2499,102 @@ struct RoutineEditorView: View {
             .animation(.smooth(duration: 0.4), value: viewModel.color)
     }
 
+    /// Putting the schedule on hold, or letting it go again.
+    private var holdButton: some View {
+        Button {
+            if viewModel.pausedUntil != nil {
+                viewModel.resume()
+            } else {
+                openChildSheet(.hold)
+            }
+        } label: {
+            HStack(spacing: LocktySpacing.sm) {
+                Image(systemName: viewModel.pausedUntil == nil ? "pause.circle" : "play.circle")
+                    .font(.system(size: 15, weight: .medium))
+
+                Text(holdButtonTitle)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+            }
+            .foregroundStyle(LocktyColors.primaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
+        .tappable()
+    }
+
+    private var holdButtonTitle: String {
+        guard let until = viewModel.pausedUntil else { return "Pause routine" }
+        return "Paused until \(LocktyDateFormatting.shortDayAndTime(until)) · Resume"
+    }
+
+
+    private var holdScreen: some View {
+        VStack(spacing: LocktySpacing.xl) {
+            VStack(spacing: LocktySpacing.sm) {
+                Text("Pause for how long?")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.center)
+
+                Text("The routine will not start while it is paused. It begins again on its own at the end of the hold -- there is nothing to switch back on.")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Picker("", selection: $holdDuration) {
+                ForEach(RulePauseDuration.allCases) { duration in
+                    Text(duration.title).tag(duration)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 180)
+            .clipped()
+
+            Text("Until \(LocktyDateFormatting.shortDayAndTime(Date().addingTimeInterval(holdDuration.duration)))")
+                .font(.system(.subheadline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+
+            LocktyHoldButton(title: "Hold to pause", systemImage: "pause.fill") {
+                viewModel.pause(for: holdDuration)
+                closePicker()
+            }
+        }
+        .padding(.horizontal, LocktySpacing.screenInset)
+        .padding(.top, LocktySpacing.xl)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
+        .frame(maxWidth: .infinity)
+    }
+
+    private var deleteScreen: some View {
+        LocktyDestructiveConfirmation(
+            title: "Delete this routine?",
+            message: deleteMessage,
+            confirmTitle: "Hold to delete",
+            onConfirm: {
+                Task {
+                    if await viewModel.delete() {
+                        dismissEditor()
+                    } else {
+                        closePicker()
+                    }
+                }
+            },
+            onCancel: closePicker
+        )
+    }
+
+    private var deleteMessage: String {
+        let name = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subject = name.isEmpty ? "This routine" : "\u{201C}\(name)\u{201D}"
+        return "\(subject) will stop running, and the apps it blocks will be free at its hours. This cannot be undone."
+    }
+
     private var readOnlyContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             // A summary, not the form with its controls removed. Reading a routine used
@@ -2366,7 +2610,13 @@ struct RoutineEditorView: View {
             // Start it, or end it if it is the one running. While a different routine
             // is running there is no button at all: starting this one would mean
             // stopping that one, which is not a decision this button should make.
-            if isRoutineActive {
+            //
+            // And nothing at all while a strict routine is running. Strict mode refuses to
+            // be stopped -- that is the whole of it -- so the button held, filled, fired,
+            // and the routine carried on: a control that looks like it worked and did not
+            // is worse than no control, because it teaches you the wrong thing about what
+            // strict mode does.
+            if isRoutineActive, viewModel.canStopRoutine {
                 LocktyHoldButton(
                     title: "Hold to finish",
                     systemImage: "stop.circle",
@@ -2403,6 +2653,15 @@ struct RoutineEditorView: View {
                 .padding(.top, LocktySpacing.sm)
                 .padding(.horizontal, LocktySpacing.screenInset)
             }
+
+            // The hold lives here, on the screen you read the routine on, rather than
+            // inside the form. Pausing is not editing: you are not changing what the
+            // routine is, you are saying not this week -- and it is the thing you reach
+            // for while looking at a routine, not while filling one in.
+            if !isCreating, viewModel.hasSchedule, !isRoutineActive {
+                holdButton
+                    .padding(.horizontal, LocktySpacing.screenInset)
+            }
         }
         // No margin of its own: `RoutinePreviewContent` already sits at `screenInset`,
         // and this block used to add a second one, so a routine at rest was inset twice
@@ -2431,9 +2690,14 @@ struct RoutineEditorView: View {
 
                 Spacer(minLength: 0)
 
+                // It moves with the circles under it: the whole point of the line is that
+                // it answers what you just tapped, and a label that swapped instantly
+                // while the days animated read as a different control.
                 Text(RoutineEditorView.presetName(for: selected))
                     .font(.system(.subheadline, design: .default, weight: .regular))
                     .foregroundStyle(LocktyColors.secondaryText)
+                    .contentTransition(.numericText())
+                    .animation(.smooth(duration: 0.28), value: selected)
             }
 
             HStack(spacing: 10) {
@@ -2442,12 +2706,12 @@ struct RoutineEditorView: View {
 
                     Text(weekday.shortLabel)
                         .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(isOn ? .black : LocktyColors.primaryText)
+                        .foregroundStyle(isOn ? Color(uiColor: .systemBackground) : LocktyColors.primaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
                         .background {
                             if isOn {
-                                Circle().fill(.white)
+                                Circle().fill(LocktyColors.primaryText)
                             } else {
                                 Circle().stroke(LocktyColors.ink(0.18), lineWidth: 1)
                             }
@@ -2745,11 +3009,17 @@ private struct ScheduleTimeField: View {
 
 /// The colours, and nothing else: a popover carries its own edge, so anything drawn
 /// behind these swatches is a second surface inside the first one.
-private struct RoutineColorPickerPopover: View {
+/// The six colours, as a popover.
+///
+/// Not private any more: an objective is chosen from the same six, and two grids of the
+/// same swatches would be two grids to keep in step.
+struct RoutineColorPickerPopover: View {
     @Binding var selectedColor: RoutineColor
     @Environment(\.dismiss) private var dismiss
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: LocktySpacing.md), count: 3)
+    // Four across rather than three: the palette is twelve now, and three columns made
+    // it four rows tall inside a popover.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: LocktySpacing.md), count: 4)
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: LocktySpacing.md) {

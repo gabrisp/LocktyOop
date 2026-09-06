@@ -921,17 +921,27 @@ struct AddAppFolderCard: View {
                         .foregroundStyle(LocktyColors.primaryText)
                 }
 
-            Text("New group")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(LocktyColors.primaryText)
-                .multilineTextAlignment(.center)
+            // The same title block a folder has, down to the 2pt between the two lines
+            // and the height reserved for two lines of name. Built loosely it sat 4pt
+            // lower than every folder beside it and its two lines drifted apart, so the
+            // one tile in the row that is not a folder was also the only one not lining
+            // up with the rest.
+            VStack(alignment: .center, spacing: 2) {
+                Text("New group")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
 
-            Text("Reusable")
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
-                .multilineTextAlignment(.center)
+                Text("Reusable")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .top)
         }
-        .frame(width: folderSide)
+        .frame(width: folderSide, alignment: .top)
     }
 }
 

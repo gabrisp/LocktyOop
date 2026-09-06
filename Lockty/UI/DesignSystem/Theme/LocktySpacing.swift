@@ -33,4 +33,21 @@ enum LocktySpacing {
     /// loose -- there is nothing under the last row but the edge of the sheet, where at
     /// the top there is a bar to clear.
     static func sheetBottom(forTop top: CGFloat) -> CGFloat { top / 2 }
+
+    /// The horizontal inset of a *tab's* content, as opposed to a sheet's.
+    ///
+    /// Wider than the sheet inset, and not by taste: a screen inside a navigation stack
+    /// has a toolbar above it, and the system lays its items out to its own margin. At
+    /// 16 the cards sat visibly inside the settings gear above them -- everything on the
+    /// page starting a few points to the right of the bar it hangs under, which reads as
+    /// the content being slightly misaligned rather than as a choice.
+    static let tabInset: CGFloat = 20
+
+    /// The side margin the system's floating tab bar keeps.
+    ///
+    /// What the panel above it has to line up with. It is not `tabInset` -- that is the
+    /// app's own gutter for content inside a screen, and the bar is drawn by the system to
+    /// its own measure. A panel rising out of the bar at a different inset reads as a
+    /// separate object that happens to be near it, rather than as the bar opening.
+    static let systemTabBarInset: CGFloat = 16
 }

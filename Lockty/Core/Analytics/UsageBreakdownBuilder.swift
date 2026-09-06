@@ -9,6 +9,38 @@ import Foundation
 /// travels with the answer instead of being hidden inside an average.
 struct UsageBreakdownBuilder {
     private let appGroupStore: AppGroupStore
+    private let cache = DayCache()
+
+    /// The days this builder has already read, decoded and, where there was nothing, not
+    /// found.
+    ///
+    /// Kept because the same days are read over and over: a month is read once for the
+    /// month and again for the month before it (the comparison), the grid of known apps
+    /// reads the last thirty, and every reclassification asks for all of it again. That
+    /// was ninety-odd file reads and JSON decodes per screen, on the main actor.
+    ///
+    /// Misses are cached too, and they are the expensive ones: a day with no file of its
+    /// own falls back to scanning every aggregated snapshot there is, so twenty empty
+    /// days in a month meant twenty full scans of the whole archive.
+    ///
+    /// A screen's lifetime, no longer. The view model holds the builder, so closing the
+    /// breakdown lets the whole thing go -- which is also what stops it from serving
+    /// yesterday's numbers tomorrow.
+    private final class DayCache {
+        private var days: [String: ScreenTimeReportSnapshot?] = [:]
+
+        func snapshot(for key: DayKey, load: () -> ScreenTimeReportSnapshot?) -> ScreenTimeReportSnapshot? {
+            if let cached = days[key.id] { return cached }
+            let loaded = load()
+            days[key.id] = loaded
+            return loaded
+        }
+    }
+
+    private func snapshot(for day: Date, calendar: Calendar) -> ScreenTimeReportSnapshot? {
+        let key = DayKey(date: day, calendar: calendar)
+        return cache.snapshot(for: key) { try? appGroupStore.loadScreenTimeReportSnapshot(for: key) }
+    }
 
     /// Below this, an app in the neutral section is folded into the stack rather than
     /// given a row. Five minutes across a whole period is a thing you opened, not a thing
@@ -26,7 +58,7 @@ struct UsageBreakdownBuilder {
         calendar: Calendar = .current
     ) -> UsageBreakdown {
         let days = period.days(containing: anchorDay, calendar: calendar)
-        let current = totals(for: days)
+        let current = totals(for: days, calendar: calendar)
 
         guard current.daysWithData > 0 else {
             return .empty(period: period, anchorDay: anchorDay)
@@ -63,17 +95,18 @@ struct UsageBreakdownBuilder {
     /// file the one you were thinking of. A month of cached snapshots is a month of file
     /// reads; nothing is asked of Screen Time.
     func knownApps(classifications: [AppIdentity.ID: AppClassification], calendar: Calendar = .current) -> [UsageBreakdownApp] {
+        let catalog = appGroupStore.loadAppNameCatalog()
         var seen: [AppIdentity.ID: UsageBreakdownApp] = [:]
         let today = calendar.startOfDay(for: Date())
 
         for daysBack in 0...30 {
             guard let day = calendar.date(byAdding: .day, value: -daysBack, to: today),
-                  let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
+                  let snapshot = snapshot(for: day, calendar: calendar)
             else { continue }
 
             for application in snapshot.applications where application.totalActivityDuration > 0 && Self.isRealApp(application.app) {
                 var entry = seen[application.app.id] ?? UsageBreakdownApp(
-                    app: application.app,
+                    app: application.app.resolved(with: catalog),
                     duration: 0,
                     classification: classifications[application.app.id] ?? .neutral
                 )
@@ -100,13 +133,17 @@ struct UsageBreakdownBuilder {
 
     // MARK: - Totals
 
-    private func totals(for days: [Date]) -> (durations: [AppIdentity.ID: UsageBreakdownApp], total: TimeInterval, daysWithData: Int) {
+    private func totals(
+        for days: [Date],
+        calendar: Calendar = .current
+    ) -> (durations: [AppIdentity.ID: UsageBreakdownApp], total: TimeInterval, daysWithData: Int) {
+        let catalog = appGroupStore.loadAppNameCatalog()
         var durations: [AppIdentity.ID: UsageBreakdownApp] = [:]
         var total: TimeInterval = 0
         var daysWithData = 0
 
         for day in days {
-            guard let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day)),
+            guard let snapshot = snapshot(for: day, calendar: calendar),
                   snapshot.totalActivityDuration > 0
             else { continue }
 
@@ -115,7 +152,7 @@ struct UsageBreakdownBuilder {
 
             for application in snapshot.applications {
                 var entry = durations[application.app.id] ?? UsageBreakdownApp(
-                    app: application.app,
+                    app: application.app.resolved(with: catalog),
                     duration: 0,
                     classification: .neutral
                 )
@@ -149,7 +186,7 @@ struct UsageBreakdownBuilder {
             return nil
         }
 
-        let previous = totals(for: period.days(containing: previousAnchor, calendar: calendar))
+        let previous = totals(for: period.days(containing: previousAnchor, calendar: calendar), calendar: calendar)
         guard previous.daysWithData > 0 else { return nil }
 
         let previousHeadline = period == .day

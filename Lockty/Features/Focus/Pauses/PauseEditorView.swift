@@ -267,7 +267,7 @@ final class PauseEditorViewModel: ObservableObject {
             switch step {
             // Nothing to sanitise: every one of these is valid at any setting it can
             // hold, because the configurations clamp themselves.
-            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue, .objectives:
                 return step
             case .countdown(let configuration):
                 return configuration.duration > 0 ? step : nil
@@ -697,7 +697,7 @@ private struct PauseStepEditorCard: View {
             }
 
             switch step {
-            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+            case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue, .objectives:
                 Text(step.detail)
                     .font(.system(size: 20, weight: .light, design: .rounded))
                     .foregroundStyle(LocktyColors.primaryText)

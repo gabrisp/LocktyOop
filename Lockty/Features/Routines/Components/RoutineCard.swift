@@ -8,6 +8,8 @@ struct RoutineCard: View {
     let routine: Routine
     let isActive: Bool
     var applicationTokens: [ApplicationToken] = []
+    /// When the hold on it ends, if it is on hold.
+    var pausedUntil: Date?
     let onOpen: () -> Void
 
     private var accent: Color {
@@ -25,6 +27,13 @@ struct RoutineCard: View {
     /// What the pill says. A countdown only while the start is close enough to matter —
     /// "starts in 27 d" is noise, so past three days it shows the window instead.
     private var pillText: String? {
+        // A hold is the first thing about a routine while it lasts. "Starts tomorrow" on
+        // something that is switched off until Saturday is a promise it is not keeping,
+        // and the pill is the only line the tile has to say anything at all.
+        if let pausedUntil {
+            return "Paused until \(LocktyDateFormatting.shortDayAndTime(pausedUntil))"
+        }
+
         if isActive {
             return "Active"
         }
@@ -37,7 +46,7 @@ struct RoutineCard: View {
 
         guard let days = daysUntilNextStart(of: schedule) else { return window }
         switch days {
-        case 0: return "Empieza hoy"
+        case 0: return "Starts today"
         case 1: return "Starts tomorrow"
         case 2: return "Starts in 2 d"
         default: return window

@@ -18,6 +18,12 @@ final class RoutinesViewModel: ObservableObject {
     /// for every tile on screen.
     @Published private(set) var applicationTokens: [UUID: [ApplicationToken]] = [:]
     @Published private(set) var errorMessage: String?
+    /// Which routines are on hold and until when, read with them.
+    @Published private(set) var pauses: RulePauseState = RulePauseState()
+
+    /// Its own handle on the shared container: the store is a path and a coder, so one
+    /// made here is the same store as any other.
+    private let appGroupStore = AppGroupStore()
 
     init(
         routineEngine: RoutineEngine,
@@ -41,6 +47,11 @@ final class RoutinesViewModel: ObservableObject {
         applicationTokens[routineID] ?? []
     }
 
+    /// When the hold on a routine ends, or nil when it is not on hold.
+    func pausedUntil(for routineID: UUID) -> Date? {
+        pauses.pauseEnd(for: routineID)
+    }
+
     func load() async {
         do {
             let loaded = try await repository.routines()
@@ -49,9 +60,11 @@ final class RoutinesViewModel: ObservableObject {
                 let merged = selectionStore.mergedSelection(scopes: Set([.routine(routine.id)] + groupScopes))
                 result[routine.id] = merged.applicationTokens.stablePrefix(merged.applicationTokens.count)
             }
+            let pauseState = appGroupStore.loadRulePauseState()
             withAnimation(.smooth(duration: 0.28)) {
                 routines = loaded
                 applicationTokens = tokens
+                pauses = pauseState
             }
             // Keeps background scheduling in step with whatever was just created,
             // edited or deleted.

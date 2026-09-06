@@ -21,7 +21,12 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
             reportLogger.notice("Built snapshot day=\(snapshot.day.id, privacy: .public) totalActivityDuration=\(snapshot.totalActivityDuration, privacy: .public) apps=\(snapshot.applications.count, privacy: .public) segments=\(snapshot.activitySegments.count, privacy: .public)")
             print("Built DeviceActivityReport snapshot day=\(snapshot.day.id) total=\(snapshot.totalActivityDuration) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
             do {
-                try AppGroupStore().saveScreenTimeReportSnapshot(snapshot)
+                let store = AppGroupStore()
+                // The names first, and separately: they outlive the day they were seen
+                // in, and a snapshot being overwritten tomorrow must not take them with
+                // it.
+                store.noteAppNames(from: snapshot)
+                try store.saveScreenTimeReportSnapshot(snapshot)
                 reportLogger.notice("Saved snapshot to App Group for day=\(snapshot.day.id, privacy: .public)")
                 print("Saved DeviceActivityReport snapshot to App Group for day=\(snapshot.day.id)")
             } catch {
@@ -72,15 +77,33 @@ struct LocktyTotalActivityReport: DeviceActivityReportScene {
 
                 for await category in segment.categories {
                     for await applicationActivity in category.applications {
+                        // The name and the bundle id are read here, in the extension,
+                        // because here is the only place they exist. In the app,
+                        // `Application(token:)` hands back a nil name -- that is the
+                        // privacy bargain of Screen Time -- so an identity built from a
+                        // token alone came out called after its bundle id, or after
+                        // nothing at all. The extension is holding the real name at this
+                        // exact moment; not writing it down was the whole problem.
+                        //
+                        // The icon cannot be saved and never will be: it is drawn out of
+                        // process from the token, which is why the token is kept too.
+                        let application = applicationActivity.application
+                        let bundleIdentifier = application.bundleIdentifier
+                        let displayName = AppIdentity.preferredDisplayName(
+                            localizedDisplayName: application.localizedDisplayName,
+                            bundleIdentifier: bundleIdentifier
+                        )
+
                         let appIdentity: AppIdentity
-                        if let token = applicationActivity.application.token {
-                            appIdentity = AppIdentity(token: token)
-                        } else {
-                            let bundleIdentifier = applicationActivity.application.bundleIdentifier
-                            let displayName = AppIdentity.preferredDisplayName(
-                                localizedDisplayName: applicationActivity.application.localizedDisplayName,
-                                bundleIdentifier: bundleIdentifier
+                        if let token = application.token {
+                            appIdentity = AppIdentity(
+                                id: AppIdentity.ID(token: token),
+                                displayName: displayName,
+                                bundleIdentifier: bundleIdentifier,
+                                applicationToken: token,
+                                iconSource: .screenTimeToken
                             )
+                        } else {
                             appIdentity = AppIdentity(
                                 id: AppIdentity.ID(rawValue: bundleIdentifier ?? "display.\(displayName.lowercased())"),
                                 displayName: displayName,

@@ -5,7 +5,10 @@ import UIKit
 struct TodayView: View {
     let day: Date
     @ObservedObject var viewModel: TodayViewModel
+    @ObservedObject var objectivesViewModel: ObjectivesViewModel
+    @ObservedObject var ruleStatsViewModel: RuleStatsViewModel
     @ObservedObject var router: AppRouter
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var scrollOffset: CGFloat = 0
     /// Routines/Pauses hide on a downward scroll and come back the moment the finger
@@ -17,6 +20,12 @@ struct TodayView: View {
 
     private var state: TodayDayState {
         viewModel.state(for: day)
+    }
+
+    /// Whether the day's figures have arrived.
+    private var isLoaded: Bool {
+        if case .loaded = state.loadingState { return true }
+        return false
     }
 
     /// The day's productivity, rounded. Nil while it is still unknown, so the rock waits
@@ -182,8 +191,47 @@ struct TodayView: View {
             topChrome
         }
         .task(id: DayKey(date: day)) {
+            objectivesViewModel.load()
+            await ruleStatsViewModel.load(period: .day, anchor: day, days: 7)
             await viewModel.load(day: day)
-            viewModel.announceScoreIfRisen(day: day)
+            // The island's productivity notice is off for now. It fires on the score
+            // rising, and it rose with an up-trend glyph on days where every figure on
+            // the screen behind it was red -- "up four points" on a bad day is true and
+            // useless, and an arrow going the other way to everything else reads as the
+            // app not knowing what it is looking at. Commented out, not removed: the
+            // toast and the rule it fires on are both still here.
+//            viewModel.announceScoreIfRisen(day: day)
+        }
+        // Everything on this screen is a reading of right now, and right now moves while
+        // the app is in someone's pocket: the day rolls over, Screen Time delivers a
+        // report, Health counts more steps. Coming back to the app re-reads all of it
+        // rather than showing whatever was true when it was last put down.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            objectivesViewModel.load()
+            Task {
+                await ruleStatsViewModel.load(period: .day, anchor: day, days: 7)
+                await viewModel.load(day: day, force: true)
+            }
+        }
+        // Anything done in a sheet lands here when it closes. A rule deleted from the
+        // limits card used to stay on the card until the next cold launch: the sheet was
+        // the only thing that knew, and nothing asked it. Every action on this screen
+        // updates it, immediately.
+        .onChange(of: router.sheet) { _, newValue in
+            guard newValue == nil else { return }
+            objectivesViewModel.load()
+            Task {
+                await ruleStatsViewModel.load(period: .day, anchor: day, days: 7)
+                await viewModel.load(day: day, force: true)
+            }
+        }
+        // Ticking an objective changes the Focus score -- finishing what you set yourself
+        // is part of it -- and the score is computed in the pipeline, not here. Without
+        // this the ring filled and the number above it stayed where it was until the next
+        // cold launch.
+        .onChange(of: objectivesViewModel.completedCount) { _, _ in
+            Task { await viewModel.load(day: day, force: true) }
         }
         .animation(.smooth(duration: 0.32), value: router.pendingUnlock?.id)
         // Ending a routine takes its cards off the screen rather than having them
@@ -388,52 +436,127 @@ struct TodayView: View {
                 // The other two scores, beside the one in the badge. They were on a
                 // screen nothing linked to any more, and they are the same kind of thing
                 // as the number above -- so they are the same rock, smaller.
-                if case .loaded = state.loadingState {
-                    DailyScoreRocksView(metrics: state.primaryMetrics.metrics) { kind in
-                        router.push(.scoreDetail(day: day, kind: kind))
-                    }
-                    .transition(.blurReplace.combined(with: .opacity))
+                // Always here, loaded or not. They used to be mounted only once the day
+                // had landed, so the top of the screen rearranged itself a second after
+                // every open -- and a screen that jumps while you are reading it is a
+                // screen you stop trusting.
+                DailyScoreRocksView(
+                    metrics: state.primaryMetrics.metrics,
+                    isPlaceholder: !isLoaded
+                ) { kind in
+                    guard isLoaded else { return }
+                    router.push(.scoreDetail(day: day, kind: kind))
                 }
 
-                // The day itself, before anything Lockty is doing about it. It is the
-                // one card that is true every day whether or not a routine ran, and the
-                // question people open the app to ask.
-                if state.hourlyActivity.hasAnyActivity {
-                    DailyPulseCard(
-                        state: state.hourlyActivity,
-                        metric: $pulseMetric
-                    )
-                    .transition(.blurReplace.combined(with: .opacity))
-                }
+                // The stack of notices that used to sit here -- what the day was saying,
+                // in a sentence or three. Out for now, kept: the same notices are still
+                // delivered as notifications, which is where they were asked for.
+//              TodayInsightStack(insights: TodayInsightBuilder.insights(for: state))
+//                  .transition(.blurReplace)
 
-                // Then the running routine, which comes before everything else. An
-                // unlock request, when there is one, sits even above both because it is
-                // waiting on immediate action.
-                if let routineCardState = viewModel.routineCardState,
-                   routineCardState.phase == .active {
-                    ActiveModeCard(
-                        state: routineCardState,
-                        groups: viewModel.activeRoutineGroups,
-                        activeRoutine: viewModel.activeRoutine,
-                        allowance: viewModel.activePauseAllowance,
-                        onUnlock: { token in
-                            openUnlockFlow(for: token, context: nil)
+                // The hourly chart lives on the score pages now, where it sits under the
+                // number it explains. Commented out rather than removed: it is the same
+                // card, and Today is a shorter screen without three metrics stacked on
+                // one axis at the top of it.
+//                if state.hourlyActivity.hasAnyActivity {
+//                    DailyPulseCard(
+//                        state: state.hourlyActivity,
+//                        metric: $pulseMetric
+//                    )
+//                    .transition(.blurReplace.combined(with: .opacity))
+//                }
+
+                // The running routine is the Focus tab's card, and it is the whole top of
+                // that screen -- so Today was showing it a second time, above the things
+                // Today is actually for. Commented out, not removed.
+//                if let routineCardState = viewModel.routineCardState,
+//                   routineCardState.phase == .active {
+//                    ActiveModeCard(
+//                      state: routineCardState,
+//                      groups: viewModel.activeRoutineGroups,
+//                      activeRoutine: viewModel.activeRoutine,
+//                      allowance: viewModel.activePauseAllowance,
+//                      onUnlock: { token in
+//                          openUnlockFlow(for: token, context: nil)
+//                      },
+//                      onOpenSection: { openFocus() },
+//                      onShowAllowance: { token in
+//                          guard let allowance = viewModel.activePauseAllowance else { return }
+//                          router.presentSheet(
+//                              .allowanceTimer(
+//                                  AllowanceTimerRoute(
+//                                      appID: AppIdentity.ID(token: token),
+//                                      token: token,
+//                                      expiresAt: allowance.expiresAt
+//                                  )
+//                              )
+//                          )
+//                      }
+//                  )
+//                  .transition(.blurReplace.combined(with: .opacity))
+//              }
+
+                // Then the day itself, which is the question people open the app to ask.
+                // Above the routines on purpose: what happened is what you came for, and
+                // what is scheduled is what happens next.
+                AppUsageListCard(
+                    state: state,
+                    onClassificationChange: { appUsage, classification in
+                        viewModel.updateClassification(
+                            app: appUsage.app,
+                            classification: classification,
+                            day: day
+                        )
+                    },
+                    onOpen: { router.push(.usageBreakdown(day: day)) }
+                )
+
+                // The half-width strip of objectives that used to sit here. Out for now,
+                // kept: the marking it was for is on the objectives page itself, at the
+                // end of each row.
+//              if !objectivesViewModel.dailyObjectives.isEmpty {
+//                  ObjectiveQuickCards(viewModel: objectivesViewModel) { objective in
+//                      router.push(.objectives(focused: objective.id))
+//                  }
+//                  .transition(.blurReplace)
+//              }
+
+                // What you meant to do, under where the time actually went.
+                ObjectivesCard(viewModel: objectivesViewModel, day: day) {
+                    router.push(.objectives(focused: nil))
+                }
+                .transition(.blurReplace)
+
+                // And what the rules did about it. Its own card, beside the limits rather
+                // than inside them: a limit says what is left of a budget right now, and
+                // this says what ran.
+                RulesCard(stats: ruleStatsViewModel.stats) {
+                    router.push(.ruleStats)
+                }
+                .transition(.blurReplace)
+
+                // The limits, which are the other kind of rule: nothing starts them and
+                // nothing ends them, so the only thing worth showing is how much of each
+                // one is left. Above the schedules because it is about right now.
+                if !viewModel.limits.isEmpty {
+                    LimitsCard(
+                        limits: viewModel.limits,
+                        onSelect: { ruleID in
+                            router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: ruleID)))
                         },
-                        onOpenSection: { openFocus() },
-                        onShowAllowance: { token in
-                            guard let allowance = viewModel.activePauseAllowance else { return }
-                            router.presentSheet(
-                                .allowanceTimer(
-                                    AllowanceTimerRoute(
-                                        appID: AppIdentity.ID(token: token),
-                                        token: token,
-                                        expiresAt: allowance.expiresAt
-                                    )
-                                )
-                            )
-                        }
+                        onOpenSection: { router.push(.ruleStats) }
                     )
-                    .transition(.blurReplace.combined(with: .opacity))
+                    .transition(.blurReplace)
+                }
+
+                // What is on hold. Under the limits and above what is scheduled, which is
+                // where it belongs: these are limits and routines that would be in those
+                // two cards if they were not switched off.
+                if !viewModel.pausedItems.isEmpty {
+                    PausedCard(items: viewModel.pausedItems) { id in
+                        Task { await viewModel.resumePaused(id, day: day) }
+                    }
+                    .transition(.blurReplace)
                 }
 
                 // Its own card, not a mode of the one above: nothing here is blocking
@@ -502,25 +625,13 @@ struct TodayView: View {
                     }
                 }
 
-                AppUsageListCard(
-                    state: state,
-                    onClassificationChange: { appUsage, classification in
-                        viewModel.updateClassification(
-                            appID: appUsage.id,
-                            classification: classification,
-                            day: day
-                        )
-                    },
-                    onOpen: { router.push(.usageBreakdown(day: day)) }
-                )
-
                 ScreenTimeReportLoaderView(day: day)
                     .frame(width: 1, height: 1)
                     .opacity(0.01)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.top, LocktySpacing.sm)
             .padding(.bottom, LocktySpacing.xl)
         }
@@ -546,6 +657,20 @@ struct TodayView: View {
                         .font(.system(.subheadline, design: .default, weight: .medium))
                         .foregroundStyle(LocktyColors.primaryText)
                 }
+            }
+
+            // The flame sits beside Settings, bare. Everything else in this bar is a
+            // plain glyph on the page, and a glass capsule around one of them would make
+            // the streak look like the only thing in the bar worth pressing.
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    router.presentSheet(.streak)
+                } label: {
+                    Image(systemName: "flame")
+                        .fontWeight(.light)
+                        .foregroundStyle(LocktyColors.primaryText)
+                }
+                .buttonStyle(.plain)
             }
 
             ToolbarItem(placement: .topBarTrailing) {

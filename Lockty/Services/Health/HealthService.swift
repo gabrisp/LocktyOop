@@ -33,6 +33,13 @@ protocol HealthServicing {
     func requestAuthorization() async throws -> HealthAuthorizationState
     /// Steps taken since midnight, in the device's own calendar.
     func stepCountToday() async throws -> Int
+    /// Steps over a range, for an objective counted by the week or the month.
+    func stepCount(from start: Date, to end: Date) async throws -> Int
+    /// Hours actually asleep in a range.
+    ///
+    /// Asleep, not in bed: the two differ by the half hour spent on the phone before
+    /// putting it down, which is the half hour this app is about.
+    func sleepHours(from start: Date, to end: Date) async throws -> Double
 }
 
 enum HealthServiceError: LocalizedError {
@@ -65,6 +72,10 @@ final class LiveHealthService: HealthServicing {
         HKQuantityType(.stepCount)
     }
 
+    private var sleepType: HKCategoryType {
+        HKCategoryType(.sleepAnalysis)
+    }
+
     var isAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()
     }
@@ -77,19 +88,22 @@ final class LiveHealthService: HealthServicing {
     func requestAuthorization() async throws -> HealthAuthorizationState {
         guard isAvailable else { throw HealthServiceError.unavailable }
 
-        try await store.requestAuthorization(toShare: [], read: [stepType])
+        try await store.requestAuthorization(toShare: [], read: [stepType, sleepType])
         defaults.set(true, forKey: Self.hasRequestedKey)
         return .requested
     }
 
     func stepCountToday() async throws -> Int {
+        let calendar = Calendar.current
+        return try await stepCount(from: calendar.startOfDay(for: Date()), to: Date())
+    }
+
+    func stepCount(from start: Date, to end: Date) async throws -> Int {
         guard isAvailable else { throw HealthServiceError.unavailable }
 
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(
-            withStart: startOfDay,
-            end: Date(),
+            withStart: start,
+            end: end,
             options: [.strictStartDate]
         )
 
@@ -114,6 +128,50 @@ final class LiveHealthService: HealthServicing {
                 }
 
                 continuation.resume(returning: Int(sum.doubleValue(for: .count())))
+            }
+
+            store.execute(query)
+        }
+    }
+}
+
+extension LiveHealthService {
+    /// Hours asleep between two dates.
+    ///
+    /// Summed over the samples rather than taken from a single "time asleep" figure,
+    /// because there is no such figure: HealthKit records sleep as a series of stretches,
+    /// each with a stage, and the ones that count as sleeping are the three below. A nap
+    /// and a night are both in here, which is right -- the objective is hours of sleep,
+    /// not one unbroken night.
+    func sleepHours(from start: Date, to end: Date) async throws -> Double {
+        guard isAvailable else { throw HealthServiceError.unavailable }
+
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKCategoryType(.sleepAnalysis),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: HealthServiceError.queryFailed(error.localizedDescription))
+                    return
+                }
+
+                let asleep: Set<Int> = [
+                    HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepREM.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
+                ]
+
+                let seconds = (samples as? [HKCategorySample] ?? [])
+                    .filter { asleep.contains($0.value) }
+                    .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+
+                continuation.resume(returning: seconds / 3600)
             }
 
             store.execute(query)

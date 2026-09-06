@@ -22,15 +22,25 @@ struct LiveUsageDataService: UsageDataServicing {
     }
 
     func usageSummary(for day: Date) async throws -> DayUsageSummary {
+        try await usageSummary(for: day, preferCached: false)
+    }
+
+    func usageSummary(for day: Date, preferCached: Bool) async throws -> DayUsageSummary {
         usageLogger().notice("Requesting usage summary for \(DayKey(date: day).id, privacy: .public)")
         print("Requesting usage summary for \(DayKey(date: day).id)")
-        let snapshot = try await snapshot(for: day)
+        let snapshot = try await snapshot(for: day, preferCached: preferCached)
         let key = DayKey(date: day)
+
+        // Names filled in from the catalogue the report extension keeps. A snapshot
+        // written before the extension started recording them -- or one whose app was
+        // only ever seen as a token -- carries a stand-in name; the catalogue is where
+        // the real one lives.
+        let catalog = appGroupStore.loadAppNameCatalog()
 
         let applications = await snapshot.applications.asyncMap { applicationSnapshot in
             let classification = await classificationRepository.classification(for: applicationSnapshot.app.id) ?? .neutral
             return ApplicationUsage(
-                app: applicationSnapshot.app,
+                app: applicationSnapshot.app.resolved(with: catalog),
                 duration: applicationSnapshot.totalActivityDuration,
                 classification: classification
             )
@@ -47,12 +57,30 @@ struct LiveUsageDataService: UsageDataServicing {
         try await usageSummary(for: day).applications
     }
 
-    private func snapshot(for day: Date) async throws -> ScreenTimeReportSnapshot {
+    private func snapshot(for day: Date, preferCached: Bool = false) async throws -> ScreenTimeReportSnapshot {
         let dayKey = DayKey(date: Calendar.current.startOfDay(for: day))
         print("Resolving snapshot for \(dayKey.id)")
+
+        // What was written the last time this day was read, handed back immediately. The
+        // live query below is the truth and still runs -- this is only so the screen has
+        // the day's real figures on it while that happens, instead of zeroes.
+        if preferCached, let cachedSnapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: dayKey) {
+            usageLogger().notice("Using cached Screen Time snapshot for \(dayKey.id, privacy: .public) by preference")
+            print("Using cached Screen Time snapshot for \(dayKey.id) by preference")
+            return cachedSnapshot
+        }
+
         if supportsDirectActivityData {
             do {
                 if let directSnapshot = try await directSnapshot(for: dayKey) {
+                    // The names, filed as well as the figures.
+                    //
+                    // The catalogue used to be written only by the report extension, and
+                    // this path -- the live query, which is what actually runs on 26.4 and
+                    // up -- resolved the same names and threw them away. Anything reading
+                    // the catalogue afterwards (a notification naming the app you have been
+                    // in, a snapshot that only ever saw a token) found nothing there.
+                    appGroupStore.noteAppNames(from: directSnapshot)
                     try? appGroupStore.saveScreenTimeReportSnapshot(directSnapshot)
                     usageLogger().notice("Using direct DeviceActivityData access for \(dayKey.id, privacy: .public)")
                     print("Using direct DeviceActivityData access for \(dayKey.id)")

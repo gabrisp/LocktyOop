@@ -21,8 +21,26 @@ struct LocktyGaugeRow: View {
     let position: Double?
     /// What sits at the centre of the track. Usually the word for an ordinary day.
     var anchorLabel: String = "USUAL"
-    /// Whether a higher figure is the worse one. Screen time yes, time away no.
-    var higherIsWorse = true
+    /// What to call each of the three bands, in this row's own terms.
+    ///
+    /// Every row used to share one set -- Great, Usual, Slow down -- so a page of four
+    /// readings came out "Usual, Usual, Usual, Slow down": four rows saying nothing and
+    /// one saying something. The words belong to the figure. A long stretch away is not
+    /// "great", it is a real break; half a day untouched is not "usual", it is half the
+    /// day.
+    var verdicts = Verdicts()
+
+    struct Verdicts {
+        var good: String
+        var middle: String
+        var bad: String
+
+        init(_ good: String = "Great", _ middle: String = "Usual", _ bad: String = "Slow down") {
+            self.good = good
+            self.middle = middle
+            self.bad = bad
+        }
+    }
 
     private var verdict: (text: String, color: Color)? {
         guard let position else { return nil }
@@ -30,22 +48,36 @@ struct LocktyGaugeRow: View {
         // Three bands, not a gradient of adjectives: the middle third is an ordinary day
         // and should be told it is ordinary rather than given a grade.
         switch position {
-        case ..<0.34: return ("Great", LocktyColors.productive)
-        case ..<0.67: return ("Usual", LocktyColors.secondaryText)
-        default: return (higherIsWorse ? "Slow down" : "Room to grow", LocktyColors.unproductive)
+        case ..<0.34: return (verdicts.good, LocktyColors.productive)
+        case ..<0.67: return (verdicts.middle, LocktyColors.warning)
+        default: return (verdicts.bad, LocktyColors.unproductive)
         }
     }
 
+    /// The bar's colour, on the same three bands the verdict uses.
+    ///
+    /// Three, not two. Green and red alone made an ordinary day pick a side -- a reading
+    /// a hair past the middle went fully red, which is a judgement the figure has not
+    /// earned. The middle band is amber: nothing to celebrate, nothing to answer for.
+    ///
+    /// Read per row, never from the score above it. Two rows on the same page routinely
+    /// disagree -- a day can be short on screen time and heavy on pickups -- and a page
+    /// tinted by its headline would say they agreed.
     private var fillColor: Color {
         guard let position else { return LocktyColors.neutral }
-        return position < 0.5 ? LocktyColors.productive : LocktyColors.unproductive
+        switch position {
+        case ..<0.34: return LocktyColors.productive
+        case ..<0.67: return LocktyColors.warning
+        default: return LocktyColors.unproductive
+        }
     }
 
     var body: some View {
         // The heading and its bar are two readings of one figure, not a label sitting on
         // a control -- so they want air between them. Tight, the "USUAL" marker crowds
-        // the words above it and the pair reads as one squashed row.
-        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+        // the words above it and the pair reads as one squashed row. The marker is a
+        // capsule with its own height, so the gap has to clear that as well as the text.
+        VStack(alignment: .leading, spacing: LocktySpacing.xl) {
             HStack(alignment: .firstTextBaseline, spacing: LocktySpacing.sm) {
                 Text(title)
                     .font(.system(.headline, design: .default, weight: .semibold))
@@ -80,37 +112,12 @@ struct LocktyGaugeRow: View {
             let end = width * ratio
 
             ZStack(alignment: .leading) {
-                // The empty track, with ticks. The ticks are what make a half-full bar
-                // read as a scale rather than as a progress bar that stopped.
-                Capsule()
-                    .fill(LocktyColors.ink(0.07))
-                    .frame(height: 6)
-
-                HStack(spacing: 0) {
-                    ForEach(1..<8, id: \.self) { _ in
-                        Rectangle()
-                            .fill(LocktyColors.ink(0.10))
-                            .frame(width: 1, height: 6)
-
-                        Spacer(minLength: 0)
-                    }
-                }
-                .frame(width: width, height: 6)
-
-                if position != nil {
-                    // From the middle outwards, which is the whole idea: the bar grows
-                    // away from an ordinary day in whichever direction the day went.
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [fillColor.opacity(0.15), fillColor],
-                                startPoint: ratio < 0.5 ? .trailing : .leading,
-                                endPoint: ratio < 0.5 ? .leading : .trailing
-                            )
-                        )
-                        .frame(width: abs(end - centre), height: 6)
-                        .offset(x: min(end, centre))
-                }
+                // Everything but the marker carries a breath of blur. The bar is an
+                // impression of where the day sits, and reading it as one is easier when
+                // its edges are not drawn sharper than the thing they describe. The
+                // marker stays out of it -- a blurred word just looks broken.
+                barLayers(width: width, centre: centre, ratio: ratio, end: end)
+                    .blur(radius: 0.5)
 
                 anchor
                     .position(x: centre, y: 3)
@@ -118,6 +125,56 @@ struct LocktyGaugeRow: View {
             .frame(height: 6)
         }
         .frame(height: 34)
+    }
+
+    private func barLayers(width: CGFloat, centre: CGFloat, ratio: CGFloat, end: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            // The empty track, with ticks. The ticks are what make a half-full bar
+            // read as a scale rather than as a progress bar that stopped.
+            Capsule()
+                .fill(LocktyColors.ink(0.07))
+                .frame(height: 6)
+
+            HStack(spacing: 0) {
+                ForEach(1..<8, id: \.self) { _ in
+                    Rectangle()
+                        .fill(LocktyColors.ink(0.10))
+                        .frame(width: 1, height: 6)
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(width: width, height: 6)
+
+            if position != nil {
+                // From the middle outwards, which is the whole idea: the bar grows
+                // away from an ordinary day in whichever direction the day went.
+                //
+                // It dissolves at the far end rather than stopping at one. A hard tip
+                // is a claim to precision the figure does not have -- there is no
+                // exact point at which a day becomes a bad one, and a bar that ends
+                // on a line says there is. Solid at the anchor, where the reading is
+                // certain, thinning away from it.
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                fillColor,
+                                fillColor.opacity(0.85),
+                                fillColor.opacity(0.25),
+                                fillColor.opacity(0)
+                            ],
+                            startPoint: ratio < 0.5 ? .trailing : .leading,
+                            endPoint: ratio < 0.5 ? .leading : .trailing
+                        )
+                    )
+                    .frame(width: abs(end - centre), height: 6)
+                    .blur(radius: 1.4)
+                    .offset(x: min(end, centre))
+            }
+
+        }
+        .frame(width: width, height: 6)
     }
 
     /// The marker at the middle. Sits on the track rather than beside it, because what it

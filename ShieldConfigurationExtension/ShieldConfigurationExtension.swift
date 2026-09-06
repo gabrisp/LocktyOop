@@ -33,80 +33,180 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     /// secondary closes. Neither depends on a per-app rule any more -- the pause belongs
     /// to the running routine, so it covers everything that routine blocks.
     private func makeConfiguration(resourceName: String, application: Application?) -> ShieldConfiguration {
-        let runtime = try? AppGroupStore().loadRuntimeState()
+        let store = AppGroupStore()
+        let runtime = try? store.loadRuntimeState()
         let allActive = runtime?.activeRoutines ?? []
 
-        // The routines actually holding *this* app shut. With several running at once
-        // only the ones blocking it have any say over its shield; the others are
-        // blocking something else entirely.
-        let appID = application?.token.map(AppIdentity.ID.init(token:))
+        // What is actually holding *this* app, asked in the right order.
+        //
+        // A limit first. With a routine running and an unrelated app over its daily
+        // budget, the shield blamed the routine -- it was the only thing this screen ever
+        // looked at -- so it said "Deep work is running" over an app Deep Work does not
+        // block, and the real answer, that the app had used its two hours, was nowhere on
+        // the screen. The limit is matched on the app's own token, which is the one thing
+        // both sides genuinely hold.
+        let token = application?.token
+        let limitRule = token.flatMap { token -> Rule? in
+            let lookup = RuleShieldLookup(appGroupStore: store)
+            guard let rule = lookup.limitingRule(for: token) else { return nil }
+            return rule.isShielding(given: store.loadRuleEnforcementState()) ? rule : nil
+        }
+
+        // The routines holding this app shut. With several running at once only the ones
+        // blocking it have any say; the others are blocking something else entirely.
+        let appID = token.map(AppIdentity.ID.init(token:))
         let blocking = appID.map { id in
             allActive.filter { $0.shieldPolicy.blockedApplications.contains(id) }
         } ?? []
-        let responsible = blocking.isEmpty ? allActive : blocking
+        let responsible = blocking.isEmpty && limitRule == nil ? allActive : blocking
 
-        // Strict mode is the only thing that takes the unlock button away. It used to
-        // hang on the routine's stored pause policy, so a routine saved without one
-        // showed a shield whose only button closed the app -- and the standard
-        // wait-then-confirm flow, which the action extension always falls back to, was
-        // never reachable.
-        //
-        // Every responsible routine has to allow it: one strict routine is enough to
-        // keep the app shut, and offering a button that cannot deliver would be a lie.
-        // Two questions, both of which have to be yes. Strict Mode can take the button
-        // away, and so can a routine that simply allows no breaks -- `breakAvailability`
-        // refuses on `maximumBreaks == 0`, so a shield offering "Unlock with Lockty"
-        // there was offering a button that walks you into a flow which then says no.
-        let offersUnlock = !responsible.isEmpty && responsible.allSatisfy { routine in
-            let strictAllows = routine.modeSnapshot != .strict || routine.allowsPauseDuringStrictMode
-            return strictAllows && routine.breakPolicySnapshot.maximumBreaks > 0
-        }
+        // Strict mode is the only thing that takes the unlock button away, and a limit
+        // that has run out has nothing to give either: every responsible routine has to
+        // allow it, because one strict routine is enough to keep the app shut and a button
+        // that cannot deliver is a lie.
+        let offersUnlock = limitRule == nil
+            && !responsible.isEmpty
+            && responsible.allSatisfy { routine in
+                // Strict never offers it, whatever its pause policy says. Strict mode is
+                // the promise that this cannot be talked out of; a button that opens a
+                // negotiation is that promise being broken on the one screen where it is
+                // being tested.
+                routine.modeSnapshot != .strict && routine.breakPolicySnapshot.maximumBreaks > 0
+            }
 
-        let preferences = AppGroupStore().loadShieldScreenPreferences()
+        let preferences = store.loadShieldScreenPreferences()
         let packMessage = preferences.message(cost: todaysUsage(of: application))
 
-        let subtitle: String
-        switch responsible.count {
-        case 0:
-            subtitle = "This app is locked."
-        case 1:
-            let name = responsible[0].nameSnapshot
-            subtitle = offersUnlock
-                ? "\(name) is running. Ask Lockty to unlock it, or close the app."
-                : "\(name) is running."
-        default:
-            // Named rather than counted: knowing which routines are holding an app is
-            // what tells you whether to wait one out or go and end one.
-            let names = responsible.map(\.nameSnapshot).joined(separator: " and ")
-            subtitle = offersUnlock
-                ? "\(names) are running. Ask Lockty to unlock it, or close the app."
-                : "\(names) are running."
+        // The reasons, one per line, under an empty one.
+        //
+        // Both when both apply: a routine can be running *and* the app can have used its
+        // day, and picking one to mention leaves the other as a surprise the next time.
+        // The blank line above them is what keeps the title a title -- run together, the
+        // whole thing reads as a paragraph nobody finishes.
+        var reasons: [String] = []
+
+        if let limitRule {
+            reasons.append(Self.limitReason(limitRule, store: store))
         }
 
+        switch responsible.count {
+        case 0:
+            if reasons.isEmpty { reasons.append("This app is locked.") }
+        case 1:
+            reasons.append("\(responsible[0].nameSnapshot) is running.")
+        default:
+            // Named rather than counted: knowing which routines are holding an app is what
+            // tells you whether to wait one out or go and end one.
+            reasons.append("\(responsible.map(\.nameSnapshot).joined(separator: " and ")) are running.")
+        }
+
+        if offersUnlock {
+            reasons.append("Ask Lockty to unlock it, or close the app.")
+        }
+
+        // Its own face. An hourglass for a limit, the mode's own glyph for a mode, a shield
+        // for a session -- a padlock on everything said only that something was locked,
+        // which is the one thing already obvious from the screen being there.
+        let symbol: String
+        if preferences.isSilent {
+            symbol = "moon.fill"
+        } else if limitRule != nil {
+            symbol = "hourglass"
+        } else if let icon = responsible.first?.iconSnapshot, !icon.isEmpty {
+            symbol = icon
+        } else if responsible.first != nil {
+            symbol = "shield.fill"
+        } else {
+            symbol = "lock.fill"
+        }
+
+        // The colour of whatever is holding it: the routine's own, or the plain amber a
+        // limit is drawn in everywhere else. With several routines the first responsible
+        // one wins -- the same one the sentence names first -- because a shield cannot be
+        // two colours and a blend matches nothing anybody chose.
+        let tint = limitRule != nil
+            ? UIColor(red: 1.0, green: 0.77, blue: 0.34, alpha: 1)
+            : responsible.first.map { UIColor(routineColor: $0.colorSnapshot) }
+
+        // Light or dark, as the phone is.
+        //
+        // The whole screen was written for black: a near-black ground, white type, and a
+        // dark blur, forced whatever the device was set to. On a phone in light mode that
+        // is a panel from another app. The ground is now the system's own, the type is
+        // resolved through the trait collection, and the colour arrives as a cast over it
+        // either way.
+        let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+        let ground = isDark
+            ? UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1)
+            : UIColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1)
+        let primaryText: UIColor = isDark ? .white : UIColor(white: 0.06, alpha: 1)
+
         return ShieldConfiguration(
-            backgroundBlurStyle: .systemUltraThinMaterialDark,
-            backgroundColor: UIColor(red: 0.04, green: 0.045, blue: 0.055, alpha: 1),
-            icon: UIImage(systemName: preferences.isSilent ? "moon.fill" : "lock.fill"),
-            // The pack's line is the headline when there is one, with the routine's own
-            // sentence under it. The pack is what you chose to read; the sentence is why
-            // the app will not open, and dropping it would leave someone staring at a
-            // haiku with no idea what to do about it.
+            backgroundBlurStyle: isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight,
+            // A cast of the colour over the ground rather than the colour itself: this is
+            // read at arm's length over whatever app was opened, and a saturated ground
+            // would make the words on it hard work.
+            backgroundColor: tint?.blended(with: ground, amount: isDark ? 0.86 : 0.90) ?? ground,
+            icon: UIImage(systemName: symbol),
+            // The pack's line is the headline when there is one, with the reason under it.
+            // The pack is what you chose to read; the reason is why the app will not open,
+            // and dropping it would leave someone staring at a haiku with no idea what to
+            // do about it.
+            // Who stopped you, said plainly. "TikTok" on its own is the app announcing
+            // itself; "TikTok is blocked by Lockty" is an answer, and it is the first
+            // thing anybody wants from this screen.
             title: ShieldConfiguration.Label(
-                text: packMessage ?? resourceName,
-                color: .white
+                text: packMessage ?? "\(resourceName) is blocked by Lockty",
+                color: primaryText
             ),
+            // The pack's line is the headline when there is one, so the plain sentence
+            // moves down here in front of the reasons. The pack is what you chose to read;
+            // the reasons are why the app will not open, and dropping them would leave
+            // someone staring at a haiku with no idea what to do about it.
             subtitle: ShieldConfiguration.Label(
-                text: packMessage == nil ? subtitle : "\(resourceName) · \(subtitle)",
-                color: UIColor.white.withAlphaComponent(0.68)
+                text: packMessage == nil
+                    ? "\n" + reasons.joined(separator: "\n")
+                    : "\n\(resourceName) is blocked by Lockty.\n" + reasons.joined(separator: "\n"),
+                color: primaryText.withAlphaComponent(isDark ? 0.68 : 0.62)
             ),
             primaryButtonLabel: offersUnlock
                 ? ShieldConfiguration.Label(text: "Unlock with Lockty", color: .black)
                 : ShieldConfiguration.Label(text: "Close", color: .black),
-            primaryButtonBackgroundColor: .white,
+            // Every colour in the palette is light enough to carry black type, which is why
+            // the label above is black either way.
+            primaryButtonBackgroundColor: tint ?? (isDark ? .white : UIColor(white: 0.12, alpha: 1)),
             secondaryButtonLabel: offersUnlock
-                ? ShieldConfiguration.Label(text: "Close", color: UIColor.white.withAlphaComponent(0.85))
+                ? ShieldConfiguration.Label(text: "Close", color: primaryText.withAlphaComponent(0.85))
                 : nil
         )
+    }
+
+    /// What a limit says when it is the thing in the way.
+    ///
+    /// The figure, not the word: "you have used your 2 h today" is an answer, where "a
+    /// limit is running" is the screen restating itself.
+    private static func limitReason(_ rule: Rule, store: AppGroupStore) -> String {
+        _ = store
+
+        switch rule.kind {
+        case .openCountLimit:
+            let maximum = rule.openCountLimitConfiguration?.maximumOpens ?? 0
+            return "You have hit the limit of \(maximum) opens."
+
+        case .dailyUsageLimit:
+            let minutes = rule.dailyUsageLimitConfiguration?.maximumMinutesPerDay ?? 0
+            let length = minutes >= 60
+                ? (minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) m")
+                : "\(minutes) m"
+            return "You have hit the limit of \(length) here."
+
+        case .sessionDurationLimit:
+            let minutes = rule.sessionDurationLimitConfiguration?.maximumMinutesPerSession ?? 0
+            return "You have hit the limit of \(minutes) m at a time."
+
+        case .schedule:
+            return rule.name
+        }
     }
 
     /// How long this app has been used today, from the cached report snapshot.
@@ -127,5 +227,29 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let hours = minutes / 60
         let remainder = minutes % 60
         return remainder == 0 ? "\(hours) h" : "\(hours) h \(remainder) min"
+    }
+}
+
+private extension UIColor {
+    convenience init(routineColor: RoutineColor) {
+        let components = routineColor.components
+        self.init(red: components.red, green: components.green, blue: components.blue, alpha: 1)
+    }
+
+    /// This colour mixed towards another. `amount` is how much of the *other* one.
+    func blended(with other: UIColor, amount: CGFloat) -> UIColor {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        var otherRed: CGFloat = 0, otherGreen: CGFloat = 0, otherBlue: CGFloat = 0, otherAlpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha),
+              other.getRed(&otherRed, green: &otherGreen, blue: &otherBlue, alpha: &otherAlpha)
+        else { return other }
+
+        let mix = min(max(amount, 0), 1)
+        return UIColor(
+            red: red * (1 - mix) + otherRed * mix,
+            green: green * (1 - mix) + otherGreen * mix,
+            blue: blue * (1 - mix) + otherBlue * mix,
+            alpha: alpha * (1 - mix) + otherAlpha * mix
+        )
     }
 }

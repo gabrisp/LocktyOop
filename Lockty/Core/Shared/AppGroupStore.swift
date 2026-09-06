@@ -65,11 +65,9 @@ final class AppGroupStore {
                 throw AppGroupStoreError.decodeFailed
             }
             Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Loaded runtime state successfully.")
-            print("Loaded runtime state successfully.")
             return envelope.state
         } catch {
             Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").error("Failed decoding runtime state: \(error.localizedDescription, privacy: .public)")
-            print("Failed decoding runtime state: \(error.localizedDescription)")
             throw AppGroupStoreError.decodeFailed
         }
     }
@@ -83,7 +81,6 @@ final class AppGroupStore {
             legacyDefaultsKey: key
         )
         Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").notice("Saved runtime state.")
-        print("Saved runtime state.")
     }
 
     nonisolated func updateRuntimeState(_ transform: (inout RuntimeState) -> Void) throws {
@@ -103,7 +100,23 @@ final class AppGroupStore {
         }
     }
 
+    /// One day's report, from memory when it was read a moment ago.
+    ///
+    /// The trend builder walks a fortnight of these and the breakdown walks a month, and
+    /// each of those runs several times over a single load of Today: the log was hundreds
+    /// of lines of the same thirty files being decoded again. A report for a day that has
+    /// passed cannot change, and today's changes at most every few minutes.
     nonisolated func loadScreenTimeReportSnapshot(for day: DayKey) throws -> ScreenTimeReportSnapshot? {
+        if let cached = ReportSnapshotCache.shared.snapshot(for: day.id) {
+            return cached.value
+        }
+
+        let loaded = try loadScreenTimeReportSnapshotUncached(for: day)
+        ReportSnapshotCache.shared.store(loaded, for: day.id)
+        return loaded
+    }
+
+    private nonisolated func loadScreenTimeReportSnapshotUncached(for day: DayKey) throws -> ScreenTimeReportSnapshot? {
         if let data = try readData(
             fileName: reportFileName(for: day),
             legacyDefaultsKey: SharedKeys.screenTimeReportSnapshotPrefix + day.id
@@ -114,18 +127,18 @@ final class AppGroupStore {
                     Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").error("Snapshot schema mismatch for day \(day.id, privacy: .public)")
                     throw AppGroupStoreError.snapshotDecodeFailed
                 }
-                Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").notice("Loaded snapshot for day \(day.id, privacy: .public) apps=\(envelope.snapshot.applications.count)")
-                print("Loaded snapshot for day \(day.id) apps=\(envelope.snapshot.applications.count)")
+                // Deliberately quiet. A month of the breakdown reads ninety-odd days,
+                // and a `print` per day is ninety writes to stderr on whichever thread
+                // asked -- which was measurably slower than the file reads themselves.
+                // The failures below still say everything they said.
                 return envelope.snapshot
             } catch {
                 Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").error("Failed decoding snapshot for day \(day.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                print("Failed decoding snapshot for day \(day.id): \(error.localizedDescription)")
                 throw AppGroupStoreError.snapshotDecodeFailed
             }
         }
 
         Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").debug("No direct snapshot file for day \(day.id, privacy: .public), checking aggregated files.")
-        print("No direct snapshot file for day \(day.id), checking aggregated files.")
         return loadAllScreenTimeReportSnapshots().first { snapshot in
             snapshot.day.year == day.year &&
             snapshot.day.month == day.month &&
@@ -134,6 +147,7 @@ final class AppGroupStore {
     }
 
     nonisolated func saveScreenTimeReportSnapshot(_ snapshot: ScreenTimeReportSnapshot) throws {
+        ReportSnapshotCache.shared.invalidate()
         let envelope = ScreenTimeReportSnapshotEnvelope.current(snapshot)
         let data = try encoder.encode(envelope)
         try writeData(
@@ -142,7 +156,6 @@ final class AppGroupStore {
             legacyDefaultsKey: SharedKeys.screenTimeReportSnapshotPrefix + snapshot.day.id
         )
         Logger(subsystem: "com.gabrisp.Lockty", category: "screen-time").notice("Saved snapshot for day \(snapshot.day.id, privacy: .public) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
-        print("Saved snapshot for day \(snapshot.day.id) apps=\(snapshot.applications.count) segments=\(snapshot.activitySegments.count)")
     }
 
     nonisolated func loadAllScreenTimeReportSnapshots() -> [ScreenTimeReportSnapshot] {
@@ -211,7 +224,6 @@ final class AppGroupStore {
             fileName: "selection-records.json",
             legacyDefaultsKey: SharedKeys.screenTimeSelectionRecordsKey
         )
-        print("Saved selection records count=\(records.count)")
     }
 
     nonisolated func loadPauseRuleSnapshots() -> [PauseRuleSnapshot] {
@@ -282,6 +294,95 @@ final class AppGroupStore {
         try writeData(data, fileName: "user-app-groups.json", legacyDefaultsKey: nil)
     }
 
+    // MARK: - Rule history
+
+    /// What each rule did, day by day. See `RuleHistory`.
+    nonisolated func loadRuleHistory() -> RuleHistory {
+        guard let data = (try? readData(fileName: "rule-history.json", legacyDefaultsKey: nil)) ?? nil,
+              let history = try? decoder.decode(RuleHistory.self, from: data) else {
+            return .empty
+        }
+        return history
+    }
+
+    nonisolated func saveRuleHistory(_ history: RuleHistory) throws {
+        let data = try encoder.encode(history)
+        try writeData(data, fileName: "rule-history.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func updateRuleHistory(_ transform: (inout RuleHistory) -> Void) throws {
+        var history = loadRuleHistory()
+        transform(&history)
+        try saveRuleHistory(history)
+    }
+
+    // MARK: - Quick actions
+
+    /// What sits behind the plus button, in the order it was arranged.
+    nonisolated func loadQuickActions() -> QuickActionSet {
+        guard let data = (try? readData(fileName: "quick-actions.json", legacyDefaultsKey: nil)) ?? nil,
+              let set = try? decoder.decode(QuickActionSet.self, from: data) else {
+            return .default
+        }
+        return set
+    }
+
+    nonisolated func saveQuickActions(_ set: QuickActionSet) throws {
+        let data = try encoder.encode(set)
+        try writeData(data, fileName: "quick-actions.json", legacyDefaultsKey: nil)
+    }
+
+    // MARK: - Daily scores
+
+    /// The day's finished scores, for the home screen.
+    ///
+    /// Written by the app whenever it works them out and read by the widget, which has no
+    /// way to compute them itself.
+    nonisolated func loadDailyScores() -> DailyScoreSnapshot? {
+        guard let data = (try? readData(fileName: "daily-scores.json", legacyDefaultsKey: nil)) ?? nil else {
+            return nil
+        }
+        return try? decoder.decode(DailyScoreSnapshot.self, from: data)
+    }
+
+    nonisolated func saveDailyScores(_ snapshot: DailyScoreSnapshot) throws {
+        let data = try encoder.encode(snapshot)
+        try writeData(data, fileName: "daily-scores.json", legacyDefaultsKey: nil)
+    }
+
+    // MARK: - Objectives
+
+    nonisolated func loadObjectives() -> [Objective] {
+        guard let data = (try? readData(fileName: "objectives.json", legacyDefaultsKey: nil)) ?? nil else {
+            return []
+        }
+        return (try? decoder.decode([Objective].self, from: data)) ?? []
+    }
+
+    nonisolated func saveObjectives(_ objectives: [Objective]) throws {
+        let data = try encoder.encode(objectives)
+        try writeData(data, fileName: "objectives.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func loadObjectiveProgress() -> ObjectiveProgressState {
+        guard let data = (try? readData(fileName: "objective-progress.json", legacyDefaultsKey: nil)) ?? nil,
+              let state = try? decoder.decode(ObjectiveProgressState.self, from: data) else {
+            return .empty
+        }
+        return state
+    }
+
+    nonisolated func saveObjectiveProgress(_ state: ObjectiveProgressState) throws {
+        let data = try encoder.encode(state)
+        try writeData(data, fileName: "objective-progress.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func updateObjectiveProgress(_ transform: (inout ObjectiveProgressState) -> Void) throws {
+        var state = loadObjectiveProgress()
+        transform(&state)
+        try saveObjectiveProgress(state)
+    }
+
     nonisolated func loadAutoFocusConfiguration() -> AutoFocusConfiguration {
         guard let data = (try? readData(fileName: "autofocus-configuration.json", legacyDefaultsKey: nil)) ?? nil,
               let configuration = try? decoder.decode(AutoFocusConfiguration.self, from: data) else {
@@ -307,12 +408,62 @@ final class AppGroupStore {
         try writeData(data, fileName: "rules.json", legacyDefaultsKey: nil)
     }
 
+    /// Every app name the report extension has ever written down.
+    nonisolated func loadAppNameCatalog() -> AppNameCatalog {
+        guard let data = (try? readData(fileName: "app-names.json", legacyDefaultsKey: nil)) ?? nil,
+              let catalog = try? decoder.decode(AppNameCatalog.self, from: data) else {
+            return .empty
+        }
+        return catalog
+    }
+
+    nonisolated func saveAppNameCatalog(_ catalog: AppNameCatalog) throws {
+        let data = try encoder.encode(catalog)
+        try writeData(data, fileName: "app-names.json", legacyDefaultsKey: nil)
+    }
+
+    /// Files the names in a snapshot, keeping everything already known.
+    ///
+    /// Called from the report extension, which is the only process that ever learns one.
+    nonisolated func noteAppNames(from snapshot: ScreenTimeReportSnapshot) {
+        var catalog = loadAppNameCatalog()
+        let before = catalog.records
+        for application in snapshot.applications {
+            catalog.note(application.app)
+        }
+        guard catalog.records != before else { return }
+        try? saveAppNameCatalog(catalog)
+    }
+
+    nonisolated func loadRulePauseState() -> RulePauseState {
+        guard let data = (try? readData(fileName: "rule-pauses.json", legacyDefaultsKey: nil)) ?? nil,
+              let state = try? decoder.decode(RulePauseState.self, from: data) else {
+            return .empty
+        }
+        return state
+    }
+
+    nonisolated func saveRulePauseState(_ state: RulePauseState) throws {
+        let data = try encoder.encode(state)
+        try writeData(data, fileName: "rule-pauses.json", legacyDefaultsKey: nil)
+    }
+
+    nonisolated func updateRulePauseState(_ transform: (inout RulePauseState) -> Void) throws {
+        var state = loadRulePauseState()
+        transform(&state)
+        try saveRulePauseState(state)
+    }
+
     /// The rules the shield has to honour, and what they have spent today.
     ///
     /// Read together because they are only meaningful together: a rule says what it
     /// limits, the enforcement record says whether that limit has been hit.
+    /// A rule on hold is not a rule right now: it is dropped here, at the one point every
+    /// caller goes through, rather than at each of the four places that build a policy.
     nonisolated func loadShieldRules() -> (rules: [Rule], enforcement: RuleEnforcementState) {
-        (loadStoredRules().filter(\.isEnabled), loadRuleEnforcementState())
+        let pauses = loadRulePauseState()
+        let rules = loadStoredRules().filter { $0.isEnabled && !pauses.isPaused($0.id) }
+        return (rules, loadRuleEnforcementState())
     }
 
     /// The apps in the Always Allowed group.
@@ -391,7 +542,6 @@ final class AppGroupStore {
     ) throws -> Data? {
         if let fileURL = fileURL(named: fileName), fileManager.fileExists(atPath: fileURL.path) {
             Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").debug("Reading shared file \(fileName, privacy: .public) at \(fileURL.path(percentEncoded: false), privacy: .public)")
-            print("Reading shared file \(fileName) at \(fileURL.path(percentEncoded: false))")
             return try Data(contentsOf: fileURL)
         }
 
@@ -418,7 +568,6 @@ final class AppGroupStore {
             defaults?.set(data, forKey: legacyDefaultsKey)
         }
         Logger(subsystem: "com.gabrisp.Lockty", category: "persistence").notice("Wrote shared file \(fileName, privacy: .public) to \(fileURL.path(percentEncoded: false), privacy: .public)")
-        print("Wrote shared file \(fileName) to \(fileURL.path(percentEncoded: false))")
     }
 
     nonisolated private func removeData(
@@ -462,5 +611,44 @@ final class AppGroupStore {
         value.replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: ":", with: "-")
             .replacingOccurrences(of: " ", with: "_")
+    }
+}
+
+/// Report snapshots, briefly remembered.
+///
+/// Reading one is a file read and a decode of a day's worth of app activity, and the same
+/// thirty days are walked by the trend, the breakdown and the insights on every load. A
+/// few seconds of memory turns that from hundreds of decodes into thirty.
+///
+/// A class with a lock rather than an actor: every reader is `nonisolated`, and several of
+/// them are extensions.
+private final class ReportSnapshotCache: @unchecked Sendable {
+    static let shared = ReportSnapshotCache()
+
+    /// Long enough to cover one screen's worth of reads, short enough that a report
+    /// written by the extension shows up almost at once.
+    private let lifetime: TimeInterval = 5
+
+    private let lock = NSLock()
+    private var entries: [String: (value: ScreenTimeReportSnapshot?, readAt: Date)] = [:]
+
+    func snapshot(for key: String) -> (value: ScreenTimeReportSnapshot?, readAt: Date)? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let entry = entries[key], Date().timeIntervalSince(entry.readAt) < lifetime else { return nil }
+        return entry
+    }
+
+    func store(_ snapshot: ScreenTimeReportSnapshot?, for key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[key] = (snapshot, Date())
+    }
+
+    func invalidate() {
+        lock.lock()
+        defer { lock.unlock() }
+        entries.removeAll()
     }
 }

@@ -219,6 +219,16 @@ enum FrictionCatalog {
             tint: .orange
         ) {
             .steps(StepsConfiguration())
+        },
+        FrictionCatalogItem(
+            kind: .objectives,
+            category: .personal,
+            title: "Objectives",
+            subtitle: "Only continue once you have met what you set yourself.",
+            systemImage: "target",
+            tint: .mint
+        ) {
+            .objectives(ObjectivesFrictionConfiguration())
         }
     ]
 

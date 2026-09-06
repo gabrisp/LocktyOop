@@ -195,7 +195,10 @@ final class ApplicationDetailViewModel: ObservableObject {
     }
 
     func updateClassification(_ classification: AppClassification) {
-        todayViewModel.updateClassification(appID: appID, classification: classification, day: day)
+        // The identity, not the id: it carries the token, which is the only thing that
+        // can be handed to Screen Time to watch.
+        guard let app = appUsage?.app else { return }
+        todayViewModel.updateClassification(app: app, classification: classification, day: day)
         appUsage?.classification = classification
     }
 }

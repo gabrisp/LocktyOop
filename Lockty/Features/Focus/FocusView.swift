@@ -26,7 +26,7 @@ struct FocusView: View {
         var id: String { rawValue }
     }
 
-    private var gutter: CGFloat { LocktySpacing.lg }
+    private var gutter: CGFloat { LocktySpacing.tabInset }
     private var tileWidth: CGFloat { RoutineGridMetrics.tileWidth }
     private var appTileWidth: CGFloat { 110 }
     private var appFolderShape: RoundedRectangle {
@@ -78,8 +78,9 @@ struct FocusView: View {
             .padding(.horizontal, gutter)
             .padding(.vertical, LocktySpacing.lg)
         }
-        .navigationTitle("Focus")
-        .navigationBarTitleDisplayMode(.large)
+        // No title. The tab bar underneath already says Focus, and a large title repeating
+        // it cost the top third of the screen to say a word that was never in doubt.
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -104,18 +105,25 @@ struct FocusView: View {
             Text(quickTimer.errorMessage ?? "")
         }
         .task {
-            await quickTimer.load()
-            await frictionRepository.seedDefaultFrictionIfNeeded()
-            await rulesViewModel.load()
-            await frictionsViewModel.load()
-            await appsViewModel.load()
+            // All at once. These were five awaits in a row -- a Core Data fetch, a seed, a
+            // schedule sync and two more fetches -- so the screen waited for the sum of
+            // them before it could draw anything, which is the pause you feel walking into
+            // Focus. They do not depend on each other, so they do not have to queue.
+            async let timer: Void = quickTimer.load()
+            async let seed: Void = frictionRepository.seedDefaultFrictionIfNeeded()
+            async let rules: Void = rulesViewModel.load()
+            async let frictions: Void = frictionsViewModel.load()
+            async let apps: Void = appsViewModel.load()
+
+            _ = await (timer, seed, rules, frictions, apps)
         }
         .onChange(of: router.sheet) { _, newValue in
             guard newValue == nil else { return }
             Task {
-                await rulesViewModel.load()
-                await frictionsViewModel.load()
-                await appsViewModel.load()
+                async let rules: Void = rulesViewModel.load()
+                async let frictions: Void = frictionsViewModel.load()
+                async let apps: Void = appsViewModel.load()
+                _ = await (rules, frictions, apps)
             }
         }
     }
@@ -131,20 +139,42 @@ struct FocusView: View {
         let groups = todayViewModel.activeRoutineGroups
 
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-            if groups.count == 1, let group = groups.first {
-                ring(for: group)
-                    .frame(maxWidth: .infinity)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: LocktySpacing.lg) {
-                        ForEach(groups) { group in
-                            ring(for: group, side: 112)
-                        }
-                    }
-                    .padding(.vertical, 2)
+            // What is running, as pills that count down. The same object as the day's
+            // three scores, so the two screens read alike -- except the figure inside
+            // moves every second, because that is what there is to know about a mode
+            // while it is on.
+            ActiveModePills(routines: todayViewModel.activeRoutineGroups.map(\.routine)) { routine in
+                // A shield is a routine to the engine and to nothing else. Opening the
+                // routine editor on one shows a sheet built to read a saved mode -- its
+                // schedule, its tasks, its name -- against something that has none of
+                // that and is not in the library at all, which is why it looked so odd.
+                // It gets its own sheet back, which is where it was set up.
+                if routine.routineID == QuickTimerViewModel.routineID {
+                    router.presentSheet(.quickShield)
+                } else {
+                    // The routine's own sheet, not the live-session one: that was built
+                    // for a screen that no longer exists, while the editor's read-only
+                    // face shows the apps, the pause and the strict guards.
+                    router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.routineID)))
                 }
-                .scrollClipDisabled()
             }
+
+            // The rings this replaced. Kept, not removed: they say the same thing at four
+            // times the size, and one of the two had to go.
+//          if groups.count == 1, let group = groups.first {
+//              ring(for: group)
+//                  .frame(maxWidth: .infinity)
+//          } else {
+//              ScrollView(.horizontal, showsIndicators: false) {
+//                  HStack(spacing: LocktySpacing.lg) {
+//                      ForEach(groups) { group in
+//                          ring(for: group, side: 112)
+//                      }
+//                  }
+//                  .padding(.vertical, 2)
+//              }
+//              .scrollClipDisabled()
+//          }
 
             if let routineCardState = todayViewModel.routineCardState,
                routineCardState.phase == .active {
@@ -156,6 +186,7 @@ struct FocusView: View {
                     onUnlock: { _ in },
                     onOpenSection: {}
                 )
+                .transition(.blurReplace)
             }
 
             if let checklist = todayViewModel.state(for: Date()).activeRoutineChecklist {
@@ -164,9 +195,14 @@ struct FocusView: View {
                         await todayViewModel.toggleActiveRoutineTask(item.id, day: Date())
                     }
                 }
+                .transition(.blurReplace)
             }
         }
+        // The rings and the card go with the routine that owned them, rather than
+        // vanishing between one frame and the next -- and they go the moment the engine
+        // says so, wherever the routine was ended from.
         .animation(.smooth(duration: 0.32), value: groups.map(\.id))
+        .animation(.smooth(duration: 0.32), value: todayViewModel.routineCardState?.id)
     }
 
     private func ring(for group: TodayActiveRoutineGroup, side: CGFloat = 128) -> some View {
@@ -252,12 +288,17 @@ struct FocusView: View {
                         RoutineCard(
                             routine: routine,
                             isActive: rulesViewModel.activeScheduleRuleIDs().contains(rule.id),
-                            applicationTokens: rulesViewModel.tokens(for: rule.id)
+                            applicationTokens: rulesViewModel.tokens(for: rule.id),
+                            pausedUntil: rulesViewModel.pausedUntil(for: rule.id)
                         ) {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: rule.id)))
                         }
                     } else {
-                        RuleCard(rule: rule, applicationTokens: rulesViewModel.tokens(for: rule.id)) {
+                        RuleCard(
+                            rule: rule,
+                            applicationTokens: rulesViewModel.tokens(for: rule.id),
+                            pausedUntil: rulesViewModel.pausedUntil(for: rule.id)
+                        ) {
                             router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: rule.id)))
                         }
                     }
@@ -294,7 +335,8 @@ struct FocusView: View {
                 AppFolderCard(
                     title: "Unproductive",
                     subtitle: folderCountText(appsViewModel.distractingTokens.count),
-                    tokens: appsViewModel.distractingTokens
+                    tokens: appsViewModel.distractingTokens,
+                    titleAlignment: .center
                 )
                 .frame(width: appTileWidth)
             }
@@ -313,7 +355,8 @@ struct FocusView: View {
                 AppFolderCard(
                     title: "Always Allowed",
                     subtitle: folderCountText(appsViewModel.alwaysAllowedTokens.count),
-                    tokens: appsViewModel.alwaysAllowedTokens
+                    tokens: appsViewModel.alwaysAllowedTokens,
+                    titleAlignment: .center
                 )
                 .frame(width: appTileWidth)
                 .opacity(appsViewModel.isAlwaysAllowedLocked ? 0.45 : 1)
@@ -327,7 +370,12 @@ struct FocusView: View {
                     AppFolderCard(
                         title: group.name,
                         subtitle: folderCountText(appsViewModel.tokens(for: group.id).count),
-                        tokens: appsViewModel.tokens(for: group.id)
+                        tokens: appsViewModel.tokens(for: group.id),
+                        // Centred, like the "New group" tile sitting at the end of the
+                        // same row. A row is not a column: there is no left edge for the
+                        // names to line up on, so leading alignment only made each name
+                        // hug a different point under its own folder.
+                        titleAlignment: .center
                     )
                     .frame(width: appTileWidth)
                 }
@@ -364,30 +412,8 @@ struct FocusView: View {
     }
 
     private func addTile(title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            CardView(radius: RoutineGridMetrics.tileRadius, interactive: true, height: RoutineGridMetrics.tileHeight) {
-                VStack(spacing: LocktySpacing.sm) {
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(Color(uiColor: .systemBackground))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(LocktyColors.primaryText))
-
-                    Text(title)
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .buttonStyle(.locktyInteractive)
-        .tappable()
-        .frame(width: tileWidth)
+        LocktyAddTile(title: title, action: action)
+            .frame(width: tileWidth)
     }
 }
 

@@ -8,17 +8,20 @@ import Foundation
 @MainActor
 struct RoutineScheduleCoordinator {
     private let repository: RoutineRepository
+    private let routineExecutionRepository: RoutineExecutionRepository
     private let appGroupStore: AppGroupStore
     private let deviceActivityService: DeviceActivityServicing
     private let alarmService: AlarmServicing
 
     init(
         repository: RoutineRepository,
+        routineExecutionRepository: RoutineExecutionRepository,
         appGroupStore: AppGroupStore,
         deviceActivityService: DeviceActivityServicing,
         alarmService: AlarmServicing
     ) {
         self.repository = repository
+        self.routineExecutionRepository = routineExecutionRepository
         self.appGroupStore = appGroupStore
         self.deviceActivityService = deviceActivityService
         self.alarmService = alarmService
@@ -44,9 +47,35 @@ struct RoutineScheduleCoordinator {
         }
     }
 
-    func sync() async {
+    /// When the last full sync ran.
+    ///
+    /// The lists call this on every appearance, and a sync reads every rule and routine,
+    /// fingerprints each monitor and asks DeviceActivity what it is running. Nothing of
+    /// that changes twice in a few seconds, and it was the slowest thing between tapping
+    /// Focus and seeing it.
+    private static var lastSyncedAt: Date?
+    private static let minimumInterval: TimeInterval = 20
+
+    func sync(force: Bool = false) async {
+        // Every monitor this registers is something that would fire and rebuild what the
+        // debug kill just tore down. It runs on launch and on every visit to a list, so it
+        // is the surest way for a kill to undo itself.
+        #if DEBUG
+        guard !DebugKillSwitch.isKilled else {
+            print("Schedules not synced: debug kill switch is on")
+            return
+        }
+        #endif
+
+        if !force, let last = Self.lastSyncedAt, Date().timeIntervalSince(last) < Self.minimumInterval {
+            return
+        }
+        Self.lastSyncedAt = Date()
+
         await syncRules()
         await syncAutoFocus()
+        await syncUsageMilestones()
+        await syncStreakReminder()
 
         guard let routines = try? await repository.routines() else { return }
 
@@ -68,6 +97,59 @@ struct RoutineScheduleCoordinator {
         }
 
         await syncStartAlarms(routines: routines)
+    }
+
+    /// Books tonight's streak reminder, or withdraws it.
+    ///
+    /// On every sync rather than only when the streak screen is opened: the reminder is
+    /// for the evening of a day that has not been earned, and most such days are days
+    /// nobody opened that screen.
+    private func syncStreakReminder() async {
+        let executions = (try? await routineExecutionRepository.executions(from: nil, to: nil)) ?? []
+        let calendar = Calendar.current
+        let routineDays = Set(executions.map { DayKey(date: $0.startedAt, calendar: calendar) })
+
+        let summary = await Task.detached(priority: .utility) {
+            StreakCalculator().summary(routineDays: routineDays, calendar: calendar)
+        }.value
+
+        StreakReminderScheduler().refresh(
+            isTodayEarned: summary.isTodayEarned,
+            current: summary.current
+        )
+    }
+
+    /// Sets the "you have passed yesterday" watches on the couple of apps where passing
+    /// yesterday would mean anything.
+    ///
+    /// Yesterday's own report is the bar. Apps that barely registered yesterday are left
+    /// out: clearing four minutes says more about yesterday than about today.
+    private func syncUsageMilestones() async {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+
+        guard let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: yesterday)) else {
+            return
+        }
+
+        let milestones = snapshot.applications
+            .filter { $0.totalActivityDuration >= Double(UsageMilestoneNotice.minimumMinutes) * 60 }
+            .sorted { $0.totalActivityDuration > $1.totalActivityDuration }
+            .prefix(UsageMilestoneNotice.maximumWatched)
+            .compactMap { application -> UsageMilestone? in
+                guard let token = application.app.applicationToken else { return nil }
+                return UsageMilestone(
+                    appID: application.app.id,
+                    token: token,
+                    minutes: Int(application.totalActivityDuration / 60)
+                )
+            }
+
+        do {
+            try await deviceActivityService.syncUsageMilestones(Array(milestones))
+        } catch {
+            print("Usage milestone sync failed: \(error.localizedDescription)")
+        }
     }
 
     /// Keeps AutoFocus watching whatever is currently marked as distracting.

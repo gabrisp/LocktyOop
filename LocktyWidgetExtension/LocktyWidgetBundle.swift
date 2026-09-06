@@ -5,5 +5,7 @@ import WidgetKit
 struct LocktyWidgetBundle: WidgetBundle {
     var body: some Widget {
         PauseAllowanceLiveActivity()
+        ObjectivesWidget()
+        ScoresWidget()
     }
 }

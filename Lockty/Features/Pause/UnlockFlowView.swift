@@ -128,7 +128,7 @@ struct UnlockFlowView: View {
         case .friction:
             currentStepStatus.primaryState.title
         default:
-            "Continuar"
+            "Continue"
         }
     }
 
@@ -408,7 +408,14 @@ struct UnlockFlowStepPreview: View {
     var locationService: LocationTriggerServicing?
 
     var body: some View {
+        // One gutter, here, for every step there is.
+        //
+        // It used to live inside the step views, and only nine of the sixteen had it --
+        // so a flow of three steps could have two of them inset and the third running to
+        // the edge of the screen. Which ones were which was invisible until they were
+        // seen side by side in the catalogue.
         content
+            .padding(.horizontal, 16)
     }
 
     @ViewBuilder
@@ -486,6 +493,13 @@ struct UnlockFlowStepPreview: View {
             } else {
                 placeholder(systemImage: "wave.3.right", title: "Scan a tag")
             }
+
+        case .objectives(let configuration):
+            UnlockObjectivesStepView(
+                configuration: configuration,
+                status: $status,
+                healthService: healthService
+            )
 
         case .steps(let configuration):
             if let healthService {

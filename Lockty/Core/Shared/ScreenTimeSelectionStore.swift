@@ -23,12 +23,25 @@ struct ScreenTimeSelectionStore {
     nonisolated func load(scope: ScreenTimeSelectionScope) throws -> FamilyActivitySelection {
         let selection = records().first(where: { $0.scope == scope })?.selection ?? FamilyActivitySelection()
         selectionLogger().debug("Loaded selection for scope=\(scope.id, privacy: .public) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
-        print("Loaded selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
         return selection
     }
 
     func save(_ selection: FamilyActivitySelection, scope: ScreenTimeSelectionScope) throws {
         var storedRecords = records()
+
+        // Nothing to do when it is already what is stored.
+        //
+        // One guard, in the one place every write goes through. Loading the routines wrote
+        // all four of their selections back every time -- and each write re-reads and
+        // re-encodes a file of two hundred records -- so opening Focus was a dozen reads
+        // and a dozen writes to save exactly what was already there.
+        if let existing = storedRecords.first(where: { $0.scope == scope }),
+           existing.selection.applicationTokens == selection.applicationTokens,
+           existing.selection.categoryTokens == selection.categoryTokens,
+           existing.selection.webDomainTokens == selection.webDomainTokens {
+            return
+        }
+
         let record = ScreenTimeSelectionRecord(scope: scope, selection: selection)
         if let index = storedRecords.firstIndex(where: { $0.scope == scope }) {
             storedRecords[index] = record
@@ -36,8 +49,8 @@ struct ScreenTimeSelectionStore {
             storedRecords.append(record)
         }
         try appGroupStore.saveSelectionRecords(storedRecords)
+        SelectionRecordCache.shared.invalidate()
         selectionLogger().notice("Saved selection for scope=\(scope.id, privacy: .public) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
-        print("Saved selection scope=\(scope.id) apps=\(selection.applicationTokens.count) categories=\(selection.categoryTokens.count) domains=\(selection.webDomainTokens.count)")
     }
 
     func remove(scope: ScreenTimeSelectionScope) throws {
@@ -45,12 +58,11 @@ struct ScreenTimeSelectionStore {
         let previousCount = storedRecords.count
         storedRecords.removeAll { $0.scope == scope }
         guard storedRecords.count != previousCount else {
-            print("No selection record found to remove for scope=\(scope.id)")
             return
         }
         try appGroupStore.saveSelectionRecords(storedRecords)
+        SelectionRecordCache.shared.invalidate()
         selectionLogger().notice("Removed selection for scope=\(scope.id, privacy: .public)")
-        print("Removed selection scope=\(scope.id)")
     }
 
     nonisolated func record(scope: ScreenTimeSelectionScope) -> ScreenTimeSelectionRecord? {
@@ -100,10 +112,8 @@ struct ScreenTimeSelectionStore {
                 })
                 .sorted(by: { $0.updatedAt > $1.updatedAt })
                 .first {
-                print("Resolved pause selection for appID=\(appID.rawValue) from scope=\(matched.scope.id)")
                 return matched.selection
             }
-            print("No pause selection found for appID=\(appID.rawValue)")
             return FamilyActivitySelection()
         case .combined:
             return mergedSelection(for: policy)
@@ -117,15 +127,6 @@ struct ScreenTimeSelectionStore {
             record.isContained(in: policy)
         }
 
-        print(
-            """
-            Merging selection for policy reason=\(String(describing: policy.reason)) \
-            policyApps=\(policy.blockedApplications.count) \
-            policyDomains=\(policy.blockedDomains.count) \
-            matchedScopes=\(matchingRecords.map(\.scope.id))
-            """
-        )
-
         return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
             partialResult.applicationTokens.formUnion(record.selection.applicationTokens)
             partialResult.categoryTokens.formUnion(record.selection.categoryTokens)
@@ -135,7 +136,6 @@ struct ScreenTimeSelectionStore {
 
     nonisolated func mergedSelection(scopes: Set<ScreenTimeSelectionScope>) -> FamilyActivitySelection {
         let matchingRecords = records().filter { scopes.contains($0.scope) }
-        print("Merging selection for explicit scopes=\(matchingRecords.map { $0.scope.id })")
         return matchingRecords.reduce(into: FamilyActivitySelection()) { partialResult, record in
             partialResult.applicationTokens.formUnion(record.selection.applicationTokens)
             partialResult.categoryTokens.formUnion(record.selection.categoryTokens)
@@ -143,10 +143,66 @@ struct ScreenTimeSelectionStore {
         }
     }
 
+    /// Every stored selection, from memory when it was read a moment ago.
+    ///
+    /// This is the hottest read in the app and the most expensive one: the file holds a
+    /// couple of hundred records and each carries a `FamilyActivitySelection`, whose tokens
+    /// are opaque blobs that are slow to decode. It is called from `load`, from `record`,
+    /// from `mergedSelection` -- which itself runs once per rule, per limit and per shield
+    /// policy -- so a single pass over Today or Focus decoded that file dozens of times
+    /// over for an answer that had not changed. The log was full of nothing else.
+    ///
+    /// Cached for a second, and dropped the moment this process writes. A second is long
+    /// enough to collapse a screen's worth of reads into one and short enough that nothing
+    /// another process wrote can be missed by more than that.
     nonisolated func records() -> [ScreenTimeSelectionRecord] {
+        if let cached = SelectionRecordCache.shared.records() {
+            return cached
+        }
+
         let loadedRecords = appGroupStore.loadSelectionRecords()
+        SelectionRecordCache.shared.store(loadedRecords)
         selectionLogger().debug("Loaded selection record count=\(loadedRecords.count)")
-        print("Loaded selection record count=\(loadedRecords.count)")
         return loadedRecords
+    }
+}
+
+/// The records, briefly remembered.
+///
+/// A class with a lock rather than an actor: every reader here is `nonisolated` and most
+/// are not on the main actor -- the extensions read this too -- and making them await
+/// would mean making half the app's read paths async for a cache.
+private final class SelectionRecordCache: @unchecked Sendable {
+    static let shared = SelectionRecordCache()
+
+    /// How long a read stays good for. Long enough to cover one screen's worth of calls.
+    private let lifetime: TimeInterval = 1
+
+    private let lock = NSLock()
+    private var cached: [ScreenTimeSelectionRecord]?
+    private var readAt: Date?
+
+    func records() -> [ScreenTimeSelectionRecord]? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let cached, let readAt, Date().timeIntervalSince(readAt) < lifetime else { return nil }
+        return cached
+    }
+
+    func store(_ records: [ScreenTimeSelectionRecord]) {
+        lock.lock()
+        defer { lock.unlock() }
+        cached = records
+        readAt = Date()
+    }
+
+    /// After a write of our own, so the next read is the truth rather than the second
+    /// before it.
+    func invalidate() {
+        lock.lock()
+        defer { lock.unlock() }
+        cached = nil
+        readAt = nil
     }
 }

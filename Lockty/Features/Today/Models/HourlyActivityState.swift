@@ -60,6 +60,11 @@ struct HourlyActivityState: Equatable {
     /// people quietly build a belief on.
     var reductionVersusBaseline: TimeInterval?
 
+    /// What an ordinary earlier day looked like, for the two counts. Nil under three days
+    /// of history, for the same reason the reduction is.
+    var baselineUnlocks: Double?
+    var baselineNotifications: Double?
+
     static let empty = HourlyActivityState(
         hours: (0..<24).map { Hour(hour: $0, usage: 0, unlocks: 0, notifications: 0) },
         reductionVersusBaseline: nil

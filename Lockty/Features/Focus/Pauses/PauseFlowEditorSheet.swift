@@ -275,7 +275,7 @@ struct PauseFlowStepRow: View {
         // The six newer steps have their settings in the friction editor, which is where
         // steps are written now. This sheet edits the older pause flows and shows them
         // as they are.
-        case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue:
+        case .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .pastAnswers, .tuneValue, .objectives:
             EmptyView()
 
         case .countdown(let configuration):

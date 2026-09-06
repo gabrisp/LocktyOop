@@ -14,6 +14,14 @@ struct AllowanceTimerRoute: Hashable {
 enum SheetRoute: Hashable, Identifiable {
     case allowanceTimer(AllowanceTimerRoute)
     case dayPicker
+    case streak
+    /// Writing an objective, or reading one. Nil is a new one.
+    ///
+    /// Through the router like every other editor. It used to be a `.sheet` attached to
+    /// the objectives page itself, which never presented: the page already sits inside
+    /// the stack that the router's own sheet is attached to, and the second presentation
+    /// simply never happened.
+    case objectiveEditor(UUID?)
     case focusCreationChoice(FocusCreationChoiceRoute)
     case appClassification(AppIdentity.ID)
     case breakStatus(BreakUnavailableState)
@@ -28,6 +36,8 @@ enum SheetRoute: Hashable, Identifiable {
     case pauseFlowEditor(PauseFlowEditorRoute)
     case frictionEditor(FrictionEditorRoute)
     case appGroupEditor(AppGroupEditorRoute)
+    /// A shield put up on the spot: a length, what it holds, and it starts.
+    case quickShield
     case autoFocus
     case alwaysAllowed
     case productivityDetail(Date)
@@ -42,6 +52,8 @@ enum SheetRoute: Hashable, Identifiable {
         switch self {
         case .allowanceTimer(let route): "allowance-timer-\(route.appID.rawValue)"
         case .dayPicker: "day-picker"
+        case .streak: "streak"
+        case .objectiveEditor(let id): "objective-editor-\(id?.uuidString ?? "new")"
         case .focusCreationChoice(let route): "focus-creation-choice-\(route.draftID.uuidString)"
         case .appClassification(let id): "app-classification-\(id.rawValue)"
         case .breakStatus(let state): "break-status-\(state.id.uuidString)"
@@ -56,6 +68,7 @@ enum SheetRoute: Hashable, Identifiable {
         case .pauseFlowEditor(let route): "pause-flow-editor-\(route.draftID.uuidString)"
         case .frictionEditor(let route): "friction-editor-\(route.draftID.uuidString)"
         case .appGroupEditor(let route): "app-group-editor-\(route.draftID.uuidString)"
+        case .quickShield: "quick-shield"
         case .autoFocus: "auto-focus"
         case .alwaysAllowed: "always-allowed"
         case .productivityDetail(let day): "productivity-detail-\(day.timeIntervalSince1970)"

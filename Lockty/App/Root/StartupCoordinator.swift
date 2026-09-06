@@ -67,7 +67,7 @@ final class StartupCoordinator: ObservableObject {
             // the app is reinstalled or authorization is re-granted -- re-registering
             // here means a scheduled routine keeps starting without the user having to
             // open its editor again.
-            await scheduleCoordinator.sync()
+            await scheduleCoordinator.sync(force: true)
         } catch {
             session.recordStartupError(error.localizedDescription)
             appGroupStore.resetRuntimeStateToSafeDefault()
@@ -92,6 +92,14 @@ final class StartupCoordinator: ObservableObject {
         // and one that had already ended stayed on it.
         await routineEngine.restore(from: runtimeState)
         await pauseEngine.restore(from: runtimeState)
+
+        // And the shield is recomputed from the rules as they stand, exactly as on a
+        // cold launch. A limit rule has nothing that starts or stops it -- no routine, no
+        // schedule -- so its block is only ever as current as the last thing that
+        // recomputed the policy. Coming back to the app is one of those moments, and
+        // without this a gate that had gone up while Lockty was away could be left
+        // sitting in the App Group while the phone enforced an older policy.
+        await pauseEngine.refreshShields()
 
         // Surfaced as a card on Today rather than presented: a cover thrown up over
         // whatever the user was doing is also what made it loop, since pendingPause
@@ -134,6 +142,30 @@ final class StartupCoordinator: ObservableObject {
         clearUnlockNotification(for: context.pauseRuleID)
 
         Task { @MainActor in
+            // A limit rule answers for itself.
+            //
+            // It has no routine behind it, and `breakAvailability` is a question about a
+            // routine's break policy -- asked about an app held by an open-count rule it
+            // came back "unavailable" every time, so tapping the shield and coming here
+            // produced a refusal toast on every single foreground, for a rule with nine
+            // of its ten opens still unspent.
+            if let limitRuleID = context.limitRuleID {
+                let decision = RuleShieldLookup(appGroupStore: appGroupStore).decision(forRule: limitRuleID)
+
+                switch decision {
+                case .exhausted(_, let ruleName):
+                    clearPendingPause()
+                    router.pendingUnlock = nil
+                    toastCenter.show(.ruleLimitReached(ruleName: ruleName))
+                case .allow, .notLimited:
+                    router.pendingUnlock = context
+                    toastCenter.show(.unlockRequested(context: context) { [weak self] in
+                        self?.openUnlockRequest(context)
+                    })
+                }
+                return
+            }
+
             let availability = await routineEngine.breakAvailability(
                 forApp: context.appID,
                 trigger: .manual,
@@ -151,8 +183,22 @@ final class StartupCoordinator: ObservableObject {
             // Said, not silently swallowed: the shield was just tapped, and nothing at
             // all happening reads as the app having failed to open rather than as the
             // answer being no.
+            //
+            // And the request goes with it. A refused pause that stays in the App Group
+            // is refused again on the next foreground, and the one after that -- the same
+            // toast for the same tap, for as long as the request stays valid.
+            clearPendingPause()
             router.pendingUnlock = nil
             toastCenter.show(.unlockRefused(context: context, state: unavailable))
+        }
+    }
+
+    /// Drops the request the shield left behind, once it has been answered one way or
+    /// the other.
+    private func clearPendingPause() {
+        try? appGroupStore.updateRuntimeState { state in
+            state.pendingPause = nil
+            state.pendingEvents.removeAll { $0.isPauseRequest }
         }
     }
 

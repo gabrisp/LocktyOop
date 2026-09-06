@@ -10,7 +10,11 @@ import ManagedSettings
 nonisolated struct RuleEnforcementRecord: Codable, Hashable {
     /// The local day this record counts for, as `yyyy-MM-dd`.
     var dayKey: String
-    /// Passes through the shield a `.openCountLimit` rule has already granted today.
+    /// How many times the rule's apps have been opened today.
+    ///
+    /// Observed, not granted. Screen Time reports pickups per app per day, and that count
+    /// is written here whenever a day is read -- the rule does not have to hold the apps
+    /// shut in order to count them, which is what it used to do.
     var openCountUsed: Int
     /// When a `.dailyUsageLimit` rule spent its budget. Nil means it still has some.
     var usageLimitReachedAt: Date?
@@ -88,11 +92,19 @@ extension Rule {
     /// - `.dailyUsageLimit` is measured by DeviceActivity. The apps are free until the
     ///   threshold event says the day's minutes are gone, and then they are shielded for
     ///   the rest of the day.
-    /// - `.openCountLimit` and `.sessionDurationLimit` cannot be measured that way --
-    ///   there is no "times opened" event, and a threshold counts across a whole interval
-    ///   rather than across one sitting. Both are enforced from the other side instead:
-    ///   the apps stay shielded, and each trip through the shield hands back a limited
-    ///   allowance. The shield is the meter.
+    /// - `.openCountLimit` is counted from the report's own pickups, which are written
+    ///   into the enforcement record as each day is read. The apps are free for the
+    ///   opens the rule allows and shut once they are spent -- ten opens means ten
+    ///   ordinary opens, not ten trips through a shield.
+    ///
+    ///   The cost is honesty about lag: there is no "times opened" event to subscribe
+    ///   to, so the count only moves when Screen Time hands over a fresh report. The
+    ///   eleventh open can happen before the block lands. The alternative was shielding
+    ///   the app from the first open of the day so the shield could do the counting,
+    ///   which enforces perfectly and makes "ten opens a day" mean ten interruptions.
+    /// - `.sessionDurationLimit` still cannot be measured: a threshold counts across a
+    ///   whole interval rather than across one sitting, so the apps stay shielded and
+    ///   each trip through hands back one sitting's worth of time.
     /// - `.schedule` is a routine and is not enforced here at all.
     nonisolated func isShielding(given enforcement: RuleEnforcementState, on date: Date = Date()) -> Bool {
         guard isEnabled else { return false }
@@ -102,7 +114,9 @@ extension Rule {
             return false
         case .dailyUsageLimit:
             return enforcement.record(for: id, on: date).usageLimitReachedAt != nil
-        case .openCountLimit, .sessionDurationLimit:
+        case .openCountLimit:
+            return (remainingOpens(given: enforcement, on: date) ?? 1) <= 0
+        case .sessionDurationLimit:
             return true
         }
     }
@@ -121,10 +135,9 @@ extension Rule {
         case .sessionDurationLimit:
             sessionDurationLimitConfiguration.map { max($0.maximumMinutesPerSession, 1) }
         case .openCountLimit:
-            // An open is a sitting, not an instant. Without a length of its own the app
-            // would re-shield the moment it came to the front and the open would be
-            // spent on nothing.
-            15
+            // Past the day's opens, the only way back in is a break -- so the length is
+            // the break's, and there is none at all when the rule allows none.
+            breakPolicy.isAllowed ? max(breakPolicy.durationMinutes ?? 5, 1) : nil
         case .schedule, .dailyUsageLimit:
             nil
         }
@@ -178,13 +191,34 @@ nonisolated struct RuleShieldLookup {
         case exhausted(ruleID: UUID, ruleName: String)
     }
 
+    /// The same answer, for a rule already known by id.
+    ///
+    /// The shield action starts from a token because that is all it has; the app starts
+    /// from the request the shield wrote, which names the rule outright. Asking by token
+    /// there would mean matching an app back to a rule that has already been matched.
+    func decision(forRule ruleID: UUID, on date: Date = Date()) -> Decision {
+        guard let rule = appGroupStore.loadStoredRules().first(where: { $0.id == ruleID }) else {
+            return .notLimited
+        }
+        return decision(for: rule, on: date)
+    }
+
     func decision(for token: ApplicationToken, on date: Date = Date()) -> Decision {
         guard let rule = limitingRule(for: token) else { return .notLimited }
+        return decision(for: rule, on: date)
+    }
 
+    private func decision(for rule: Rule, on date: Date) -> Decision {
         let enforcement = appGroupStore.loadRuleEnforcementState()
 
+        // Out of opens. A break is the way back in when the rule offers one, and there is
+        // simply no way in when it does not -- which is the difference between "ten opens
+        // and then earn the next one" and "ten opens and that is the day".
         if let remaining = rule.remainingOpens(given: enforcement, on: date), remaining <= 0 {
-            return .exhausted(ruleID: rule.id, ruleName: rule.name)
+            guard rule.breakPolicy.isAllowed, let minutes = rule.allowanceMinutesPerPass else {
+                return .exhausted(ruleID: rule.id, ruleName: rule.name)
+            }
+            return .allow(ruleID: rule.id, allowanceDuration: TimeInterval(minutes * 60))
         }
 
         // A daily-usage rule that has spent its budget is shut until tomorrow; there is
@@ -199,18 +233,21 @@ nonisolated struct RuleShieldLookup {
         return .allow(ruleID: rule.id, allowanceDuration: TimeInterval(minutes * 60))
     }
 
-    /// Charges one pass to the rule, if it is one that counts them.
+    /// Records what the day's report says about a rule's opens.
     ///
-    /// Called when the unlock is granted, not when it is asked for: a flow the user
-    /// started and then walked away from must not cost them an open.
-    func chargePass(ruleID: UUID, on date: Date = Date()) {
-        guard let rule = appGroupStore.loadStoredRules().first(where: { $0.id == ruleID }),
-              rule.kind == .openCountLimit
-        else { return }
+    /// Written by the app as each day is read, from the pickups Screen Time reports per
+    /// app. It replaces rather than adds: this is an observation of the whole day, not an
+    /// event, so running it twice must not count the same opens twice.
+    ///
+    /// This used to be `chargePass`, incremented when an unlock was granted -- which only
+    /// worked because every open went through the shield. It no longer does.
+    func recordObservedOpens(_ opens: Int, ruleID: UUID, on date: Date = Date()) {
+        let stored = appGroupStore.loadRuleEnforcementState().record(for: ruleID, on: date)
+        guard stored.openCountUsed != opens else { return }
 
         try? appGroupStore.updateRuleEnforcementState { state in
             state.update(ruleID, on: date) { record in
-                record.openCountUsed += 1
+                record.openCountUsed = opens
             }
         }
     }

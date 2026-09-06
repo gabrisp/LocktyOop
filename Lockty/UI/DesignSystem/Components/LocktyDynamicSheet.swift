@@ -342,7 +342,21 @@ struct LocktyDynamicSheet<Content: View>: View {
     /// the screen.
     private var presentedHeight: CGFloat {
         guard keyboardInset > 0 else { return sheetHeight }
-        return min(sheetHeight + keyboardInset, windowSize.height)
+
+        // Only what the keyboard actually covers of *this* sheet, and only for a sheet
+        // tall enough to have anything down there.
+        //
+        // It used to add the whole keyboard to every sheet. On a tall form that is right
+        // -- the detent is fixed, the sheet does not move, and the rows at the bottom
+        // would be behind the keys. On a short one it is badly wrong: a naming screen of
+        // two hundred points grew to five hundred and forty, and the sheet that had one
+        // field in it arrived looking like a full-screen page with a field at the top.
+        // A sheet shorter than the keyboard is lifted by the system on its own, which is
+        // the case this now leaves alone.
+        guard sheetHeight > keyboardInset else { return sheetHeight }
+
+        let covered = min(keyboardInset, sheetHeight)
+        return min(sheetHeight + covered, windowSize.height)
     }
 
     /// The keyboard's height as it comes and goes. `willChangeFrame` rather than
@@ -479,7 +493,7 @@ struct LocktyDynamicSheetBarButton<Label: View>: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: press) {
             label
                 .foregroundStyle(LocktyColors.primaryText)
                 .frame(minWidth: 44, minHeight: 44)
@@ -487,5 +501,22 @@ struct LocktyDynamicSheetBarButton<Label: View>: View {
         }
         .buttonStyle(.locktyInteractive(brighten: true))
         .tappable()
+    }
+
+    /// The keyboard goes down first, every time, whatever the button does.
+    ///
+    /// A dynamic sheet is measured, and the keyboard is part of what it is measured
+    /// against: leaving one up while the screen underneath changes -- a check that moves
+    /// to the next screen, a back button, a close -- gives the sheet two answers about how
+    /// tall it should be and it arrives somewhere between them. Every one of these buttons
+    /// is the end of whatever was being typed, so none of them has a reason to keep it.
+    private func press() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+        action()
     }
 }

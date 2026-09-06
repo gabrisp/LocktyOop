@@ -19,6 +19,7 @@ struct RoutinesView: View {
                         routine: routine,
                         isActive: viewModel.activeRoutineIDs().contains(routine.id),
                         applicationTokens: viewModel.tokens(for: routine.id),
+                        pausedUntil: viewModel.pausedUntil(for: routine.id),
                         onOpen: {
                             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: routine.id)))
                         }
@@ -63,26 +64,8 @@ struct RoutinesView: View {
     }
 
     private var addRoutineTile: some View {
-        Button {
+        LocktyAddTile(title: "New Mode") {
             router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: nil)))
-        } label: {
-            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .light))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 24, height: 24)
-
-                    Spacer(minLength: 0)
-
-                    Text("Add Routine")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-                }
-            }
         }
-        .buttonStyle(.plain)
-        .tappable()
     }
 }

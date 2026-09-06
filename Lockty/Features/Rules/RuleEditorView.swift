@@ -33,6 +33,15 @@ final class RuleEditorViewModel: ObservableObject {
     @Published private(set) var frictions: [Friction] = []
 
     private let repository: RuleRepository
+    /// So a hold takes effect at the moment it is taken.
+    ///
+    /// Holding a rule wrote the hold and stopped there. The shield is applied from the
+    /// stored rules and nothing recomputed it, so the app stayed shut until something
+    /// else happened to touch the policy -- a rule "paused" that went on blocking.
+    private let pauseEngine: PauseEngine
+    /// Its own handle on the shared container. The store is a path and a coder -- it
+    /// holds nothing -- so one made here is the same store as any other.
+    private let appGroupStore = AppGroupStore()
     private let selectionStore: ScreenTimeSelectionStore
     private let frictionRepository: FrictionRepository
     private let appGroupRepository: UserAppGroupRepository
@@ -67,8 +76,10 @@ final class RuleEditorViewModel: ObservableObject {
         selectionStore: ScreenTimeSelectionStore,
         frictionRepository: FrictionRepository,
         appGroupRepository: UserAppGroupRepository,
-        toastCenter: LocktyToastCenter
+        toastCenter: LocktyToastCenter,
+        pauseEngine: PauseEngine
     ) {
+        self.pauseEngine = pauseEngine
         self.initialRuleID = ruleID
         self.editingID = ruleID ?? UUID()
         self.draftID = draftID
@@ -164,6 +175,7 @@ final class RuleEditorViewModel: ObservableObject {
         }
         refreshSelectionState()
         captureBaseline()
+        refreshPauseState()
     }
 
     func loadFrictions() async {
@@ -240,8 +252,13 @@ final class RuleEditorViewModel: ObservableObject {
         }
 
         let selection = selectionPreview
-        guard !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selectedAppGroupIDs.isEmpty else {
-            errorMessage = "Select at least one app or group."
+        // Apps, and only apps. A limit counts minutes and pickups, and those are reported
+        // per app: a category or a group is a set that can grow behind the rule's back,
+        // so "30 minutes a day" would quietly start counting something it was never
+        // pointed at. The picker no longer offers either; this is the guard that means an
+        // older rule cannot save one through the back door.
+        guard !selection.applicationTokens.isEmpty else {
+            errorMessage = "Select at least one app."
             return false
         }
 
@@ -269,7 +286,7 @@ final class RuleEditorViewModel: ObservableObject {
             name: trimmedName,
             isEnabled: isEnabled,
             kind: kind,
-            appGroupIDs: selectedAppGroupIDs,
+            appGroupIDs: [],
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
             contentRestrictions: contentRestrictions,
             openCountLimitConfiguration: kind == .openCountLimit
@@ -307,6 +324,99 @@ final class RuleEditorViewModel: ObservableObject {
             try selectionStore.save(selection, scope: persistedSelectionScope)
             try? selectionStore.remove(scope: draftSelectionScope)
             try await repository.save(rule)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Whether this limit has already stopped something today.
+    ///
+    /// While it has, the rule is sealed: it cannot be edited, deleted or held. That is the
+    /// whole of what a limit is -- a decision made in advance about a moment you knew you
+    /// would argue with. A limit you can delete the second it fires is a limit that only
+    /// applies when you already agree with it, and every escape hatch here is the same
+    /// hatch: edit it to a bigger number, hold it until tomorrow, or remove it outright.
+    ///
+    /// It seals for the day, not forever. Tomorrow the record is a fresh one and the rule
+    /// is yours again.
+    @Published private(set) var isSpentToday = false
+
+    /// When the hold on this rule ends, or nil when it is not on hold.
+    @Published private(set) var pausedUntil: Date?
+
+    func refreshPauseState() {
+        pausedUntil = appGroupStore.loadRulePauseState().pauseEnd(for: editingID)
+        refreshSpentState()
+    }
+
+    func refreshSpentState() {
+        guard !isCreating, let kind, kind != .schedule else {
+            isSpentToday = false
+            return
+        }
+
+        let stored = appGroupStore.loadStoredRules().first { $0.id == editingID }
+        let enforcement = appGroupStore.loadRuleEnforcementState()
+        let isBlocking = stored?.isShielding(given: enforcement) ?? false
+
+        // Sealed only when there is genuinely no way through it.
+        //
+        // A limit that has fired but still offers unlocks is not a wall -- the way past it
+        // is the friction it asks for, which is the whole point of having one. Sealing it
+        // there would take away the editing *and* leave the unlock, which is the worst of
+        // both: an escape hatch that works and a rule you cannot touch.
+        //
+        // With no unlocks allowed, or none left, or a strict rule that refuses them, the
+        // limit *is* the wall -- and then editing, deleting or holding it are simply three
+        // more doors out of a room that was locked on purpose.
+        let allowsUnlock = (stored?.breakPolicy.maximumBreaks ?? 0) > 0
+        isSpentToday = isBlocking && !allowsUnlock
+    }
+
+    /// What the screen says when it refuses.
+    var spentReason: String {
+        "This limit has already stopped you today. It can be changed again tomorrow."
+    }
+
+    func pause(for duration: RulePauseDuration) {
+        try? appGroupStore.updateRulePauseState { state in
+            state.pause(editingID, until: Date().addingTimeInterval(duration.duration))
+        }
+        refreshPauseState()
+        applyShields()
+    }
+
+    func resume() {
+        try? appGroupStore.updateRulePauseState { state in
+            state.resume(editingID)
+        }
+        refreshPauseState()
+        applyShields()
+    }
+
+    /// Recomputes what is shielded from what is stored now. `loadShieldRules()` already
+    /// drops anything on hold, so this is the whole of a hold taking effect -- and of it
+    /// ending.
+    private func applyShields() {
+        Task { await pauseEngine.refreshShields() }
+    }
+
+    /// Removes the rule for good.
+    ///
+    /// Returns whether it went, so the caller only closes the editor on a deletion that
+    /// actually happened -- a failure here used to be a screen that dismissed as if all
+    /// was well and a rule still sitting in the list behind it.
+    func delete() async -> Bool {
+        guard !isCreating else { return true }
+        do {
+            try await repository.delete(id: editingID)
+            defer { applyShields() }
+            // The selection the rule was blocking goes with it. Left behind it is a
+            // record nothing points at, and the next rule to reuse the id -- ids are
+            // reused when a routine bridges to a rule -- would inherit its apps.
+            try? selectionStore.remove(scope: .rule(editingID))
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -371,6 +481,9 @@ final class RuleEditorViewModel: ObservableObject {
 private enum RuleEditorLocalSheet: String, Identifiable {
     case apps
     case breakSettings
+    case delete
+    /// Putting the rule on hold for a while.
+    case hold
 
     var id: String { rawValue }
 }
@@ -384,9 +497,14 @@ struct RuleEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: RuleEditorLocalSheet?
+    /// Where the hold wheel sits. A day: long enough to be a real break from a rule,
+    /// short enough that nobody has to remember they did it.
+    @State private var holdDuration: RulePauseDuration = .oneDay
     @State private var isNaming = false
     /// A new rule goes straight to its form -- there is nothing to preview yet.
     @State private var isEditing: Bool
+    /// Whether the kind screen is showing the second question -- which sort of limit.
+    @State private var isChoosingLimitKind = false
     @State private var isShowingKindChoice: Bool
     /// What a discard confirmation, if one is up, is about to throw away.
     @State private var pendingDiscard: LocktyDiscardIntent?
@@ -417,7 +535,14 @@ struct RuleEditorView: View {
     }
 
     private var contentID: String {
-        if isShowingKindChoice { return "kind-choice" }
+        if isShowingKindChoice { return isChoosingLimitKind ? "kind-choice-limit" : "kind-choice" }
+        // A spent limit draws a different screen -- no pencil, no trash, a sentence where
+        // the hold button was -- so the chrome has to be re-taken for it.
+        //
+        // This line read `"\(contentID)-spent"`: the property calling itself, forever,
+        // until the stack ran out. Opening a limit that had already fired was the only way
+        // to reach it, which is exactly the sheet that was crashing.
+        if viewModel.isSpentToday { return "reading-spent" }
         if viewModel.kind == .schedule { return "schedule" }
         if let activeSheet { return activeSheet.id }
         if isNaming { return "naming" }
@@ -496,24 +621,49 @@ struct RuleEditorView: View {
     private var rootContent: some View {
         ZStack {
             if isShowingKindChoice {
-                kindChoiceContent
-                    .locktyDynamicSheetChrome(id: chromeID) {
-                        chromeTitleText("Create Rule")
-                    } leading: {
-                        LocktyDynamicSheetBarButton(action: requestClose) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .medium))
-                        }
-                    } trailing: {
-                        Color.clear.frame(width: 44, height: 44)
+                // Two questions, one chrome.
+                //
+                // They were two branches with a chrome modifier each, and that is what
+                // broke the back button: the chrome is registered by whichever screen
+                // last appeared and cleared by whichever last disappeared, so on the way
+                // back the leaving screen's clear landed after the arriving screen's
+                // register and the bar was left holding the close button. Pressing back
+                // closed the sheet, exactly as it looked.
+                //
+                // One chrome that changes with the step, and the contents move underneath
+                // it -- which is also what makes the movement read as going a step deeper.
+                ZStack {
+                    if isChoosingLimitKind {
+                        limitKindChoiceContent
+                            .transition(screenTransition)
+                    } else {
+                        kindChoiceContent
+                            .transition(screenTransition)
                     }
-                    .geometryGroup()
-                    .transition(screenTransition)
+                }
+                .geometryGroup()
+                .locktyDynamicSheetChrome(id: chromeID) {
+                    chromeTitleText(isChoosingLimitKind ? "Create Limit" : "Create Rule")
+                } leading: {
+                    kindChoiceLeading
+                } trailing: {
+                    Color.clear.frame(width: 44, height: 44)
+                }
+                .transition(screenTransition)
             } else if viewModel.kind == .schedule {
-                makeScheduleRuleEditor(returnToKindChoice)
+                // Where its back button goes depends on how you got here. Creating one,
+                // there is a step behind it -- the kind you picked -- and a chevron is
+                // right. Opening one that already exists, there is nothing behind it but
+                // the way out, and the chevron was taking people from a mode they were
+                // reading into the screen for making a new one.
+                makeScheduleRuleEditor { scheduleReturnAction() }
                     .geometryGroup()
                     .transition(screenTransition)
-            } else if isEditing {
+            } else if isEditing || activeSheet != nil {
+                // `activeSheet` too, and this is the whole bug it fixes: the read-only
+                // screen drew the preview and nothing else, so a child sheet opened from
+                // it -- delete, the hold -- set the state and then never appeared. The
+                // form's scaffold is what honours `activeSheet`.
                 editorScaffold
                     .geometryGroup()
                     .transition(screenTransition)
@@ -528,11 +678,34 @@ struct RuleEditorView: View {
 
     /// The summary, wearing the same bar the form does.
     private var readOnlyScaffold: some View {
-        RulePreviewContent(
-            onEdit: { enterEditingFlow() },
-            viewModel: viewModel,
-            applicationTokens: previewTokens
-        )
+        VStack(alignment: .leading, spacing: LocktySpacing.lg) {
+            RulePreviewContent(
+                onEdit: { enterEditingFlow() },
+                viewModel: viewModel,
+                applicationTokens: previewTokens
+            )
+
+            // Pausing is not editing: you are not changing what the rule is, you are
+            // saying not this week. So it lives on the screen you read the rule on,
+            // exactly as a routine's does.
+            if !viewModel.isCreating {
+                if viewModel.isSpentToday {
+                    // Not a disabled button: a control greyed out invites you to work out
+                    // how to enable it. The sentence is the answer, and there is nothing
+                    // to press.
+                    Text(viewModel.spentReason)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, LocktySpacing.screenInset)
+                        .transition(.blurReplace)
+                } else {
+                    holdButton
+                        .padding(.horizontal, LocktySpacing.screenInset)
+                }
+            }
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .locktyDynamicSheetChrome(id: chromeID) {
@@ -567,6 +740,10 @@ struct RuleEditorView: View {
             chromeTitleText("Selected")
         case .breakSettings:
             chromeTitleText("Break")
+        case .delete:
+            chromeTitleText("Delete")
+        case .hold:
+            chromeTitleText("Pause")
         case nil:
             // The generated name, not "New Rule": the rule already has a name by the
             // time this is on screen, and showing a placeholder over a filled field
@@ -620,7 +797,13 @@ struct RuleEditorView: View {
 
     @ViewBuilder
     private var chromeTrailing: some View {
-        if activeSheet != nil {
+        // Nothing at all on the one that commits by being held. A tick beside "Delete
+        // this rule?" is a second way to say yes sitting where the way to say no should
+        // be.
+        if activeSheet == .delete || activeSheet == .hold {
+            Color.clear
+                .frame(width: 44, height: 44)
+        } else if activeSheet != nil {
             LocktyDynamicSheetBarButton(action: closeChildSheet) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 18, weight: .medium))
@@ -632,9 +815,29 @@ struct RuleEditorView: View {
             }
             .disabled(viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } else {
-            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 15, weight: .medium))
+            // The trash only while editing. Reading a rule is not the moment to be one
+            // tap from destroying it, and the pencil is right there -- so it sits beside
+            // the pencil on the screen where you are already changing things.
+            HStack(spacing: LocktySpacing.sm) {
+                // Neither while the limit is spent. A rule you can delete the moment it
+                // stops you is a rule that only applies while you agree with it.
+                if isEditing, !viewModel.isCreating, !viewModel.isSpentToday {
+                    LocktyDynamicSheetBarButton(action: { openChildSheet(.delete) }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(LocktyColors.error)
+                    }
+                }
+
+                if !viewModel.isSpentToday {
+                    LocktyDynamicSheetBarButton(action: enterEditingFlow) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                } else {
+                    // Its place kept, so the bar does not shuffle when the rule seals.
+                    Color.clear.frame(width: 44, height: 44)
+                }
             }
         }
     }
@@ -652,6 +855,14 @@ struct RuleEditorView: View {
                 breakSettingsScreen
                     .geometryGroup()
                     .transition(screenTransition)
+            case .delete:
+                deleteScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
+            case .hold:
+                holdScreen
+                    .geometryGroup()
+                    .transition(screenTransition)
             case nil:
                 if isNaming {
                     namingContent
@@ -667,6 +878,15 @@ struct RuleEditorView: View {
         .geometryGroup()
     }
 
+    /// The two things a rule can be.
+    ///
+    /// A schedule or a limit, and nothing else. The four kinds were four tiles here, but
+    /// three of them were the same answer at different granularities -- and one of them,
+    /// the cap on a single sitting, is not something you write down at all: it is decided
+    /// on the spot from the plus in the tab bar, which is what that button is for.
+    ///
+    /// "Limit" is a door rather than an answer: which sort of limit is the next question,
+    /// asked on its own screen.
     private var kindChoiceContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVGrid(
@@ -677,14 +897,99 @@ struct RuleEditorView: View {
                 spacing: LocktySpacing.md
             ) {
                 kindTile(kind: .schedule, subtitle: "Scheduled blocking")
-                kindTile(kind: .openCountLimit, subtitle: "App open limit")
-                kindTile(kind: .dailyUsageLimit, subtitle: "Daily time limit")
-                kindTile(kind: .sessionDurationLimit, subtitle: "Session time limit")
+
+                limitTile
             }
             .padding(.horizontal, LocktySpacing.screenInset)
             .padding(.vertical, LocktySpacing.lg)
         }
     }
+
+    /// Which sort of limit: by how many times something is opened, or by how long it is
+    /// used. Both are "so much a day"; what differs is what is being counted.
+    private var limitKindChoiceContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: LocktySpacing.md),
+                    GridItem(.flexible(), spacing: LocktySpacing.md)
+                ],
+                spacing: LocktySpacing.md
+            ) {
+                kindTile(kind: .openCountLimit, subtitle: "So many opens a day")
+                kindTile(kind: .dailyUsageLimit, subtitle: "So much time a day")
+            }
+            .padding(.horizontal, LocktySpacing.screenInset)
+            .padding(.vertical, LocktySpacing.lg)
+        }
+    }
+
+    /// The door to the second question, drawn as the kinds are.
+    private var limitTile: some View {
+        Button {
+            isGoingBack = false
+            withAnimation(sheetAnimation) { isChoosingLimitKind = true }
+        } label: {
+            CardView(radius: LocktyRadius.large, interactive: true, height: 188) {
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Spacer(minLength: 0)
+
+                    Text("Limit")
+                        .font(LocktyTypography.headline)
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text("By opens or by time")
+                        .font(LocktyTypography.callout)
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+            }
+        }
+        .buttonStyle(.locktyInteractive)
+        .tappable()
+    }
+
+    /// Close on the first question, back on the second.
+    @ViewBuilder
+    private var kindChoiceLeading: some View {
+        if isChoosingLimitKind {
+            LocktyDynamicSheetBarButton(action: returnToKindChoiceRoot) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        } else {
+            LocktyDynamicSheetBarButton(action: requestClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        }
+    }
+
+    /// Where the schedule editor's back button goes.
+    ///
+    /// Extracted rather than written inline: a ternary of two closures inside a view
+    /// builder is more than the type checker will sit through.
+    private func scheduleReturnAction() {
+        if viewModel.isCreating {
+            returnToKindChoice()
+        } else {
+            requestClose()
+        }
+    }
+
+    /// Back one step, from the limits to the two kinds.
+    private func returnToKindChoiceRoot() {
+        isGoingBack = true
+        withAnimation(sheetAnimation) { isChoosingLimitKind = false }
+    }
+
+    // The cap on one sitting, as a rule you write down. Kept, not used: it is decided on
+    // the spot from the plus in the tab bar now.
+    //
+    //  kindTile(kind: .sessionDurationLimit, subtitle: "Session time limit")
 
     private func kindTile(kind: RuleKind, subtitle: String) -> some View {
         Button {
@@ -761,12 +1066,120 @@ struct RuleEditorView: View {
                 }
             }
             .padding(.top, LocktySpacing.sm)
+
+            // Only on a rule that exists. A rule being created has nothing to delete, and
+            // the way out of it is the same X every other new thing has.
         }
         .padding(.horizontal, LocktySpacing.screenInset)
         .padding(.top, LocktySpacing.md)
         .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Puts the rule on hold, or lets it go again.
+    ///
+    /// Every kind, not only schedules. A limit is as worth suspending as a routine --
+    /// a day off does not mean deleting the count of opens you want back on Monday.
+    private var holdButton: some View {
+        Button {
+            if viewModel.pausedUntil != nil {
+                viewModel.resume()
+            } else {
+                openChildSheet(.hold)
+            }
+        } label: {
+            HStack(spacing: LocktySpacing.sm) {
+                Image(systemName: viewModel.pausedUntil == nil ? "pause.circle" : "play.circle")
+                    .font(.system(size: 15, weight: .medium))
+
+                Text(holdButtonTitle)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+            }
+            .foregroundStyle(LocktyColors.primaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
+        .tappable()
+    }
+
+    private var holdButtonTitle: String {
+        guard let until = viewModel.pausedUntil else { return "Pause rule" }
+        return "Paused until \(LocktyDateFormatting.shortDayAndTime(until)) · Resume"
+    }
+
+    private var holdScreen: some View {
+        VStack(spacing: LocktySpacing.xl) {
+            VStack(spacing: LocktySpacing.sm) {
+                Text("Pause for how long?")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .multilineTextAlignment(.center)
+
+                Text("The rule stops counting and stops blocking while it is paused. It comes back on its own at the end of the hold -- there is nothing to switch back on.")
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Picker("", selection: $holdDuration) {
+                ForEach(RulePauseDuration.allCases) { duration in
+                    Text(duration.title).tag(duration)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 180)
+            .clipped()
+
+            Text("Until \(LocktyDateFormatting.shortDayAndTime(Date().addingTimeInterval(holdDuration.duration)))")
+                .font(.system(.subheadline, design: .default, weight: .semibold))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+
+            LocktyHoldButton(title: "Hold to pause", systemImage: "pause.fill") {
+                viewModel.pause(for: holdDuration)
+                closeChildSheet()
+            }
+        }
+        .padding(.horizontal, LocktySpacing.screenInset)
+        .padding(.top, LocktySpacing.xl)
+        .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
+        .frame(maxWidth: .infinity)
+    }
+
+    private var deleteScreen: some View {
+        LocktyDestructiveConfirmation(
+            title: "Delete this rule?",
+            message: deleteMessage,
+            onConfirm: {
+                Task {
+                    if await viewModel.delete() {
+                        dismissEditor()
+                    }
+                }
+            },
+            onCancel: closeChildSheet
+        )
+    }
+
+    /// What deleting actually costs, said plainly and differently per kind: a schedule
+    /// stops running, a limit stops counting.
+    private var deleteMessage: String {
+        let name = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subject = name.isEmpty ? "This rule" : "\u{201C}\(name)\u{201D}"
+
+        switch viewModel.kind {
+        case .schedule:
+            return "\(subject) will stop running, and the apps it blocks will be free at its hours. This cannot be undone."
+        case .openCountLimit, .dailyUsageLimit, .sessionDurationLimit:
+            return "\(subject) will stop counting, and the apps it holds will be free immediately. This cannot be undone."
+        case .none:
+            return "\(subject) will be removed. This cannot be undone."
+        }
     }
 
     @ViewBuilder
@@ -818,7 +1231,7 @@ struct RuleEditorView: View {
         } label: {
             HStack(spacing: LocktySpacing.md) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Apps seleccionadas")
+                    Text("Selected apps")
                         .font(.system(.subheadline, design: .default, weight: .regular))
                         .foregroundStyle(LocktyColors.primaryText)
 
@@ -982,7 +1395,9 @@ struct RuleEditorView: View {
         VStack {
                 LocktyActivitySelectionView(
                     title: "Selected",
-                    addLabel: "Add app or category",
+                    // Apps only, so the button says apps only. It offered "app or
+                    // category" over a screen that refuses categories.
+                    addLabel: "Add app",
                     selection: Binding(
                         get: { viewModel.selectionPreview },
                         set: { newValue in
@@ -1331,6 +1746,7 @@ struct RuleEditorView: View {
         isGoingBack = true
         withAnimation(sheetAnimation) {
             isShowingKindChoice = true
+            isChoosingLimitKind = false
             viewModel.kind = nil
         }
     }

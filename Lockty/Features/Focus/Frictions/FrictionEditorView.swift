@@ -771,23 +771,32 @@ struct FrictionEditorView: View {
     /// out inline turned it into a stack of forms, where the shape of the flow -- which
     /// steps, in what order -- was the hardest thing to see on the screen that exists to
     /// show it.
+    ///
+    /// The same card everything else in the app is edited in. It used to be a flat
+    /// ink-filled rectangle with a second one under it for the remove -- two grey slabs,
+    /// belonging to nothing else in the app.
+    ///
+    /// The controls inside are menus, like every other setting: a row that says what it
+    /// is set to and opens the options over it. Nothing here is a field to fill in.
     @ViewBuilder
     private func stepDetailContent(stepID: UUID) -> some View {
-        if let index = viewModel.draft.steps.firstIndex(where: { $0.id == stepID }) {
-            let step = viewModel.draft.steps[index]
+        if let step = viewModel.draft.steps.first(where: { $0.id == stepID }) {
 
+            // No heading of its own: the bar above already names the step, and a screen
+            // that says what it is twice in the first forty points is a screen that does
+            // not trust its own chrome.
             VStack(alignment: .leading, spacing: LocktySpacing.lg) {
-                FrictionStepSettings(
-                    step: step,
-                    locationService: locationService,
-                    onChange: { viewModel.update(stepID: stepID, with: $0) }
-                )
-                .padding(LocktySpacing.lg)
+                VStack(alignment: .leading, spacing: LocktySpacing.sm) {
+                    FrictionStepSettings(
+                        step: step,
+                        locationService: locationService,
+                        onChange: { viewModel.update(stepID: stepID, with: $0) }
+                    )
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                        .fill(LocktyColors.ink(0.055))
-                )
+                .padding(.horizontal, LocktySpacing.cardInset)
+                .padding(.vertical, LocktySpacing.sm)
+                .locktyCardBackground(cornerRadius: Self.cardRadius)
 
                 Button(role: .destructive) {
                     viewModel.removeStep(id: stepID)
@@ -796,24 +805,21 @@ struct FrictionEditorView: View {
                     HStack(spacing: LocktySpacing.sm) {
                         Image(systemName: "trash")
                             .font(.system(size: 15, weight: .medium))
+
                         Text("Remove step")
-                            .font(.system(.subheadline, design: .default, weight: .medium))
-                        Spacer(minLength: 0)
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
                     }
                     .foregroundStyle(LocktyColors.error)
-                    .padding(.horizontal, LocktySpacing.lg)
-                    .padding(.vertical, LocktySpacing.lg)
                     .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
-                            .fill(LocktyColors.ink(0.055))
-                    )
+                    .frame(height: 52)
+                    .contentShape(Capsule(style: .continuous))
                 }
-                .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)))
+                .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))
                 .tappable()
             }
-            .padding(.horizontal, LocktySpacing.lg)
-            .padding(.vertical, LocktySpacing.lg)
+            .padding(.horizontal, LocktySpacing.screenInset)
+            .padding(.top, LocktySpacing.md)
+            .padding(.bottom, LocktySpacing.sheetBottom(forTop: LocktySpacing.md))
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -829,12 +835,13 @@ struct FrictionEditorView: View {
         withAnimation(sheetAnimation) { activeSheet = nil }
     }
 
-    /// The grid of miniatures, and the list underneath it.
+    /// The grid of miniatures.
     ///
-    /// Both, not one instead of the other. The grid answers "what will this look like
-    /// when it stops me", which is the question; the rows underneath still say what each
-    /// one is called and what it does, which is what you want once you have narrowed it
-    /// down to two.
+    /// The rows of horizontal carousels that used to sit underneath are commented out
+    /// rather than deleted. They said what each friction is called and what it does; the
+    /// grid shows what it will actually look like when it stops you, which turns out to
+    /// be the question people are asking. Two catalogues of the same twenty things on one
+    /// screen is one catalogue too many.
     private var catalogContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: LocktySpacing.xl) {
@@ -843,35 +850,46 @@ struct FrictionEditorView: View {
                     closeCatalog()
                 }
 
-                ForEach(FrictionCategory.allCases) { category in
-                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                        Text(category.title)
-                            .font(LocktyTypography.headline)
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .padding(.horizontal, LocktySpacing.screenInset)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: LocktySpacing.md) {
-                                ForEach(FrictionCatalog.items(in: category)) { item in
-                                    Button {
-                                        viewModel.addStep(item)
-                                        closeCatalog()
-                                    } label: {
-                                        FrictionCatalogCard(item: item)
-                                    }
-                                    .buttonStyle(.locktyInteractive)
-                                    .tappable()
-                                }
-                            }
-                            .padding(.horizontal, LocktySpacing.screenInset)
-                        }
-                    }
-                }
+//                ForEach(FrictionCategory.allCases) { category in
+//                    VStack(alignment: .leading, spacing: LocktySpacing.md) {
+//                        Text(category.title)
+//                            .font(LocktyTypography.headline)
+//                            .foregroundStyle(LocktyColors.primaryText)
+//                            .padding(.horizontal, LocktySpacing.screenInset)
+//
+//                        ScrollView(.horizontal, showsIndicators: false) {
+//                            LazyHStack(spacing: LocktySpacing.md) {
+//                                ForEach(FrictionCatalog.items(in: category)) { item in
+//                                    Button {
+//                                        viewModel.addStep(item)
+//                                        closeCatalog()
+//                                    } label: {
+//                                        FrictionCatalogCard(item: item)
+//                                    }
+//                                    .buttonStyle(.locktyInteractive)
+//                                    .tappable()
+//                                }
+//                            }
+//                            .padding(.horizontal, LocktySpacing.screenInset)
+//                        }
+//                    }
+//                }
             }
             .padding(.vertical, LocktySpacing.lg)
         }
     }
 
+    /// The flow, as one numbered list.
+    ///
+    /// The same shape the read-only screen uses, because it is the same thing: a friction
+    /// is a sequence, and a sequence reads as a list. It used to be a stack of separate
+    /// cards, each with an eyebrow, a title, a subtitle and two arrows -- four objects
+    /// per step, so five steps came to twenty, and the order (the one thing the list is
+    /// actually for) was the hardest thing on the screen to see.
+    ///
+    /// Reordering and removing moved into each row's own menu. They are things you do to
+    /// a step you have already picked out, which is what a press-and-hold is for; leaving
+    /// them on the face of every row put the rarest actions in the most prominent place.
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.md) {
             Text("STEPS")
@@ -888,17 +906,27 @@ struct FrictionEditorView: View {
                             .fill(LocktyColors.ink(0.055))
                     )
             } else {
-                ForEach(Array(viewModel.draft.steps.enumerated()), id: \.element.id) { index, step in
-                    FrictionStepEditorCard(
-                        step: step,
-                        index: index,
-                        isFirst: index == 0,
-                        isLast: index == viewModel.draft.steps.count - 1,
-                        onOpen: { openStepDetail(step.id) },
-                        onMoveUp: { viewModel.moveStepUp(id: step.id) },
-                        onMoveDown: { viewModel.moveStepDown(id: step.id) }
-                    )
+                VStack(spacing: 0) {
+                    ForEach(Array(viewModel.draft.steps.enumerated()), id: \.element.id) { index, step in
+                        if index > 0 {
+                            Divider()
+                                .overlay(LocktyColors.separator.opacity(0.45))
+                        }
+
+                        FrictionStepListRow(
+                            step: step,
+                            index: index,
+                            isFirst: index == 0,
+                            isLast: index == viewModel.draft.steps.count - 1,
+                            onOpen: { openStepDetail(step.id) },
+                            onMoveUp: { viewModel.moveStepUp(id: step.id) },
+                            onMoveDown: { viewModel.moveStepDown(id: step.id) },
+                            onRemove: { viewModel.removeStep(id: step.id) }
+                        )
+                    }
                 }
+                .padding(.horizontal, LocktySpacing.cardInset)
+                .locktyCardBackground(cornerRadius: Self.cardRadius)
             }
 
             addStepCard
@@ -939,6 +967,8 @@ struct FrictionEditorView: View {
     static let cardRadius: CGFloat = 22
 }
 
+/// The card the horizontal catalogue was built from. Unreached while that catalogue is
+/// commented out above, and kept for the same reason it is.
 private struct FrictionCatalogCard: View {
     let item: FrictionCatalogItem
 
@@ -974,7 +1004,11 @@ private struct FrictionCatalogCard: View {
     }
 }
 
-private struct FrictionStepEditorCard: View {
+/// One step in the list: its number, what it is, and what it is set to.
+///
+/// Deliberately the same row the read-only screen draws. The only difference is that
+/// this one opens.
+private struct FrictionStepListRow: View {
     let step: FrictionStep
     let index: Int
     let isFirst: Bool
@@ -982,54 +1016,60 @@ private struct FrictionStepEditorCard: View {
     let onOpen: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
+    let onRemove: () -> Void
 
     var body: some View {
         // A Button, not a tap gesture. A gesture carries no pressed state, so the row it
         // sits on cannot respond to being touched at all.
         Button(action: onOpen) {
-        CardView(radius: FrictionEditorView.cardRadius, padding: LocktySpacing.lg) {
-            HStack(alignment: .center, spacing: LocktySpacing.md) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("STEP \(index + 1)")
-                        .locktyEyebrow()
-
-                    Text(step.title)
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-
-                    // What it is set to, in a line. The list's job is the shape of the
-                    // flow; the settings live one tap away.
-                    Text(step.detail)
-                        .font(.system(.footnote, design: .default, weight: .regular))
-                        .foregroundStyle(LocktyColors.secondaryText)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: LocktySpacing.sm) {
-                    Button(action: onMoveUp) {
-                        Image(systemName: "arrow.up")
-                    }
-                    .disabled(isFirst)
-
-                    Button(action: onMoveDown) {
-                        Image(systemName: "arrow.down")
-                    }
-                    .disabled(isLast)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(LocktyColors.secondaryText)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .medium))
+            HStack(spacing: LocktySpacing.md) {
+                Text("\(index + 1)")
+                    .font(.system(.footnote, design: .rounded, weight: .semibold))
                     .foregroundStyle(LocktyColors.secondaryText)
+                    .monospacedDigit()
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(LocktyColors.ink(0.08)))
+
+                Text(step.title)
+                    .font(.system(.body, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .lineLimit(1)
+
+                Spacer(minLength: LocktySpacing.sm)
+
+                // What it is set to. The list's job is the shape of the flow; the
+                // settings live one tap away.
+                Text(step.detail)
+                    .font(.system(.body, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
+                    .lineLimit(1)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: 14, style: .continuous)))
+        .tappable()
+        .contextMenu {
+            Button {
+                onMoveUp()
+            } label: {
+                Label("Move up", systemImage: "arrow.up")
+            }
+            .disabled(isFirst)
+
+            Button {
+                onMoveDown()
+            } label: {
+                Label("Move down", systemImage: "arrow.down")
+            }
+            .disabled(isLast)
+
+            Button(role: .destructive, action: onRemove) {
+                Label("Remove", systemImage: "trash")
             }
         }
-        }
-        .buttonStyle(.locktyInteractive)
-        .tappable()
     }
 }
 
@@ -1049,6 +1089,15 @@ private struct FrictionStepSettings: View {
     @ViewBuilder
     private var configurationView: some View {
         switch step {
+        case .objectives(let configuration):
+            LocktyToggle(
+                title: "Every objective",
+                isOn: Binding(
+                    get: { configuration.requiresAll },
+                    set: { onChange(.objectives(ObjectivesFrictionConfiguration(id: configuration.id, requiresAll: $0))) }
+                )
+            )
+
         case .copyPhrase(let configuration):
             EnumPicker(
                 title: "Length",
@@ -1790,18 +1839,20 @@ private struct EnumPicker<Value: CaseIterable & Identifiable & Hashable & RawRep
 
             Spacer(minLength: LocktySpacing.sm)
 
-            Text(label(for: selection))
-                .font(.system(.subheadline, design: .default, weight: .regular))
-                .foregroundStyle(LocktyColors.secondaryText)
+            // The value and its chevron are the control, not the whole row: the menu
+            // opens out of the thing it is about.
+            HStack(spacing: LocktySpacing.sm) {
+                Text(label(for: selection))
+                    .font(.system(.subheadline, design: .default, weight: .regular))
+                    .foregroundStyle(LocktyColors.secondaryText)
 
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(LocktyColors.tertiaryText)
-        }
-        .frame(minHeight: 44)
-        .contentShape(Rectangle())
-        .onTapGesture { isShowingOptions = true }
-        .locktyMenu(isPresented: $isShowingOptions) {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(LocktyColors.tertiaryText)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { isShowingOptions = true }
+            .locktyMenu(isPresented: $isShowingOptions) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(Value.allCases), id: \.id) { option in
                     LocktyMenuItem(
@@ -1813,10 +1864,12 @@ private struct EnumPicker<Value: CaseIterable & Identifiable & Hashable & RawRep
                     }
                 }
             }
-            .padding(.vertical, LocktySpacing.sm)
-            .padding(.horizontal, LocktySpacing.xs)
-            .frame(width: 210)
+                .padding(.vertical, LocktySpacing.sm)
+                .padding(.horizontal, LocktySpacing.xs)
+                .frame(width: 210)
+            }
         }
+        .frame(minHeight: 44)
     }
 
     private func label(for value: Value) -> String {

@@ -220,6 +220,11 @@
 			path = LocktyWidgetExtension;
 			sourceTree = "<group>";
 		};
+		B100000000000000000000A0 /* Lockty/UI/DesignSystem/Theme */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Lockty/UI/DesignSystem/Theme;
+			sourceTree = "<group>";
+		};
 		EDB04DA2303DE8FA00D469E9 /* Lockty */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Lockty;
@@ -315,6 +320,7 @@
 				B10000000000000000000007 /* ShieldConfigurationExtension */,
 				B10000000000000000000008 /* ShieldActionExtension */,
 				B10000000000000000000080 /* LocktyWidgetExtension */,
+				B100000000000000000000A0 /* Lockty/UI/DesignSystem/Theme */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -452,6 +458,7 @@
 				B10000000000000000000009 /* Lockty/Core/Domain */,
 				B1000000000000000000000A /* Lockty/Core/Shared */,
 				B10000000000000000000080 /* LocktyWidgetExtension */,
+				B100000000000000000000A0 /* Lockty/UI/DesignSystem/Theme */,
 			);
 			name = LocktyWidgetExtension;
 			productName = LocktyWidgetExtension;

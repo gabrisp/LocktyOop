@@ -58,6 +58,7 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
     case nfcTag(NFCTagConfiguration)
     case location(LocationTrigger)
     case steps(StepsConfiguration)
+    case objectives(ObjectivesFrictionConfiguration)
     case copyPhrase(CopyPhraseConfiguration)
     case holdSteady(HoldSteadyConfiguration)
     case oddOneOut(OddOneOutConfiguration)
@@ -94,6 +95,8 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
         case .location(let configuration):
             configuration.id
         case .steps(let configuration):
+            configuration.id
+        case .objectives(let configuration):
             configuration.id
         case .copyPhrase(let configuration):
             configuration.id
@@ -152,6 +155,8 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             "Tune the Value"
         case .steps:
             "Steps"
+        case .objectives:
+            "Objectives"
         }
     }
 
@@ -197,6 +202,8 @@ nonisolated enum PauseStep: Codable, Hashable, Identifiable {
             return configuration.tolerance == 0 ? "exact" : "±\(configuration.tolerance)"
         case .steps(let configuration):
             return "\(configuration.dailyGoal.formatted(.number.grouping(.automatic))) steps"
+        case .objectives(let configuration):
+            return configuration.requiresAll ? "All objectives" : "Any one objective"
         }
     }
 }
@@ -213,6 +220,22 @@ nonisolated struct StepsConfiguration: Codable, Hashable, Identifiable {
     init(id: UUID = UUID(), dailyGoal: Int = 8000) {
         self.id = id
         self.dailyGoal = dailyGoal
+    }
+}
+
+/// The objectives friction's only setting: all of them, or one will do.
+nonisolated struct ObjectivesFrictionConfiguration: Codable, Hashable, Identifiable {
+    let id: UUID
+    /// Every objective in its period, or just one of them.
+    ///
+    /// "All" is the honest default -- the point is that you have done what you said you
+    /// would -- but a day with six objectives on it would be a wall rather than a
+    /// friction, so one is offered too.
+    var requiresAll: Bool
+
+    init(id: UUID = UUID(), requiresAll: Bool = true) {
+        self.id = id
+        self.requiresAll = requiresAll
     }
 }
 

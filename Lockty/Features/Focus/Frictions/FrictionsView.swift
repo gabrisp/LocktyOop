@@ -47,27 +47,9 @@ struct FrictionsView: View {
     }
 
     private var addFrictionTile: some View {
-        Button {
+        LocktyAddTile(title: "New Friction") {
             router.presentSheet(.frictionEditor(FrictionEditorRoute(frictionID: nil)))
-        } label: {
-            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .light))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 24, height: 24)
-
-                    Spacer(minLength: 0)
-
-                    Text("Add Friction")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-                }
-            }
         }
-        .buttonStyle(.plain)
-        .tappable()
     }
 }
 

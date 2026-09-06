@@ -31,19 +31,24 @@ struct AppGroupPreviewContent: View {
                 titleAlignment: .center
             )
 
-            VStack(spacing: 2) {
-                Text(subtitleLine)
-                    .font(.system(.subheadline, design: .default, weight: .regular))
-                    .foregroundStyle(LocktyColors.secondaryText)
-                    .lineLimit(1)
-
-                Text(name)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-            }
+            // The name and the count again, at four times the size. Commented out rather
+            // than removed: the folder above already carries both, in the same component
+            // the rows of folders use, so this said everything the reader had just read.
+            // The other preview screens keep their heading because their badge is a
+            // glyph and names nothing.
+//            VStack(spacing: 2) {
+//                Text(subtitleLine)
+//                    .font(.system(.subheadline, design: .default, weight: .regular))
+//                    .foregroundStyle(LocktyColors.secondaryText)
+//                    .lineLimit(1)
+//
+//                Text(name)
+//                    .font(.system(size: 34, weight: .bold))
+//                    .foregroundStyle(LocktyColors.primaryText)
+//                    .multilineTextAlignment(.center)
+//                    .lineLimit(2)
+//                    .minimumScaleFactor(0.7)
+//            }
 
             summaryCard
         }
@@ -64,6 +69,7 @@ struct AppGroupPreviewContent: View {
         return parts.isEmpty ? "Nothing yet" : parts.joined(separator: ", ")
     }
 
+    /// Unreached while the heading above is commented out, and kept with it.
     private var subtitleLine: String {
         "Group · \(count == 1 ? "1 app" : "\(count) apps")"
     }

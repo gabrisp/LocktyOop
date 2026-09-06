@@ -19,8 +19,6 @@ final class AppRouter: ObservableObject {
     @Published var selectedDay: Date
     @Published var daySliderOffset: CGFloat
     @Published var todayChromeCollapseProgress: CGFloat = 0
-    /// Drives IGStyleTabBar's scroll-hide behavior: 0 = expanded/visible, 1 = minimized/hidden.
-    @Published var tabBarProgress: CGFloat = 0
     let dayNavigationDays: [Date]
 
     var path: [AppRoute] {

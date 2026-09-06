@@ -55,6 +55,10 @@ struct CardView<Content: View>: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: resolvedRadius, style: .continuous)
+        // Nil means "no colour of its own", not "white". White is the right default on
+        // black -- the gradient is light being added -- and the wrong one on a pale page,
+        // where white over white is nothing at all. The surface picks per scheme; this is
+        // only what the press effect brightens with.
         let resolvedTint = tint ?? .white
 
         content
@@ -71,7 +75,7 @@ struct CardView<Content: View>: View {
             .background {
                 LocktyCardSurface(
                     shape: shape,
-                    tint: resolvedTint,
+                    tint: tint,
                     variant: LocktyCardBorderProfile(index: borderVariantIndex)
                 )
             }
@@ -89,12 +93,24 @@ struct CardView<Content: View>: View {
 
 private struct LocktyCardSurface<S: InsettableShape>: View {
     let shape: S
-    let tint: Color
+    /// The card's own colour, or nil for one that has none.
+    let tint: Color?
     let variant: LocktyCardBorderProfile
 
     @Environment(\.colorScheme) private var colorScheme
 
     private var isDark: Bool { colorScheme == .dark }
+
+    /// What the fall of colour is drawn in.
+    ///
+    /// An untinted card gets white on black and ink on white, because the gradient is not
+    /// a colour -- it is the card lifting off the page, and which direction that is depends
+    /// on the page. It was white either way, so on a light screen every plain card was a
+    /// white gradient over a white surface: the glow along the bottom edge that makes a
+    /// card look like an object simply was not there.
+    private var auraTint: Color {
+        tint ?? (isDark ? .white : .black)
+    }
 
     var body: some View {
         // The gradient is the card's entire fill. There is no flat base layer under it
@@ -106,26 +122,46 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
         // so a card built the dark way was invisible. The gradient survives, inverted --
         // the bottom edge is where the card lifts off the page, and it lifts by being
         // brighter in the dark and by casting a shadow in the light.
+        // A ground first, then the tint over it. Both modes, in that order.
+        //
+        // The dark card used to be the gradient and nothing else, added to whatever was
+        // behind it -- so it was not a surface at all, it was a wash. On the page that
+        // passed; stacked (the insight cards sit three deep) each one showed the ones
+        // underneath through itself and none of them could be read. An opaque ground is
+        // what makes a card a card.
+        //
+        // And in light the white was standing in *for* the gradient rather than under
+        // it, so every card was the same blank white however it was tinted -- the usage
+        // card's green, a routine's colour, all painted out.
         shape
-            .fill(isDark ? AnyShapeStyle(aura) : AnyShapeStyle(lightSurface))
+            .fill(isDark ? AnyShapeStyle(darkSurface) : AnyShapeStyle(lightSurface))
+            .overlay {
+                shape
+                    .fill(isDark ? AnyShapeStyle(aura) : AnyShapeStyle(lightAura))
+                    // Added on black, laid down on white: there is no light to add to
+                    // white, and the same layer has to darken there instead.
+                    .blendMode(isDark ? .plusLighter : .normal)
+            }
             .overlay {
                 shape
                     .strokeBorder(primaryBorder, lineWidth: variant.baseLineWidth)
             }
             .compositingGroup()
-            // Added to the background rather than laid over it, which is what makes the
-            // bottom edge read as lit rather than as a lighter grey painted on. The
-            // blend has to sit outside the compositing group: inside it the fill would
-            // be adding to nothing but transparency and the card would look unchanged.
-            //
-            // Only in the dark: adding light to a light page washes it out instead of
-            // lifting the card off it.
-            .blendMode(isDark ? .plusLighter : .normal)
             .shadow(
                 color: isDark ? .clear : Color.black.opacity(0.06),
                 radius: 10,
                 y: 4
             )
+    }
+
+    /// The dark-mode ground: near-black, and opaque.
+    ///
+    /// Not the page's own black -- a card the exact colour of what it sits on is not a
+    /// card -- and not a translucent white either, which is what it was: over the page
+    /// that reads as a faint lift, and over another card it reads as both of them at
+    /// once. This is a colour, so a stack of them has a top one you can read.
+    private var darkSurface: Color {
+        Color(red: 0.075, green: 0.08, blue: 0.09)
     }
 
     /// The light-mode card: white, a touch cooler towards the bottom so it still has the
@@ -139,6 +175,29 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
             colors: [
                 LocktyColors.cardSurface,
                 LocktyColors.cardSurface.opacity(0.93)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// The same fall of colour as the dark card's, at the strength a light ground needs.
+    ///
+    /// Drawn normally rather than added: there is no light to add to white. The values
+    /// are roughly double the dark ones because `plusLighter` on black is a far stronger
+    /// operator than laying a colour over white at the same opacity -- copying the dark
+    /// numbers straight across left the card looking untinted, which is where this whole
+    /// problem started.
+    private var lightAura: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: auraTint.opacity(0.04), location: 0.00),
+                .init(color: auraTint.opacity(0.05), location: 0.38),
+                .init(color: auraTint.opacity(0.07), location: 0.60),
+                .init(color: auraTint.opacity(0.10), location: 0.75),
+                .init(color: auraTint.opacity(0.16), location: 0.86),
+                .init(color: auraTint.opacity(0.24), location: 0.94),
+                .init(color: auraTint.opacity(0.32), location: 1.00)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -160,13 +219,13 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
             // visible crease part-way down instead of a glow. The values are lower than
             // they look because they are added, not drawn over.
             stops: [
-                .init(color: tint.opacity(0.020), location: 0.00),
-                .init(color: tint.opacity(0.022), location: 0.38),
-                .init(color: tint.opacity(0.030), location: 0.60),
-                .init(color: tint.opacity(0.048), location: 0.75),
-                .init(color: tint.opacity(0.080), location: 0.86),
-                .init(color: tint.opacity(0.130), location: 0.94),
-                .init(color: tint.opacity(0.190), location: 1.00)
+                .init(color: auraTint.opacity(0.020), location: 0.00),
+                .init(color: auraTint.opacity(0.022), location: 0.38),
+                .init(color: auraTint.opacity(0.030), location: 0.60),
+                .init(color: auraTint.opacity(0.048), location: 0.75),
+                .init(color: auraTint.opacity(0.080), location: 0.86),
+                .init(color: auraTint.opacity(0.130), location: 0.94),
+                .init(color: auraTint.opacity(0.190), location: 1.00)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -176,7 +235,7 @@ private struct LocktyCardSurface<S: InsettableShape>: View {
     /// The rim. White over a dark page, a dark hairline over a light one -- the same
     /// gradient either way, only in whichever colour is not the card's own.
     private var primaryBorder: LinearGradient {
-        let edge = isDark ? tint : Color.black
+        let edge = isDark ? auraTint : Color.black
         let scale = isDark ? 1.0 : 0.45
 
         return LinearGradient(

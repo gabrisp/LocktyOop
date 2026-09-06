@@ -132,6 +132,20 @@ extension LocktyToast {
         )
     }
 
+    /// A limit rule with nothing left to give today.
+    ///
+    /// Its own toast rather than the routine's refusal, which talks about breaks and
+    /// cooldowns -- neither of which a limit rule has.
+    static func ruleLimitReached(ruleName: String) -> LocktyToast {
+        LocktyToast(
+            leading: .symbol("lock.fill", LocktyColors.unproductive),
+            title: ruleName,
+            message: "No unlocks left today",
+            accent: LocktyColors.unproductive,
+            duration: .seconds(2.8)
+        )
+    }
+
     static func alwaysAllowedLocked() -> LocktyToast {
         LocktyToast(
             leading: .symbol("lock.fill", LocktyColors.warning),

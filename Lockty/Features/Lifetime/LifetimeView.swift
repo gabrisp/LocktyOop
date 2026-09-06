@@ -82,7 +82,7 @@ struct LifetimeView: View {
                     }
                 }
             }
-            .padding(.horizontal, LocktySpacing.md)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.vertical, LocktySpacing.lg)
         }
         .scrollIndicators(.hidden)

@@ -87,7 +87,11 @@ struct FrictionCatalogGrid: View {
         } label: {
             VStack(spacing: LocktySpacing.sm) {
                 FrictionStepThumbnail(
-                    step: item.makeStep(),
+                    // The constant, not a freshly minted step. `makeStep()` mints a new
+                    // UUID every time the body runs, which is a new identity for the
+                    // preview on every redraw -- so every `task(id:)` inside it restarted
+                    // and the grid rebuilt itself continuously while you scrolled.
+                    step: FrictionPreviewSteps.step(for: item.kind),
                     tint: item.tint,
                     index: items.firstIndex(where: { $0.id == item.id }) ?? 0
                 )
@@ -112,15 +116,20 @@ struct FrictionCatalogGrid: View {
 /// makes it a preview rather than an illustration: it cannot say something the step does
 /// not, and it cannot fall out of date.
 struct FrictionStepThumbnail: View {
-    let step: FrictionStep
+    /// Nil for the kinds with nothing worth previewing, which rest on their glyph.
+    let step: FrictionStep?
     let tint: Color
     /// Where it sits in the grid, used only to stagger the build.
     var index: Int = 0
 
-    /// The size the step is laid out at before being shrunk. A phone's width, so text
-    /// wraps where it will wrap and a grid has the columns it will have.
+    /// The size the step is laid out at before being shrunk: a phone, at a phone's
+    /// shape. The width is what makes text wrap where it will wrap; the height is what
+    /// makes the miniature look like a screen rather than a letterbox of one.
     private let renderedWidth: CGFloat = 340
-    private let renderedHeight: CGFloat = 460
+    private var renderedHeight: CGFloat { renderedWidth * Self.screenAspect }
+
+    /// Roughly 19.5:9, which is every iPhone since the notch.
+    static let screenAspect: CGFloat = 19.5 / 9
 
     @State private var status = UnlockFlowStepStatus.ready
     /// Whether the real step is built yet.
@@ -131,28 +140,39 @@ struct FrictionStepThumbnail: View {
     /// for nobody -- so a cell builds when it arrives and lets go when it leaves.
     @State private var isRendered = false
 
+    /// The margin between the miniature and the edge of its cell.
+    ///
+    /// A step laid out edge to edge in a cell this small has its text touching the
+    /// border, which reads as a screenshot that has been cropped rather than as a small
+    /// screen. The gap is what makes it look like a device.
+    private let inset: CGFloat = 10
+
     var body: some View {
         GeometryReader { proxy in
-            let scale = proxy.size.width / renderedWidth
+            let available = max(proxy.size.width - inset * 2, 1)
+            let scale = available / renderedWidth
 
             Group {
                 if isRendered {
                     content
                         .frame(width: renderedWidth, height: renderedHeight)
                         .scaleEffect(scale, anchor: .top)
-                        .frame(width: proxy.size.width, height: renderedHeight * scale, alignment: .top)
+                        .frame(width: available, height: renderedHeight * scale, alignment: .top)
                         .transition(.opacity)
                 } else {
                     resting
-                        .frame(width: proxy.size.width, height: renderedHeight * scale, alignment: .top)
+                        .frame(width: available, height: renderedHeight * scale, alignment: .top)
                 }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .padding(.top, inset)
             // Inert. A thumbnail you can play is a thumbnail people will play, and the
             // flow it belongs to has not started.
             .allowsHitTesting(false)
             .disabled(true)
         }
         .task {
+            guard step != nil else { return }
             // Staggered by position, so a screenful arrives in sequence rather than all
             // on the same frame. Capped: past the first row or two the delay would be
             // longer than the scroll that revealed them.
@@ -161,7 +181,9 @@ struct FrictionStepThumbnail: View {
             withAnimation(.smooth(duration: 0.25)) { isRendered = true }
         }
         .onDisappear { isRendered = false }
-        .frame(height: 132)
+        // The cell is a screen's shape, so what is inside it is not squashed and the
+        // grid reads as a row of phones.
+        .aspectRatio(1 / Self.screenAspect, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -186,14 +208,18 @@ struct FrictionStepThumbnail: View {
 
     @ViewBuilder
     private var content: some View {
-        UnlockFlowStepPreview(step: step, status: $status)
+        if let step {
+            UnlockFlowStepPreview(step: step, status: $status)
+        } else {
+            resting
+        }
     }
 
     /// What a cell shows before its step is built, and after it has been let go. The
     /// step's own glyph on its own tint, which is what the eye lands on at this size
     /// anyway -- so the swap reads as the cell sharpening rather than as it appearing.
     private var resting: some View {
-        Image(systemName: step.symbolName ?? "square.dashed")
+        Image(systemName: step?.symbolName ?? "square.dashed")
             .font(.system(size: 26, weight: .light))
             .foregroundStyle(tint.opacity(0.7))
             .frame(maxWidth: .infinity, maxHeight: .infinity)

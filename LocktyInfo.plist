@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Written here rather than as an INFOPLIST_KEY_ build setting. Xcode only
+	     recognises a fixed list of those, and NSAlarmKitUsageDescription is not on it:
+	     the setting was in the project, was silently dropped at build time, and the
+	     shipped Info.plist had no alarm key at all. AlarmKit refuses authorization
+	     without it, so every routine alarm failed before a prompt was ever shown. -->
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Lockty sets an alarm a few minutes before a scheduled routine starts, so it does not begin without warning.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

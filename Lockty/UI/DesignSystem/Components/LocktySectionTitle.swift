@@ -122,6 +122,11 @@ struct LocktySectionTitle: View {
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(LocktyColors.ink(0.72))
                         .lineLimit(1)
+                        // The heading is one object that changes its words -- the score
+                        // pages keep it in place across Focus, Detox and Checks with a
+                        // matched geometry -- so it morphs rather than being swapped out
+                        // underneath itself.
+                        .locktyNumericTransition(trigger: title)
 
                     if onOpen != nil || showsChevron {
                         Image(systemName: "chevron.right")
@@ -133,6 +138,7 @@ struct LocktySectionTitle: View {
                         .padding(.leading, LocktySpacing.xs)
                 } else {
                     Text(title.uppercased())
+                        .locktyNumericTransition(trigger: title)
                         .locktyEyebrow()
                 }
 
@@ -159,10 +165,28 @@ struct LocktySectionTitle: View {
 
                 accessory
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onOpen?()
-            }
+            // The tap belongs to the heading only when the heading is the way in.
+            //
+            // With `showsChevron` the heading is *inside* somebody else's button -- that
+            // is what the flag means -- and a tap gesture with a content shape under it
+            // swallows every press before the button ever sees one. It is why the
+            // Objectives card could not be opened: the row looked tappable, took the tap,
+            // and called a closure that was nil.
+            .modifier(LocktySectionTitleTap(onOpen: onOpen))
+        }
+    }
+}
+
+private struct LocktySectionTitleTap: ViewModifier {
+    let onOpen: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let onOpen {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture { onOpen() }
+        } else {
+            content
         }
     }
 }

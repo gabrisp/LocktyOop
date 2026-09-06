@@ -89,16 +89,37 @@ struct PauseSuccessDayCardState: Codable, Hashable {
 struct IntentionalTimeCardState: Codable, Hashable {
     var valueText: String
     var detailText: String
+    /// The figure behind the text, so a gauge can place it against the day.
+    var duration: TimeInterval = 0
 }
 
 struct ScreenTimeCardState: Codable, Hashable {
     var durationText: String
     var comparisonText: String
+    /// How this day compares with the one before it. Positive is *less* used, which is
+    /// the direction worth a green arrow. Nil when there is nothing to compare with.
+    ///
+    /// The previous day, not the week's average, because the breakdown screen this card
+    /// opens compares a day with the day before -- and two arrows on the same figure
+    /// pointing opposite ways is not a nuance, it is a bug as far as anyone reading it is
+    /// concerned. A day under the week's average can easily be over yesterday.
+    var deltaVersusPreviousDay: TimeInterval?
+    /// The day's total, unformatted.
+    ///
+    /// Carried as well as the text because two screens were spelling the same figure out
+    /// of different sources: this one is what Screen Time reports for the day, which is
+    /// what the breakdown shows, and the usage card was adding up the apps it happened to
+    /// list instead -- always the smaller of the two, since the report counts activity it
+    /// will not attribute to any app.
+    var duration: TimeInterval = 0
 }
 
 struct BestDetoxCardState: Codable, Hashable {
     var durationText: String
     var comparisonText: String
+    /// The stretch itself. Nil when the day has none to speak of, which is not the same
+    /// as one of zero length.
+    var duration: TimeInterval?
 }
 
 struct RoutineSummaryCardState: Codable, Hashable {

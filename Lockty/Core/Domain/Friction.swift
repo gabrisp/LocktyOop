@@ -35,6 +35,12 @@ nonisolated enum FrictionKind: String, Codable, CaseIterable, Identifiable, Hash
     case nfcTag
     case location
     case steps
+    /// Meet what you said you would meet.
+    ///
+    /// The one friction made of your own words: it lists the objectives that are not
+    /// done in the period they are counted in, and does not let you through until they
+    /// are. Nothing to solve, nothing to type -- go and drink the water.
+    case objectives
     /// Retype a sentence exactly. The strongest of the six: slow, dull, and impossible to
     /// finish from memory however many times you have seen it.
     case copyPhrase
@@ -287,6 +293,8 @@ extension PauseStep {
             .tuneValue
         case .steps:
             .steps
+        case .objectives:
+            .objectives
         case .countdown, .breathing, .intention, .confirmation:
             nil
         }
@@ -330,6 +338,8 @@ extension PauseStep {
             "slider.horizontal.below.square.filled.and.square"
         case .steps:
             "figure.walk"
+        case .objectives:
+            "target"
         }
     }
 }

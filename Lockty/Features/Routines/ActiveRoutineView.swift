@@ -191,7 +191,7 @@ struct ActiveRoutineView: View {
                     }
                 }
             }
-            .padding(.horizontal, LocktySpacing.md)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.vertical, LocktySpacing.lg)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

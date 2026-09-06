@@ -18,12 +18,17 @@ struct RulesView: View {
                     RoutineCard(
                         routine: routine,
                         isActive: viewModel.activeScheduleRuleIDs().contains(rule.id),
-                        applicationTokens: viewModel.tokens(for: rule.id)
+                        applicationTokens: viewModel.tokens(for: rule.id),
+                        pausedUntil: viewModel.pausedUntil(for: rule.id)
                     ) {
                         router.presentSheet(.routineEditor(RoutineEditorRoute(routineID: rule.id)))
                     }
                 } else {
-                    RuleCard(rule: rule, applicationTokens: viewModel.tokens(for: rule.id)) {
+                    RuleCard(
+                        rule: rule,
+                        applicationTokens: viewModel.tokens(for: rule.id),
+                        pausedUntil: viewModel.pausedUntil(for: rule.id)
+                    ) {
                         router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: rule.id)))
                     }
                 }
@@ -54,33 +59,17 @@ struct RulesView: View {
     }
 
     private var addRuleTile: some View {
-        Button {
+        LocktyAddTile(title: "New Rule") {
             router.presentSheet(.ruleEditor(RuleEditorRoute(ruleID: nil)))
-        } label: {
-            CardView(interactive: true, height: RoutineGridMetrics.tileHeight) {
-                VStack(alignment: .leading, spacing: LocktySpacing.md) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .light))
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .frame(width: 24, height: 24)
-
-                    Spacer(minLength: 0)
-
-                    Text("Add Rule")
-                        .font(LocktyTypography.headline)
-                        .foregroundStyle(LocktyColors.primaryText)
-                        .lineLimit(1)
-                }
-            }
         }
-        .buttonStyle(.plain)
-        .tappable()
     }
 }
 
 struct RuleCard: View {
     let rule: Rule
     let applicationTokens: [ApplicationToken]
+    /// When the hold on it ends, if it is on hold.
+    var pausedUntil: Date?
     let onOpen: () -> Void
 
     private var accent: Color {
@@ -110,6 +99,11 @@ struct RuleCard: View {
     }
 
     private var pillText: String {
+        // What it limits matters less than the fact that it is not limiting it right now.
+        if let pausedUntil {
+            return "Paused until \(LocktyDateFormatting.shortDayAndTime(pausedUntil))"
+        }
+
         switch rule.kind {
         case .schedule:
             return "Schedule"

@@ -6,6 +6,12 @@ struct SystemAccessItemState: Equatable {
     var detail: String
     var actionTitle: String?
     var isLoading = false
+    /// Whether the permission has actually been given.
+    ///
+    /// Carried rather than inferred from the wording. The onboarding gate used to read
+    /// the detail string and check whether it contained "Authorized", which is a
+    /// sentence written for a person deciding what an app may do.
+    var isGranted = false
 }
 
 @MainActor
@@ -35,7 +41,12 @@ final class SystemAccessViewModel: ObservableObject {
         screenTimeState = Self.screenItem(screen)
         notificationState = Self.notificationItem(notification)
         locationState = Self.locationItem(location)
-        alarmState = SystemAccessItemState(title: "Alarms", detail: alarm.rawValue.capitalized, actionTitle: alarm == .notDetermined ? "Enable" : nil)
+        alarmState = SystemAccessItemState(
+            title: "Alarms",
+            detail: alarm.rawValue.capitalized,
+            actionTitle: alarm == .notDetermined ? "Enable" : nil,
+            isGranted: alarm == .authorized
+        )
     }
 
     func requestScreenTime() async { screenTimeState.isLoading = true; _ = await screenTime.requestAuthorization(); await refresh() }
@@ -65,15 +76,26 @@ final class SystemAccessViewModel: ObservableObject {
         return SystemAccessItemState(
             title: "Screen Time",
             detail: detail,
-            actionTitle: [.notDetermined, .denied].contains(state) ? "Request" : nil
+            actionTitle: [.notDetermined, .denied].contains(state) ? "Request" : nil,
+            isGranted: state == .authorized || state == .authorizedWithDataAccess
         )
     }
 
     private static func notificationItem(_ state: NotificationAuthorizationState) -> SystemAccessItemState {
-        SystemAccessItemState(title: "Notifications", detail: state.rawValue.capitalized, actionTitle: state == .notDetermined ? "Enable" : nil)
+        SystemAccessItemState(
+            title: "Notifications",
+            detail: state.rawValue.capitalized,
+            actionTitle: state == .notDetermined ? "Enable" : nil,
+            isGranted: state == .authorized || state == .provisional || state == .ephemeral
+        )
     }
 
     private static func locationItem(_ state: LocationAuthorizationState) -> SystemAccessItemState {
-        SystemAccessItemState(title: "Location", detail: state.rawValue.capitalized, actionTitle: state == .notDetermined ? "Enable" : nil)
+        SystemAccessItemState(
+            title: "Location",
+            detail: state.rawValue.capitalized,
+            actionTitle: state == .notDetermined ? "Enable" : nil,
+            isGranted: state == .whenInUse || state == .always
+        )
     }
 }

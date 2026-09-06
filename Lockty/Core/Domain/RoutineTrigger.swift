@@ -68,15 +68,20 @@ nonisolated enum Weekday: Int, Codable, CaseIterable, Hashable, Identifiable {
         .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
     ]
 
+    /// The initial on a weekday circle.
+    ///
+    /// English, like the rest of the app. Two of them repeat -- Tuesday and Thursday
+    /// both start with T, Saturday and Sunday with S -- which is why they are read in
+    /// order rather than individually, and why the row is always the whole week.
     var shortLabel: String {
         switch self {
-        case .monday: "L"
-        case .tuesday: "M"
-        case .wednesday: "X"
-        case .thursday: "J"
-        case .friday: "V"
+        case .monday: "M"
+        case .tuesday: "T"
+        case .wednesday: "W"
+        case .thursday: "T"
+        case .friday: "F"
         case .saturday: "S"
-        case .sunday: "D"
+        case .sunday: "S"
         }
     }
 }

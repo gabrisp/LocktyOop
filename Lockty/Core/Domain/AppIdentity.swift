@@ -89,13 +89,23 @@ extension AppIdentity.ID {
 }
 
 extension AppIdentity {
+    /// The best name available, in order: what the system calls the app, then a name
+    /// picked out of its bundle identifier, then nothing.
+    ///
+    /// The localized name wins whenever there is one. It used to be thrown away if it
+    /// contained a full stop -- which is right for a bundle identifier arriving in the
+    /// wrong field and wrong for every app actually called "X.com", "Booking.com",
+    /// "N26.de" -- and those all fell through to the parser below, which is the thing
+    /// that produces the mangled names. A dot inside a name is not evidence of anything;
+    /// a name that *is* its bundle identifier is, and that is what is tested for now.
     nonisolated static func preferredDisplayName(
         localizedDisplayName: String?,
         bundleIdentifier: String?
     ) -> String {
         if let localizedDisplayName,
            !localizedDisplayName.isEmpty,
-           !localizedDisplayName.contains(".") {
+           localizedDisplayName != bundleIdentifier,
+           !looksLikeBundleIdentifier(localizedDisplayName) {
             return localizedDisplayName
         }
 
@@ -124,6 +134,17 @@ extension AppIdentity {
 
         return "App"
     }
+
+    /// Whether a string is a reverse-DNS identifier wearing a name's clothes.
+    ///
+    /// Three or more dot-separated parts, none of them spaced -- "com.burbn.instagram".
+    /// A real name with a dot in it ("X.com", "Booking.com") has two parts at most, or a
+    /// space somewhere, and is left alone.
+    private static func looksLikeBundleIdentifier(_ value: String) -> Bool {
+        guard !value.contains(" ") else { return false }
+        return value.split(separator: ".").count >= 3
+    }
+
 
     nonisolated init(token: ManagedSettings.ApplicationToken) {
         let application = ManagedSettings.Application(token: token)

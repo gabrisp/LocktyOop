@@ -155,7 +155,6 @@ struct UnlockWordSearchStepView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             resetSession()
         }
@@ -510,7 +509,6 @@ struct UnlockLetterMatchStepView: View {
                 letterMatchBoardContainer
             }
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             resetLetterMatch()
         }
@@ -864,7 +862,6 @@ struct UnlockOperationsStepView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 16)
         .task(id: configuration.id) {
             resetOperations()
         }

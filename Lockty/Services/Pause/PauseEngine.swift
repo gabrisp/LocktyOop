@@ -75,6 +75,16 @@ final class PauseEngine: ObservableObject {
     /// newly created Pause never actually shielded its app, and the flow it describes
     /// could never be triggered. Call after any change to the rules, and on launch.
     func refreshShields() async {
+        // Nothing arms while the debug kill is latched. This is the call every other
+        // change ends with, so without this check "kill everything" lasted until the next
+        // list load put the whole policy back.
+        #if DEBUG
+        guard !DebugKillSwitch.isKilled else {
+            print("Shields not refreshed: debug kill switch is on")
+            return
+        }
+        #endif
+
         do {
             let runtime = try appGroupStore.loadRuntimeState()
             let pauseRules = await pauseRuleRepository.rules()
@@ -100,6 +110,24 @@ final class PauseEngine: ObservableObject {
             print("Refreshed shields rules=\(pauseRules.count) blockedApps=\(effectivePolicy.blockedApplications.count)")
         } catch {
             print("Refreshing shields failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Takes everything down and leaves it down.
+    ///
+    /// Not `refreshShields` with nothing to apply: that recomputes from the stored rules,
+    /// which is exactly what must not happen here. This clears what is applied and writes
+    /// an empty policy into the runtime state, so anything reading it later -- the
+    /// extensions included -- finds nothing to hold.
+    func clearShields() async {
+        do {
+            try await shieldService.clearAllRestrictions()
+            try appGroupStore.updateRuntimeState { state in
+                state.shieldPolicy = .empty
+            }
+            print("Cleared every shield")
+        } catch {
+            print("Clearing shields failed: \(error.localizedDescription)")
         }
     }
 
@@ -172,12 +200,10 @@ final class PauseEngine: ObservableObject {
                 try await shieldService.apply(effectivePolicy)
             }
 
-            // Charged here and not in the shield action: the button that asked for this
-            // unlock is not the unlock. A flow the user started and then backed out of
-            // must not cost them one of the day's opens.
-            if let limitRuleID = context.limitRuleID {
-                RuleShieldLookup(appGroupStore: appGroupStore).chargePass(ruleID: limitRuleID)
-            }
+            // Nothing is charged here any more. An open-count rule counts the opens
+            // Screen Time reports, not the trips through the shield -- so an unlock past
+            // the day's ten is a break, governed by the rule's own break policy, and
+            // adding to the count for it would be counting the same day twice.
 
             do {
                 try await deviceActivityService.schedulePauseRelock(allowance)

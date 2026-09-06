@@ -40,12 +40,27 @@ struct UsageBreakdownView: View {
                 // under you as you answer.
                 if !viewModel.isEditing {
                     headline
-                        .transition(.blurReplace.combined(with: .opacity))
+                        .transition(.blurReplace)
+                }
+
+                // Between the figures and the apps: the line is about the same total the
+                // headline just gave, and the sections under it are where that total went.
+                if !viewModel.isEditing, viewModel.period != .day {
+                    trendSection
+                        .transition(.blurReplace)
+
+                    // The line and the list are two different readings -- how much, and
+                    // what it went to -- and they were running together as one column.
+                    Divider()
+                        .overlay(LocktyColors.separator.opacity(0.45))
+
+                    Text("APPS")
+                        .locktyEyebrow()
                 }
 
                 if viewModel.isEditing {
                     editingGrid
-                        .transition(.blurReplace.combined(with: .opacity))
+                        .transition(.blurReplace)
                 } else if viewModel.breakdown.hasData {
                     ForEach(viewModel.breakdown.sections) { section in
                         sectionView(section)
@@ -54,7 +69,7 @@ struct UsageBreakdownView: View {
                     emptyState
                 }
             }
-            .padding(.horizontal, LocktySpacing.screenInset)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.vertical, LocktySpacing.lg)
         }
         // The app's own helper, which falls back to a safeAreaInset before 26. The
@@ -63,9 +78,9 @@ struct UsageBreakdownView: View {
         .customSafeAreaBar(edge: .top, spacing: 0) {
             if !viewModel.isEditing {
                 periodPicker
-                    .padding(.horizontal, LocktySpacing.screenInset)
+                    .padding(.horizontal, LocktySpacing.tabInset)
                     .padding(.bottom, LocktySpacing.md)
-                    .transition(.blurReplace.combined(with: .opacity))
+                    .transition(.blurReplace)
             }
         }
         // No way back while editing, and no period to change: leaving is done by the tick
@@ -100,7 +115,7 @@ struct UsageBreakdownView: View {
                     Text("Edit")
                         .font(.system(.headline, design: .default, weight: .semibold))
                         .foregroundStyle(LocktyColors.primaryText)
-                        .transition(.blurReplace.combined(with: .opacity))
+                        .transition(.blurReplace)
                 }
             }
 
@@ -134,8 +149,18 @@ struct UsageBreakdownView: View {
                 selection: $viewModel.anchorDay
             )
         }
-        .task(id: viewModel.period) { await viewModel.reload() }
-        .task(id: viewModel.anchorDay) { await viewModel.reload() }
+        // One task, not one per input. Two of them both fired on the first appear, so
+        // opening the screen built the whole period twice -- every file read, decoded and
+        // totalled again for the same answer.
+        .task(id: DayKey(date: viewModel.anchorDay).id + viewModel.period.rawValue) {
+            await viewModel.reload()
+        }
+        // The grid's apps are gathered when the pencil is pressed, not before: it is a
+        // month of file reads for a mode most openings of this screen never enter.
+        .task(id: viewModel.isEditing) {
+            guard viewModel.isEditing else { return }
+            await viewModel.loadKnownAppsIfNeeded()
+        }
     }
 
     // MARK: - Period
@@ -173,17 +198,96 @@ struct UsageBreakdownView: View {
 
     // MARK: - Headline
 
+    /// Average screen time across the period, day by day.
+    ///
+    /// Only on a week or a month: a day has no days behind it to draw. And only once
+    /// there are enough of them -- below that the chart is still drawn, blurred, with
+    /// what it is waiting for written across it, because showing the shape of the thing
+    /// you are working towards is worth more than an empty box that says "no data".
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: LocktySpacing.md) {
+            // No heading. "Average screen time · 5 days" is already written under the
+            // figure the line is drawn from, and a title over the chart saying the same
+            // words was the page introducing itself twice.
+            ZStack {
+                LocktyTrendChart(
+                    points: trendPoints,
+                    tint: LocktyColors.primaryText,
+                    format: { LocktyDurationFormatter.abbreviated($0) }
+                )
+                // The line changes when the period does, and it changes shape entirely
+                // -- seven points become thirty. There is nothing to interpolate between
+                // those two, so it blurs out and the new one blurs in, like every other
+                // thing in the app that becomes something else.
+                .id(viewModel.period.rawValue + "-\(viewModel.trend.count)")
+                .transition(.blurReplace)
+                .animation(.smooth(duration: 0.4), value: viewModel.period)
+                .animation(.smooth(duration: 0.4), value: viewModel.trend)
+                .blur(radius: viewModel.hasEnoughTrendHistory ? 0 : 7)
+                .opacity(viewModel.hasEnoughTrendHistory ? 1 : 0.5)
+                .allowsHitTesting(viewModel.hasEnoughTrendHistory)
+
+                if !viewModel.hasEnoughTrendHistory {
+                    Text(viewModel.trendWaitCaption)
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, LocktySpacing.xl)
+                }
+            }
+            .animation(.smooth(duration: 0.4), value: viewModel.hasEnoughTrendHistory)
+        }
+    }
+
+    /// The period's days as points, with the two ends and the middle named.
+    ///
+    /// When there is not enough history the line is drawn from what there is anyway --
+    /// it is blurred out, and a blurred flat line reads as nothing at all where a blurred
+    /// shape reads as a chart that is on its way.
+    private var trendPoints: [LocktyTrendChart.Point] {
+        let days = viewModel.trend
+        guard !days.isEmpty else { return [] }
+        let named = Set([0, days.count / 2, days.count - 1])
+
+        return days.enumerated().map { index, day in
+            LocktyTrendChart.Point(
+                id: index,
+                value: day.usage,
+                label: named.contains(index) ? Self.weekdayFormatter.string(from: day.date) : nil,
+                caption: Self.captionFormatter.string(from: day.date)
+            )
+        }
+    }
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter
+    }()
+
+    /// The whole day, for the tooltip. "Mon 2 Sep" -- an initial is enough to orient
+    /// yourself along the axis and not enough to know which day you are holding.
+    private static let captionFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter
+    }()
+
     private var headline: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(LocktyDurationFormatter.abbreviated(viewModel.breakdown.headlineDuration))
                 .font(.system(size: 44, weight: .bold))
                 .foregroundStyle(LocktyColors.primaryText)
                 .monospacedDigit()
-                .contentTransition(.numericText())
+                .locktyNumericTransition(trigger: viewModel.breakdown.headlineDuration)
 
             Text(viewModel.totalCaption)
                 .font(.system(.body, design: .default, weight: .regular))
                 .foregroundStyle(LocktyColors.secondaryText)
+                .id(viewModel.totalCaption)
+                .transition(.blurReplace)
+                .animation(.smooth(duration: 0.3), value: viewModel.totalCaption)
 
             if let delta = viewModel.breakdown.deltaVersusPrevious, abs(delta) >= 60 {
                 HStack(spacing: 5) {
@@ -193,7 +297,7 @@ struct UsageBreakdownView: View {
                     Text("\(LocktyDurationFormatter.abbreviated(abs(delta))) \(viewModel.deltaCaption)")
                         .font(.system(.body, design: .default, weight: .semibold))
                         .monospacedDigit()
-                        .contentTransition(.numericText())
+                        .locktyNumericTransition(trigger: delta)
                 }
                 .foregroundStyle(delta >= 0 ? LocktyColors.productive : LocktyColors.unproductive)
                 .padding(.top, 6)
@@ -259,7 +363,7 @@ struct UsageBreakdownView: View {
                     // The ones that were on screen a moment ago fly into place; the rest
                     // of the month's apps arrive on their own, since they had nowhere to
                     // fly from.
-                    .transition(.blurReplace.combined(with: .opacity))
+                    .transition(.blurReplace)
             }
         }
     }
@@ -362,14 +466,27 @@ struct UsageBreakdownView: View {
 
                 HStack(spacing: LocktySpacing.sm) {
                     GeometryReader { proxy in
+                        let colour = LocktyColors.classification(app.classification)
+
+                        // The same bar the gauges use: solid where it starts, dissolving
+                        // where it ends. A hard tip claims the minute it stops on, and
+                        // these are durations rounded to the minute standing next to each
+                        // other -- what they are for is the comparison, not the endpoint.
                         Capsule()
-                            .fill(LocktyColors.classification(app.classification))
+                            .fill(
+                                LinearGradient(
+                                    colors: [colour, colour.opacity(0.85), colour.opacity(0.25), colour.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .frame(
                                 width: longest > 0
                                     ? max(proxy.size.width * CGFloat(app.duration / longest), 6)
                                     : 6,
                                 height: 4
                             )
+                            .blur(radius: 1.2)
                             .animation(.smooth(duration: 0.5), value: app.duration)
                     }
                     .frame(height: 4)

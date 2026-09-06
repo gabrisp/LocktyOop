@@ -66,16 +66,27 @@ struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
     @ObservedObject var access: SystemAccessViewModel
     @ObservedObject var router: AppRouter
+    /// Tears every block down. Debug builds only -- see the section that offers it.
+    var onKillEverything: (() async -> Void)?
+    /// Lets it all arm again.
+    var onResumeEnforcement: (() async -> Void)?
 
     init(
         viewModel: SettingsViewModel,
         access: SystemAccessViewModel,
-        router: AppRouter
+        router: AppRouter,
+        onKillEverything: (() async -> Void)? = nil,
+        onResumeEnforcement: (() async -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.access = access
         self.router = router
+        self.onKillEverything = onKillEverything
+        self.onResumeEnforcement = onResumeEnforcement
     }
+
+    @State private var isKilling = false
+    @State private var isKilled = DebugKillSwitch.isKilled
 
     private var cardRadius: CGFloat { 18 }
 
@@ -144,8 +155,10 @@ struct SettingsView: View {
 
                     healthRow
                 }
+
+                debugSection
             }
-            .padding(.horizontal, LocktySpacing.lg)
+            .padding(.horizontal, LocktySpacing.tabInset)
             .padding(.vertical, LocktySpacing.xl)
         }
         .navigationTitle("Settings")
@@ -162,6 +175,63 @@ struct SettingsView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+    }
+
+    /// The way out when a block will not let go.
+    ///
+    /// Debug builds only, and deliberately: it ends every routine, clears the shield,
+    /// wipes the runtime state and stops every monitor -- which is exactly what you want
+    /// when something is stuck behind glass you cannot reach, and exactly what nobody
+    /// should be able to press on a phone they are trying to stay off.
+    ///
+    /// Held, not tapped. It undoes everything at once and there is no putting it back.
+    @ViewBuilder
+    private var debugSection: some View {
+        #if DEBUG
+        if let onKillEverything {
+            section(title: "Debug") {
+                VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                    Text("Ends every routine and session, clears the shield, and stops all monitoring -- and latches, so nothing arms itself again until you switch it back on. Nothing is deleted: rules, modes and objectives stay as they are.")
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if isKilled {
+                        Text("Enforcement is off. Nothing will shield, schedule or count until it is switched back on -- including after a relaunch.")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundStyle(LocktyColors.error)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        LocktyHoldButton(
+                            title: "Hold to switch it back on",
+                            systemImage: "play.circle",
+                            tint: LocktyColors.productive
+                        ) {
+                            Task {
+                                await onResumeEnforcement?()
+                                isKilled = DebugKillSwitch.isKilled
+                            }
+                        }
+                    } else {
+                        LocktyHoldButton(
+                            title: isKilling ? "Killing…" : "Hold to kill everything",
+                            systemImage: "exclamationmark.octagon",
+                            tint: LocktyColors.error
+                        ) {
+                            guard !isKilling else { return }
+                            isKilling = true
+                            Task {
+                                await onKillEverything()
+                                isKilled = DebugKillSwitch.isKilled
+                                isKilling = false
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, LocktySpacing.md)
+            }
+        }
+        #endif
     }
 
     @ViewBuilder

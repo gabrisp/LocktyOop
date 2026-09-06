@@ -15,18 +15,13 @@ struct RootView: View {
                 EmptyView()
 
             case .onboarding:
-                OnboardingView(
-                    authorizationState: onboardingAuthorizationState,
-                    onContinue: {
-                        Task {
-                            let state = await container.screenTimeAuthorizationService.requestAuthorization()
-                            await MainActor.run {
-                                onboardingAuthorizationState = state
-                                completeOnboardingIfAuthorized(state)
-                            }
-                        }
-                    }
-                )
+                // Every permission, asked for here. Continue is the way in, and it opens
+                // only once the two the app cannot work without have been given -- it
+                // used to be the request itself, so the screen was a button that asked
+                // for Screen Time and let you in whatever the answer was.
+                OnboardingView(viewModel: container.systemAccessViewModel) {
+                    container.session.completeOnboarding()
+                }
 
             case .home:
                 HomeView(
@@ -61,17 +56,15 @@ struct RootView: View {
         }
     }
 
-    @MainActor
-    private func completeOnboardingIfAuthorized(_ state: ScreenTimeAuthorizationState) {
-        guard state == .authorized || state == .authorizedWithDataAccess else { return }
-        container.session.completeOnboarding()
-    }
-
+    /// Keeps the onboarding's own view of the permissions current.
+    ///
+    /// It no longer finishes onboarding on its own. Being authorized for Screen Time is
+    /// not the same as having been through the screen that explains the other three, and
+    /// letting the state decide meant coming back from Settings dropped you into the app
+    /// mid-explanation.
     private func refreshOnboardingAuthorizationState() async {
         let state = await container.screenTimeAuthorizationService.refreshAuthorizationState()
-        await MainActor.run {
-            onboardingAuthorizationState = state
-            completeOnboardingIfAuthorized(state)
-        }
+        await MainActor.run { onboardingAuthorizationState = state }
+        await container.systemAccessViewModel.refresh()
     }
 }

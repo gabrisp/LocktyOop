@@ -21,8 +21,13 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
 
-        if event.rawValue == AutoFocusIntervention.eventName {
-            RuntimeRepairCoordinator().deliverAutoFocusIntervention()
+        if let milestone = DistractionMilestones.milestone(forEvent: event.rawValue) {
+            RuntimeRepairCoordinator().deliverDistractionMilestone(milestone)
+            return
+        }
+
+        if event.rawValue == UsageMilestoneNotice.eventName {
+            RuntimeRepairCoordinator().deliverUsageMilestone(for: activity)
             return
         }
 
@@ -93,6 +98,14 @@ private struct RuntimeRepairCoordinator {
             return
         }
 
+        // A routine on hold does not start. Checked here rather than by tearing down its
+        // monitoring, so the hold can run out on its own and the routine simply begins
+        // again at its next window -- with nothing to remember to re-register.
+        guard !store.loadRulePauseState().isPaused(id) else {
+            print("Scheduled routine \(snapshot.name) skipped: paused")
+            return
+        }
+
         guard var runtimeState = try? store.loadRuntimeState() else { return }
         // Alongside whatever else is running, not instead of it. This used to bail out
         // whenever anything was active, so a routine whose window overlapped another's
@@ -109,16 +122,30 @@ private struct RuntimeRepairCoordinator {
     /// A new day for a daily-usage rule: the interval it was budgeted against has just
     /// restarted, so whatever it spent yesterday stops shielding anything.
     ///
-    /// The record is cleared rather than left to age out, because the shield has to come
-    /// down here and now -- a stale record that merely *reads* as a different day would
-    /// not be re-applied until something else recomputed the policy.
+    /// Only a record from another day is cleared. An interval start is not proof of a new
+    /// day -- registering a monitor on a window that is already open delivers one
+    /// immediately -- and this used to drop the record whichever day it belonged to, so
+    /// every re-registration handed the rule its whole budget back. That is what made a
+    /// daily limit vanish on opening Lockty: the app re-registered its monitors on
+    /// launch, the system called this, and the minutes already spent were forgotten.
+    ///
+    /// Clearing it is still worth doing at a real rollover, because the shield has to
+    /// come down here and now -- but the recompute below is what actually lifts it, and
+    /// a record left over from yesterday already reads as a fresh one.
     func resetRuleBudgetIfNeeded(for activity: DeviceActivityName) {
         guard let ruleID = Self.ruleID(from: activity) else { return }
 
+        let today = RuleEnforcementState.dayKey()
+        var didReset = false
         try? store.updateRuleEnforcementState { state in
+            guard let record = state.records[ruleID], record.dayKey != today else { return }
             state.records[ruleID] = nil
+            didReset = true
         }
-        print("Rule \(ruleID.uuidString) budget reset for a new day")
+
+        if didReset {
+            print("Rule \(ruleID.uuidString) budget reset for a new day")
+        }
         repairRuntimeState(activityName: activity.rawValue)
     }
 
@@ -178,78 +205,89 @@ private struct RuntimeRepairCoordinator {
     /// Says something rather than shielding, which is not a preference: a screen in front
     /// of an app is only allowed against a block the person set up, and this one is
     /// noticed rather than chosen.
-    func deliverAutoFocusIntervention() {
+    func deliverDistractionMilestone(_ milestone: DistractionMilestones.Milestone) {
         let configuration = store.loadAutoFocusConfiguration()
         guard configuration.notificationsEnabled else {
-            print("AutoFocus threshold reached but notifications are off")
+            print("Distraction milestone \(milestone.minutes)m reached but notifications are off")
             return
         }
 
-        let minutes = AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel)
-
         let content = UNMutableNotificationContent()
-        content.title = AutoFocusIntervention.title
-        content.body = AutoFocusIntervention.line(
-            minutes: minutes,
-            durationText: minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h"
-        )
+        content.title = milestone.title
+        content.body = milestone.body
         content.sound = .default
 
-        // Immediately, with no trigger: the moment it fires *is* the moment.
+        // Immediately, with no trigger: the moment it fires *is* the moment. And keyed by
+        // the milestone and the day, so a threshold that somehow reports twice replaces
+        // its own notification rather than stacking a second copy of it.
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(
-                identifier: "autofocus-\(Date().timeIntervalSince1970)",
+                identifier: "distraction-\(milestone.minutes)-\(RuleEnforcementState.dayKey())",
                 content: content,
                 trigger: nil
             )
         )
 
-        print("AutoFocus intervened after \(minutes)m")
-        rearmAutoFocus(
-            afterCooldown: AutoFocusIntervention.cooldownMinutes(for: configuration.interventionLevel)
-        )
+        print("Distraction milestone delivered at \(milestone.minutes)m")
     }
 
-    /// Sets the threshold again, once the cooldown has passed.
+    /// Today has passed yesterday in one app.
     ///
-    /// A usage event fires once per window and then stays quiet, so without this the
-    /// intervention arrived once a day whatever the cooldown was set to -- the setting
-    /// existed and did nothing. Re-registering from inside the extension is what turns it
-    /// into the real gap between one intervention and the next.
-    ///
-    /// The new window opens at the end of the cooldown and runs to the end of the day.
-    /// `DeviceActivitySchedule` refuses an interval under fifteen minutes, so a cooldown
-    /// shorter than that would throw -- the window is simply carried to the end of the
-    /// day, which is always long enough, and the cooldown lives in where it *starts*.
-    private func rearmAutoFocus(afterCooldown minutes: Int) {
-        let configuration = store.loadAutoFocusConfiguration()
-        let tokens = selectionStore.applicationTokens(for: configuration.distractingApplicationIDs)
-        guard !tokens.isEmpty else { return }
+    /// The name comes out of the catalogue the report extension keeps, because here --
+    /// in an extension, from a token -- `Application(token:).localizedDisplayName` is
+    /// nil. That is the whole reason the catalogue exists: without it this notification
+    /// would have to say "an app", which is a notification about nothing.
+    func deliverUsageMilestone(for activity: DeviceActivityName) {
+        guard let appID = UsageMilestoneNotice.appID(from: activity.rawValue) else { return }
 
+        let catalog = store.loadAppNameCatalog()
+        guard let record = catalog.record(for: appID) else {
+            print("Usage milestone for \(appID.rawValue) skipped: no name on file")
+            return
+        }
+
+        // Yesterday's figure, read back rather than carried in the activity name: the
+        // name has to stay the same across the day or the monitor would be re-registered
+        // every time the figure was recomputed.
         let calendar = Calendar.current
-        let resumesAt = Date().addingTimeInterval(Double(max(minutes, 5)) * 60)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        let minutes = (try? store.loadScreenTimeReportSnapshot(for: DayKey(date: yesterday)))?
+            .applications
+            .first { $0.app.id == appID }?
+            .totalActivityDuration ?? 0
 
-        // Nothing left of today to watch: tomorrow's window opens on its own, because the
-        // app re-registers the repeating schedule on every sync.
-        guard calendar.isDateInToday(resumesAt) else { return }
+        guard minutes > 0 else { return }
 
-        let start = calendar.dateComponents([.hour, .minute, .second], from: resumesAt)
-        let event = DeviceActivityEvent(
-            applications: tokens,
-            threshold: DateComponents(minute: AutoFocusIntervention.thresholdMinutes(for: configuration.interventionLevel))
+        let content = UNMutableNotificationContent()
+        content.title = UsageMilestoneNotice.title
+        content.body = UsageMilestoneNotice.message(
+            appName: record.displayName,
+            yesterday: Self.durationText(minutes)
         )
+        content.sound = .default
 
-        try? DeviceActivityCenter().startMonitoring(
-            DeviceActivityName(AutoFocusIntervention.activityName),
-            during: DeviceActivitySchedule(
-                intervalStart: start,
-                intervalEnd: DateComponents(hour: 23, minute: 59, second: 0),
-                repeats: false
-            ),
-            events: [DeviceActivityEvent.Name(AutoFocusIntervention.eventName): event]
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(
+                identifier: "milestone-\(appID.rawValue)-\(RuleEnforcementState.dayKey())",
+                content: content,
+                trigger: nil
+            )
         )
-        print("AutoFocus re-armed for \(resumesAt)")
+        print("Usage milestone delivered for \(record.displayName)")
     }
+
+    private static func durationText(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration / 60)
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(hours) h" : "\(hours) h \(remainder) min"
+    }
+
+    // The re-arm that used to live here is gone with the single threshold it existed
+    // for. There is nothing to re-arm now: each milestone is its own event with its own
+    // figure, every one fires once per day by construction, and the cooldown between
+    // them is simply the time it takes to spend the next fifteen minutes.
 
     func repair(afterThresholdFor activity: DeviceActivityName, event: DeviceActivityEvent.Name) {
         _ = event
@@ -262,6 +300,16 @@ private struct RuntimeRepairCoordinator {
                     record.usageLimitReachedAt = Date()
                 }
             }
+
+            // And into the history, because this is the one thing about a limit that must
+            // outlive the day: the enforcement record is cleared at midnight, and a day
+            // the app is never opened would otherwise leave no trace that the rule fired.
+            // Only the flag -- the extension has no report to read, and writing figures it
+            // does not have would overwrite what the app wrote with zeroes.
+            try? store.updateRuleHistory { history in
+                history.markReached(ruleID)
+            }
+
             print("Rule \(ruleID.uuidString) reached its daily usage limit")
         }
 

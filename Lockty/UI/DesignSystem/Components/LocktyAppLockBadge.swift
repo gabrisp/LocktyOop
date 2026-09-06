@@ -19,6 +19,8 @@ struct LocktyAppLockBadge: View {
     var unlockedFrom: Date?
     var unlockedUntil: Date?
     var showsBorder = true
+
+    @Environment(\.colorScheme) private var colorScheme
     /// Whether this app can be unlocked at all right now, which is what colours the ring.
     var availability: Availability = .unlockable
     /// What sits under the badge. `.none` when the badge is the whole story.
@@ -181,16 +183,7 @@ struct LocktyAppLockBadge: View {
             .padding(inset)
             .overlay {
                 if showsBorder {
-                    RoundedRectangle(cornerRadius: borderRadius, style: .continuous)
-                        // Locked draws the whole ring; unlocked unwinds it as the
-                        // allowance is spent, so what is left of the border is what is
-                        // left of the time.
-                        .trim(from: 0, to: locked ? 1 : progress)
-                        .stroke(
-                            accent(at: date).opacity(locked ? 0.7 : 0.95),
-                            style: StrokeStyle(lineWidth: borderWidth, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
+                    rim(progress: locked ? 1 : progress, tint: accent(at: date), locked: locked)
                 }
             }
             // Scaled as one piece -- icon, gap and ring together -- so the proportions
@@ -206,6 +199,45 @@ struct LocktyAppLockBadge: View {
                     .offset(y: 18)
             }
             .padding(.bottom, caption == .none ? 0 : 20)
+    }
+
+    /// The ring, in three layers: the track it could fill, the light coming off the part
+    /// that is filled, and that part drawn crisply on top.
+    ///
+    /// The same construction the score pills use. The border was a single hard stroke,
+    /// which said the number and nothing else -- a glow behind it is what makes the ring
+    /// read as lit by what it is measuring rather than as an outline drawn round an icon.
+    ///
+    /// The glow is a second copy of the arc rather than a shadow: a shadow follows the
+    /// whole outline, and what should be glowing is the part that is left.
+    @ViewBuilder
+    private func rim(progress: Double, tint: Color, locked: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: borderRadius, style: .continuous)
+        let isDark = colorScheme == .dark
+
+        ZStack {
+            shape
+                .stroke(LocktyColors.ink(0.10), lineWidth: borderWidth)
+
+            // Locked draws the whole ring; unlocked unwinds it as the allowance is spent,
+            // so what is left of the border is what is left of the time.
+            shape
+                .trim(from: 0, to: progress)
+                .stroke(tint, style: StrokeStyle(lineWidth: borderWidth, lineCap: .round))
+                .blur(radius: 4)
+                .opacity(isDark ? 1 : 0.55)
+                .blendMode(isDark ? .plusLighter : .normal)
+                .rotationEffect(.degrees(-90))
+
+            shape
+                .trim(from: 0, to: progress)
+                .stroke(
+                    tint.opacity(locked ? 0.7 : 0.95),
+                    style: StrokeStyle(lineWidth: borderWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+        }
+        .animation(.smooth(duration: 0.5), value: progress)
     }
 
     /// The finished badge's side: the measured icon, its gap, and the scale applied.

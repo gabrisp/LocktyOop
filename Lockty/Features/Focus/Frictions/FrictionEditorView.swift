@@ -14,17 +14,34 @@ final class FrictionEditorViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let repository: FrictionRepository
+    /// To answer whether a running routine walks this friction. The runtime state names
+    /// the routines that are running; only the stored routine says which friction it uses.
+    private let routineRepository: RoutineRepository
+    private let appGroupStore = AppGroupStore()
     private let initialFrictionID: UUID?
     private var createdAt: Date
     private var hasLoaded = false
     private var baseline: FrictionEditorDraft
 
+    /// Whether something running right now is walking this friction.
+    ///
+    /// Deleting it under a routine that is using it would leave the routine promising a
+    /// friction that no longer exists -- and the person mid-unlock staring at a flow with
+    /// no steps in it.
+    @Published private(set) var isInUse = false
+
+    /// Whether the trash should be there at all. Never on one being created: there is
+    /// nothing to delete until it has been saved once.
+    var canDelete: Bool { initialFrictionID != nil && !isInUse }
+
     init(
         frictionID: UUID?,
         draftID: UUID,
-        repository: FrictionRepository
+        repository: FrictionRepository,
+        routineRepository: RoutineRepository
     ) {
         self.initialFrictionID = frictionID
+        self.routineRepository = routineRepository
         self.editingID = frictionID ?? UUID()
         self.draftID = draftID
         self.repository = repository
@@ -36,6 +53,55 @@ final class FrictionEditorViewModel: ObservableObject {
 
     var title: String {
         initialFrictionID == nil ? "New Friction" : "Edit Friction"
+    }
+
+    /// Re-reads whether anything running is using this friction.
+    ///
+    /// Asked of what is running, not of what merely mentions it. A friction named by a
+    /// routine that is not on right now, or by a limit that has not tripped, is not in the
+    /// way of anything: deleting it changes what those will do next time, which is what
+    /// deleting is for.
+    func refreshUsage() async {
+        guard let initialFrictionID else {
+            isInUse = false
+            return
+        }
+
+        let running = Set(
+            ((try? appGroupStore.loadRuntimeState())?.activeRoutines ?? []).map(\.routineID)
+        )
+        let routines = (try? await routineRepository.routines()) ?? []
+        let heldByRoutine = routines.contains { routine in
+            running.contains(routine.id) && routine.frictionID == initialFrictionID
+        }
+
+        let shieldRules = appGroupStore.loadShieldRules()
+        let heldByLimit = shieldRules.rules.contains { rule in
+            rule.breakPolicy.requiredFrictionID == initialFrictionID
+                && rule.isShielding(given: shieldRules.enforcement)
+        }
+
+        isInUse = heldByRoutine || heldByLimit
+    }
+
+    func delete() async -> Bool {
+        guard let initialFrictionID else { return false }
+
+        // Asked again at the moment of deleting, not only when the button was drawn: a
+        // routine can start while this sheet is open.
+        await refreshUsage()
+        guard !isInUse else {
+            errorMessage = "This friction is being used by something running right now."
+            return false
+        }
+
+        do {
+            try await repository.delete(id: initialFrictionID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     var isCreating: Bool {
@@ -298,11 +364,13 @@ private enum FrictionEditorLocalSheet: Identifiable, Equatable {
     case catalog
     /// One step's settings, on their own screen.
     case step(UUID)
+    case delete
 
     var id: String {
         switch self {
         case .catalog: "catalog"
         case .step(let stepID): "step-\(stepID.uuidString)"
+        case .delete: "delete"
         }
     }
 }
@@ -402,6 +470,9 @@ struct FrictionEditorView: View {
         )
         .task {
             await viewModel.load()
+            // What is running can have changed since this sheet was last opened, and the
+            // trash is drawn from the answer.
+            await viewModel.refreshUsage()
         }
         .onChange(of: isNaming, initial: false) { _, newValue in
             guard newValue else { return }
@@ -491,6 +562,10 @@ struct FrictionEditorView: View {
                 stepDetailContent(stepID: stepID)
                     .geometryGroup()
                     .transition(screenTransition)
+            case .delete:
+                deleteContent
+                    .geometryGroup()
+                    .transition(screenTransition)
             case nil:
                 switch currentCompactScreen {
                 case .reading:
@@ -518,6 +593,8 @@ struct FrictionEditorView: View {
             chromeTitleText("Friction Catalog")
         case .step(let stepID):
             chromeTitleText(viewModel.draft.steps.first { $0.id == stepID }?.title ?? "Step")
+        case .delete:
+            chromeTitleText("Delete")
         case nil:
             if isNaming {
                 chromeTitleText("Name")
@@ -600,11 +677,60 @@ struct FrictionEditorView: View {
             }
             .disabled(viewModel.draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } else {
-            LocktyDynamicSheetBarButton(action: enterEditingFlow) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 15, weight: .medium))
+            HStack(spacing: LocktySpacing.sm) {
+                // Only while editing, and only when nothing running is walking it. A
+                // friction a live routine is using is not the person's to delete right
+                // now: the flow they are in the middle of is made of its steps.
+                if isEditing, viewModel.canDelete {
+                    LocktyDynamicSheetBarButton(action: {
+                        isGoingBack = false
+                        withAnimation(sheetAnimation) { activeSheet = .delete }
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(LocktyColors.error)
+                    }
+                }
+
+                LocktyDynamicSheetBarButton(action: enterEditingFlow) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                }
             }
         }
+    }
+
+    private var deleteContent: some View {
+        LocktyDestructiveConfirmation(
+            title: "Delete this friction?",
+            message: deleteMessage,
+            onConfirm: {
+                Task {
+                    if await viewModel.delete() {
+                        // The same close every other exit uses. `onCloseEditor()` alone
+                        // only releases the editor's draft from the store; it is `dismiss`
+                        // that takes the sheet off the screen, so the hold completed, the
+                        // friction went, and the sheet sat there saying nothing.
+                        dismissEditor()
+                    } else {
+                        isGoingBack = true
+                        withAnimation(sheetAnimation) { activeSheet = nil }
+                    }
+                }
+            },
+            onCancel: {
+                isGoingBack = true
+                withAnimation(sheetAnimation) { activeSheet = nil }
+            }
+        )
+    }
+
+    /// What deleting it costs, said plainly: the routines and limits that name it keep
+    /// running, and simply stop asking for anything.
+    private var deleteMessage: String {
+        let name = viewModel.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subject = name.isEmpty ? "This friction" : "\u{201C}\(name)\u{201D}"
+        return "\(subject) will be removed. Anything set up to ask for it will stop asking. This cannot be undone."
     }
 
     /// From the summary the pencil opens the form; from the form there is nothing left to

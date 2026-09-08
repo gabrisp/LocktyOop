@@ -17,7 +17,8 @@ struct ActiveModeCard: View {
     var allowance: ActivePauseAllowance?
     let onUnlock: (ApplicationToken) -> Void
     /// The heading's chevron: routines live on Focus, and the card is a window onto them.
-    let onOpenSection: () -> Void
+    /// Nil on Focus itself, where the chevron would point at the screen it is already on.
+    var onOpenSection: (() -> Void)?
     /// Tapped on an app the allowance has already let out. There is nothing to unlock,
     /// so this shows what is left of it instead of reopening the flow.
     var onShowAllowance: ((ApplicationToken) -> Void)?
@@ -46,11 +47,48 @@ struct ActiveModeCard: View {
         }
     }
 
+    /// Everything this routine is holding, in one line.
+    ///
+    /// The apps were the whole of it, and they are the least of what a routine can be
+    /// doing: one blocking a category through two groups, filtering the web and closing
+    /// the App Store read as "3 Apps blocked" -- a line that is true and describes almost
+    /// none of it.
+    ///
+    /// Only what is actually on. A list of everything a routine *could* close, with the
+    /// unused ones greyed or named anyway, is a longer line saying less.
     private func subtitleText(for group: TodayActiveRoutineGroup) -> String {
-        let count = group.tokens.isEmpty
-            ? group.routine.shieldPolicy.blockedApplications.count
-            : group.tokens.count
-        return count == 1 ? "1 App blocked" : "\(count) Apps blocked"
+        let routine = group.routine
+        let policy = routine.shieldPolicy
+        var parts: [String] = []
+
+        let apps = group.tokens.isEmpty ? policy.blockedApplications.count : group.tokens.count
+        if apps > 0 {
+            parts.append(apps == 1 ? "1 App blocked" : "\(apps) Apps blocked")
+        }
+
+        // Named separately from the apps inside them: a group is a thing you made and
+        // recognise, and folding it into a headcount hides the reason the number is what
+        // it is.
+        let groupCount = policy.selectionScopes.filter {
+            if case .appGroup = $0 { return true } else { return false }
+        }.count
+        if groupCount > 0 {
+            parts.append(groupCount == 1 ? "1 Group" : "\(groupCount) Groups")
+        }
+
+        if !policy.blockedDomains.isEmpty {
+            parts.append(policy.blockedDomains.count == 1 ? "1 Site" : "\(policy.blockedDomains.count) Sites")
+        }
+
+        if policy.contentRestrictions.blocksAdultWebContent { parts.append("Adult content") }
+        if policy.contentRestrictions.blocksITunesPurchases { parts.append("Purchases") }
+        if policy.contentRestrictions.blocksAppInstallation { parts.append("Installs") }
+        if routine.modeSnapshot == .strict { parts.append("Strict mode") }
+
+        // A routine that closes nothing is not a state the app can reach, but a line that
+        // is simply absent reads as something that failed to load.
+        guard !parts.isEmpty else { return "Nothing blocked" }
+        return parts.joined(separator: " · ")
     }
 
     /// The title says how many are running, so a second routine starting is visible in
@@ -70,8 +108,15 @@ struct ActiveModeCard: View {
                 // gets from its own xl padding. Added here rather than by moving the card
                 // to xl: that would widen the sides too, and the app row deliberately
                 // cancels the horizontal padding to bleed to the card's edges.
-                LocktySectionTitle(headingTitle, onOpen: onOpenSection)
-                    .padding(.top, LocktySpacing.sm)
+                if let onOpenSection {
+                    LocktySectionTitle(headingTitle, onOpen: onOpenSection)
+                        .padding(.top, LocktySpacing.sm)
+                } else {
+                    // On Focus there is nowhere for the chevron to lead. The same heading,
+                    // without the arrow and without a tap that would answer nothing.
+                    LocktySectionTitle(headingTitle, showsChevron: false)
+                        .padding(.top, LocktySpacing.sm)
+                }
 
                 if visibleGroups.isEmpty {
                     routineRow(

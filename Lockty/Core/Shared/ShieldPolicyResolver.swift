@@ -48,6 +48,21 @@ struct ShieldPolicyResolver {
             contentRestrictions = contentRestrictions.union(rule.contentRestrictions)
             reasons.append(.rule(rule.id))
             selectionScopes.formUnion(rule.selectionScopes)
+
+            // A strict limit closes the one door that would otherwise undo it: deleting
+            // the app takes its counter with it, and reinstalling starts the day over.
+            // Only that one -- the clock and the passcode are a routine's affair, and a
+            // limit was never asked whether it wanted them.
+            if rule.mode == .strict {
+                strictGuards = strictGuards.union(
+                    StrictModeGuards(
+                        preventsEditing: false,
+                        preventsDateAndTimeChanges: false,
+                        preventsAppRemoval: true,
+                        preventsPasscodeChanges: false
+                    )
+                )
+            }
         }
 
         let releasedApplications = activePauseAllowance?.releasedApplications ?? []

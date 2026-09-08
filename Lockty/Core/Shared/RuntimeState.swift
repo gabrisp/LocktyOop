@@ -33,6 +33,16 @@ nonisolated struct RuntimeState: Codable, Hashable {
     var pendingPause: PendingPauseContext?
     var activePauseAllowance: ActivePauseAllowance?
 
+    /// What each running routine will still allow, keyed by routine.
+    ///
+    /// Worked out by the app and left here for the extensions, which need the answer and
+    /// cannot reach it: the count of breaks already taken lives in Core Data, and an
+    /// extension has no Core Data. Without it the shield could only ever ask "does this
+    /// routine allow breaks at all", so a routine that allowed two and had spent both
+    /// still wrote "Unlock with Lockty" on its button -- and pressing it opened the app to
+    /// be told no.
+    var breakAvailabilities: [UUID: StoredBreakAvailability]
+
     var shieldPolicy: ShieldPolicy
     var pendingEvents: [PendingSystemEvent]
     var recoveryFlags: Set<RuntimeRecoveryFlag>
@@ -43,6 +53,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
         activeBreaks: [],
         pendingPause: nil,
         activePauseAllowance: nil,
+        breakAvailabilities: [:],
         shieldPolicy: .empty,
         pendingEvents: [],
         recoveryFlags: [],
@@ -78,7 +89,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
     // would throw on the next read and be reset away.
     private enum CodingKeys: String, CodingKey {
         case activeRoutines, activeBreaks, activeRoutine, activeBreak
-        case pendingPause, activePauseAllowance, shieldPolicy
+        case pendingPause, activePauseAllowance, breakAvailabilities, shieldPolicy
         case pendingEvents, recoveryFlags, lastUpdatedAt
     }
 
@@ -87,6 +98,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
         activeBreaks: [ActiveBreak],
         pendingPause: PendingPauseContext?,
         activePauseAllowance: ActivePauseAllowance?,
+        breakAvailabilities: [UUID: StoredBreakAvailability] = [:],
         shieldPolicy: ShieldPolicy,
         pendingEvents: [PendingSystemEvent],
         recoveryFlags: Set<RuntimeRecoveryFlag>,
@@ -96,6 +108,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
         self.activeBreaks = activeBreaks
         self.pendingPause = pendingPause
         self.activePauseAllowance = activePauseAllowance
+        self.breakAvailabilities = breakAvailabilities
         self.shieldPolicy = shieldPolicy
         self.pendingEvents = pendingEvents
         self.recoveryFlags = recoveryFlags
@@ -123,6 +136,8 @@ nonisolated struct RuntimeState: Codable, Hashable {
 
         pendingPause = try container.decodeIfPresent(PendingPauseContext.self, forKey: .pendingPause)
         activePauseAllowance = try container.decodeIfPresent(ActivePauseAllowance.self, forKey: .activePauseAllowance)
+        breakAvailabilities = try container
+            .decodeIfPresent([UUID: StoredBreakAvailability].self, forKey: .breakAvailabilities) ?? [:]
         shieldPolicy = try container.decode(ShieldPolicy.self, forKey: .shieldPolicy)
         pendingEvents = try container.decode([PendingSystemEvent].self, forKey: .pendingEvents)
         recoveryFlags = try container.decode(Set<RuntimeRecoveryFlag>.self, forKey: .recoveryFlags)
@@ -135,6 +150,7 @@ nonisolated struct RuntimeState: Codable, Hashable {
         try container.encode(activeBreaks, forKey: .activeBreaks)
         try container.encodeIfPresent(pendingPause, forKey: .pendingPause)
         try container.encodeIfPresent(activePauseAllowance, forKey: .activePauseAllowance)
+        try container.encode(breakAvailabilities, forKey: .breakAvailabilities)
         try container.encode(shieldPolicy, forKey: .shieldPolicy)
         try container.encode(pendingEvents, forKey: .pendingEvents)
         try container.encode(recoveryFlags, forKey: .recoveryFlags)
@@ -147,4 +163,33 @@ nonisolated enum RuntimeRecoveryFlag: String, Codable, Hashable {
     case expiredBreakNeedsFinalization
     case expiredPauseNeedsRelock
     case corruptedPayloadReset
+}
+
+/// What one routine will still allow, as a fact an extension can read.
+///
+/// A photograph, not a source: the app works this out from the break policy and the run's
+/// own history, and writes it down. Nothing else may compute from it, and it is only ever
+/// as fresh as the last time the app recomputed the shield -- which is after every change
+/// that could move it.
+nonisolated struct StoredBreakAvailability: Codable, Hashable {
+    /// Whether the routine offers breaks at all.
+    var offersBreaks: Bool
+    /// How many are left in this run. Nil for unlimited.
+    var remaining: Int?
+    /// When the next one may be taken, while a cooldown is running.
+    var retryAt: Date?
+
+    init(offersBreaks: Bool, remaining: Int? = nil, retryAt: Date? = nil) {
+        self.offersBreaks = offersBreaks
+        self.remaining = remaining
+        self.retryAt = retryAt
+    }
+
+    /// Whether asking right now would be answered with a yes.
+    func isAvailable(at date: Date = Date()) -> Bool {
+        guard offersBreaks else { return false }
+        if let remaining, remaining <= 0 { return false }
+        if let retryAt, date < retryAt { return false }
+        return true
+    }
 }

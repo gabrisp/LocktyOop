@@ -18,7 +18,12 @@ struct PausedCard: View {
     var body: some View {
         CardView(radius: LocktyRadius.medium, padding: LocktySpacing.xl) {
             VStack(alignment: .leading, spacing: 0) {
-                LocktySectionTitle("On hold")
+                // The heading every other card on Today wears, not the small eyebrow with
+                // a rule above it. `Scheduled` and this one are siblings -- two lists of
+                // routines, one running later and one not running on purpose -- and they
+                // were titled in two different styles. No chevron: unlike `Scheduled`,
+                // a hold has no screen of its own to open.
+                LocktySectionTitle("On hold", showsChevron: false)
                     .padding(.bottom, LocktySpacing.md)
 
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in

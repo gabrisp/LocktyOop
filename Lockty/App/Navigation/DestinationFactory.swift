@@ -164,9 +164,6 @@ struct DestinationFactory {
 
         case .unlockFlow(let route):
             featureFactory.makeUnlockFlow(route: route)
-
-        case .frictionRun(let id):
-            featureFactory.makeFrictionRun(frictionID: id)
         }
     }
 }

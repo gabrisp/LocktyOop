@@ -113,7 +113,17 @@ struct HomeView: View {
     @available(iOS 26.0, *)
     private var morphingBottomBar: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            MorphingTabBar(activeTab: $selectedBarTab, isExpanded: $isPanelOpen, collapsedWidth: 132) {
+            MorphingTabBar(
+                activeTab: $selectedBarTab,
+                isExpanded: $isPanelOpen,
+                collapsedWidth: 132,
+                // The tab bar's own gesture: pressing the tab you are on takes everything
+                // pushed on top of it away and leaves you on the screen it starts from.
+                onReselect: { tab in
+                    closePanel()
+                    router.popToRoot(for: tab.appTab)
+                }
+            ) {
                 panel
             }
 
@@ -249,7 +259,10 @@ struct HomeView: View {
             open(.routineEditor(RoutineEditorRoute(routineID: nil, startsEditing: true)))
 
         case .newLimit:
-            open(.ruleEditor(RuleEditorRoute(ruleID: nil)))
+            // Straight to which sort of limit. The tile already said "limit", and landing
+            // on "Create Rule" asked that again and offered a schedule as one of the
+            // answers -- which is not a limit at all.
+            open(.ruleEditor(RuleEditorRoute(ruleID: nil, startsAtLimitKind: true)))
 
         case .newObjective:
             open(.objectiveEditor(nil))

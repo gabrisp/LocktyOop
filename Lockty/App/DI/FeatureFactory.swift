@@ -339,7 +339,8 @@ struct FeatureFactory {
                     FrictionEditorView(
                         viewModel: editorStore.frictionEditor(
                             route: FrictionEditorRoute(frictionID: nil, draftID: route.frictionDraftID),
-                            repository: frictionRepository
+                            repository: frictionRepository,
+                            routineRepository: routineRepository
                         ),
                         isEmbeddedInParentSheet: true,
                         locationService: locationService,
@@ -361,7 +362,7 @@ struct FeatureFactory {
         let token = requestContext?.applicationToken ?? route.token
         let running = routineEngine.activeRoutines
         var blockedSelection = running.reduce(into: Set<ApplicationToken>()) { result, routine in
-            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
             result.formUnion(selection.applicationTokens)
         }
         if let token {
@@ -373,18 +374,25 @@ struct FeatureFactory {
         // app being asked about. Falling back to whichever routine started first would
         // put up a friction that has nothing to do with the app in hand.
         let appID = token.map(AppIdentity.ID.init(token:)) ?? requestContext?.appID
+        let blocking = appID.map { id in
+            running.filter { routine in
+                if routine.shieldPolicy.blockedApplications.contains(id) {
+                    return true
+                }
+                let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
+                return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == id }
+            }
+        } ?? []
         let activeRoutine = requestContext?.activeRoutineID
             .flatMap { routineID in running.first { $0.routineID == routineID } }
-            ?? appID.flatMap { id in
-                running.first { routine in
-                    if routine.shieldPolicy.blockedApplications.contains(id) {
-                        return true
-                    }
-                    let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
-                    return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == id }
-                }
-            }
+            ?? blocking.routineAnsweringForApp
             ?? routineEngine.activeRoutine()
+        let allowanceMinutes = max(
+            1,
+            Int((requestContext?.allowanceDuration
+                ?? activeRoutine?.pausePolicySnapshot.allowanceDuration
+                ?? 300) / 60)
+        )
         let requestedSteps = requestContext?.steps ?? []
         let flowSteps = requestedSteps.isEmpty ? (activeRoutine?.pausePolicySnapshot.steps ?? []) : requestedSteps
 
@@ -393,7 +401,16 @@ struct FeatureFactory {
             initialToken: token,
             frictionSteps: flowSteps,
             breatheSeconds: activeRoutine?.pausePolicySnapshot.breatheSeconds ?? LocktyBreathe.minimumSeconds,
-            defaultMinutes: Int((requestContext?.allowanceDuration ?? activeRoutine?.pausePolicySnapshot.allowanceDuration ?? 300) / 60),
+            // The allowance is a ceiling, not a figure.
+            //
+            // Choosing "five minutes" on a routine says how long an unlock may last at
+            // most; the wheel then offers one to five, so a minute is sayable when a
+            // minute is all that is needed. The range was never passed at all, so the
+            // wheel sat on its own default of one to fifteen and offered fifteen minutes
+            // on a routine that had granted five -- and five on one that had granted
+            // thirty.
+            allowanceRange: 1...allowanceMinutes,
+            defaultMinutes: allowanceMinutes,
             nfcService: nfcService,
             locationService: locationService,
             healthService: healthService
@@ -440,6 +457,11 @@ struct FeatureFactory {
                     requestContext: requestContext,
                     intention: intention
                 )
+                // Before the flow closes, so the card behind it is already right. The
+                // unlock spends a break and starts a cooldown on everything else that
+                // routine holds, and nothing recomputed either: the rings stayed green
+                // with no countdown until the app was backgrounded and brought back.
+                await todayViewModel.refreshActiveRoutineState()
                 router.dismissFullScreen()
             }
         } onClose: {
@@ -447,15 +469,39 @@ struct FeatureFactory {
         }
     }
 
-    func makeFrictionRun(frictionID: UUID) -> some View {
-        GlobalFrictionRunView(
-            frictionID: frictionID,
-            repository: frictionRepository,
-            nfcService: nfcService,
-            locationService: locationService,
-            healthService: healthService,
-            onClose: { router.dismissFullScreen() }
+    /// Opens the friction for a limit that is holding its apps right now.
+    ///
+    /// The context is built here rather than in the editor because a limit's unlock is the
+    /// same object the shield builds when you walk into one of its apps -- a `PauseContext`
+    /// carrying `limitRuleID`, which is what tells `makeUnlockFlow` to skip the routine
+    /// break check. Without it the flow would ask the routine engine about a break that
+    /// belongs to no routine, and be refused every time.
+    private func presentLimitUnlock(ruleID: UUID) {
+        guard let rule = AppGroupStore().loadStoredRules().first(where: { $0.id == ruleID }) else {
+            return
+        }
+
+        let selection = selectionStore.blockedSelection(scopes: rule.selectionScopes)
+        let tokens = selection.applicationTokens
+        guard let representative = tokens.stablePrefix(1).first else { return }
+
+        let identity = AppIdentity(token: representative)
+        let context = PauseContext(
+            pauseRuleID: rule.id,
+            appID: identity.id,
+            applicationToken: representative,
+            // Every app the limit holds, because the limit holds them together: spending
+            // its break on one and leaving the rest shut is not what the rule says.
+            releasedApplications: Set(tokens.map(AppIdentity.ID.init(token:))),
+            displayName: identity.displayName,
+            allowanceDuration: TimeInterval(max(rule.breakPolicy.durationMinutes ?? 5, 1) * 60),
+            steps: rule.breakPolicy.frictionPolicy.steps,
+            limitRuleID: rule.id,
+            source: .app
         )
+
+        router.dismissSheet()
+        router.presentFullScreen(.unlockFlow(UnlockFlowRoute(context: context)))
     }
 
     /// Grants the allowance the flow just asked for.
@@ -600,6 +646,10 @@ struct FeatureFactory {
                 toastCenter: toastCenter,
                 pauseEngine: pauseEngine
             ),
+            startsAtLimitKind: route.startsAtLimitKind,
+            onStartFriction: route.ruleID.map { ruleID in
+                { presentLimitUnlock(ruleID: ruleID) }
+            },
             makeScheduleRuleEditor: { onReturnToRuleChoice in
                 AnyView(
                     RoutineEditorView(
@@ -674,7 +724,8 @@ struct FeatureFactory {
         FrictionEditorView(
             viewModel: editorStore.frictionEditor(
                 route: route,
-                repository: frictionRepository
+                repository: frictionRepository,
+                routineRepository: routineRepository
             ),
             locationService: locationService,
             onCloseEditor: { editorStore.releaseFrictionEditor(draftID: route.draftID) }
@@ -762,46 +813,5 @@ struct FeatureFactory {
             ),
             router: router
         )
-    }
-}
-
-private struct GlobalFrictionRunView: View {
-    let frictionID: UUID
-    let repository: FrictionRepository
-    let nfcService: NFCServicing
-    let locationService: LocationTriggerServicing
-    let healthService: HealthServicing
-    let onClose: () -> Void
-
-    @State private var friction: Friction?
-
-    var body: some View {
-        Group {
-            if let friction {
-                UnlockFlowView(
-                    tokens: [],
-                    frictionSteps: friction.steps,
-                    breatheSeconds: friction.breatheSeconds,
-                    defaultMinutes: max(1, Int(friction.allowanceDuration / 60)),
-                    nfcService: nfcService,
-                    locationService: locationService,
-                    healthService: healthService,
-                    includesDurationStep: false,
-                    onUnlock: { _, _, _ in onClose() },
-                    onClose: onClose
-                )
-            } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .locktyScreenBackground()
-            }
-        }
-        .task(id: frictionID) {
-            let loaded = await repository.friction(id: frictionID)
-            friction = loaded
-            if loaded == nil {
-                onClose()
-            }
-        }
     }
 }

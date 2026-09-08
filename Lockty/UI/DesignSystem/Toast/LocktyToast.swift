@@ -179,9 +179,12 @@ extension LocktyToast {
     ) -> LocktyToast {
         LocktyToast(
             id: "unlock-request-\(context.id.uuidString)",
+            // The icon says which app; the words say what it wants. The name used to be
+            // the title, and outside the app a token has no `localizedDisplayName` -- so
+            // it read "App wants to be unlocked" over a picture of the app itself.
             leading: context.applicationToken.map { .appIcon($0) } ?? .symbol("lock.fill", LocktyColors.warning),
-            title: context.displayName,
-            message: "Wants to be unlocked",
+            title: "Wants to be unlocked",
+            message: "",
             accent: LocktyColors.warning,
             duration: .seconds(6),
             action: action,

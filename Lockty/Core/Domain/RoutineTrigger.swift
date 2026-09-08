@@ -49,6 +49,45 @@ nonisolated struct RoutineSchedule: Codable, Hashable, Identifiable {
         self.weekdays = weekdays
         self.timeZoneIdentifier = timeZoneIdentifier
     }
+
+    /// The run covering `date`, or nil when the schedule is not due then.
+    ///
+    /// Read in the schedule's own time zone: a routine written for nine in Madrid is a
+    /// nine-o'clock routine wherever the phone happens to be.
+    ///
+    /// An end at or before the start is the next morning -- 22:00 to 06:00 is one window
+    /// across midnight, not an empty one -- so yesterday is tried too, and the weekday
+    /// checked is the day the window *opened*. Friday night belongs to Friday.
+    nonisolated func window(containing date: Date) -> DateInterval? {
+        guard !weekdays.isEmpty else { return nil }
+
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? .current
+
+        for dayOffset in [0, -1] {
+            guard let day = calendar.date(byAdding: .day, value: dayOffset, to: date),
+                  let weekday = Weekday(rawValue: calendar.component(.weekday, from: day)),
+                  weekdays.contains(weekday)
+            else { continue }
+
+            var components = calendar.dateComponents([.year, .month, .day], from: day)
+            components.hour = hour
+            components.minute = minute
+            components.second = 0
+            guard let start = calendar.date(from: components) else { continue }
+
+            components.hour = endHour
+            components.minute = endMinute
+            guard var end = calendar.date(from: components) else { continue }
+            if end <= start {
+                guard let overnight = calendar.date(byAdding: .day, value: 1, to: end) else { continue }
+                end = overnight
+            }
+
+            if date >= start, date < end { return DateInterval(start: start, end: end) }
+        }
+        return nil
+    }
 }
 
 nonisolated enum Weekday: Int, Codable, CaseIterable, Hashable, Identifiable {

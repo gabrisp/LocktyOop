@@ -54,9 +54,22 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
         // The routines holding this app shut. With several running at once only the ones
         // blocking it have any say; the others are blocking something else entirely.
+        //
+        // Matched through every scope the routine blocks through, not just the apps picked
+        // on it directly. A routine that names what it holds by app group has an empty
+        // `blockedApplications`, so nothing here matched, and the screen fell through to
+        // blaming whatever happened to be running -- with that routine's name, glyph and
+        // colour over an app it does not hold, and its break policy deciding whether the
+        // unlock button appeared. `ShieldActionExtension` already asks the question this
+        // way; this screen was the half that still did not.
         let appID = token.map(AppIdentity.ID.init(token:))
+        let selectionStore = ScreenTimeSelectionStore(appGroupStore: store)
         let blocking = appID.map { id in
-            allActive.filter { $0.shieldPolicy.blockedApplications.contains(id) }
+            allActive.filter { routine in
+                if routine.shieldPolicy.blockedApplications.contains(id) { return true }
+                let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
+                return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == id }
+            }
         } ?? []
         let responsible = blocking.isEmpty && limitRule == nil ? allActive : blocking
 
@@ -64,15 +77,27 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         // that has run out has nothing to give either: every responsible routine has to
         // allow it, because one strict routine is enough to keep the app shut and a button
         // that cannot deliver is a lie.
+        // The one routine that answers for this app, and the same one the flow will ask.
+        // Every routine having to agree meant one that allows no breaks took the button
+        // away from a newer routine that does -- and the button is what the app decides
+        // by, so the two screens disagreed about the same app.
+        //
+        // Strict answers first when there is one, being the strictest of them, but strict
+        // is not itself a refusal. Strict mode is the promise that a routine cannot be
+        // *ended* early; it says nothing about breaks, and a strict routine set up with
+        // them is meant to have them. Taking the button away from one was the screen
+        // enforcing a rule nobody wrote -- and refusing a friction the routine had been
+        // given on purpose.
+        let governing = responsible.routineAnsweringForApp
+        // The same answer the button's action reads, so the word on the button and what
+        // pressing it does cannot disagree: breaks left in this run and any cooldown, both
+        // written down by the app because they come out of Core Data.
         let offersUnlock = limitRule == nil
             && !responsible.isEmpty
-            && responsible.allSatisfy { routine in
-                // Strict never offers it, whatever its pause policy says. Strict mode is
-                // the promise that this cannot be talked out of; a button that opens a
-                // negotiation is that promise being broken on the one screen where it is
-                // being tested.
-                routine.modeSnapshot != .strict && routine.breakPolicySnapshot.maximumBreaks > 0
-            }
+            && governing.map { routine in
+                runtime?.breakAvailabilities[routine.routineID].map { $0.isAvailable() }
+                    ?? (routine.breakPolicySnapshot.maximumBreaks > 0)
+            } == true
 
         let preferences = store.loadShieldScreenPreferences()
         let packMessage = preferences.message(cost: todaysUsage(of: application))
@@ -112,9 +137,9 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             symbol = "moon.fill"
         } else if limitRule != nil {
             symbol = "hourglass"
-        } else if let icon = responsible.first?.iconSnapshot, !icon.isEmpty {
+        } else if let icon = governing?.iconSnapshot, !icon.isEmpty {
             symbol = icon
-        } else if responsible.first != nil {
+        } else if governing != nil {
             symbol = "shield.fill"
         } else {
             symbol = "lock.fill"
@@ -126,7 +151,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         // two colours and a blend matches nothing anybody chose.
         let tint = limitRule != nil
             ? UIColor(red: 1.0, green: 0.77, blue: 0.34, alpha: 1)
-            : responsible.first.map { UIColor(routineColor: $0.colorSnapshot) }
+            : governing.map { UIColor(routineColor: $0.colorSnapshot) }
 
         // Light or dark, as the phone is.
         //

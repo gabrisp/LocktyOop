@@ -142,17 +142,29 @@ struct LiveUsageDataService: UsageDataServicing {
             webDomains: []
         )
 
-        let results = DeviceActivityData.activityData(
-            filteredBy: filter,
-            using: .cached
-        )
-        print("Started direct DeviceActivityData request for \(dayKey.id)")
+        // The cache first, the system itself when the cache has nothing.
+        //
+        // `.cached` only holds what Lockty has already been shown, so every day before it
+        // was installed -- and any day it happened not to be opened -- came back empty.
+        // That is why the history started at the install rather than at the phone. `.live`
+        // asks Screen Time, which has been keeping these figures all along.
+        //
+        // The fallback rather than the default because it is the slower of the two, and
+        // today is re-read constantly: a day already in the cache never pays for it.
+        for policy in [DeviceActivityData.Policy.cached, .live] {
+            let results = DeviceActivityData.activityData(filteredBy: filter, using: policy)
+            print("Started direct DeviceActivityData request for \(dayKey.id) using \(policy)")
 
-        return try await buildSnapshot(
-            from: results,
-            dayStart: start,
-            installedApplications: installedApplications
-        )
+            if let snapshot = try await buildSnapshot(
+                from: results,
+                dayStart: start,
+                installedApplications: installedApplications
+            ) {
+                return snapshot
+            }
+        }
+
+        return nil
     }
 
     private func buildSnapshot<S: AsyncSequence>(

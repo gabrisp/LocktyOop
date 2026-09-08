@@ -69,6 +69,7 @@ nonisolated struct RoutineScheduleSnapshot: Codable, Hashable, Identifiable {
             modeSnapshot: mode,
             colorSnapshot: color,
             startedAt: startedAt,
+            expectedEndAt: schedule.window(containing: startedAt)?.end,
             trigger: .schedule(schedule),
             shieldPolicy: ShieldPolicy(
                 blockedApplications: blockedApplications,

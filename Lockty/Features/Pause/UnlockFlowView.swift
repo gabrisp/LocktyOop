@@ -18,7 +18,6 @@ struct UnlockFlowView: View {
     let nfcService: NFCServicing?
     let locationService: LocationTriggerServicing?
     let healthService: HealthServicing?
-    let includesDurationStep: Bool
     let onUnlock: (ApplicationToken?, Int, String?) -> Void
     let onClose: () -> Void
 
@@ -48,7 +47,6 @@ struct UnlockFlowView: View {
         nfcService: NFCServicing? = nil,
         locationService: LocationTriggerServicing? = nil,
         healthService: HealthServicing? = nil,
-        includesDurationStep: Bool = true,
         onUnlock: @escaping (ApplicationToken?, Int, String?) -> Void,
         onClose: @escaping () -> Void
     ) {
@@ -60,7 +58,6 @@ struct UnlockFlowView: View {
         self.nfcService = nfcService
         self.locationService = locationService
         self.healthService = healthService
-        self.includesDurationStep = includesDurationStep
         self.onUnlock = onUnlock
         self.onClose = onClose
         // Falls back to the first blocked app rather than to nothing: the flow always
@@ -92,8 +89,13 @@ struct UnlockFlowView: View {
         AppIdentity.ID(token: token).rawValue
     }
 
+    /// The apps first and "all of them" last.
+    ///
+    /// It used to be first, which put the widest possible answer where a wheel settles
+    /// when nothing else holds it -- and a wheel that drifts one notch was the difference
+    /// between letting one app out and letting every one of them out.
     private var optionIDs: [String] {
-        [Self.allAppsOptionID] + tokens.map(Self.optionID(for:))
+        tokens.map(Self.optionID(for:)) + [Self.allAppsOptionID]
     }
 
     private func token(forOptionID id: String) -> ApplicationToken? {
@@ -101,8 +103,17 @@ struct UnlockFlowView: View {
         return tokens.first { Self.optionID(for: $0) == id }
     }
 
+    /// The app this unlock is about, or nil for "all apps".
+    ///
+    /// Nil is the widest thing this flow can mean: `grantAllowance` reads it as "release
+    /// everything the routines are holding". So it is only ever returned when "all apps"
+    /// was actually chosen. An id that resolves to nothing -- a selection made against a
+    /// list that has since changed, a wheel mid-layout -- falls back to the app the flow
+    /// was opened about rather than quietly widening to every app on the phone.
     private var selectedToken: ApplicationToken? {
-        selectedOptionID.flatMap(token(forOptionID:))
+        guard let selectedOptionID else { return initialToken }
+        guard selectedOptionID != Self.allAppsOptionID else { return nil }
+        return token(forOptionID: selectedOptionID) ?? initialToken
     }
 
     private var title: String {
@@ -185,17 +196,8 @@ struct UnlockFlowView: View {
         }
 
         let nextIndex = frictionSteps.index(after: index)
-        let nextStep: Step? = frictionSteps.indices.contains(nextIndex)
-            ? .friction(nextIndex)
-            : (includesDurationStep ? .duration : nil)
-
-        guard let nextStep else {
-            onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound, capturedIntention)
-            return
-        }
-
         withAnimation(.smooth(duration: 0.34)) {
-            step = nextStep
+            step = frictionSteps.indices.contains(nextIndex) ? .friction(nextIndex) : .duration
         }
     }
 
@@ -216,10 +218,6 @@ struct UnlockFlowView: View {
             onPrimary: {
                 switch step {
                 case .rest:
-                    guard includesDurationStep || !frictionSteps.isEmpty else {
-                        onUnlock(selectedToken, minutes ?? allowanceRange.lowerBound, capturedIntention)
-                        return
-                    }
                     withAnimation(.smooth(duration: 0.34)) { step = nextMainStepAfterRest }
                 case .app:
                     withAnimation(.smooth(duration: 0.34)) { step = returnStep }
@@ -322,7 +320,17 @@ struct UnlockFlowView: View {
             }
 
             switch frictionSteps[index] {
-            case .wordSearch, .letterMatch, .personalVideo:
+            // Every step that is only finished by doing it starts refused, and each one
+            // enables itself when it is done.
+            //
+            // This list is what a step is worth: anything missing from it falls to
+            // `.ready` below -- `advance(enabled: true)` -- and arrives with Continue
+            // already lit, so it can be walked past without being answered. The six newer
+            // frictions were never added, so copying the phrase, holding steady, the odd
+            // one out, sorting, tuning and the objectives check were all no friction at
+            // all.
+            case .wordSearch, .letterMatch, .personalVideo,
+                 .copyPhrase, .holdSteady, .oddOneOut, .sortNumbers, .tuneValue, .objectives:
                 currentStepStatus = UnlockFlowStepStatus(primaryState: .advance(enabled: false))
             case .operations:
                 currentStepStatus = UnlockFlowStepStatus(primaryState: .submit(enabled: false))

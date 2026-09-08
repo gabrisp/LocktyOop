@@ -12,6 +12,12 @@ struct MorphingTabBar<Tab: MorphingTabProtocol, ExpandedContent: View>: View {
     @Binding var activeTab: Tab
     @Binding var isExpanded: Bool
     var collapsedWidth: CGFloat? = nil
+    /// Tapping the tab you are already on.
+    ///
+    /// `valueChanged` never fires for it -- a segmented control has nothing to report when
+    /// the selection does not move -- so the one gesture every tab bar answers had no way
+    /// of being noticed at all.
+    var onReselect: ((Tab) -> Void)? = nil
     @ViewBuilder var expandedContent: ExpandedContent
 
     @State private var viewWidth: CGFloat?
@@ -26,6 +32,10 @@ struct MorphingTabBar<Tab: MorphingTabProtocol, ExpandedContent: View>: View {
                 guard tabs.indices.contains(index) else { return }
                 activeTab = tabs[index]
             }
+            let handleTap: (Int) -> Void = { index in
+                guard tabs.indices.contains(index), tabs[index] == activeTab else { return }
+                onReselect?(tabs[index])
+            }
 
             if let viewWidth {
                 let labelSize = CGSize(width: collapsedWidth ?? viewWidth, height: 52)
@@ -39,7 +49,7 @@ struct MorphingTabBar<Tab: MorphingTabProtocol, ExpandedContent: View>: View {
                     expandedContent
                         .frame(width: viewWidth)
                 } label: {
-                    MorphingSegmentedControl(symbols: symbols, index: selectedIndex) { image in
+                    MorphingSegmentedControl(symbols: symbols, index: selectedIndex, onTap: handleTap) { image in
                         let font = UIFont.systemFont(ofSize: 19, weight: .regular)
                         let configuration = UIImage.SymbolConfiguration(font: font)
                         return UIImage(systemName: image, withConfiguration: configuration)
@@ -60,6 +70,8 @@ private struct MorphingSegmentedControl: UIViewRepresentable {
     var tint: Color = .gray.opacity(0.15)
     var symbols: [String]
     @Binding var index: Int
+    /// Every tap, including the ones that change nothing.
+    var onTap: (Int) -> Void = { _ in }
     var image: (String) -> UIImage?
 
     func makeUIView(context: Context) -> UISegmentedControl {
@@ -72,6 +84,10 @@ private struct MorphingSegmentedControl: UIViewRepresentable {
         }
 
         control.addTarget(context.coordinator, action: #selector(Coordinator.didSelect(_:)), for: .valueChanged)
+        // Alongside `valueChanged`, not instead of it. This one fires for a tap on the
+        // segment already selected, which is the only way to hear the gesture that means
+        // "take me back to the top of this tab".
+        control.addTarget(context.coordinator, action: #selector(Coordinator.didTap(_:)), for: .touchUpInside)
 
         DispatchQueue.main.async {
             for view in control.subviews.dropLast() where view is UIImageView {
@@ -100,6 +116,11 @@ private struct MorphingSegmentedControl: UIViewRepresentable {
         @objc
         func didSelect(_ control: UISegmentedControl) {
             parent.index = control.selectedSegmentIndex
+        }
+
+        @objc
+        func didTap(_ control: UISegmentedControl) {
+            parent.onTap(control.selectedSegmentIndex)
         }
     }
 

@@ -13,9 +13,6 @@ final class AppRouter: ObservableObject {
     @Published var selectedTab: AppTab = .today
     @Published var sheet: SheetRoute?
     @Published var fullScreen: FullScreenRoute?
-    /// An unlock the shield asked for while Lockty was closed. Today surfaces it as a
-    /// card; answering the card is what opens the flow.
-    @Published var pendingUnlock: PauseContext?
     @Published var selectedDay: Date
     @Published var daySliderOffset: CGFloat
     @Published var todayChromeCollapseProgress: CGFloat = 0
@@ -53,6 +50,18 @@ final class AppRouter: ObservableObject {
 
     func push(_ route: AppRoute) {
         path.append(route)
+    }
+
+    /// Empties a tab's stack, taking it back to the screen it starts on.
+    ///
+    /// What a tab bar does when you press the tab you are already on. Per tab rather than
+    /// on `path`, so pressing one tab cannot unwind the other one behind it.
+    func popToRoot(for tab: AppTab) {
+        switch tab {
+        case .today: todayPath.removeAll()
+        case .focus: focusPath.removeAll()
+        case .lifetime: lifetimePath.removeAll()
+        }
     }
 
     func pop() {

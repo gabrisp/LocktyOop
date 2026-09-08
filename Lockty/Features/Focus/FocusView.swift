@@ -1,3 +1,4 @@
+import ManagedSettings
 import SwiftUI
 
 struct FocusView: View {
@@ -183,8 +184,29 @@ struct FocusView: View {
                     groups: groups,
                     activeRoutine: todayViewModel.activeRoutine,
                     allowance: todayViewModel.activePauseAllowance,
-                    onUnlock: { _ in },
-                    onOpenSection: {}
+                    onUnlock: { token in openUnlockFlow(for: token) },
+                    onShowAllowance: { token in
+                        guard let allowance = todayViewModel.activePauseAllowance else { return }
+                        router.presentSheet(
+                            .allowanceTimer(
+                                AllowanceTimerRoute(
+                                    appID: AppIdentity.ID(token: token),
+                                    token: token,
+                                    expiresAt: allowance.expiresAt
+                                )
+                            )
+                        )
+                    }
+                )
+                .transition(.blurReplace)
+            }
+
+            // Under the routines, because that is the order the two answer in: what you
+            // set out to do, then what you ran out of.
+            if !todayViewModel.activeLimitGroups.isEmpty {
+                ActiveLimitsCard(
+                    groups: todayViewModel.activeLimitGroups,
+                    onUnlock: { token in openUnlockFlow(for: token) }
                 )
                 .transition(.blurReplace)
             }
@@ -203,6 +225,26 @@ struct FocusView: View {
         // says so, wherever the routine was ended from.
         .animation(.smooth(duration: 0.32), value: groups.map(\.id))
         .animation(.smooth(duration: 0.32), value: todayViewModel.routineCardState?.id)
+        .animation(.smooth(duration: 0.32), value: todayViewModel.activeLimitGroups.map(\.id))
+    }
+
+    /// The flow Focus opens when an app behind a running routine is tapped.
+    ///
+    /// Asked before anything is presented rather than at the end of the flow: a cooldown
+    /// or a spent break limit means the answer is already no, and walking the friction
+    /// first would be asking for work that cannot be accepted. The sheet says which of
+    /// the two it is, and how long is left when there is a wait to sit out.
+    @MainActor
+    private func openUnlockFlow(for token: ApplicationToken) {
+        Task { @MainActor in
+            switch await todayViewModel.unlockAvailability(appID: AppIdentity.ID(token: token)) {
+            case .available:
+                router.presentFullScreen(.unlockFlow(UnlockFlowRoute(token: token)))
+
+            case .unavailable(let unavailable):
+                router.presentSheet(.breakStatus(unavailable))
+            }
+        }
     }
 
     private func ring(for group: TodayActiveRoutineGroup, side: CGFloat = 128) -> some View {
@@ -318,7 +360,7 @@ struct FocusView: View {
 
             ForEach(frictionsViewModel.frictions) { friction in
                 FrictionFocusCard(friction: friction) {
-                    router.presentFullScreen(.frictionRun(friction.id))
+                    router.presentSheet(.frictionEditor(FrictionEditorRoute(frictionID: friction.id)))
                 }
                 .frame(width: tileWidth)
                 .transition(.blurReplace.combined(with: .scale(0.88)).combined(with: .opacity))

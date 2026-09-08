@@ -16,6 +16,13 @@ struct UnlockCopyPhraseStepView: View {
     @FocusState private var isFocused: Bool
 
     private var matches: Bool {
+        // Never before there is a sentence. The phrase arrives from `.task`, a moment
+        // after the first render, and until then both strings are empty -- which compared
+        // equal, so the step reported itself finished before it had asked anything.
+        guard !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+
         let target = configuration.isCaseSensitive ? phrase : phrase.lowercased()
         let entry = configuration.isCaseSensitive ? typed : typed.lowercased()
         return target.trimmingCharacters(in: .whitespacesAndNewlines)

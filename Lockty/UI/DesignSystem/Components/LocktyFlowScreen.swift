@@ -133,7 +133,11 @@ struct LocktyFlowScreen<Content: View>: View {
                     .foregroundStyle(LocktyColors.onPrimary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
-                    .background(Capsule(style: .continuous).fill(isResting ? LocktyColors.ink(0.55) : .white))
+                    // `primaryText` rather than white: it is the pair of the `onPrimary` label
+                    // above, black in light and white in dark. Hardcoded white made the
+                    // button white on a near-white ground in light mode -- a Continue you
+                    // could only find by guessing where it was.
+                    .background(Capsule(style: .continuous).fill(isResting ? LocktyColors.ink(0.55) : LocktyColors.primaryText))
                     .clipShape(Capsule(style: .continuous))
             }
             .buttonStyle(.locktyInteractive(shape: Capsule(style: .continuous)))

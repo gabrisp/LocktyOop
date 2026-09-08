@@ -139,12 +139,16 @@ struct LocktyAppLockBadge: View {
             }
 
         case .remainingTime:
+            // The accent, like every other caption here and like the rim right above it.
+            // This one is only ever shown while the app is out, so it was the one caption
+            // painted in plain text next to a green ring saying the opposite -- the colour
+            // is what says "this app is open", and the words under it disagreed.
             Text(remainingTimeText(at: date))
                 .font(.system(.caption, design: .default, weight: .medium))
                 .monospacedDigit()
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy(duration: 0.25), value: remainingTimeText(at: date))
-                .foregroundStyle(LocktyColors.primaryText)
+                .foregroundStyle(accent(at: date))
                 .lineLimit(1)
         }
     }

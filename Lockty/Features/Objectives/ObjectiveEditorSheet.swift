@@ -1,3 +1,5 @@
+import FamilyControls
+import ManagedSettings
 import SwiftUI
 
 /// An objective: read on one screen, changed on another, named on a third.
@@ -18,7 +20,7 @@ struct ObjectiveEditorSheet: View {
     let onSave: (Objective) -> Void
     let onDelete: (Objective) -> Void
 
-    private enum Screen: Hashable {
+    private enum Screen: LocktyFlowStep {
         case reading
         case form
         /// The grid of ready-made objectives.
@@ -27,11 +29,26 @@ struct ObjectiveEditorSheet: View {
         case app
         case naming
         case symbol
+
+        /// How far in each one sits, which is all `LocktyFlowStack` needs to animate the
+        /// moves between them the right way round.
+        ///
+        /// `naming` and `app` share a depth on purpose: both are reached from the kind,
+        /// neither is reached from the other, and neither is behind the other.
+        var flowDepth: Int {
+            switch self {
+            case .reading: 0
+            case .type: 1
+            case .naming, .app: 2
+            case .form: 3
+            case .symbol: 4
+            }
+        }
     }
 
-    @State private var screen: Screen
-    /// Which way the last move went, so the screens leave the way they arrived.
-    @State private var isGoingBack = false
+    @StateObject private var flow: LocktyFlowStack<Screen>
+
+    private var screen: Screen { flow.step }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -50,7 +67,9 @@ struct ObjectiveEditorSheet: View {
     @State private var appName: String?
     /// Every app seen in the last month, for the app-time picker. Read once, when that
     /// screen is first opened -- it is a month of cached files.
-    @State private var knownApps: [UsageBreakdownApp] = []
+    /// What the picker has answered. An objective keeps only the app it names, so this
+    /// is the picker's own working state and nothing reads it afterwards.
+    @State private var appSelection = FamilyActivitySelection()
     @FocusState private var isNameFocused: Bool
 
     /// The glyphs on offer. A short list on purpose: an objective is read at a glance in
@@ -71,10 +90,11 @@ struct ObjectiveEditorSheet: View {
         self.viewModel = viewModel
         self.onSave = onSave
         self.onDelete = onDelete
-        // A new objective starts at its name, its glyph and its colour -- the three
-        // things that make it a thing at all -- and carries on to what kind it is. The
-        // form is where you land afterwards, not where you begin.
-        _screen = State(initialValue: objective == nil ? .naming : .reading)
+        // A new objective starts with what kind it is, because that answers most of the
+        // rest: "Steps" arrives named, glyphed and with a target that makes sense, and
+        // being asked to name it first meant naming a thing you had not chosen yet.
+        // Only the two that come with nothing -- Custom and Yes or no -- go on to ask.
+        _flow = StateObject(wrappedValue: LocktyFlowStack(objective == nil ? .type : .reading))
         _name = State(initialValue: objective?.name ?? "")
         _symbolName = State(initialValue: objective?.symbolName ?? "target")
         _target = State(initialValue: objective?.target ?? 1)
@@ -179,7 +199,9 @@ struct ObjectiveEditorSheet: View {
     }
 
     private var chromeLeading: some View {
-        let isRoot = screen == .reading || (objective == nil && screen == .naming)
+        // The kind is where a new objective begins now, so that is the one with an X on
+        // it rather than a chevron pointing at a screen that comes after it.
+        let isRoot = screen == .reading || (objective == nil && screen == .type)
 
         return LocktyDynamicSheetBarButton(action: goBack) {
             Image(systemName: isRoot ? "xmark" : "chevron.left")
@@ -225,7 +247,7 @@ struct ObjectiveEditorSheet: View {
                 // cleared leaves the bar a beat behind, and a tap in that beat should do
                 // nothing rather than carry an objective forward with no name.
                 guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                move(to: objective == nil ? .type : .form)
+                move(to: .form)
             }) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 18, weight: .medium))
@@ -243,36 +265,25 @@ struct ObjectiveEditorSheet: View {
         case .form:
             if objective == nil { move(to: .type) } else { move(to: .reading) }
         case .naming:
-            if objective == nil { dismiss() } else { move(to: .form) }
+            // Back to the kind, which is the step before it now -- not out of the sheet.
+            if objective == nil { move(to: .type) } else { move(to: .form) }
         case .type:
-            if objective == nil { move(to: .naming) } else { move(to: .form) }
+            // The first screen of a new objective, so behind it is the way out.
+            if objective == nil { dismiss() } else { move(to: .form) }
         case .app, .symbol:
             move(to: .form)
         }
     }
 
-    /// Going in slides from the right; coming back slides from the left. The same
-    /// transition the routine editor uses, because it is the same fake navigation: there
-    /// is no stack here, only one screen replacing another, and the movement is what says
-    /// which direction you went.
-    private var screenTransition: AnyTransition {
-        .asymmetric(
-            insertion: .move(edge: isGoingBack ? .leading : .trailing)
-                .combined(with: AnyTransition(.blurReplace))
-                .combined(with: .opacity),
-            removal: .move(edge: isGoingBack ? .trailing : .leading)
-                .combined(with: AnyTransition(.blurReplace))
-                .combined(with: .opacity)
-        )
-    }
+    private var screenTransition: AnyTransition { flow.transition }
 
     private func move(to next: Screen) {
-        // Reading is the root, so anything arriving at it is a step back -- and so is
-        // walking the creation flow in reverse.
-        isGoingBack = next == .reading
-            || (screen == .type && next == .naming)
-            || (screen != .reading && screen != .type && next == .form)
-        withAnimation(.snappy(duration: 0.4, extraBounce: 0.02)) { screen = next }
+        // The direction is read off the two screens' depths rather than from a list of
+        // pairs kept here. The list this replaces did not mention form-to-type, so going
+        // back from the form animated forwards the moment the kind screen moved in front
+        // of the name. The stack owns the animation too, because setting the direction
+        // and swapping the screen have to happen in that order and in separate renders.
+        flow.move(to: next)
     }
 
     /// The objective as the sheet currently has it, for the preview to read.
@@ -582,7 +593,8 @@ struct ObjectiveEditorSheet: View {
                         value: targetBinding,
                         values: targetValues,
                         format: { formatTarget($0) },
-                        caption: targetCaption
+                        caption: targetCaption,
+                        fineStep: targetFineStep
                     )
                 }
                 .padding(.bottom, LocktySpacing.sm)
@@ -735,64 +747,35 @@ struct ObjectiveEditorSheet: View {
 
     /// Which app the objective is about.
     ///
-    /// The apps Screen Time has actually reported, not a picker: this objective does not
-    /// block anything, so it needs no authorization to choose with -- and the list of
-    /// apps you have used is a better list than the whole phone anyway.
+    /// Apple's own picker, the one the rest of the app already uses. The list it replaces
+    /// was built from the apps Screen Time had happened to report, which meant an app you
+    /// want to cut down on but have not opened much -- exactly the one worth an objective
+    /// -- was often not on it at all, and no amount of scrolling would find it.
     private var appScreen: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(knownApps.prefix(40).enumerated()), id: \.element.id) { index, app in
-                if index > 0 {
-                    Divider().overlay(LocktyColors.separator.opacity(0.45))
+        FamilyActivityPicker(selection: appSelectionBinding)
+    }
+
+    /// One app, taken out of a picker that answers with a set.
+    ///
+    /// The picker offers categories and web domains too; an objective is about a single
+    /// app, so the first application token is what is read and the rest is left where it
+    /// is. Choosing one moves straight back to the form, as tapping a row used to.
+    private var appSelectionBinding: Binding<FamilyActivitySelection> {
+        Binding(
+            get: { appSelection },
+            set: { selection in
+                appSelection = selection
+                guard let token = selection.applicationTokens.first else { return }
+
+                let identity = AppIdentity(token: token)
+                appID = identity.id
+                appName = identity.displayName
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    name = "Less \(identity.displayName)"
                 }
-
-                Button {
-                    appID = app.app.id
-                    appName = app.app.displayName
-                    if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        name = "Less \(app.app.displayName)"
-                    }
-                    move(to: .form)
-                } label: {
-                    HStack(spacing: LocktySpacing.md) {
-                        AppIconView(
-                            source: app.app.iconSource,
-                            applicationToken: app.app.applicationToken,
-                            fallbackSystemImage: app.app.iconSystemName,
-                            size: 34,
-                            chrome: .plain
-                        )
-
-                        Text(app.app.displayName)
-                            .font(.system(.body, design: .default, weight: .regular))
-                            .foregroundStyle(LocktyColors.primaryText)
-                            .lineLimit(1)
-
-                        Spacer(minLength: LocktySpacing.sm)
-
-                        if app.app.id == appID {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(LocktyColors.routine(color))
-                        }
-                    }
-                    .frame(minHeight: 56)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.locktyInteractive(brighten: true))
-                .tappable()
+                move(to: .form)
             }
-        }
-        .padding(.horizontal, LocktySpacing.cardInset)
-        .locktyCardBackground(cornerRadius: 26)
-        .padding(.horizontal, LocktySpacing.screenInset)
-        .padding(.vertical, LocktySpacing.lg)
-        .task {
-            guard knownApps.isEmpty else { return }
-            let builder = UsageBreakdownBuilder()
-            knownApps = await Task.detached(priority: .userInitiated) {
-                builder.knownApps(classifications: [:])
-            }.value
-        }
+        )
     }
 
     /// The name, on a screen of its own -- reached from the pencil, exactly as a rule's is.
@@ -883,6 +866,10 @@ struct ObjectiveEditorSheet: View {
     ///
     /// The name only when there is not one already -- somebody editing "Morning water"
     /// and switching it to Steps has not asked to have their name thrown away.
+    /// The two the grid cannot fill in for you: everything else arrives with a name and a
+    /// glyph, and stopping to ask for them would be asking about a decision already made.
+    private static let presetsThatMustBeNamed: Set<String> = ["custom", "yesno"]
+
     private func apply(_ preset: ObjectivePreset) {
         source = preset.source
         if preset.source != .appUsage { appID = nil; appName = nil }
@@ -894,9 +881,19 @@ struct ObjectiveEditorSheet: View {
             name = preset.title
         }
         if objective == nil { period = preset.period }
-        // An app-time objective is not an objective until it names an app, so choosing
-        // one leads straight to the list rather than back to a form with a gap in it.
-        move(to: preset.source == .appUsage && appID == nil ? .app : .form)
+        // Where the choice leads is what the choice left unanswered.
+        //
+        // App time is not an objective until it names an app, so it leads to the picker.
+        // Custom and Yes or no arrive with no name and a glyph that means nothing yet --
+        // they are the two the list cannot fill in for you -- so they lead to the name.
+        // Everything else is already a whole objective and lands on the form.
+        if preset.source == .appUsage, appID == nil {
+            move(to: .app)
+        } else if Self.presetsThatMustBeNamed.contains(preset.id) {
+            move(to: .naming)
+        } else {
+            move(to: .form)
+        }
     }
 
     /// The target as whole numbers the stepper can walk.
@@ -917,6 +914,8 @@ struct ObjectiveEditorSheet: View {
         case .steps: Array(stride(from: 1000, through: 40000, by: 100))
         case .sleep: Array(stride(from: 240, through: 720, by: 30))
         case .appUsage: Array(stride(from: 5, through: 240, by: 5))
+        case .screenTime: Array(stride(from: 15, through: 720, by: 15))
+        case .focusScore: Array(stride(from: 5, through: 100, by: 5))
         case .manual: Array(1...200)
         }
     }
@@ -934,7 +933,23 @@ struct ObjectiveEditorSheet: View {
         case .steps: return "steps \(every)"
         case .sleep: return "asleep \(every)"
         case .appUsage: return "minutes \(every), at most"
+        case .screenTime: return "minutes on the phone \(every), at most"
+        case .focusScore: return "focus score, at most"
         case .manual: return unit.isEmpty ? "times \(every)" : "\(unit) \(every)"
+        }
+    }
+
+    /// How fine the slider behind the target goes.
+    ///
+    /// Finer than the buttons everywhere it means anything. Minutes go one at a time, so
+    /// "under 42 minutes" is sayable; a sleep target moves in five, because nobody aims
+    /// for seven hours and thirty-one minutes; steps move in fifty, which is below the
+    /// hundred the buttons walk in and still a number anyone would write down.
+    private var targetFineStep: Int {
+        switch source {
+        case .steps: 50
+        case .sleep: 5
+        case .appUsage, .screenTime, .focusScore, .manual: 1
         }
     }
 
@@ -942,8 +957,10 @@ struct ObjectiveEditorSheet: View {
         switch source {
         case .steps:
             return value.formatted(.number.grouping(.automatic))
-        case .appUsage:
+        case .appUsage, .screenTime:
             return value < 60 ? "\(value) min" : "\(value / 60) h \(value % 60)"
+        case .focusScore:
+            return "\(value)%"
         case .sleep:
             let hours = value / 60
             let minutes = value % 60

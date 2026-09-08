@@ -32,7 +32,11 @@ final class RoutineDetailViewModel: ObservableObject {
     func load() async {
         let routines = try? await repository.routines()
         routine = routines?.first(where: { $0.id == routineID })
-        selection = (try? selectionStore.load(scope: .routine(routineID))) ?? FamilyActivitySelection()
+        // The routine's own picks plus every app group it blocks through. Loading the
+        // routine scope alone showed an empty apps section on a routine that names what
+        // it holds only by group.
+        let groupScopes = (routine?.appGroupIDs ?? []).map(ScreenTimeSelectionScope.appGroupScope)
+        selection = selectionStore.blockedSelection(scopes: Set([.routine(routineID)] + groupScopes))
         recentExecutions = ((try? await executionRepository.executions(from: nil, to: nil)) ?? [])
             .filter { $0.routineID == routineID }
             .sorted { $0.startedAt > $1.startedAt }

@@ -116,7 +116,9 @@ struct QuickShieldSheet: View {
             }
 
             VStack(spacing: 0) {
-                row(title: "Apps", value: viewModel.blockedSummary, isEnabled: !isRunning) { move(to: .apps) }
+                // Not "Apps": a shield can be websites and the adult filter and no app at
+                // all, and the row was naming one of the three things behind it.
+                row(title: "Restrictions", value: viewModel.blockedSummary, isEnabled: !isRunning) { move(to: .apps) }
 
                 divider
 
@@ -129,17 +131,22 @@ struct QuickShieldSheet: View {
             // two different things.
             .opacity(isRunning ? 0.55 : 1)
 
-            LocktyHoldButton(
-                title: isRunning ? "Hold to finish" : "Hold to start",
-                systemImage: isRunning ? "stop.circle" : "shield",
-                tint: isRunning ? LocktyColors.unproductive : LocktyColors.productive
-            ) {
-                Task {
-                    if isRunning {
-                        await viewModel.stop()
-                    } else {
-                        await viewModel.start()
-                        if viewModel.errorMessage == nil { onClose() }
+            // Nothing to hold while a strict shield is running. Strict is the promise
+            // that this one cannot be ended early, and a button that fills up and does
+            // nothing is that promise being tested on the screen that made it.
+            if !(isRunning && viewModel.isRunningStrict) {
+                LocktyHoldButton(
+                    title: isRunning ? "Hold to finish" : "Hold to start",
+                    systemImage: isRunning ? "stop.circle" : "shield",
+                    tint: isRunning ? LocktyColors.unproductive : LocktyColors.productive
+                ) {
+                    Task {
+                        if isRunning {
+                            await viewModel.stop()
+                        } else {
+                            await viewModel.start()
+                            if viewModel.errorMessage == nil { onClose() }
+                        }
                     }
                 }
             }

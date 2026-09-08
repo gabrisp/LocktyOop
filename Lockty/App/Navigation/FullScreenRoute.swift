@@ -24,13 +24,11 @@ enum FullScreenRoute: Hashable, Identifiable {
     /// Choosing what to unlock and for how long. Carries the app when the flow was
     /// started from one, so that step is already answered.
     case unlockFlow(UnlockFlowRoute)
-    case frictionRun(UUID)
 
     var id: String {
         switch self {
         case .activeRoutine(let id): "active-routine-\(id.uuidString)"
         case .unlockFlow(let route): "unlock-\(route.id.uuidString)"
-        case .frictionRun(let id): "friction-run-\(id.uuidString)"
         }
     }
 }

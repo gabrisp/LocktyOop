@@ -31,7 +31,8 @@ final class PauseAllowanceLiveActivityController: PauseAllowanceLiveActivityCont
 
         let attributes = PauseAllowanceActivityAttributes(
             appDisplayName: allowance.context.displayName,
-            allowanceDuration: allowance.context.allowanceDuration
+            allowanceDuration: allowance.context.allowanceDuration,
+            symbolName: Self.symbolName(for: allowance.context)
         )
         let state = PauseAllowanceActivityAttributes.ContentState(
             expiresAt: allowance.expiresAt,
@@ -39,9 +40,17 @@ final class PauseAllowanceLiveActivityController: PauseAllowanceLiveActivityCont
         )
 
         do {
+            // Stale at the moment the allowance runs out, not never.
+            //
+            // Nothing of ours runs on the wall clock in the background -- DeviceActivity
+            // refuses any window under fifteen minutes, so a short allowance has no
+            // background event at all -- and the activity used to sit there afterwards
+            // reading 0:00 until Lockty was opened and `relock` ended it. A stale date is
+            // the one thing the system will honour on its own: it dims the activity at
+            // expiry and takes it away without anybody being there to ask.
             _ = try Activity.request(
                 attributes: attributes,
-                content: ActivityContent(state: state, staleDate: nil),
+                content: ActivityContent(state: state, staleDate: allowance.expiresAt),
                 pushType: nil
             )
             liveActivityLogger.notice("Started pause allowance Live Activity for \(allowance.context.displayName, privacy: .public)")
@@ -53,5 +62,25 @@ final class PauseAllowanceLiveActivityController: PauseAllowanceLiveActivityCont
 
     func end() async {
         await PauseAllowanceLiveActivityTermination.endAll()
+    }
+
+    /// The face of whatever is holding the app, decided the same way the shield screen
+    /// decides it: an hourglass for a limit, the routine's own glyph for a routine, a
+    /// shield when there is neither.
+    ///
+    /// Read from the runtime state rather than carried on the context, because the icon
+    /// belongs to the routine and the context is about the app.
+    private static func symbolName(for context: PauseContext) -> String {
+        guard context.limitRuleID == nil else { return "hourglass" }
+
+        guard let routineID = context.activeRoutineID,
+              let routine = (try? AppGroupStore().loadRuntimeState())?
+                  .activeRoutines
+                  .first(where: { $0.routineID == routineID }),
+              let icon = routine.iconSnapshot,
+              !icon.isEmpty
+        else { return "shield.fill" }
+
+        return icon
     }
 }

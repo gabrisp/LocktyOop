@@ -105,7 +105,8 @@ final class EditorViewModelStore {
 
     func frictionEditor(
         route: FrictionEditorRoute,
-        repository: FrictionRepository
+        repository: FrictionRepository,
+        routineRepository: RoutineRepository
     ) -> FrictionEditorViewModel {
         if let existing = frictionEditors[route.draftID] {
             return existing
@@ -114,7 +115,8 @@ final class EditorViewModelStore {
         let created = FrictionEditorViewModel(
             frictionID: route.frictionID,
             draftID: route.draftID,
-            repository: repository
+            repository: repository,
+            routineRepository: routineRepository
         )
         frictionEditors[route.draftID] = created
         return created

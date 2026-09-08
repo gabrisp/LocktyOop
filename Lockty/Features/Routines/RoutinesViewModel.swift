@@ -57,7 +57,7 @@ final class RoutinesViewModel: ObservableObject {
             let loaded = try await repository.routines()
             let tokens = loaded.reduce(into: [UUID: [ApplicationToken]]()) { result, routine in
                 let groupScopes = routine.appGroupIDs.map(ScreenTimeSelectionScope.appGroupScope)
-                let merged = selectionStore.mergedSelection(scopes: Set([.routine(routine.id)] + groupScopes))
+                let merged = selectionStore.blockedSelection(scopes: Set([.routine(routine.id)] + groupScopes))
                 result[routine.id] = merged.applicationTokens.stablePrefix(merged.applicationTokens.count)
             }
             let pauseState = appGroupStore.loadRulePauseState()

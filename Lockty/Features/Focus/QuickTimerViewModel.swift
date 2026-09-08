@@ -109,10 +109,10 @@ final class QuickTimerViewModel: ObservableObject {
         // No end at all when it is infinite: the engine takes nil as "until it is stopped".
         let endsAt = isInfinite ? nil : Date().addingTimeInterval(TimeInterval(minutes * 60))
 
-        // Named after the moment it was made. A session is not a thing you keep, so there
-        // is nothing to call it -- and asking for a name before a five-minute block is
-        // asking a question about a thing that will be over before it is answered.
-        let name = Self.nameFormatter.string(from: Date())
+        // Called what it is. A shield is not a thing you keep and there is nothing to
+        // name it, so it was stamped with the moment it was made -- and a card reading
+        // "14:32" says nothing about what is happening, only when you started it.
+        let name = "Shield"
 
         // Strict is refused outright when there is no end, whatever the switch says: a
         // block that cannot be ended and does not expire is a phone you cannot get back.
@@ -122,7 +122,10 @@ final class QuickTimerViewModel: ObservableObject {
             id: Self.routineID,
             name: name,
             icon: "shield",
-            color: .mint,
+            // A different one each time. Every shield sharing one colour made two of them
+            // in a day look like the same thing running twice, and mint is the routines'
+            // own -- a shield wearing it read as a routine.
+            color: RoutineColor.allCases.randomElement() ?? .mint,
             mode: mode,
             triggers: [.manual],
             blockedApplications: Set(selection.applicationTokens.map(AppIdentity.ID.init(token:))),
@@ -142,7 +145,18 @@ final class QuickTimerViewModel: ObservableObject {
         }
     }
 
+    /// Whether the shield running right now refuses to be ended.
+    ///
+    /// Strict on a shield is the whole of what strict means -- it cannot be finished
+    /// early -- so nothing that would end it may be offered while one is on.
+    var isRunningStrict: Bool {
+        routineEngine.activeRoutine(id: Self.routineID)?.modeSnapshot == .strict
+    }
+
     func stop() async {
+        // Refused here as well as hidden in the views: the engine refuses it too, and a
+        // third guard costs nothing next to a shield that ends when it was promised not to.
+        guard !isRunningStrict else { return }
         await routineEngine.stop(routineID: Self.routineID)
 
         // And the session forgets what it held. A shield is decided in one go and gone

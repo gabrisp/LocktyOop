@@ -134,7 +134,6 @@ final class StartupCoordinator: ObservableObject {
     /// at the end of it.
     private func present(_ presentedPause: PendingPauseContext?) {
         guard let presentedPause else {
-            router.pendingUnlock = nil
             return
         }
 
@@ -155,10 +154,8 @@ final class StartupCoordinator: ObservableObject {
                 switch decision {
                 case .exhausted(_, let ruleName):
                     clearPendingPause()
-                    router.pendingUnlock = nil
                     toastCenter.show(.ruleLimitReached(ruleName: ruleName))
                 case .allow, .notLimited:
-                    router.pendingUnlock = nil
                     toastCenter.show(.unlockRequested(context: context) { [weak self] in
                         self?.openUnlockRequest(context)
                     })
@@ -173,7 +170,6 @@ final class StartupCoordinator: ObservableObject {
             )
 
             guard case .unavailable(let unavailable) = availability else {
-                router.pendingUnlock = nil
                 toastCenter.show(.unlockRequested(context: context) { [weak self] in
                     self?.openUnlockRequest(context)
                 })
@@ -188,7 +184,6 @@ final class StartupCoordinator: ObservableObject {
             // is refused again on the next foreground, and the one after that -- the same
             // toast for the same tap, for as long as the request stays valid.
             clearPendingPause()
-            router.pendingUnlock = nil
             toastCenter.show(.unlockRefused(context: context, state: unavailable))
         }
     }
@@ -204,7 +199,6 @@ final class StartupCoordinator: ObservableObject {
 
     /// Opens the flow the toast was asking about without selecting a tab first.
     private func openUnlockRequest(_ context: PauseContext) {
-        router.pendingUnlock = nil
         router.presentFullScreen(.unlockFlow(UnlockFlowRoute(context: context)))
     }
 

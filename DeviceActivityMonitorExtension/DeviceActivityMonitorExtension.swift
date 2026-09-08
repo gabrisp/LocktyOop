@@ -106,15 +106,23 @@ private struct RuntimeRepairCoordinator {
             return
         }
 
-        guard var runtimeState = try? store.loadRuntimeState() else { return }
-        // Alongside whatever else is running, not instead of it. This used to bail out
-        // whenever anything was active, so a routine whose window overlapped another's
-        // was dropped at its start and never reconsidered -- it lost its entire window
-        // without a word. Only starting the same routine twice is refused.
-        guard !runtimeState.activeRoutines.contains(where: { $0.routineID == id }) else { return }
+        // Read and written in one step held by the store, rather than a copy loaded here
+        // and saved back afterwards. Two processes write this file, and a whole-state save
+        // puts back everything the copy was holding -- including routines the app has
+        // ended in the meantime, which then reappear on the next foreground because
+        // `restore(from:)` takes the App Group at its word.
+        var didStart = false
+        try? store.updateRuntimeState { runtimeState in
+            // Alongside whatever else is running, not instead of it. This used to bail out
+            // whenever anything was active, so a routine whose window overlapped another's
+            // was dropped at its start and never reconsidered -- it lost its entire window
+            // without a word. Only starting the same routine twice is refused.
+            guard !runtimeState.activeRoutines.contains(where: { $0.routineID == id }) else { return }
 
-        runtimeState.activeRoutines.append(snapshot.makeActiveRoutine(startedAt: Date()))
-        try? store.saveRuntimeState(runtimeState)
+            runtimeState.activeRoutines.append(snapshot.makeActiveRoutine(startedAt: Date()))
+            didStart = true
+        }
+        guard didStart else { return }
         print("Started scheduled routine \(snapshot.name) from the monitor extension")
         repairRuntimeState(activityName: activity.rawValue)
     }
@@ -162,34 +170,43 @@ private struct RuntimeRepairCoordinator {
     /// one that another running routine also blocks stays blocked, because that routine
     /// is still in the union.
     private func endScheduledRoutine(activityName: String) {
-        guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))),
-              var runtimeState = try? store.loadRuntimeState(),
-              let active = runtimeState.activeRoutines.first(where: { $0.routineID == id })
-        else { return }
-
-        // Only a session this window actually started. A routine's monitoring window is
-        // registered for its schedule and ends at the schedule's end whatever is
-        // happening -- so starting the same routine by hand outside its hours got it
-        // switched off at the end of a window it had nothing to do with, and the block
-        // simply lifted. The trigger records how the session began, and a manual one ends
-        // when a person says so.
-        guard case .schedule = active.trigger else {
-            print("Ignoring schedule end for routine \(id.uuidString): started by hand, not by this window")
+        guard let id = UUID(uuidString: String(activityName.dropFirst("lockty.routine.".count))) else {
             return
         }
 
-        runtimeState.activeRoutines.removeAll { $0.routineID == id }
-        runtimeState.activeBreaks.removeAll { $0.routineID == id }
+        var endedLiveActivities = false
+        var didEnd = false
+        try? store.updateRuntimeState { runtimeState in
+            guard let active = runtimeState.activeRoutines.first(where: { $0.routineID == id }) else {
+                return
+            }
 
-        // The allowance and the request the shield was waiting on belong to the session
-        // as a whole, so they only go once there is no session left to belong to.
-        if runtimeState.activeRoutines.isEmpty {
-            runtimeState.activePauseAllowance = nil
-            runtimeState.pendingPause = nil
-            PauseAllowanceLiveActivityTermination.endAllBlocking()
+            // Only a session this window actually started. A routine's monitoring window is
+            // registered for its schedule and ends at the schedule's end whatever is
+            // happening -- so starting the same routine by hand outside its hours got it
+            // switched off at the end of a window it had nothing to do with, and the block
+            // simply lifted. The trigger records how the session began, and a manual one ends
+            // when a person says so.
+            guard case .schedule = active.trigger else { return }
+
+            runtimeState.activeRoutines.removeAll { $0.routineID == id }
+            runtimeState.activeBreaks.removeAll { $0.routineID == id }
+
+            // The allowance and the request the shield was waiting on belong to the session
+            // as a whole, so they only go once there is no session left to belong to.
+            if runtimeState.activeRoutines.isEmpty {
+                runtimeState.activePauseAllowance = nil
+                runtimeState.pendingPause = nil
+                endedLiveActivities = true
+            }
+            didEnd = true
         }
 
-        try? store.saveRuntimeState(runtimeState)
+        guard didEnd else {
+            print("Ignoring schedule end for routine \(id.uuidString): not running, or started by hand")
+            return
+        }
+        if endedLiveActivities { PauseAllowanceLiveActivityTermination.endAllBlocking() }
         repairRuntimeState(activityName: activityName)
     }
 
@@ -212,9 +229,18 @@ private struct RuntimeRepairCoordinator {
             return
         }
 
+        // Built here rather than baked into the milestone: which app took the time, how
+        // today stands against yesterday and what share of the screen this is are facts
+        // that only exist at the moment of delivery. A notice that says "34 min, most of
+        // it Instagram" answers the question the bare figure only raises.
+        let line = DistractionMilestones.line(
+            for: milestone,
+            context: distractionContext(store: store)
+        )
+
         let content = UNMutableNotificationContent()
-        content.title = milestone.title
-        content.body = milestone.body
+        content.title = line.title
+        content.body = line.body
         content.sound = .default
 
         // Immediately, with no trigger: the moment it fires *is* the moment. And keyed by
@@ -229,6 +255,42 @@ private struct RuntimeRepairCoordinator {
         )
 
         print("Distraction milestone delivered at \(milestone.minutes)m")
+    }
+
+    /// What the report snapshots can tell a distraction notice right now.
+    ///
+    /// Every part is optional and every part is allowed to be missing: Screen Time
+    /// delivers these late, and a notice claiming "0 min in Instagram" over an app you
+    /// have been in all morning is worse than one that does not mention it.
+    private func distractionContext(store: AppGroupStore) -> DistractionMilestones.Context {
+        var context = DistractionMilestones.Context()
+        let distracting = store.loadAutoFocusConfiguration().distractingApplicationIDs
+        let catalog = store.loadAppNameCatalog()
+
+        if let today = try? store.loadScreenTimeReportSnapshot(for: DayKey(date: Date())) {
+            context.todayTotalMinutes = Int(today.totalActivityDuration / 60)
+
+            if let top = today.applications
+                .filter({ distracting.contains($0.app.id) })
+                .max(by: { $0.totalActivityDuration < $1.totalActivityDuration }) {
+                // The catalogue first: from an extension, a token's own
+                // `localizedDisplayName` is nil, which is the whole reason it exists.
+                context.topAppName = catalog.record(for: top.app.id)?.displayName ?? top.app.displayName
+                context.topAppMinutes = Int(top.totalActivityDuration / 60)
+                context.topAppPickups = top.pickups
+            }
+        }
+
+        let calendar = Calendar.current
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()),
+           let snapshot = try? store.loadScreenTimeReportSnapshot(for: DayKey(date: yesterday)) {
+            let total = snapshot.applications
+                .filter { distracting.contains($0.app.id) }
+                .reduce(0) { $0 + $1.totalActivityDuration }
+            if total > 0 { context.yesterdayMinutes = Int(total / 60) }
+        }
+
+        return context
     }
 
     /// Today has passed yesterday in one app.
@@ -328,13 +390,28 @@ private struct RuntimeRepairCoordinator {
     }
 
     private func repairRuntimeState(activityName: String) {
-        guard var runtimeState = try? store.loadRuntimeState() else { return }
+        // Everything that does not depend on the runtime state is read first, so the
+        // read-modify-write below is as short as it can be.
+        //
+        // This used to load a copy at the top, read every pause rule and shield rule,
+        // resolve the whole policy, and only then save the copy back -- putting back
+        // whatever it had been holding all that while. Anything the app wrote inside that
+        // window was undone, and since this runs on *every* monitor callback, a routine
+        // ended in the app came back silently on the next foreground: `restore(from:)`
+        // takes the App Group at its word.
+        let pauseRules = storedPauseRules()
+        let shieldRules = store.loadShieldRules()
+        let alwaysAllowed = store.loadAlwaysAllowedApplications()
 
+        var endedLiveActivities = false
+        var resolvedPolicy: ShieldPolicy?
+
+        try? store.updateRuntimeState { runtimeState in
         if activityName.hasPrefix("lockty.pause."),
            runtimeState.activePauseAllowance?.isExpired == true {
             runtimeState.activePauseAllowance = nil
             runtimeState.pendingPause = nil
-            PauseAllowanceLiveActivityTermination.endAllBlocking()
+            endedLiveActivities = true
         }
 
         if activityName.hasPrefix("lockty.break.") {
@@ -347,7 +424,29 @@ private struct RuntimeRepairCoordinator {
             }
         }
 
-        let pauseRules = store.loadPauseRuleSnapshots()
+        let effectivePolicy = resolver.resolve(
+            activeRoutines: runtimeState.activeRoutines,
+            activeBreaks: runtimeState.activeBreaks,
+            activePauseAllowance: runtimeState.livePauseAllowance,
+            pauseRules: pauseRules,
+            rules: shieldRules.rules,
+            ruleEnforcement: shieldRules.enforcement,
+            alwaysAllowedApplications: alwaysAllowed
+        )
+
+        runtimeState.shieldPolicy = effectivePolicy
+        runtimeState.recoveryFlags = []
+        resolvedPolicy = effectivePolicy
+        }
+
+        if endedLiveActivities { PauseAllowanceLiveActivityTermination.endAllBlocking() }
+        guard let resolvedPolicy else { return }
+        apply(policy: resolvedPolicy)
+    }
+
+    /// The pause rules as the resolver wants them.
+    private func storedPauseRules() -> [PauseRule] {
+        store.loadPauseRuleSnapshots()
             .filter(\.isEnabled)
             .map {
                 PauseRule(
@@ -361,25 +460,6 @@ private struct RuntimeRepairCoordinator {
                     updatedAt: $0.updatedAt
                 )
             }
-
-        let shieldRules = store.loadShieldRules()
-
-        let effectivePolicy = resolver.resolve(
-            activeRoutines: runtimeState.activeRoutines,
-            activeBreaks: runtimeState.activeBreaks,
-            activePauseAllowance: runtimeState.livePauseAllowance,
-            pauseRules: pauseRules,
-            rules: shieldRules.rules,
-            ruleEnforcement: shieldRules.enforcement,
-                alwaysAllowedApplications: store.loadAlwaysAllowedApplications()
-        )
-
-        runtimeState.shieldPolicy = effectivePolicy
-        runtimeState.recoveryFlags = []
-
-        let store = AppGroupStore()
-        try? store.saveRuntimeState(runtimeState)
-        apply(policy: effectivePolicy)
     }
 
     private func apply(policy: ShieldPolicy) {

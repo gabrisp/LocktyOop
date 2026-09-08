@@ -10,6 +10,10 @@ final class RuleEditorViewModel: ObservableObject {
 
     @Published var name = ""
     @Published var kind: RuleKind?
+    /// Strict on a limit closes one door: the app it names cannot be uninstalled, and the
+    /// limit itself cannot be edited, held or deleted. Not the device switches -- those
+    /// are a routine's business.
+    @Published var mode: RoutineMode = .normal
     @Published var isEnabled = true
     @Published var maximumOpens = 10
     @Published var openCountWindowHours = 24
@@ -155,6 +159,7 @@ final class RuleEditorViewModel: ObservableObject {
         createdAt = rule.createdAt
         name = rule.name
         kind = rule.kind
+        mode = rule.mode
         isEnabled = rule.isEnabled
         maximumOpens = Self.clampedOpenCount(rule.openCountLimitConfiguration?.maximumOpens ?? 10)
         openCountWindowHours = rule.openCountLimitConfiguration?.windowHours ?? 24
@@ -290,6 +295,7 @@ final class RuleEditorViewModel: ObservableObject {
             name: trimmedName,
             isEnabled: isEnabled,
             kind: kind,
+            mode: mode,
             appGroupIDs: selectedAppGroupIDs,
             blockedApplications: Set(restrictedApplicationTokens.map(AppIdentity.ID.init(token:))),
             contentRestrictions: contentRestrictions,
@@ -384,7 +390,38 @@ final class RuleEditorViewModel: ObservableObject {
         "This limit has already stopped you today. It can be changed again tomorrow."
     }
 
+    /// Whether the limit refuses to be changed, held or removed.
+    ///
+    /// Asked of the rule rather than of whether it has tripped. A limit you can edit at
+    /// nine in the morning, before it has spent anything, is not strict at all -- the same
+    /// reason a strict routine refuses a hold taken before its window opens.
+    var isStrictLocked: Bool { mode == .strict }
+
+    /// Whether this limit is holding its apps shut right now.
+    @Published private(set) var isShieldingNow = false
+
+    /// Whether there is a friction to walk from this screen.
+    ///
+    /// Three things at once: the limit has actually run out, it was set up to open an
+    /// exception, and there is a friction to stand in the way. Any of them missing and the
+    /// button would be an offer that ends in a refusal.
+    var canStartFriction: Bool {
+        isShieldingNow && breaksAllowed && selectedFriction != nil
+    }
+
+    func refreshShieldingState() {
+        let shieldRules = appGroupStore.loadShieldRules()
+        isShieldingNow = shieldRules.rules
+            .first { $0.id == editingID }?
+            .isShielding(given: shieldRules.enforcement) ?? false
+    }
+
     func pause(for duration: RulePauseDuration) {
+        guard !isStrictLocked else {
+            errorMessage = "This limit is strict and cannot be put on hold."
+            return
+        }
+
         try? appGroupStore.updateRulePauseState { state in
             state.pause(editingID, until: Date().addingTimeInterval(duration.duration))
         }
@@ -414,6 +451,10 @@ final class RuleEditorViewModel: ObservableObject {
     /// was well and a rule still sitting in the list behind it.
     func delete() async -> Bool {
         guard !isCreating else { return true }
+        guard !isStrictLocked else {
+            errorMessage = "This limit is strict and cannot be deleted."
+            return false
+        }
         do {
             try await repository.delete(id: editingID)
             defer { applyShields() }
@@ -495,6 +536,9 @@ private enum RuleEditorLocalSheet: String, Identifiable {
 struct RuleEditorView: View {
     @StateObject private var viewModel: RuleEditorViewModel
     let makeScheduleRuleEditor: (@escaping () -> Void) -> AnyView
+    /// Opens the friction for this limit, from the screen that is reading it. Nil where
+    /// there is nowhere to present one from.
+    let onStartFriction: (() -> Void)?
     let isEmbeddedInParentSheet: Bool
     let onReturnToParent: (() -> Void)?
     let onCloseEditor: () -> Void
@@ -508,7 +552,10 @@ struct RuleEditorView: View {
     /// A new rule goes straight to its form -- there is nothing to preview yet.
     @State private var isEditing: Bool
     /// Whether the kind screen is showing the second question -- which sort of limit.
-    @State private var isChoosingLimitKind = false
+    @State private var isChoosingLimitKind: Bool
+    /// Opened straight onto the limits, by a door that already said "limit". Then there is
+    /// no first question behind them to go back to.
+    private let startsAtLimitKind: Bool
     @State private var isShowingKindChoice: Bool
     /// What a discard confirmation, if one is up, is about to throw away.
     @State private var pendingDiscard: LocktyDiscardIntent?
@@ -517,17 +564,22 @@ struct RuleEditorView: View {
 
     init(
         viewModel: RuleEditorViewModel,
+        startsAtLimitKind: Bool = false,
+        onStartFriction: (() -> Void)? = nil,
         makeScheduleRuleEditor: @escaping (@escaping () -> Void) -> AnyView,
         isEmbeddedInParentSheet: Bool = false,
         onReturnToParent: (() -> Void)? = nil,
         onCloseEditor: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.startsAtLimitKind = startsAtLimitKind
+        self.onStartFriction = onStartFriction
         self.makeScheduleRuleEditor = makeScheduleRuleEditor
         self.isEmbeddedInParentSheet = isEmbeddedInParentSheet
         self.onReturnToParent = onReturnToParent
         self.onCloseEditor = onCloseEditor
         _isShowingKindChoice = State(initialValue: viewModel.isCreating)
+        _isChoosingLimitKind = State(initialValue: startsAtLimitKind && viewModel.isCreating)
         _isEditing = State(initialValue: viewModel.isCreating)
     }
 
@@ -598,6 +650,9 @@ struct RuleEditorView: View {
         }
         .task {
             await viewModel.load()
+            // Whether it is holding anything right now, which is what decides if there is
+            // a friction to offer. It can have tripped since this sheet was last opened.
+            viewModel.refreshShieldingState()
         }
         .onChange(of: isNaming, initial: false) { _, newValue in
             guard newValue else { return }
@@ -684,10 +739,29 @@ struct RuleEditorView: View {
     private var readOnlyScaffold: some View {
         VStack(alignment: .leading, spacing: LocktySpacing.lg) {
             RulePreviewContent(
-                onEdit: { enterEditingFlow() },
+                // Nil closes the long press too, not only the pencil: `RulePreviewContent`
+                // hangs `locktyEditOnLongPress` off this same closure, so a strict limit
+                // has no way into its form from either gesture.
+                onEdit: viewModel.isStrictLocked ? nil : { enterEditingFlow() },
                 viewModel: viewModel,
                 applicationTokens: previewTokens
             )
+
+            // The way past a limit, from the screen that is telling you about it.
+            //
+            // The shield offers this when you walk into the app, and nowhere else did:
+            // reading the limit that is holding your apps, the only thing to do about it
+            // was to go and open one of them. The same hold the routines have, for the
+            // same reason -- it is the one action on the screen worth being sure about.
+            if let onStartFriction, viewModel.canStartFriction {
+                LocktyHoldButton(
+                    title: "Hold to unlock",
+                    systemImage: "lock.open",
+                    tint: LocktyColors.warning,
+                    action: onStartFriction
+                )
+                .padding(.horizontal, LocktySpacing.screenInset)
+            }
 
             // Pausing is not editing: you are not changing what the rule is, you are
             // saying not this week. So it lives on the screen you read the rule on,
@@ -704,7 +778,9 @@ struct RuleEditorView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, LocktySpacing.screenInset)
                         .transition(.blurReplace)
-                } else {
+                } else if !viewModel.isStrictLocked {
+                    // A strict limit is not held either. A hold is the limit not applying,
+                    // which is the whole thing it was made strict to prevent.
                     holdButton
                         .padding(.horizontal, LocktySpacing.screenInset)
                 }
@@ -825,7 +901,7 @@ struct RuleEditorView: View {
             HStack(spacing: LocktySpacing.sm) {
                 // Neither while the limit is spent. A rule you can delete the moment it
                 // stops you is a rule that only applies while you agree with it.
-                if isEditing, !viewModel.isCreating, !viewModel.isSpentToday {
+                if isEditing, !viewModel.isCreating, !viewModel.isSpentToday, !viewModel.isStrictLocked {
                     LocktyDynamicSheetBarButton(action: { openChildSheet(.delete) }) {
                         Image(systemName: "trash")
                             .font(.system(size: 15, weight: .medium))
@@ -833,7 +909,7 @@ struct RuleEditorView: View {
                     }
                 }
 
-                if !viewModel.isSpentToday {
+                if !viewModel.isSpentToday, !viewModel.isStrictLocked {
                     LocktyDynamicSheetBarButton(action: enterEditingFlow) {
                         Image(systemName: "pencil")
                             .font(.system(size: 15, weight: .medium))
@@ -959,7 +1035,7 @@ struct RuleEditorView: View {
     /// Close on the first question, back on the second.
     @ViewBuilder
     private var kindChoiceLeading: some View {
-        if isChoosingLimitKind {
+        if isChoosingLimitKind, !startsAtLimitKind {
             LocktyDynamicSheetBarButton(action: returnToKindChoiceRoot) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 15, weight: .medium))
@@ -1061,6 +1137,13 @@ struct RuleEditorView: View {
             sectionHeading("Blocked Apps", systemImage: "lock.shield")
 
             appsRow
+
+            // Only limits reach this content -- a schedule is handed to the routine
+            // editor before here -- and a limit is exactly the thing whose breaks were
+            // settable in the model and reachable from nowhere on screen.
+            sectionHeading("Breaks", systemImage: "figure.walk")
+
+            breakPolicyRow
 
             LocktyHoldButton(title: viewModel.isCreating ? "Hold to confirm" : "Hold to save") {
                 Task {
@@ -1257,6 +1340,49 @@ struct RuleEditorView: View {
         .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
     }
 
+    /// The way in to the break policy, and to the friction it asks for.
+    ///
+    /// `breakSettingsScreen` was written, wired into the chrome and into `sheetContent`,
+    /// and never opened: nothing anywhere assigned `.breakSettings`. So a limit could hold
+    /// breaks in its model, say so in its own summary, and offer no way to turn them on or
+    /// to choose the friction they are supposed to ask for.
+    private var breakPolicyRow: some View {
+        Button {
+            openChildSheet(.breakSettings)
+        } label: {
+            HStack(spacing: LocktySpacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Break policy")
+                        .font(.system(.subheadline, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.primaryText)
+
+                    Text(breakPolicySummary)
+                        .font(.system(.footnote, design: .default, weight: .regular))
+                        .foregroundStyle(LocktyColors.secondaryText)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(LocktyColors.secondaryText)
+            }
+            .padding(.horizontal, LocktySpacing.md)
+            .padding(.vertical, LocktySpacing.md)
+            .locktyCardBackground(cornerRadius: cardRadius)
+        }
+        .buttonStyle(.locktyInteractive(shape: RoundedRectangle(cornerRadius: cardRadius, style: .continuous)))
+    }
+
+    /// The policy in one line: how many, how long, and which friction stands in the way.
+    private var breakPolicySummary: String {
+        guard viewModel.breaksAllowed else { return "This rule cannot be bypassed" }
+
+        let count = BreakPolicy.label(forMaximumBreaks: viewModel.maximumBreaks)
+        let friction = viewModel.selectedFriction?.name ?? "No friction chosen"
+        return "\(count) · \(viewModel.maximumBreakMinutes) min · \(friction)"
+    }
+
     private var breakSettingsScreen: some View {
         VStack(alignment: .leading, spacing: 18) {
             sectionHeading("Break policy", systemImage: "figure.walk")
@@ -1418,6 +1544,13 @@ struct RuleEditorView: View {
                     contentRestrictions: Binding(
                         get: { viewModel.contentRestrictions },
                         set: { viewModel.contentRestrictions = $0 }
+                    ),
+                    // The switch and nothing under it. A routine passes `strictGuards` as
+                    // well and gets the four doors; a limit has one, and it is the switch
+                    // itself.
+                    isStrict: Binding(
+                        get: { viewModel.mode == .strict },
+                        set: { viewModel.mode = $0 ? .strict : .normal }
                     ),
                     rules: .rule,
                     suggestions: [],
@@ -1750,7 +1883,7 @@ struct RuleEditorView: View {
         isGoingBack = true
         withAnimation(sheetAnimation) {
             isShowingKindChoice = true
-            isChoosingLimitKind = false
+            isChoosingLimitKind = startsAtLimitKind
             viewModel.kind = nil
         }
     }

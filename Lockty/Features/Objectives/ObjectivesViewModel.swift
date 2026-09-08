@@ -75,6 +75,11 @@ final class ObjectivesViewModel: ObservableObject {
                 next.set(hours, for: objective)
             case .appUsage:
                 next.set(appMinutes(for: objective), for: objective)
+            case .screenTime:
+                next.set(screenTimeMinutes(for: objective), for: objective)
+            case .focusScore:
+                guard let score = todaysFocusScore() else { continue }
+                next.set(score, for: objective)
             case .manual:
                 break
             }
@@ -110,6 +115,48 @@ final class ObjectivesViewModel: ObservableObject {
         }
 
         return total / 60
+    }
+
+    /// Minutes on the phone altogether over the objective's period.
+    ///
+    /// The snapshot's own total rather than the sum of its apps: the two differ, because
+    /// the total includes time Screen Time could not attribute to anything, and the figure
+    /// on the Screen Time card is the total. An objective and the card it sits under
+    /// disagreeing about the same day is worse than either number on its own.
+    private func screenTimeMinutes(for objective: Objective) -> Double {
+        let calendar = Calendar.current
+        let days: Int = switch objective.period {
+        case .daily: 1
+        case .weekly: 7
+        case .monthly: 30
+        }
+
+        var total: TimeInterval = 0
+        for offset in 0..<days {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: Date()),
+                  let snapshot = try? appGroupStore.loadScreenTimeReportSnapshot(for: DayKey(date: day))
+            else { continue }
+
+            total += snapshot.totalActivityDuration
+        }
+
+        return total / 60
+    }
+
+    /// Today's Focus score, or nil when the day's scores have not been worked out yet.
+    ///
+    /// Read from the App Group snapshot the pipeline leaves behind -- the same photograph
+    /// the widget reads -- because the score comes out of Core Data, Screen Time and half
+    /// a dozen calculators, and recomputing it here would be a second answer to the same
+    /// question. Nil rather than zero when the snapshot is missing or belongs to another
+    /// day: a "0% focus" that only means "not measured yet" would read as a kept ceiling.
+    private func todaysFocusScore() -> Double? {
+        guard let snapshot = appGroupStore.loadDailyScores(),
+              snapshot.day == DayKey(date: Date()).id,
+              let focus = snapshot.score(PrimaryMetricKind.focus.rawValue)
+        else { return nil }
+
+        return (focus.progress * 100).rounded()
     }
 
     /// The stretch a period covers, ending now.

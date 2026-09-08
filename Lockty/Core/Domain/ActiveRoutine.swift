@@ -81,3 +81,41 @@ nonisolated struct ActiveRoutine: Codable, Hashable, Identifiable {
         allowsPauseDuringStrictMode = try container.decode(Bool.self, forKey: .allowsPauseDuringStrictMode)
     }
 }
+
+/// Which routine answers for an app, when several are holding it at once.
+///
+/// Overlapping routines are the point, and two of them can hold the same app with
+/// different break policies. Something has to decide whose friction you walk and whose
+/// break limit applies, and every screen that needed the answer was working it out for
+/// itself: some took the first to have started, one took the strictest, and they
+/// disagreed -- so the app could offer a friction that the unlock would then refuse.
+extension Collection where Element == ActiveRoutine {
+    /// The routine whose policy governs: the last to have started.
+    ///
+    /// The later routine is the more deliberate one. Taking the first meant a routine set
+    /// up weeks ago decided what the one started a minute ago would allow -- so a routine
+    /// that offers no unlocks silenced a newer one that does.
+    var governingRoutine: ActiveRoutine? {
+        self.max { $0.startedAt < $1.startedAt }
+    }
+
+    /// The strict routine among them, if there is one.
+    ///
+    /// It answers before the others because it is the strictest of them: starting a looser
+    /// routine beside a strict one must not become the way to be governed by the looser
+    /// one's policy.
+    ///
+    /// Answering is not refusing. Strict mode is the promise that a routine cannot be
+    /// *ended* early -- that is the whole of what it means -- and it says nothing about
+    /// breaks. A strict routine that was set up with a friction is meant to have it, so it
+    /// answers with its own break policy like any other.
+    var strictRoutine: ActiveRoutine? {
+        first { $0.modeSnapshot == .strict }
+    }
+
+    /// The one that answers: the strict routine if there is one, otherwise the most
+    /// recent. What it then allows is its own break policy's business.
+    var routineAnsweringForApp: ActiveRoutine? {
+        strictRoutine ?? governingRoutine
+    }
+}

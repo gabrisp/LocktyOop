@@ -64,7 +64,36 @@ nonisolated enum FrictionWordBank {
         "The recipe calls for three tomatoes, a lemon, and a pinch of salt.",
         "Every window on the second floor was opened at the same time.",
         "The ferry crosses twice an hour except on Sundays in the winter.",
-        "A wooden bench faces the pond where the ducks gather each morning."
+        "A wooden bench faces the pond where the ducks gather each morning.",
+        "The baker on the corner closes early on the first Monday of the month.",
+        "Three brown envelopes were left leaning against the letterbox.",
+        "The hallway light flickers whenever the front door is closed hard.",
+        "A jar of pickled lemons has been at the back of the shelf since spring.",
+        "The bus stops twice on the hill before it reaches the roundabout.",
+        "Someone has chalked the day of the week on the board by the door.",
+        "The greenhouse roof lost two panes in the storm last November.",
+        "A wooden ladder leans against the wall beside the apple tree.",
+        "The postman leaves the parcels under the porch when it rains.",
+        "There is a chipped blue bowl on the counter holding loose change.",
+        "The path to the beach narrows where the fence has fallen over.",
+        "A radio plays quietly in the workshop across the courtyard.",
+        "The oldest tree in the square was planted the year the school opened.",
+        "Six bicycles are chained to the railing outside the bakery.",
+        "The tide comes in fastest along the flat stretch past the rocks.",
+        "A brass key hangs on a nail behind the kitchen door.",
+        "The train timetable on the wall has been out of date for two years.",
+        "Someone painted the shutters green and left the frames white.",
+        "A stack of clay pots waits by the gate for the weekend.",
+        "The stream behind the mill runs shallow until the autumn rain.",
+        "Four crates of oranges were unloaded outside the shop this morning.",
+        "The bell in the tower rings a minute later than the station clock.",
+        "A long scratch runs down the side of the wooden table.",
+        "The washing line stretches from the porch to the corner of the shed.",
+        "Two ladders and a bucket were left at the foot of the stairs.",
+        "The corner shop sells newspapers, milk, and very little else.",
+        "A wasp got into the room through the gap above the window.",
+        "The gravel path crunches differently after a week without rain.",
+        "Someone stacked firewood against the north wall of the barn."
     ]
 
     /// A sentence of roughly the wanted length, and never the same one twice running.
@@ -89,11 +118,41 @@ nonisolated enum FrictionWordBank {
         "shield.fill", "heart.fill", "star.fill", "cloud.fill", "drop.fill", "leaf.fill"
     ]
 
-    /// A glyph and one that looks like it but is not. Chosen as neighbours in the list,
-    /// which is ordered so that adjacent entries are the hardest to tell apart.
+    /// Shapes that genuinely take a second look, written down as pairs.
+    ///
+    /// The old version took a glyph and one of the next three in the list, on the stated
+    /// assumption that the list was ordered by how alike its entries are. It is not
+    /// ordered by anything, so the puzzle regularly asked which of eleven circles was the
+    /// triangle -- which is not a puzzle, it is a formality with a delay on it. "Looks
+    /// like" is not a property one shape has on its own, so it is stated per pair.
+    static let confusablePairs: [(String, String)] = [
+        ("circle.fill", "hexagon.fill"),
+        ("hexagon.fill", "octagon.fill"),
+        ("octagon.fill", "seal.fill"),
+        ("seal.fill", "circle.fill"),
+        ("circle.fill", "octagon.fill"),
+        ("square.fill", "diamond.fill"),
+        ("diamond.fill", "rhombus.fill"),
+        ("rhombus.fill", "square.fill"),
+        ("square.fill", "capsule.fill"),
+        ("capsule.fill", "rectangle.fill"),
+        ("triangle.fill", "pentagon.fill"),
+        ("pentagon.fill", "hexagon.fill"),
+        ("heart.fill", "drop.fill"),
+        ("drop.fill", "leaf.fill"),
+        ("cloud.fill", "shield.fill"),
+        ("shield.fill", "seal.fill"),
+        ("star.fill", "seal.fill"),
+        ("star.fill", "sparkle")
+    ]
+
+    /// A shape and one that looks like it but is not, either way round.
+    ///
+    /// The order is flipped at random so the odd one is not always the rarer glyph of the
+    /// two: a puzzle whose answer is "the unusual-looking one" is answered without
+    /// counting.
     static func confusablePair() -> (common: String, odd: String) {
-        let index = Int.random(in: 0..<glyphs.count)
-        let other = (index + Int.random(in: 1...3)) % glyphs.count
-        return (glyphs[index], glyphs[other])
+        let pair = confusablePairs.randomElement() ?? ("circle.fill", "hexagon.fill")
+        return Bool.random() ? (common: pair.0, odd: pair.1) : (common: pair.1, odd: pair.0)
     }
 }

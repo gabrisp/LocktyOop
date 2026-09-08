@@ -94,6 +94,35 @@ struct ScreenTimeSelectionStore {
         return tokens
     }
 
+    /// What these scopes actually shut, with Always Allowed taken out.
+    ///
+    /// Always Allowed beats everything, and it has to beat it *here* rather than only at
+    /// the moment the shield is written. It was subtracted when the policy was applied and
+    /// nowhere else, so the phone let the app through while every screen went on calling
+    /// it blocked: it was counted among the apps a routine holds, listed on the routine's
+    /// card, drawn with a lock on it, and offered in the unlock flow as something to spend
+    /// a break on.
+    ///
+    /// Named directly, sitting in an app group, or caught by a category -- all three go
+    /// the same way. The merge has already resolved the first two into tokens, and a
+    /// category is handled where the shield is written, by the `except:` list that reads
+    /// this same set.
+    nonisolated func blockedSelection(scopes: Set<ScreenTimeSelectionScope>) -> FamilyActivitySelection {
+        var selection = mergedSelection(scopes: scopes)
+        let allowed = appGroupStore.loadAlwaysAllowedApplications()
+        guard !allowed.isEmpty else { return selection }
+
+        selection.applicationTokens = selection.applicationTokens.filter {
+            !allowed.contains(AppIdentity.ID(token: $0))
+        }
+        return selection
+    }
+
+    /// Whether this app is one nothing may hold.
+    nonisolated func isAlwaysAllowed(_ appID: AppIdentity.ID) -> Bool {
+        appGroupStore.loadAlwaysAllowedApplications().contains(appID)
+    }
+
     nonisolated func selection(for policy: ShieldPolicy) throws -> FamilyActivitySelection {
         if !policy.selectionScopes.isEmpty {
             return mergedSelection(scopes: policy.selectionScopes)

@@ -184,10 +184,15 @@ struct LocktyToastOverlay: View {
                         }
                     }
 
-                    Text(toast.message)
-                        .font(.system(.subheadline, design: .default, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.68))
-                        .lineLimit(1)
+                    // Skipped when there is none, rather than drawn empty: a toast whose
+                    // title says the whole thing has no second line, and an empty one
+                    // leaves a gap that reads as something failing to load.
+                    if !toast.message.isEmpty {
+                        Text(toast.message)
+                            .font(.system(.subheadline, design: .default, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.68))
+                            .lineLimit(1)
+                    }
 
                     if let progress = toast.progress {
                         progressBar(progress)
@@ -195,16 +200,31 @@ struct LocktyToastOverlay: View {
                     }
 
                     // Only a question has one. A report says what happened and needs no
-                    // instruction under it.
+                    // button under it.
+                    //
+                    // A button rather than a line of hint text: the whole toast has always
+                    // been tappable, but nothing on it looked like something to press, so
+                    // the one toast that is a question looked like every report that is
+                    // not. Tapping the toast still works; this is the part that says so.
                     if let actionTitle = toast.actionTitle {
-                        HStack(spacing: 4) {
-                            Text(actionTitle)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
+                        Button {
+                            guard let action = center.current?.action else { return }
+                            center.dismiss()
+                            action()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(actionTitle)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Capsule(style: .continuous).fill(toast.accent))
                         }
-                        .font(.system(.footnote, design: .default, weight: .semibold))
-                        .foregroundStyle(toast.accent)
-                        .padding(.top, 3)
+                        .buttonStyle(.plain)
+                        .padding(.top, 6)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -172,11 +172,58 @@ final class RoutineEditorViewModel: ObservableObject {
         triggers.contains { if case .schedule = $0 { return true } else { return false } }
     }
 
+    /// Whether the routine starts and ends on its own.
+    ///
+    /// Not `hasSchedule`: the editor always carries a schedule trigger so its hours can be
+    /// edited in place, weekdays picked or not. With no weekday chosen it is a manual
+    /// routine wearing an empty schedule, and nothing about it happens by itself -- which
+    /// is the only case where starting it by hand is the routine working as written.
+    var runsOnASchedule: Bool {
+        !scheduleTrigger.weekdays.isEmpty
+    }
+
+    /// Whether the routine's own hours are open right now.
+    var isInsideItsScheduleWindow: Bool {
+        scheduleTrigger.window(containing: Date()) != nil
+    }
+
+    /// Whether starting it by hand would mean anything.
+    ///
+    /// A routine with no hours of its own is only ever started by hand, so it always
+    /// offers it. One written for weekdays offers it inside its window and nowhere else:
+    /// stopped at half past ten it stays stopped -- the schedule will not bring it back
+    /// until the next occurrence -- so the hold is the only way back into an afternoon it
+    /// was written for. Outside those hours the same hold would run it at a time the
+    /// routine itself says it should not.
+    var canStartByHand: Bool {
+        !runsOnASchedule || isInsideItsScheduleWindow
+    }
+
+    /// Whether this routine can be put on hold at all.
+    ///
+    /// `allowsPauseDuringStrictMode` was written in the editor, saved on the routine and
+    /// carried into the App Group on every snapshot -- and never once consulted. A strict
+    /// routine that had been set up to refuse pauses could be held like any other.
+    ///
+    /// Asked of the routine rather than of a run, because a hold taken ten minutes before
+    /// its window opens is the same thing as one taken inside it: either way the routine
+    /// does not run. Enforcing it only while running would leave the whole of strict mode
+    /// switchable off by anyone who got there first.
+    var canPause: Bool {
+        mode != .strict || allowsPauseDuringStrictMode
+    }
+
     func refreshPauseState() {
         pausedUntil = appGroupStore.loadRulePauseState().pauseEnd(for: editingID)
     }
 
     func pause(for duration: RulePauseDuration) {
+        // Refused here as well as hidden in the view: the button is one way in, and a
+        // guard on the state change is the one that holds whatever else learns to call it.
+        guard canPause else {
+            errorMessage = "Pause is disabled for this Strict routine."
+            return
+        }
         try? appGroupStore.updateRulePauseState { state in
             state.pause(editingID, until: Date().addingTimeInterval(duration.duration))
         }
@@ -205,7 +252,7 @@ final class RoutineEditorViewModel: ObservableObject {
     func delete() async -> Bool {
         guard !isCreating else { return true }
 
-        let decision = strictModePolicy.decision(for: .deleteRoutine, activeRoutine: routineEngine.activeRoutine())
+        let decision = strictModePolicy.decision(for: .deleteRoutine, activeRoutine: runningRoutine)
         guard decision.isAllowed else {
             errorMessage = decision.reason
             return false
@@ -226,8 +273,23 @@ final class RoutineEditorViewModel: ObservableObject {
 
     var isCreating: Bool { initialRoutineID == nil }
 
+    /// The hours this routine had when the editor opened, so saving can tell whether they
+    /// are what changed. Nil while creating one.
+    private var loadedSchedule: RoutineSchedule?
+
     func activeRoutine() -> ActiveRoutine? {
         routineEngine.activeRoutine()
+    }
+
+    /// This routine, if it is one of the ones running.
+    ///
+    /// Asked for by id rather than taken from `activeRoutine()`, which answers "the one to
+    /// show where only one fits" -- the first to have started. Routines overlap on
+    /// purpose, so with two running every question this screen asks about the routine on
+    /// it was being answered about a different one: the second routine's editor showed no
+    /// finish button at all, and got one the moment the first was ended.
+    var runningRoutine: ActiveRoutine? {
+        routineEngine.activeRoutine(id: editingID)
     }
 
     /// Ends the routine this editor is showing, when it is the one running.
@@ -303,9 +365,7 @@ final class RoutineEditorViewModel: ObservableObject {
     /// Strict. Its restrictions are already applied, so a mid-run edit would leave the
     /// live shield and the stored routine describing different things.
     var editingBlockDecision: StrictModeDecision {
-        guard let initialRoutineID, let active = routineEngine.activeRoutine(),
-              active.routineID == initialRoutineID
-        else {
+        guard let initialRoutineID, let active = routineEngine.activeRoutine(id: initialRoutineID) else {
             return .allowed
         }
 
@@ -326,7 +386,7 @@ final class RoutineEditorViewModel: ObservableObject {
     /// does. Asked of the stop action itself rather than of `isEditingBlocked`, which is
     /// true for *any* running routine.
     var canStopRoutine: Bool {
-        guard let active = routineEngine.activeRoutine(), active.routineID == editingID else { return false }
+        guard let active = runningRoutine else { return false }
         return strictModePolicy.decision(for: .stopRoutine, activeRoutine: active).isAllowed
     }
 
@@ -379,6 +439,7 @@ final class RoutineEditorViewModel: ObservableObject {
         color = routine.color
         mode = routine.mode
         triggers = routine.triggers.isEmpty ? [.manual] : routine.triggers
+        loadedSchedule = scheduleTrigger
         allowsPauseDuringStrictMode = routine.allowsPauseDuringStrictMode
         tasks = routine.tasks
             .sorted { $0.order < $1.order }
@@ -637,6 +698,13 @@ final class RoutineEditorViewModel: ObservableObject {
             try selectionStore.save(selection, scope: persistedSelectionScope)
             try? selectionStore.remove(scope: draftSelectionScope)
             try await repository.save(routine)
+            // Only when the hours are what you just wrote. Saving a rename is not a
+            // statement about whether the routine should be running, and starting it here
+            // would bring back one that had been ended on purpose an hour into its own
+            // window.
+            if isCreating || loadedSchedule != scheduleTrigger {
+                await startIfInsideItsWindow(routine)
+            }
             routineEditorLogger.notice("Routine editor saved id=\(routine.id.uuidString, privacy: .public) name=\(routine.name, privacy: .public) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) groups=\(self.selectedAppGroupIDs.count) domains=\(self.blockedDomains.count)")
             print("Routine editor saved id=\(routine.id.uuidString) name=\(routine.name) tasks=\(tasks.count) apps=\(selection.applicationTokens.count) groups=\(selectedAppGroupIDs.count) domains=\(blockedDomains.count)")
             return true
@@ -645,6 +713,28 @@ final class RoutineEditorViewModel: ObservableObject {
             print("Routine editor failed saving id=\(routine.id.uuidString): \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    /// Starts the routine that was just written, when its hours are already open.
+    ///
+    /// A routine created -- or given its hours -- at ten past ten on a nine-to-five is
+    /// meant to be running now, and the DeviceActivity monitor only fires at the edges of
+    /// a window, so nothing else would start it before tomorrow's.
+    ///
+    /// Here rather than on every sync: on a timer, a routine ended on purpose at half past
+    /// ten came back by itself a few seconds later. Writing the schedule is the moment you
+    /// said what the routine should be doing; nothing else is.
+    private func startIfInsideItsWindow(_ routine: Routine) async {
+        guard !routineEngine.isRunning(routine.id) else { return }
+
+        for trigger in routine.triggers {
+            guard case .schedule(let schedule) = trigger,
+                  let window = schedule.window(containing: Date())
+            else { continue }
+
+            await routineEngine.start(routine, trigger: trigger, expectedEndAt: window.end)
+            return
         }
     }
 
@@ -843,11 +933,11 @@ struct RoutineEditorView: View {
     private var isCreating: Bool { viewModel.isCreating }
 
     private var isRoutineActive: Bool {
-        viewModel.activeRoutine()?.routineID == viewModel.editingID
+        viewModel.runningRoutine != nil
     }
 
     private var activeRoutineStartedAt: Date? {
-        isRoutineActive ? viewModel.activeRoutine()?.startedAt : nil
+        viewModel.runningRoutine?.startedAt
     }
 
     private func startRoutine() async {
@@ -2625,18 +2715,17 @@ struct RoutineEditorView: View {
                     Task {
                         let stopped = await viewModel.stopRoutine()
                         guard stopped else { return }
-
-                        withAnimation(.smooth(duration: 0.28)) {
-                            // The card on Today is a request against the routine that was
-                            // running. Ending the routine answers it.
-                            router.pendingUnlock = nil
-                        }
                         dismissEditor()
                     }
                 }
                 .padding(.top, LocktySpacing.sm)
                 .padding(.horizontal, LocktySpacing.screenInset)
-            } else if viewModel.activeRoutine() == nil {
+            } else if viewModel.activeRoutine() == nil, viewModel.canStartByHand {
+                // Gone from a scheduled routine outside its hours, where a hand start
+                // would run it at a time the routine itself says it should not. Kept
+                // inside them, where it is the only way back into a run that was ended
+                // early -- nothing else starts it again before the next occurrence.
+                //
                 // The routine's own colour, not a generic green. Every other thing on
                 // this screen is already wearing it, and the button is the one that
                 // starts the thing it belongs to.
@@ -2658,7 +2747,7 @@ struct RoutineEditorView: View {
             // inside the form. Pausing is not editing: you are not changing what the
             // routine is, you are saying not this week -- and it is the thing you reach
             // for while looking at a routine, not while filling one in.
-            if !isCreating, viewModel.hasSchedule, !isRoutineActive {
+            if !isCreating, viewModel.hasSchedule, !isRoutineActive, viewModel.canPause {
                 holdButton
                     .padding(.horizontal, LocktySpacing.screenInset)
             }

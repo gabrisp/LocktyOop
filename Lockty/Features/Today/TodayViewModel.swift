@@ -35,6 +35,22 @@ struct TodayActiveRoutineGroup: Identifiable, Equatable {
     var availability: BreakAvailability = .available
 }
 
+/// A limit that is holding its apps shut right now, and what it is holding.
+///
+/// The sibling of `TodayActiveRoutineGroup`. A limit that has run out is the same fact as
+/// a routine that is running -- something is shut and there is a reason -- and it was the
+/// only one of the two with nowhere on screen showing which apps it had taken.
+struct TodayActiveLimitGroup: Identifiable, Equatable {
+    var id: UUID { ruleID }
+    let ruleID: UUID
+    let name: String
+    /// What the rule says it is, in a line: "10 opens", "2 h a day".
+    let detail: String
+    let tokens: [ApplicationToken]
+    /// Whether this limit will open an exception, and on what terms.
+    var availability: LocktyAppLockBadge.Availability
+}
+
 /// One scheduled run coming up this week.
 struct TodayScheduledRoutine: Identifiable, Equatable {
     /// The routine plus its start, because the same routine appears once per day it runs.
@@ -361,8 +377,13 @@ final class TodayViewModel: ObservableObject {
         var groups: [TodayActiveRoutineGroup] = []
 
         for routine in routineEngine.activeRoutines.sorted(by: { $0.startedAt < $1.startedAt }) {
-            let selection = (try? selectionStore.load(scope: .routine(routine.routineID)))?
-                .applicationTokens ?? []
+            // Every scope the routine blocks through, not just its own selection: apps
+            // named by an app group are held by the routine exactly like the ones picked
+            // on it directly, and loading the routine scope alone left the card claiming
+            // a group-only routine was holding nothing.
+            let selection = selectionStore
+                .blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
+                .applicationTokens
             // Asked per routine: its own limit, its own cooldown, its own strict mode.
             let availability = await routineEngine.breakAvailability(
                 for: routine.routineID,
@@ -378,8 +399,108 @@ final class TodayViewModel: ObservableObject {
             )
         }
 
-        guard activeRoutineGroups != groups else { return }
-        activeRoutineGroups = groups
+        let deduplicated = Self.deduplicatedByStrictest(groups)
+        guard activeRoutineGroups != deduplicated else { return }
+        activeRoutineGroups = deduplicated
+    }
+
+    /// An app two routines are holding appears once, under the stricter of them.
+    ///
+    /// The apps are grouped by routine, so one that both were holding was drawn twice --
+    /// two rings, two captions, and two different answers to whether it could come out.
+    /// Whichever row you happened to tap decided which answer you got, and the row you saw
+    /// first was an accident of which routine started first.
+    ///
+    /// The strictest is the only one of the two that is true. An app is not free until
+    /// every routine holding it lets it go, so the one that will not is the one worth
+    /// showing: the other says "unlock" over an app that would stay shut.
+    ///
+    /// The rows keep their own order -- routines are listed as they started -- and only
+    /// the apps move between them.
+    private static func deduplicatedByStrictest(
+        _ groups: [TodayActiveRoutineGroup]
+    ) -> [TodayActiveRoutineGroup] {
+        // Strictest first, and ties broken by the order they are already in, so the same
+        // set of routines always resolves the same way.
+        let byStrictness = groups.enumerated().sorted { lhs, rhs in
+            let left = strictness(of: lhs.element)
+            let right = strictness(of: rhs.element)
+            return left == right ? lhs.offset < rhs.offset : left > right
+        }
+
+        var claimed = Set<AppIdentity.ID>()
+        var keptTokens: [UUID: [ApplicationToken]] = [:]
+        for entry in byStrictness {
+            var kept: [ApplicationToken] = []
+            for token in entry.element.tokens {
+                let appID = AppIdentity.ID(token: token)
+                guard !claimed.contains(appID) else { continue }
+                claimed.insert(appID)
+                kept.append(token)
+            }
+            keptTokens[entry.element.routine.routineID] = kept
+        }
+
+        return groups.map { group in
+            TodayActiveRoutineGroup(
+                routine: group.routine,
+                tokens: keptTokens[group.routine.routineID] ?? [],
+                availability: group.availability
+            )
+        }
+    }
+
+    /// Every limit shielding its apps right now, with what it is holding.
+    @Published private(set) var activeLimitGroups: [TodayActiveLimitGroup] = []
+
+    private func refreshActiveLimitGroups() async {
+        let shieldRules = appGroupStore.loadShieldRules()
+        var groups: [TodayActiveLimitGroup] = []
+
+        for rule in shieldRules.rules where rule.kind != .schedule {
+            // Only the ones actually holding something shut. A limit with most of its day
+            // left is not blocking anything, and a card of apps that are not blocked is
+            // the screen inventing a problem.
+            guard rule.isShielding(given: shieldRules.enforcement) else { continue }
+
+            let tokens = selectionStore
+                .blockedSelection(scopes: rule.selectionScopes)
+                .applicationTokens
+            guard !tokens.isEmpty else { continue }
+
+            groups.append(
+                TodayActiveLimitGroup(
+                    ruleID: rule.id,
+                    name: rule.name,
+                    detail: rule.kind.title,
+                    tokens: tokens.stablePrefix(tokens.count),
+                    // A limit opens an exception only when it was set up to. Unlike a
+                    // routine there is no cooldown to count down to here: a spent limit
+                    // that allows no break has no moment to wait for, it has a tomorrow.
+                    availability: rule.breakPolicy.isAllowed && rule.breakPolicy.maximumBreaks > 0
+                        ? .unlockable
+                        : .exhausted
+                )
+            )
+        }
+
+        guard activeLimitGroups != groups else { return }
+        activeLimitGroups = groups
+    }
+
+    /// How hard a routine is to get out of. Higher wins the app.
+    ///
+    /// Strict above everything: it is the one that cannot be talked out of at all. Then a
+    /// spent limit, which has no moment to wait for, then a cooldown, which has one.
+    private static func strictness(of group: TodayActiveRoutineGroup) -> Int {
+        guard group.routine.modeSnapshot != .strict else { return 3 }
+
+        switch group.availability {
+        case .available:
+            return 0
+        case .unavailable(let state):
+            return state.retryAt == nil ? 2 : 1
+        }
     }
 
     /// The days being loaded right now.
@@ -610,9 +731,25 @@ final class TodayViewModel: ObservableObject {
             || message.localizedCaseInsensitiveContains("not available for the requested date yet")
     }
 
+    /// Re-reads what is running, what it is holding, and what each routine will allow
+    /// next -- without re-running the whole day.
+    ///
+    /// Granting an unlock changes all three: the app that came out, the cooldown the rest
+    /// of that routine's apps now sit behind, and the break that has been spent. None of
+    /// it was recomputed when the flow closed, so the card went on showing what it had
+    /// read before the friction was walked -- green rings and no countdown -- and only
+    /// came right on the next foreground, where `handleForeground` reloads everything.
+    ///
+    /// `load(day:force:)` would also do it, and does far more: a whole Screen Time day
+    /// re-read for a change that touched none of it.
+    func refreshActiveRoutineState() async {
+        await refreshRoutineCard()
+    }
+
     private func refreshRoutineCard() async {
         await unlockAvailability()
         await refreshActiveRoutineGroups()
+        await refreshActiveLimitGroups()
 
         if let activeRoutine = routineEngine.activeRoutine() {
             routineCardState = TodayRoutineCardState(
@@ -711,8 +848,31 @@ final class TodayViewModel: ObservableObject {
     /// next thing happened to touch them.
     func resumePaused(_ id: UUID, day: Date) async {
         try? appGroupStore.updateRulePauseState { state in state.resume(id) }
+        await startIfInsideItsWindow(routineID: id)
         await pauseEngine.refreshShields()
         await load(day: day, force: true)
+    }
+
+    /// A routine let off hold inside its own hours starts again straight away.
+    ///
+    /// The hold was the only reason it was not running, so lifting it is the moment to
+    /// put it back. The monitor fires at the edges of the window and would not come round
+    /// again until the next occurrence, which is tomorrow at the earliest -- so the
+    /// schedule would have said it was running, with nothing running, for the rest of it.
+    private func startIfInsideItsWindow(routineID: UUID) async {
+        guard !routineEngine.isRunning(routineID),
+              let routine = (try? await routineRepository.routines())?
+                  .first(where: { $0.id == routineID })
+        else { return }
+
+        for trigger in routine.triggers {
+            guard case .schedule(let schedule) = trigger,
+                  let window = schedule.window(containing: Date())
+            else { continue }
+
+            await routineEngine.start(routine, trigger: trigger, expectedEndAt: window.end)
+            return
+        }
     }
 
     /// Every start a scheduled routine has between now and seven days out.

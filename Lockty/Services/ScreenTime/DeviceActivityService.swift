@@ -397,13 +397,29 @@ struct LiveDeviceActivityService: DeviceActivityServicing {
 
     /// The fingerprint of a selection and the threshold it is measured against.
     ///
-    /// Built from the encoded tokens rather than from their hash values: Swift's hashing
-    /// is seeded per process, so a hash would differ on every launch and every monitor
-    /// would look changed -- which is the bug this exists to avoid.
+    /// Each token encoded on its own and the results sorted, rather than the selection
+    /// encoded whole.
+    ///
+    /// Encoding it whole was still reading the per-process hash seed, just one step
+    /// removed: the tokens live in a `Set`, and a Set's iteration order is decided by
+    /// exactly the seeded hashing this is written to avoid. The same apps therefore
+    /// encoded to different bytes on every launch, every monitor looked changed, and
+    /// `reconcile` stopped and re-registered it -- and a DeviceActivity event's counted
+    /// usage dies with its registration. A threshold set at ten minutes is never reached
+    /// by a counter that goes back to zero every time the app is opened, which is why the
+    /// AutoFocus notices arrived late or not at all.
+    ///
+    /// Sorting the per-token encodings makes the value depend on which tokens are in the
+    /// set and on nothing else.
     private static func fingerprint(of selection: FamilyActivitySelection, plus suffix: String) -> String {
-        let data = (try? JSONEncoder().encode(selection)) ?? Data()
+        let encoder = JSONEncoder()
+        var parts: [String] = []
+        parts += selection.applicationTokens.compactMap { (try? encoder.encode($0))?.base64EncodedString() }
+        parts += selection.categoryTokens.compactMap { (try? encoder.encode($0))?.base64EncodedString() }
+        parts += selection.webDomainTokens.compactMap { (try? encoder.encode($0))?.base64EncodedString() }
+
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in data {
+        for byte in Array(parts.sorted().joined(separator: "|").utf8) {
             hash ^= UInt64(byte)
             hash = hash &* 0x100_0000_01b3
         }

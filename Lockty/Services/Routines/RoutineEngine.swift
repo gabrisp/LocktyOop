@@ -101,11 +101,15 @@ final class RoutineEngine: ObservableObject {
     /// routines block is not free until both of them agree to let it out.
     func activeRoutines(blocking appID: AppIdentity.ID) -> [ActiveRoutine] {
         let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        // Nothing holds an Always Allowed app, however it was named -- picked on the
+        // routine, sitting in one of its groups, or caught by a category it blocks.
+        guard !selectionStore.isAlwaysAllowed(appID) else { return [] }
+
         return activeRoutines.filter { routine in
             if routine.shieldPolicy.blockedApplications.contains(appID) {
                 return true
             }
-            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
             return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == appID }
         }
     }
@@ -466,14 +470,45 @@ final class RoutineEngine: ObservableObject {
                 )
             }
 
-            // A break's endedAt is only written by endBreak, which needs the app to be
-            // running when the break expires. One that ran out in the background -- the
-            // monitor extension clears it and nothing writes the end -- left a record
-            // with no endedAt at all, so `max()` was nil and the cooldown simply never
-            // applied. The break's own duration says when it was over, so an unfinished
-            // record falls back to that rather than being skipped.
-            let lastEnd = breakHistory
-                .map { $0.endedAt ?? $0.startedAt.addingTimeInterval(policy.maximumDuration) }
+            // When each break was over, in the order the answer is actually known.
+            //
+            // Its own `endedAt` first. Then, for the one still running, the end it was
+            // granted -- `activeBreak` is holding it. Only then the policy's maximum, for
+            // a record orphaned in the background, where the monitor clears the break and
+            // nothing writes an end.
+            //
+            // The maximum used to be the only fallback, and it is the wrong number for a
+            // break that is still running: it is what the policy *allows*, not what was
+            // given. A five-minute break under a fifteen-minute maximum drew its cooldown
+            // against an end ten minutes later than the real one -- and then `endBreak`
+            // wrote the true end, `retryAt` jumped backwards into the past, and the red
+            // countdown vanished mid-run without ever having finished.
+            // Asked of the routine, not of this run of it.
+            //
+            // The count above is per session -- "two breaks per run" is a sentence about
+            // a run -- but a cooldown is not. "Wait before asking for another break" is a
+            // property of the routine's policy, and it has to outlive the session that
+            // spent the last one. Read from `execution(id:)` alone it did not: that is the
+            // *session* id, freshly made every time an `ActiveRoutine` is built, so
+            // anything that started a new one -- the monitor restarting the routine, a
+            // stop and start, a schedule window rolling over -- left the record orphaned
+            // under a session nobody looks up any more, and the red countdown vanished
+            // mid-run with the wait unserved.
+            let runningBreak = activeBreak(for: activeRoutine.routineID)
+            let recent = (try? await executionRepository.executions(
+                from: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
+                to: nil
+            )) ?? []
+            let routineBreaks = recent
+                .filter { $0.routineID == activeRoutine.routineID }
+                .flatMap(\.breakHistory)
+
+            let lastEnd = (routineBreaks + breakHistory)
+                .map { record -> Date in
+                    if let endedAt = record.endedAt { return endedAt }
+                    if let runningBreak, runningBreak.id == record.id { return runningBreak.endsAt }
+                    return record.startedAt.addingTimeInterval(policy.maximumDuration)
+                }
                 .max()
 
             if let lastEnd {
@@ -520,18 +555,15 @@ final class RoutineEngine: ObservableObject {
             )
         }
 
-        for routine in blocking {
-            let availability = await breakAvailability(
-                for: routine.routineID,
-                trigger: trigger,
-                requiresFriction: requiresFriction
-            )
-            if case .unavailable = availability {
-                return availability
-            }
-        }
-
-        return .available
+        // One routine answers, not all of them. Asking every one meant the strictest
+        // answer won by accident of ordering: a routine allowing no breaks refused an
+        // unlock on behalf of a newer routine that allows them. `routineAnsweringForApp`
+        // keeps strict mode's veto and hands the rest to the most recent.
+        return await breakAvailability(
+            for: blocking.routineAnsweringForApp?.routineID,
+            trigger: trigger,
+            requiresFriction: requiresFriction
+        )
     }
 
     /// Ends the break on one routine and puts that routine's blocks back.
@@ -598,9 +630,18 @@ final class RoutineEngine: ObservableObject {
                 alwaysAllowedApplications: appGroupStore.loadAlwaysAllowedApplications()
         )
 
+        // Worked out here because here is where everything that could move it has just
+        // happened, and written down because the extensions need the answer and cannot
+        // reach the history it comes from.
+        var availabilities: [UUID: StoredBreakAvailability] = [:]
+        for routine in activeRoutines {
+            availabilities[routine.routineID] = await storedBreakAvailability(for: routine)
+        }
+
         try appGroupStore.updateRuntimeState { runtime in
             runtime.activeRoutines = activeRoutines
             runtime.activeBreaks = activeBreaks
+            runtime.breakAvailabilities = availabilities
             runtime.shieldPolicy = effectivePolicy
 
             if clearPending, activeRoutines.isEmpty {
@@ -619,6 +660,38 @@ final class RoutineEngine: ObservableObject {
             try await shieldService.remove(storedPolicy)
         } else {
             try await shieldService.apply(effectivePolicy)
+        }
+    }
+
+    /// One routine's answer, in the shape the extensions read.
+    ///
+    /// The same question `breakAvailability` answers, so the shield and the app cannot
+    /// disagree about the same routine -- and stale in one direction only: a cooldown
+    /// carries the moment it ends rather than a yes-or-no, so it expires on its own
+    /// without the app having to be there to say so.
+    private func storedBreakAvailability(for routine: ActiveRoutine) async -> StoredBreakAvailability {
+        let policy = routine.breakPolicySnapshot
+        guard policy.maximumBreaks > 0 else {
+            return StoredBreakAvailability(offersBreaks: false)
+        }
+
+        switch await breakAvailability(for: routine.routineID, trigger: .manual, requiresFriction: true) {
+        case .available:
+            let spent = (try? await executionRepository.execution(id: routine.id))?.breakHistory.count ?? 0
+            return StoredBreakAvailability(
+                offersBreaks: true,
+                remaining: policy.allowsUnlimitedBreaks ? nil : max(policy.maximumBreaks - spent, 0)
+            )
+
+        case .unavailable(let state):
+            // A cooldown says when, and nothing else: left as a count of zero it would
+            // still read as spent after the wait was over. Anything with no moment to wait
+            // for is spent, and says so.
+            return StoredBreakAvailability(
+                offersBreaks: true,
+                remaining: state.retryAt == nil ? 0 : nil,
+                retryAt: state.retryAt
+            )
         }
     }
 

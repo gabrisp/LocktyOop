@@ -72,7 +72,7 @@ nonisolated struct Objective: Codable, Hashable, Identifiable {
     /// something. It is not a block: nothing is shielded, nothing is refused. It is a
     /// thing you said you would do, kept or not kept like any other.
     nonisolated var staysUnder: Bool {
-        source == .appUsage
+        source == .appUsage || source == .screenTime || source == .focusScore
     }
 
     /// Whether this is simply done or not done.
@@ -155,6 +155,14 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
     /// Minutes in one app, from the day's own Screen Time report -- the same figure the
     /// usage screens show. A ceiling rather than a target: see `Objective.staysUnder`.
     case appUsage
+    /// Minutes on the phone altogether, from the same day snapshots as `appUsage`. The
+    /// whole of it rather than one app: "under two hours today" is a different promise
+    /// from "under thirty minutes in TikTok", and someone who keeps the second by moving
+    /// to a third app has kept nothing.
+    case screenTime
+    /// The day's Focus score, read from the snapshot the app leaves in the App Group --
+    /// the same figure the badge on Today shows, so the two cannot disagree.
+    case focusScore
 
     var id: String { rawValue }
 
@@ -166,6 +174,8 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
         case .steps: "Steps"
         case .sleep: "Sleep"
         case .appUsage: "App time"
+        case .screenTime: "Screen time"
+        case .focusScore: "Focus score"
         }
     }
 
@@ -176,6 +186,8 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
         case .steps: "Read from Health"
         case .sleep: "Hours asleep, from Health"
         case .appUsage: "Minutes in one app"
+        case .screenTime: "Minutes on the phone, all apps"
+        case .focusScore: "The score on today's badge"
         }
     }
 
@@ -193,6 +205,8 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
         case .steps: "steps"
         case .sleep: "h"
         case .appUsage: "min"
+        case .screenTime: "min"
+        case .focusScore: "%"
         }
     }
 
@@ -202,6 +216,8 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
         case .steps: 8000
         case .sleep: 8
         case .appUsage: 30
+        case .screenTime: 120
+        case .focusScore: 70
         }
     }
 
@@ -211,6 +227,8 @@ nonisolated enum ObjectiveSource: String, Codable, CaseIterable, Hashable, Ident
         case .steps: "figure.walk"
         case .sleep: "bed.double.fill"
         case .appUsage: "hourglass"
+        case .screenTime: "iphone"
+        case .focusScore: "gauge.medium"
         }
     }
 }

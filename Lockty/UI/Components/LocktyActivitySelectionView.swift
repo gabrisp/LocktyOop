@@ -21,6 +21,13 @@ struct LocktyActivitySelectionRules: Hashable {
     /// belong on this screen. They are a routine's business and nothing else's: a group
     /// is a list of apps, and a pause is one app.
     var allowsContentRestrictions: Bool = false
+    /// Whether Strict Mode is offered here.
+    ///
+    /// Separate from the switches above it. A limit is strict in the one way that means
+    /// anything for a limit -- the app it names cannot be uninstalled out from under it --
+    /// and has no business with the adult filter or the purchase block, which are a
+    /// routine's device-wide affair.
+    var allowsStrictMode: Bool = false
     /// Whether saved groups can be picked here.
     ///
     /// A limit counts something across a set of apps, and a group is a set that can grow
@@ -39,6 +46,7 @@ struct LocktyActivitySelectionRules: Hashable {
         maximumWebDomains: nil,
         allowsManualWebsites: true,
         allowsContentRestrictions: true,
+        allowsStrictMode: true,
         pickerSeedStrategy: .currentSelection
     )
     /// A limit rule: apps, and nothing else at all.
@@ -51,15 +59,21 @@ struct LocktyActivitySelectionRules: Hashable {
     ///
     /// What is left is what a limit can honestly measure: named apps, whose minutes and
     /// pickups Screen Time reports one by one.
+    ///
+    /// One app, and one only. A limit is a figure about a thing -- "ten opens", "thirty
+    /// minutes" -- and a figure shared between three apps answers none of the questions
+    /// you set it to answer: it cannot say which of them spent it, and stopping one leaves
+    /// the budget to the others. One app per limit, and a second limit for a second app.
     static let rule = LocktyActivitySelectionRules(
         allowsApplications: true,
         allowsCategories: false,
         allowsWebDomains: false,
-        maximumApplications: nil,
+        maximumApplications: 1,
         maximumCategories: 0,
         maximumWebDomains: 0,
         allowsManualWebsites: false,
         allowsContentRestrictions: false,
+        allowsStrictMode: true,
         allowsAppGroups: false,
         pickerSeedStrategy: .currentSelection
     )
@@ -271,7 +285,9 @@ struct LocktyActivitySelectionView: View {
                         // Last, both of them: everything above is a thing you pick, and
                         // these two are typed and switched. They are also the least used,
                         // and a routine is usually finished by the time it gets here.
-                        if rules.allowsContentRestrictions {
+                        // Strict on its own is enough to draw this: a limit has no
+                        // device switches but does have the one door.
+                        if rules.allowsContentRestrictions || (rules.allowsStrictMode && isStrict != nil) {
                             contentRestrictionsSection
                         }
 
@@ -535,33 +551,38 @@ struct LocktyActivitySelectionView: View {
                 .foregroundStyle(LocktyColors.primaryText)
 
             VStack(spacing: 0) {
-                restrictionRow(
-                    systemImage: "eye.slash",
-                    title: "Adult content",
-                    subtitle: "Filters adult websites while this runs.",
-                    isOn: contentRestrictions.blocksAdultWebContent
-                )
+                if rules.allowsContentRestrictions {
+                    restrictionRow(
+                        systemImage: "eye.slash",
+                        title: "Adult content",
+                        subtitle: "Filters adult websites while this runs.",
+                        isOn: contentRestrictions.blocksAdultWebContent
+                    )
 
-                restrictionDivider
+                    restrictionDivider
 
-                restrictionRow(
-                    systemImage: "creditcard",
-                    title: "Purchases",
-                    subtitle: "Blocks App Store and in-app purchases.",
-                    isOn: contentRestrictions.blocksITunesPurchases
-                )
+                    restrictionRow(
+                        systemImage: "creditcard",
+                        title: "Purchases",
+                        subtitle: "Blocks App Store and in-app purchases.",
+                        isOn: contentRestrictions.blocksITunesPurchases
+                    )
 
-                restrictionDivider
+                    restrictionDivider
 
-                restrictionRow(
-                    systemImage: "square.and.arrow.down",
-                    title: "Installing apps",
-                    subtitle: "Stops new apps being installed.",
-                    isOn: contentRestrictions.blocksAppInstallation
-                )
+                    restrictionRow(
+                        systemImage: "square.and.arrow.down",
+                        title: "Installing apps",
+                        subtitle: "Stops new apps being installed.",
+                        isOn: contentRestrictions.blocksAppInstallation
+                    )
+                }
 
                 if let isStrict {
-                    restrictionDivider
+                    // No rule above it when there is nothing above it.
+                    if rules.allowsContentRestrictions {
+                        restrictionDivider
+                    }
 
                     restrictionRow(
                         systemImage: "lock.shield",

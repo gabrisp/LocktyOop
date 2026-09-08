@@ -53,6 +53,19 @@ final class ShieldActionExtension: ShieldActionDelegate {
                 return
             }
 
+            // The button has to do what it says.
+            //
+            // The shield screen writes "Close" on this button when nothing holding the app
+            // will let it out, and "Unlock with Lockty" when something will -- but the two
+            // never asked the same question. Pressing "Close" wrote a pause request and
+            // opened Lockty into a friction that ends in a refusal, which is the worst of
+            // both: the app you asked to close stays open, and the promise strict mode is
+            // making gets tested and appears to bend.
+            guard offersUnlock(for: applicationToken) else {
+                completionHandler(.close)
+                return
+            }
+
             let context = makeUnlockRequest(for: applicationToken)
             writePendingPause(context)
 
@@ -94,6 +107,41 @@ final class ShieldActionExtension: ShieldActionDelegate {
         }
     }
 
+    /// Whether the primary button is an unlock at all, asked the way the screen asks it.
+    ///
+    /// Only about the routines. A limit answers for itself above: an exhausted one closes,
+    /// and one with passes left is spent by opening the app rather than by negotiating.
+    ///
+    /// Strict is not a refusal here either -- a strict routine set up with breaks has them
+    /// -- so the question is only ever the break policy of the routine that answers.
+    private func offersUnlock(for token: ApplicationToken) -> Bool {
+        let selectionStore = ScreenTimeSelectionStore(appGroupStore: appGroupStore)
+        let identity = AppIdentity(token: token)
+        let runtime = try? appGroupStore.loadRuntimeState()
+
+        let blocking = (runtime?.activeRoutines ?? []).filter { routine in
+            if routine.shieldPolicy.blockedApplications.contains(identity.id) {
+                return true
+            }
+            let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == identity.id }
+        }
+
+        // Nothing running holds it, so whatever put the shield up is not a routine and has
+        // not refused: the standard flow stands in, as it always has.
+        guard let governing = blocking.routineAnsweringForApp else { return true }
+
+        // The whole answer, left by the app: how many breaks are left in this run and
+        // whether a cooldown is running. Both come from the run's history, which lives in
+        // Core Data and cannot be read from here -- so without it the only question this
+        // could ask was whether the routine allows breaks at all, and a routine that
+        // allowed two and had spent both still said yes.
+        if let stored = runtime?.breakAvailabilities[governing.routineID] {
+            return stored.isAvailable()
+        }
+        return governing.breakPolicySnapshot.maximumBreaks > 0
+    }
+
     /// Builds the request from the running routine's own pause policy.
     ///
     /// Always returns one. It used to return nil when there was no active routine or the
@@ -112,10 +160,10 @@ final class ShieldActionExtension: ShieldActionDelegate {
             if routine.shieldPolicy.blockedApplications.contains(identity.id) {
                 return true
             }
-            let selection = selectionStore.mergedSelection(scopes: routine.shieldPolicy.selectionScopes)
+            let selection = selectionStore.blockedSelection(scopes: routine.shieldPolicy.selectionScopes)
             return selection.applicationTokens.contains { AppIdentity.ID(token: $0) == identity.id }
         }
-        let activeRoutine = blocking.first ?? runtime?.primaryActiveRoutine
+        let activeRoutine = blocking.routineAnsweringForApp ?? runtime?.primaryActiveRoutine
 
         var policy = activeRoutine
             .map(\.pausePolicySnapshot)

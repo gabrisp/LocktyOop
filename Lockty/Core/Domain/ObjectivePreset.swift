@@ -91,6 +91,26 @@ nonisolated struct ObjectivePreset: Identifiable, Hashable {
             detail: "Stay under, in one app"
         ),
         ObjectivePreset(
+            id: "screenTime",
+            title: "Screen time",
+            symbolName: "iphone",
+            source: .screenTime,
+            unit: "min",
+            target: 120,
+            step: 15,
+            detail: "Stay under, all apps"
+        ),
+        ObjectivePreset(
+            id: "focusScore",
+            title: "Focus score",
+            symbolName: "gauge.medium",
+            source: .focusScore,
+            unit: "%",
+            target: 70,
+            step: 5,
+            detail: "The score on today's badge"
+        ),
+        ObjectivePreset(
             id: "yesno",
             title: "Yes or no",
             symbolName: "checkmark.circle",

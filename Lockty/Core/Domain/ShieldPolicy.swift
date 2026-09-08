@@ -59,7 +59,16 @@ nonisolated struct ShieldPolicy: Codable, Hashable {
     /// the App Store has no apps and no domains, and calling that "nothing" left it never
     /// applied.
     var blocksNothing: Bool {
-        blockedApplications.isEmpty && blockedDomains.isEmpty && contentRestrictions.isEmpty && strictGuards.isEmpty
+        // The scopes count too. A routine that names what it holds by app group carries an
+        // empty `blockedApplications` -- the apps are in the group's own selection, reached
+        // through `selectionScopes` -- so a policy that shuts twenty apps read as blocking
+        // nothing, and every caller took the branch that *removes* the shield. The routine
+        // ran, the card said so, and not one app was held.
+        blockedApplications.isEmpty
+            && blockedDomains.isEmpty
+            && contentRestrictions.isEmpty
+            && strictGuards.isEmpty
+            && selectionScopes.isEmpty
     }
 
     static let empty = ShieldPolicy(

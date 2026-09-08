@@ -18,6 +18,28 @@ struct LocktyBigStepper: View {
     var format: (Int) -> String = { $0.formatted(.number.grouping(.automatic)) }
     /// The word under the number: what it is measured in.
     var caption: String?
+    /// How finely the slider behind the number goes, when the number is tapped.
+    ///
+    /// The buttons move in the steps that are sensible to think in -- five minutes, a
+    /// hundred steps -- and that is right for a button. It is wrong as a limit: somebody
+    /// who wants forty-two minutes should be able to say forty-two, and pressing plus
+    /// eight times to land on forty-five is the control deciding instead of the person.
+    ///
+    /// Nil leaves the figure a read-out. A list of glasses of water has no meaningful
+    /// in-between, and offering one would be asking for a decision that does not exist.
+    var fineStep: Int?
+
+    @State private var isShowingFineTune = false
+
+    /// The ends of the slider: the whole list, however coarsely the buttons walk it.
+    private var bounds: ClosedRange<Int>? {
+        guard let lowest = values.min(), let highest = values.max(), lowest < highest else {
+            return nil
+        }
+        return lowest...highest
+    }
+
+    private var allowsFineTune: Bool { fineStep != nil && bounds != nil }
 
     private var currentIndex: Int {
         values.firstIndex(of: value) ?? closestIndex
@@ -38,15 +60,14 @@ struct LocktyBigStepper: View {
             HStack(spacing: LocktySpacing.xl) {
                 button(systemImage: "minus", isDisabled: currentIndex <= 0) { move(by: -1) }
 
-                Text(format(value))
-                    .font(.system(size: 44, weight: .bold))
-                    .foregroundStyle(LocktyColors.primaryText)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.22), value: value)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .frame(maxWidth: .infinity)
+                if allowsFineTune {
+                    Button { isShowingFineTune = true } label: { figure }
+                        .buttonStyle(.locktyInteractive)
+                        .tappable()
+                        .locktyMenu(isPresented: $isShowingFineTune) { fineTuneMenu }
+                } else {
+                    figure
+                }
 
                 button(systemImage: "plus", isDisabled: currentIndex >= values.count - 1) { move(by: 1) }
             }
@@ -61,6 +82,65 @@ struct LocktyBigStepper: View {
         // One tick per press, and a firmer one at either end, so the limits of the list
         // are felt rather than only seen in a dimmed button.
         .sensoryFeedback(.selection, trigger: value)
+    }
+
+    private var figure: some View {
+        Text(format(value))
+            .font(.system(size: 44, weight: .bold))
+            .foregroundStyle(LocktyColors.primaryText)
+            .monospacedDigit()
+            .contentTransition(.numericText())
+            .animation(.snappy(duration: 0.22), value: value)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// The number, set by hand.
+    ///
+    /// The same figure at the top so the slider is read against what it is changing, and
+    /// the two ends written underneath so the range is a fact rather than something to
+    /// discover by dragging.
+    @ViewBuilder
+    private var fineTuneMenu: some View {
+        if let bounds, let step = fineStep {
+            VStack(alignment: .leading, spacing: LocktySpacing.md) {
+                Text(format(value))
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(LocktyColors.primaryText)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.18), value: value)
+
+                Slider(
+                    value: fineBinding(in: bounds),
+                    in: Double(bounds.lowerBound)...Double(bounds.upperBound),
+                    step: Double(max(step, 1))
+                )
+                .tint(LocktyColors.primaryText)
+
+                HStack(spacing: LocktySpacing.md) {
+                    Text(format(bounds.lowerBound))
+                    Spacer(minLength: 0)
+                    Text(format(bounds.upperBound))
+                }
+                .font(.system(.caption, design: .default, weight: .regular))
+                .foregroundStyle(LocktyColors.secondaryText)
+                .monospacedDigit()
+            }
+            .frame(width: 250)
+            .padding(LocktySpacing.lg)
+        }
+    }
+
+    /// Clamped on the way in as well as out: a value saved under an older set of options
+    /// can sit outside today's list, and a slider handed a number past its own range
+    /// snaps to an end and writes that back.
+    private func fineBinding(in bounds: ClosedRange<Int>) -> Binding<Double> {
+        Binding(
+            get: { Double(min(max(value, bounds.lowerBound), bounds.upperBound)) },
+            set: { value = min(max(Int($0.rounded()), bounds.lowerBound), bounds.upperBound) }
+        )
     }
 
     private func move(by offset: Int) {

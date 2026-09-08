@@ -312,8 +312,15 @@ final class PauseEngine: ObservableObject {
         guard remaining > 0 else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Break is over"
-        content.body = "\(allowance.context.displayName) is blocked again."
+        // The routine, not the app. A token has no `localizedDisplayName` outside the
+        // app, so the context's app name is often a placeholder -- "App is blocked again"
+        // -- while the routine's name is a real one, carried in the runtime state since
+        // the moment it started.
+        content.title = "Break finished!"
+        content.body = routineName(for: allowance.context)
+            .map { "\($0) is back running fully." }
+            ?? "Your routine is back running fully."
+
         content.sound = .default
         content.interruptionLevel = .timeSensitive
 
@@ -323,6 +330,17 @@ final class PauseEngine: ObservableObject {
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: remaining, repeats: false)
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The name of the routine this allowance was taken from.
+    private func routineName(for context: PauseContext) -> String? {
+        guard let routineID = context.activeRoutineID,
+              let routine = (try? appGroupStore.loadRuntimeState())?
+                  .activeRoutines
+                  .first(where: { $0.routineID == routineID })
+        else { return nil }
+
+        return routine.nameSnapshot
     }
 
     /// The expiry warning has nothing to warn about once the app is locked again.

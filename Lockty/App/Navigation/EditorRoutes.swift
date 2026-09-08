@@ -41,15 +41,20 @@ struct RuleEditorRoute: Hashable, Identifiable {
     let ruleID: UUID?
     let draftID: UUID
     let routineDraftID: UUID
+    /// Opens on the second question -- which sort of limit -- rather than on the first.
+    /// What "New limit" means: the kind was answered by the door you came through.
+    let startsAtLimitKind: Bool
 
     init(
         ruleID: UUID?,
         draftID: UUID = UUID(),
-        routineDraftID: UUID = UUID()
+        routineDraftID: UUID = UUID(),
+        startsAtLimitKind: Bool = false
     ) {
         self.ruleID = ruleID
         self.draftID = draftID
         self.routineDraftID = routineDraftID
+        self.startsAtLimitKind = startsAtLimitKind
     }
 
     var id: UUID { draftID }
